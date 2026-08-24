@@ -114,9 +114,9 @@ zipp==3.20.2; python_version != "3.10" and python_version != "3.11"
 
 # --- bundled cog dependencies (fork) ---
 # PyLav music stack (audio, pl*) - replaces Red-Lavalink
-Py-Lav[all] @ git+https://github.com/1Example/PyLav@develop
+Py-Lav[all] @ git+https://github.com/1Example/PyLav@11dfe92734cb869eb63782065cc9070167f741fc
 # dashboard, embedutils, splitorstealgame, tickets
-AAA3A-utils @ git+https://github.com/AAA3A-AAA3A/AAA3A_utils.git
+AAA3A-utils @ git+https://github.com/AAA3A-AAA3A/AAA3A_utils.git@a8225de11678512dffba6ed65448d8fda0560c2a
 fernet
 markdown2
 wtforms
