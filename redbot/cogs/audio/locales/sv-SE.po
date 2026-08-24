@@ -1,7 +1,8 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: red-discordbot\n"
-"POT-Creation-Date: 2023-06-14 02:57+0000\n"
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-05-07 19:17+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
 "Last-Translator: \n"
 "Language-Team: Swedish\n"
 "MIME-Version: 1.0\n"
@@ -9,72 +10,825 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: redgettext 3.4.2\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Crowdin-Project: red-discordbot\n"
-"X-Crowdin-Project-ID: 289505\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
 "X-Crowdin-Language: sv-SE\n"
-"X-Crowdin-File-ID: 51\n"
+"X-Crowdin-File: /cogs/audio/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3301\n"
 "Language: sv_SE\n"
 
-#: redbot/cogs/audio/converters.py:35
+#: audio/cog.py:35
+#, docstring
+msgid "A Media player using the PyLav library"
+msgstr "En mediaspelare med hjälp av PyLAV-biblioteket"
+
+#: audio/cog.py:49
+msgid "Play from activity"
+msgstr "Spela från aktivitet"
+
+#: audio/cog.py:52
+msgid "Play from message"
+msgstr "Spela från meddelande"
+
+#: audio/config_commands.py:40
+#, docstring
+msgid "Notifies PyLav that a Player is having issues.\n\n"
+"        If enough (50% or more of currently playing players) report issues, PyLav will automatically\n"
+"        switch to a different node or restart the current node where possible.\n"
+"        "
+msgstr "Meddelar PyLav att en spelare har problem.\n\n"
+"        Om tillräckligt många (50% eller fler av de spelare som spelar för närvarande) rapporterar problem kommer PyLav automatiskt\n"
+"        Byt till en annan nod eller starta om den aktuella noden där det är möjligt.\n"
+"        "
+
+#: audio/config_commands.py:48
+msgid "This server already voted recently. Please, try again in 10 minutes."
+msgstr "Denna server röstade redan nyligen. Försök igen om 10 minuter."
+
+#: audio/config_commands.py:59
+msgid "Thank you for your report."
+msgstr "Tack för ert betänkande."
+
+#: audio/config_commands.py:69
+#, docstring
+msgid "Removes a vote for a Player being down.\n\n"
+"        If enough (50% or more of currently active players) report issues, PyLav will automatically\n"
+"        switch to a different node or restart the current node where possible.\n\n"
+"        This command is only valid if your server previously voted for a node to be down and is now back up.\n"
+"        "
+msgstr "Tar bort en röst på att en spelare är nere.\n\n"
+"        Om tillräckligt många (50% eller mer av för närvarande aktiva spelare) rapporterar problem kommer PyLav automatiskt\n"
+"        Byt till en annan nod eller starta om den aktuella noden där det är möjligt.\n\n"
+"        Det här kommandot är bara giltigt om servern tidigare röstade för att en nod ska vara nere och nu är tillbaka.\n"
+"        "
+
+#: audio/config_commands.py:79
+msgid "There are no active votes for the current audio node."
+msgstr "Det finns inga aktiva röster för den aktuella ljudnoden."
+
+#: audio/config_commands.py:89
+msgid "I have removed your report."
+msgstr "Jag har tagit bort din rapport."
+
+#: audio/config_commands.py:97
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Visa versionen av Cog och PyLav"
+
+#: audio/config_commands.py:113
+msgid "Library / Cog"
+msgstr "Bibliotek / Kugge"
+
+#: audio/config_commands.py:114
+msgid "Version"
+msgstr "Version"
+
+#: audio/config_commands.py:128
+#, docstring
+msgid "Bot-wide settings."
+msgstr "Bot-omfattande inställningar."
+
+#: audio/config_commands.py:132
+#, docstring
+msgid "Set the maximum volume a server can set"
+msgstr "Ange den maximala volymen som servern kan ställa in"
+
+#: audio/config_commands.py:140
+msgid "You have to specify a volume less than or equal to 1,000%."
+msgstr "Du måste ange en volym som är mindre än eller lika med 1 000 %."
+
+#: audio/config_commands.py:148 audio/config_commands.py:626
+msgid "The maximum volume must be greater than 0%."
+msgstr "Den maximala volymen måste vara större än 0%."
+
+#: audio/config_commands.py:156
+msgid "The maximum volume I will allow anyone in any server is now set to {volume_variable_do_not_translate}%"
+msgstr "Den maximala volymen jag tillåter någon på vilken server som helst är nu inställd på {volume_variable_do_not_translate}%"
+
+#: audio/config_commands.py:166 audio/config_commands.py:679
+#, docstring
+msgid "Set whether I should deafen myself when playing."
+msgstr "Ställ in om jag ska döva mig själv när jag spelar."
+
+#: audio/config_commands.py:175
+msgid "From now on, I will deafen myself when joining a voice channel."
+msgstr "Från och med nu kommer jag att döva mig själv när jag går med i en röstkanal."
+
+#: audio/config_commands.py:177
+msgid "From now on, I will no longer deafen myself when joining a voice channel."
+msgstr "Från och med nu kommer jag inte längre att döva mig själv när jag går med i en röstkanal."
+
+#: audio/config_commands.py:185
+#, docstring
+msgid "Set whether the server is allowed to enable auto shuffle."
+msgstr "Ange om servern får aktivera automatisk blandning."
+
+#: audio/config_commands.py:195
+msgid "From now on, I will auto shuffle my track queue when new songs are added."
+msgstr "Från och med nu kommer jag automatiskt att blanda min spårkö när nya låtar läggs till."
+
+#: audio/config_commands.py:197
+msgid "From now on, I will no longer auto shuffle my track queue when new songs are added."
+msgstr "Från och med nu kommer jag inte längre att automatiskt blanda min spårkö när nya låtar läggs till."
+
+#: audio/config_commands.py:205 audio/config_commands.py:747
+#, docstring
+msgid "Set whether I should allow users to shuffle the queue"
+msgstr "Ange om jag ska tillåta användare att blanda kön"
+
+#: audio/config_commands.py:215
+msgid "From now on, I will allow users to shuffle the queue."
+msgstr "Från och med nu kommer jag att tillåta användare att blanda kön."
+
+#: audio/config_commands.py:217
+msgid "From now on, I will no longer allow users to shuffle the queue."
+msgstr "Från och med nu kommer jag inte längre att tillåta användare att blanda kön."
+
+#: audio/config_commands.py:225
+#, docstring
+msgid "Set whether I should automatically play songs when the queue is empty."
+msgstr "Ställ in om jag automatiskt ska spela upp låtar när kön är tom."
+
+#: audio/config_commands.py:234
+msgid "From now on, I will automatically play songs from the specified playlist when the queue is empty."
+msgstr "Från och med nu spelar jag automatiskt låtar från den angivna spellistan när kön är tom."
+
+#: audio/config_commands.py:238
+msgid "From now on, I will no longer automatically play songs from the specified playlist when the queue is empty."
+msgstr "Från och med nu kommer jag inte längre automatiskt att spela låtar från den angivna spellistan när kön är tom."
+
+#: audio/config_commands.py:248
+#, docstring
+msgid "Set whether I should disconnect from the voice channel."
+msgstr "Ställ in om jag ska koppla från röstkanalen."
+
+#: audio/config_commands.py:258
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when the queue is empty.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: Whether I should disconnect from the voice channel when the queue is empty.\n"
+"            - `<duration>`: How long after the queue is empty should the player be disconnected? The default is 60 seconds.\n"
+"            Accepts second, minutes, hours, days and weeks (if no unit is specified, the duration is assumed to be given in seconds)\n"
+"        "
+msgstr "Ställ in om jag ska koppla från röstkanalen när kön är tom.\n\n"
+"        Argument:\n"
+"            - `<toggle>': Om jag ska koppla från röstkanalen när kön är tom.\n"
+"            - `<duration>': Hur lång tid efter att kön är tom ska spelaren kopplas bort? Standardvärdet är 60 sekunder.\n"
+"            Accepterar andra, minuter, timmar, dagar och veckor (om ingen enhet anges antas varaktigheten anges i sekunder)\n"
+"        "
+
+#: audio/config_commands.py:278 audio/config_commands.py:869
+msgid "I will disconnect from the voice channel when the queue is empty after {time_to_dc_variable_do_not_translate}."
+msgstr "Jag kopplar från röstkanalen när kön är tom efter {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:282 audio/config_commands.py:873
+msgid "I will disconnect from the voice channel when the queue is empty after 60 seconds."
+msgstr "Jag kopplar från röstkanalen när kön är tom efter 60 sekunder."
+
+#: audio/config_commands.py:284 audio/config_commands.py:875
+msgid "I will no longer disconnect from the voice channel when the queue is empty."
+msgstr "Jag kommer inte längre att koppla från röstkanalen när kön är tom."
+
+#: audio/config_commands.py:301
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when alone.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: Whether I should disconnect from the voice channel when I detect that I am alone in a voice channel.\n"
+"            - `<duration>`: How longer after detecting should the player be disconnected? The default is 60 seconds.\n"
+"            Accepts second, minutes, hours, days and weeks.\n"
+"            If no unit is specified, the duration is assumed to be given in seconds.\n"
+"        "
+msgstr "Ställ in om jag ska koppla från röstkanalen när jag är ensam.\n\n"
+"        Argument:\n"
+"            - `<toggle>': Om jag ska koppla från röstkanalen när jag upptäcker att jag är ensam i en röstkanal.\n"
+"            - `<duration>': Hur lång tid efter upptäckt ska spelaren kopplas bort? Standardvärdet är 60 sekunder.\n"
+"            Accepterar andra, minuter, timmar, dagar och veckor.\n"
+"            Om ingen enhet anges antas varaktigheten anges i sekunder.\n"
+"        "
+
+#: audio/config_commands.py:322 audio/config_commands.py:939
+msgid "I will disconnect from the voice channel when alone after {time_to_dc_variable_do_not_translate}."
+msgstr "Jag kommer att koppla från röstkanalen när jag är ensam efter {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:326 audio/config_commands.py:943
+msgid "I will disconnect from the voice channel when alone after 60 seconds."
+msgstr "Jag kommer att koppla bort från röstkanalen när jag är ensam efter 60 sekunder."
+
+#: audio/config_commands.py:328 audio/config_commands.py:945
+msgid "I will no longer disconnect from the voice channel when alone."
+msgstr "Jag kommer inte längre att koppla bort från röstkanalen när jag är ensam."
+
+#: audio/config_commands.py:342
+#, docstring
+msgid "Server-specific settings."
+msgstr "Serverspecifika inställningar."
+
+#: audio/config_commands.py:346
+#, docstring
+msgid "Add, remove or show the disc jockey roles and users for this server."
+msgstr "Lägg till, ta bort eller visa discjockeyroller och användare för den här servern."
+
+#: audio/config_commands.py:352
+#, docstring
+msgid "Add disc jockey roles or users to this server."
+msgstr "Lägg till discjockeyroller eller användare på den här servern."
+
+#: audio/config_commands.py:365 audio/config_commands.py:388
+msgid "I have added {role_list_variable_do_not_translate} to the disc jockey roles."
+msgstr "Jag har lagt till {role_list_variable_do_not_translate} till discjockeyrollerna."
+
+#: audio/config_commands.py:370 audio/config_commands.py:394
+msgid "I have added {user_list_variable_do_not_translate} to the disc jockey users."
+msgstr "Jag har lagt till {user_list_variable_do_not_translate} till discjockeyanvändarna."
+
+#: audio/config_commands.py:379
+msgid "I have added {role_list_variable_do_not_translate} to the disc jockey roles and {user_list_variable_do_not_translate} to the disc jockey users."
+msgstr "Jag har lagt till {role_list_variable_do_not_translate} till discjockeyrollerna och {user_list_variable_do_not_translate} till discjockeyanvändarna."
+
+#: audio/config_commands.py:411
+#, docstring
+msgid "Remove disc jockey roles or users in this server."
+msgstr "Ta bort discjockeyroller eller användare på den här servern."
+
+#: audio/config_commands.py:443
+msgid "I have removed {role_list_variable_do_not_translate} from the disc jockey roles and {user_list_variable_do_not_translate} from the disc jockey users, as well as {number_list_variable_do_not_translate} from the disc jockey roles and users."
+msgstr "Jag har tagit bort {role_list_variable_do_not_translate} från discjockeyrollerna och {user_list_variable_do_not_translate} från discjockeyanvändarna, samt {number_list_variable_do_not_translate} från discjockeyrollerna och användarna."
+
+#: audio/config_commands.py:451
+msgid "I have removed {role_list_variable_do_not_translate} from the disc jockey roles and {user_list_variable_do_not_translate} from the disc jockey users."
+msgstr "Jag har tagit bort {role_list_variable_do_not_translate} från discjockeyrollerna och {user_list_variable_do_not_translate} från discjockeyanvändarna."
+
+#: audio/config_commands.py:459
+msgid "I have removed {role_list_variable_do_not_translate} from the disc jockey roles."
+msgstr "Jag har tagit bort {role_list_variable_do_not_translate} från discjockeyrollerna."
+
+#: audio/config_commands.py:465
+msgid "I have removed {user_list_variable_do_not_translate} from the disc jockey users."
+msgstr "Jag har tagit bort {user_list_variable_do_not_translate} från discjockeyanvändarna."
+
+#: audio/config_commands.py:471
+msgid "I have removed {user_or_role_id_list_variable_do_not_translate} from the disc jockey roles and users."
+msgstr "Jag har tagit bort {user_or_role_id_list_variable_do_not_translate} från discjockeyrollerna och användarna."
+
+#: audio/config_commands.py:486
+msgid "I have Removed `{user_or_role_id_variable_do_not_translate}` from the disc jockey roles and users."
+msgstr "Jag har tagit bort '{user_or_role_id_variable_do_not_translate}' från discjockeyrollerna och användarna."
+
+#: audio/config_commands.py:490
+msgid "I have removed {role_name_variable_do_not_translate} from the disc jockey roles."
+msgstr "Jag har tagit bort {role_name_variable_do_not_translate} från discjockeyrollerna."
+
+#: audio/config_commands.py:495
+msgid "I have removed {user_name_variable_do_not_translate} from the disc jockey users."
+msgstr "Jag har tagit bort {user_name_variable_do_not_translate} från discjockeyanvändarna."
+
+#: audio/config_commands.py:503
+#, docstring
+msgid "List the disc jockey roles and users for this server."
+msgstr "Lista skivjockeyrollerna och användarna för den här servern."
+
+#: audio/config_commands.py:554
+msgid "There are no disc jockey roles or disc jockey users set in this server."
+msgstr "Det finns inga discjockeyroller eller discjockeyanvändare på den här servern."
+
+#: audio/config_commands.py:565 audio/config_commands.py:570
+msgid "Disc Jockey Roles"
+msgstr "Disc Jockey Roller"
+
+#: audio/config_commands.py:576 audio/config_commands.py:581
+msgid "Disc Jockey Users"
+msgstr "Disc Jockey-användare"
+
+#: audio/config_commands.py:589
+#, docstring
+msgid "Clear the disc jockey roles and users for this server."
+msgstr "Rensa skivjockeyrollerna och användarna för den här servern."
+
+#: audio/config_commands.py:601
+msgid "I have removed all disc jockey roles and users from this server."
+msgstr "Jag har tagit bort alla discjockeyroller och användare från den här servern."
+
+#: audio/config_commands.py:609
+#, docstring
+msgid "Set the maximum volume a user can set."
+msgstr "Ställ in den maximala volymen som en användare kan ställa in."
+
+#: audio/config_commands.py:618
+msgid "The maximum volume must be less than 1,000%."
+msgstr "Den maximala volymen måste vara mindre än 1 000%."
+
+#: audio/config_commands.py:635
+msgid "My owner has told me that server-specific volume must be between 0% and {volume_variable_do_not_translate}%."
+msgstr "Min ägare har sagt till mig att serverspecifik volym måste vara mellan 0% och {volume_variable_do_not_translate}%."
+
+#: audio/config_commands.py:655
+msgid "The maximum volume must be between 0% and {volume_variable_do_not_translate}%."
+msgstr "Den maximala volymen måste vara mellan 0% och {volume_variable_do_not_translate}%."
+
+#: audio/config_commands.py:669
+msgid "The maximum volume users can set in this server is now {volume_variable_do_not_translate}%."
+msgstr "Den maximala volymen som användare kan ställa in på den här servern är nu {volume_variable_do_not_translate}%."
+
+#: audio/config_commands.py:688
+msgid "My owner has requested that I always deafen myself when joining a voice channel."
+msgstr "Min ägare har begärt att jag alltid ska döva mig själv när jag går med i en röstkanal."
+
+#: audio/config_commands.py:705
+msgid "I will deafen myself when joining voice channels on this server."
+msgstr "Jag kommer att döva mig själv när jag går med i röstkanaler på den här servern."
+
+#: audio/config_commands.py:707
+msgid "I will no longer deafen myself when joining voice channels on this server."
+msgstr "Jag kommer inte längre att döva mig själv när jag går med i röstkanaler på den här servern."
+
+#: audio/config_commands.py:715
+#, docstring
+msgid "Set whether I should shuffle the queue after adding every new song."
+msgstr "Ställ in om jag ska blanda kön efter att ha lagt till varje ny låt."
+
+#: audio/config_commands.py:723
+msgid "My owner has turned off the auto shuffle capability for all servers."
+msgstr "Min ägare har stängt av funktionen för automatisk blandning för alla servrar."
+
+#: audio/config_commands.py:737
+msgid "Auto shuffle turned on for this server."
+msgstr "Automatisk blandning aktiverad för den här servern."
+
+#: audio/config_commands.py:739
+msgid "Auto shuffle turned off for this server."
+msgstr "Automatisk blandning inaktiverad för den här servern."
+
+#: audio/config_commands.py:757
+msgid "My owner has turned off the shuffle capability for all servers."
+msgstr "Min ägare har stängt av blandningsfunktionen för alla servrar."
+
+#: audio/config_commands.py:770
+msgid "Shuffling turned on for this server."
+msgstr "Blandning är aktiverat för den här servern."
+
+#: audio/config_commands.py:772
+msgid "Shuffling turned off for this server."
+msgstr "Blandning inaktiverad för den här servern."
+
+#: audio/config_commands.py:780
+#, docstring
+msgid "Set whether the bot should automatically play songs when the queue is empty."
+msgstr "Ange om roboten automatiskt ska spela upp låtar när kön är tom."
+
+#: audio/config_commands.py:789
+msgid "My owner has turned off the autoplay capability for all servers."
+msgstr "Min ägare har stängt av autoplay-funktionen för alla servrar."
+
+#: audio/config_commands.py:806
+msgid "From now on, I will automatically play songs when the queue is empty."
+msgstr "Från och med nu spelar jag automatiskt låtar när kön är tom."
+
+#: audio/config_commands.py:808
+msgid "From now on, I will no longer automatically play songs when the queue is empty."
+msgstr "Från och med nu kommer jag inte längre automatiskt att spela låtar när kön är tom."
+
+#: audio/config_commands.py:816
+#, docstring
+msgid "Set whether the bot should disconnect from the voice channel"
+msgstr "Ställ in om botten ska koppla från röstkanalen"
+
+#: audio/config_commands.py:826
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when the queue is empty.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: I should disconnect from the voice channel when the queue is empty.\n"
+"            - `<duration>`: How long after the queue is empty should I disconnect?\n"
+"            The Default is 60 seconds.\n"
+"            Accept seconds, minutes, hours, days, and weeks.\n"
+"            If no unit is specified, the duration is assumed to be seconds.\n"
+"        "
+msgstr "Ställ in om jag ska koppla från röstkanalen när kön är tom.\n\n"
+"        Argument:\n"
+"            - `<toggle>': Jag ska koppla från röstkanalen när kön är tom.\n"
+"            - `<duration>': Hur länge efter att kön är tom ska jag koppla från?\n"
+"            Standardvärdet är 60 sekunder.\n"
+"            Acceptera sekunder, minuter, timmar, dagar och veckor.\n"
+"            Om ingen enhet anges antas varaktigheten vara sekunder.\n"
+"        "
+
+#: audio/config_commands.py:844
+msgid "My owner has told me to disconnect from the voice channel when the queue is empty after {time_to_dc_variable_do_not_translate}."
+msgstr "Min ägare har sagt till mig att koppla från röstkanalen när kön är tom efter {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:893
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when alone.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: I should disconnect from the voice channel when it detects that it is\n"
+"            alone.\n"
+"            - `<duration>`: How longer after detecting should I disconnect?\n"
+"            The Default is 60 seconds.\n"
+"            Accept seconds, minutes, hours, days, and weeks.\n"
+"            If no unit is specified, the duration is assumed to be seconds.\n"
+"        "
+msgstr "Ställ in om jag ska koppla från röstkanalen när jag är ensam.\n\n"
+"        Argument:\n"
+"            - `<toggle>': Jag bör koppla från röstkanalen när den upptäcker att den är\n"
+"            ensam.\n"
+"            - `<duration>': Hur lång tid efter upptäckt ska jag koppla bort?\n"
+"            Standardvärdet är 60 sekunder.\n"
+"            Acceptera sekunder, minuter, timmar, dagar och veckor.\n"
+"            Om ingen enhet anges antas varaktigheten vara sekunder.\n"
+"        "
+
+#: audio/config_commands.py:913
+msgid "My owner has told me to disconnect from the voice channel when alone after {time_to_dc_variable_do_not_translate}."
+msgstr "Min ägare har sagt till mig att koppla från röstkanalen när jag är ensam efter {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:957
+#, docstring
+msgid "Specify a playlist to be used for autoplay."
+msgstr "Ange en spellista som ska användas för automatisk uppspelning."
+
+#: audio/config_commands.py:974
+msgid "From now on, I will use {playlist_name_variable_do_not_translate} to select songs for autoplay."
+msgstr "Från och med nu kommer jag att använda {playlist_name_variable_do_not_translate} för att välja låtar för autoplay."
+
+#: audio/config_commands.py:984
+#, docstring
+msgid "Restrict which channels where I can be used."
+msgstr "Begränsa vilka kanaler där jag kan användas."
+
+#: audio/config_commands.py:990
+#, docstring
+msgid "Restrict me only to accept PyLav commands executed from the specified channel."
+msgstr "Begränsa mig till att bara acceptera PyLav-kommandon som körs från den angivna kanalen."
+
+#: audio/config_commands.py:1005
+msgid "I do not have permission to send messages or send embed links or read messages in {channel_name_variable_do_not_translate}."
+msgstr "Jag har inte behörighet att skicka meddelanden eller skicka inbäddningslänkar eller läsa meddelanden i {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1022
+msgid "I will only accept PyLav commands executed from {channel_name_variable_do_not_translate}."
+msgstr "Jag accepterar bara PyLav-kommandon som körs från {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1032
+msgid "I will accept PyLav commands executed in all channels I can see in the server."
+msgstr "Jag accepterar PyLav-kommandon som körs i alla kanaler jag kan se på servern."
+
+#: audio/config_commands.py:1040
+#, docstring
+msgid "Restrict me only to join the specified voice channel."
+msgstr "Begränsa mig bara för att gå med i den angivna röstkanalen."
+
+#: audio/config_commands.py:1052 audio/hybrid_commands.py:107
+#: audio/player_commands.py:158
+msgid "I do not have permission to connect or speak in {channel_name_variable_do_not_translate}."
+msgstr "Jag har inte behörighet att ansluta eller tala i {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1070
+msgid "I will only be allowed to join {channel_name_variable_do_not_translate}."
+msgstr "Jag får bara vara med {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1080
+msgid "I am allowed to join any voice channel in the server."
+msgstr "Jag får gå med i vilken röstkanal som helst på servern."
+
+#: audio/context_menus.py:27 audio/context_menus.py:138
+msgid "I can not play songs in direct messages. Sorry, try again on a server."
+msgstr "Jag kan inte spela låtar i direktmeddelanden. Försök tyvärr igen på en server."
+
+#: audio/context_menus.py:38
+msgid "You need to be a disc jockey in this server to play tracks in this server."
+msgstr "Du måste vara en discjockey på den här servern för att spela spår på den här servern."
+
+#: audio/context_menus.py:55 audio/context_menus.py:164
+msgid "This command is unavailable in this channel. Please use {channel_name_variable_do_not_translate} instead."
+msgstr "Det här kommandot är inte tillgängligt i den här kanalen. Använd gärna {channel_name_variable_do_not_translate} istället."
+
+#: audio/context_menus.py:84
+msgid "I could not find any suitable matches in this message."
+msgstr "Jag kunde inte hitta några lämpliga matchningar i det här meddelandet."
+
+#: audio/context_menus.py:86
+msgid "I found many suitable matches in this message."
+msgstr "Jag hittade många lämpliga matchningar i det här meddelandet."
+
+#: audio/context_menus.py:88
+msgid "I found a single suitable match in this message."
+msgstr "Jag hittade en enda lämplig matchning i det här meddelandet."
+
+#: audio/context_menus.py:149
+msgid "You need to be a disc jockey to play tracks in this server."
+msgstr "Du måste vara en discjockey för att spela spår på den här servern."
+
+#: audio/context_menus.py:183
+msgid "I could not find any supported activity in the activities {user_name_variable_do_not_translate} is partaking."
+msgstr "Jag kunde inte hitta någon stödaktivitet i aktiviteterna {user_name_variable_do_not_translate} är partaking."
+
+#: audio/context_menus.py:215
+msgid "I could not find a valid Apple Music track in the activity {user_name_variable_do_not_translate} is partaking in."
+msgstr "Jag kunde inte hitta ett giltigt Apple Music-spår i aktiviteten {user_name_variable_do_not_translate} deltar i."
+
+#: audio/context_menus.py:231
+msgid "I could not find any tracks matching {query_variable_do_not_translate}."
+msgstr "Jag kunde inte hitta några spår som matchade {query_variable_do_not_translate}."
+
+#: audio/context_menus.py:248
+msgid "I could not figure out what {user_name_variable_do_not_translate} is listening to."
+msgstr "Jag kunde inte ta reda på vad {user_name_variable_do_not_translate} lyssnar på."
+
+#: audio/hybrid_commands.py:82
+msgid "You need to give me a query to enqueue."
+msgstr "Du måste ge mig en fråga för att enqueue."
+
+#: audio/hybrid_commands.py:96
+msgid "You must be in a voice channel, so I can connect to it."
+msgstr "Du måste vara i en röstkanal så att jag kan ansluta till den."
+
+#: audio/hybrid_commands.py:147
+msgid "{track_name_variable_do_not_translate} enqueued."
+msgstr "{track_name_variable_do_not_translate} köad."
+
+#: audio/hybrid_commands.py:152 audio/player_commands.py:228
+msgid "No tracks were found for your query."
+msgstr "Inga spår hittades för din fråga."
+
+#: audio/hybrid_commands.py:154
+msgid "{number_of_tracks_variable_do_not_translate} tracks enqueued."
+msgstr "{number_of_tracks_variable_do_not_translate} spår i kö."
+
+#: audio/hybrid_commands.py:218
+msgid "You need to be in a voice channel if you do not specify which channel I should connect to."
+msgstr "Du måste vara i en röstkanal om du inte anger vilken kanal jag ska ansluta till."
+
+#: audio/hybrid_commands.py:230
+msgid "I do not have permission to connect to {channel_name_variable_do_not_translate}."
+msgstr "Jag har inte behörighet att ansluta till {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:234
+msgid "I do not have permission to speak in {channel_name_variable_do_not_translate}."
+msgstr "Jag har inte tillåtelse att tala i {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:252
+msgid "You do not have permission to connect to {channel_name_variable_do_not_translate}."
+msgstr "Du har inte behörighet att ansluta till {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:269
+msgid "I have been told only to join {channel_name_variable_do_not_translate} on this server."
+msgstr "Jag har blivit tillsagd att bara gå med {channel_name_variable_do_not_translate} på den här servern."
+
+#: audio/hybrid_commands.py:279
+msgid "I have successfully connected to {channel_name_variable_do_not_translate}."
+msgstr "Jag har anslutit till {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:305 audio/hybrid_commands.py:330
+#: audio/hybrid_commands.py:366 audio/hybrid_commands.py:397
+#: audio/hybrid_commands.py:430 audio/hybrid_commands.py:457
+#: audio/hybrid_commands.py:509 audio/hybrid_commands.py:548
+#: audio/hybrid_commands.py:586 audio/hybrid_commands.py:644
+#: audio/hybrid_commands.py:696 audio/hybrid_commands.py:705
+#: audio/hybrid_commands.py:847
+msgid "I am not currently playing anything on this server."
+msgstr "Jag spelar för närvarande ingenting på den här servern."
+
+#: audio/hybrid_commands.py:338
+msgid "I have skipped {track_name_variable_do_not_translate} as requested."
+msgstr "Jag har hoppat över {track_name_variable_do_not_translate} enligt begäran."
+
+#: audio/hybrid_commands.py:374
+msgid "I have stopped the playback and cleared the queue as requested."
+msgstr "Jag har stoppat uppspelningen och rensat kön enligt begäran."
+
+#: audio/hybrid_commands.py:406
+msgid "I have disconnected from {channel_name_variable_do_not_translate} as requested."
+msgstr "Jag har kopplat bort från {channel_name_variable_do_not_translate} enligt begäran."
+
+#: audio/hybrid_commands.py:465
+msgid "The server queue is currently empty."
+msgstr "Serverkön är för närvarande tom."
+
+#: audio/hybrid_commands.py:473
+msgid "You are not allowed to shuffle the queue."
+msgstr "Du får inte blanda kön."
+
+#: audio/hybrid_commands.py:481
+msgid "{queue_size_variable_do_not_translate} tracks shuffled."
+msgstr "{queue_size_variable_do_not_translate} spår blandade."
+
+#: audio/hybrid_commands.py:517
+msgid "From now on, I will now repeat the entire queue."
+msgstr "Från och med nu kommer jag nu att upprepa hela kön."
+
+#: audio/hybrid_commands.py:520
+msgid "From now on, I will no longer repeat any tracks."
+msgstr "Från och med nu kommer jag inte längre att upprepa några spår."
+
+#: audio/hybrid_commands.py:524
+msgid "From now on, I will now repeat {track_name_variable_do_not_translate}."
+msgstr "Från och med nu kommer jag nu att upprepa {track_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:530
+msgid "From now on, I will now repeat the current track."
+msgstr "Från och med nu kommer jag nu att upprepa det aktuella spåret."
+
+#: audio/hybrid_commands.py:554
+msgid "The player is already paused, did you mean to run {command_name_variable_do_not_translate}."
+msgstr "Spelaren är redan pausad, menade du att springa {command_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:568
+msgid "I have now paused the player as requested."
+msgstr "Jag har nu pausat spelaren enligt önskemål."
+
+#: audio/hybrid_commands.py:592
+msgid "The player already resumed, did you mean to run {command_name_variable_do_not_translate}."
+msgstr "Spelaren har redan återupptagits, menade du att springa {command_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:606
+msgid "I have now resumed the player as requested."
+msgstr "Jag har nu återupptagit spelaren enligt önskemål."
+
+#: audio/hybrid_commands.py:628
+msgid "I can not set the volume above 1,000%."
+msgstr "Jag kan inte ställa in volymen över 1 000%."
+
+#: audio/hybrid_commands.py:636
+msgid "I can not set the volume lower than 0%"
+msgstr "Jag kan inte ställa in volymen lägre än 0%"
+
+#: audio/hybrid_commands.py:653
+msgid "I have been told to restrict the maximum volume to {max_volume_variable_do_not_translate}%."
+msgstr "Jag har blivit tillsagd att begränsa den maximala volymen till {max_volume_variable_do_not_translate}%."
+
+#: audio/hybrid_commands.py:664
+msgid "I have set the player volume to {volume_variable_do_not_translate}%."
+msgstr "Jag har ställt in spelarvolymen på {volume_variable_do_not_translate}%."
+
+#: audio/hybrid_commands.py:715 audio/hybrid_commands.py:724
+#: audio/hybrid_commands.py:737 audio/hybrid_commands.py:758
+#: audio/hybrid_commands.py:768 audio/hybrid_commands.py:778
+msgid "Unable to seek track"
+msgstr "Det går inte att söka spår"
+
+#: audio/hybrid_commands.py:716
+msgid "I can not seek this track as the server reports it is a live stream."
+msgstr "Jag kan inte söka detta spår eftersom servern rapporterar att det är en livestream."
+
+#: audio/hybrid_commands.py:725
+msgid "I can not seek this track as the server report that this track does not support seeking."
+msgstr "Jag kan inte söka detta spår eftersom servern rapporterar att det här spåret inte stöder sökning."
+
+#: audio/hybrid_commands.py:738
+msgid "I can not seek the current track while the player is paused."
+msgstr "Jag kan inte söka det aktuella spåret medan spelaren är pausad."
+
+#: audio/hybrid_commands.py:759
+msgid "I can not seek the current track to an invalid percentage."
+msgstr ""
+
+#: audio/hybrid_commands.py:769
+msgid "I can not seek the current track past 100%."
+msgstr ""
+
+#: audio/hybrid_commands.py:779
+msgid "I can not seek the current track before 0%."
+msgstr ""
+
+#: audio/hybrid_commands.py:799
+msgid "I have moved the current track forward {number_of_seconds_variable_do_not_translate} seconds to the end of the track."
+msgstr "Jag har flyttat fram nuvarande spår {number_of_seconds_variable_do_not_translate} sekunder till slutet av spåret."
+
+#: audio/hybrid_commands.py:803
+msgid "I have moved the current track forward {number_of_seconds} seconds to position {timestamp_variable_do_not_translate}."
+msgstr "Jag har flyttat fram nuvarande spår {number_of_seconds} sekunder till position {timestamp_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:808
+msgid "I have moved the current track back {number_of_seconds_variable_do_not_translate} seconds to the beginning."
+msgstr "Jag har flyttat tillbaka det aktuella spåret {number_of_seconds_variable_do_not_translate} sekunder till början."
+
+#: audio/hybrid_commands.py:812
+msgid "I have moved the current track back {number_of_seconds} seconds to position {timestamp_variable_do_not_translate}."
+msgstr "Jag har flyttat tillbaka det aktuella spåret {number_of_seconds} sekunder till position {timestamp_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:818
+msgid "I have moved the current track to the beginning."
+msgstr "Jag har flyttat det nuvarande spåret till början."
+
+#: audio/hybrid_commands.py:856
+msgid "The history of tracks is currently empty."
+msgstr "Spårens historia är för närvarande tom."
+
+#: audio/hybrid_commands.py:864
+msgid "Playing previous track: {track_name_variable_do_not_translate}."
+msgstr "Spelar föregående spår: {track_name_variable_do_not_translate}."
+
+#: audio/player_commands.py:31
+msgid "Plays the specified track from the queue."
+msgstr "Spelar upp det angivna spåret från kön."
+
+#: audio/player_commands.py:51
+msgid "There are no songs in the queue."
+msgstr "Det finns inga låtar i kön."
+
+#: audio/player_commands.py:60
+msgid "Track index must be between 1 and {size_of_queue_variable_do_not_translate}"
+msgstr "Spårindex måste vara mellan 1 och {size_of_queue_variable_do_not_translate}"
+
+#: audio/player_commands.py:78
+msgid "There are no tracks in position {queue_position_variable_do_not_translate}."
+msgstr "Det finns inga spår på plats {queue_position_variable_do_not_translate}."
+
+#: audio/player_commands.py:90
+msgid "{track_name_variable_do_not_translate} will play after {current_track_name_variable_do_not_translate} finishes ({estimated_time_variable_do_not_translate})."
+msgstr "{track_name_variable_do_not_translate} kommer att spela efter {current_track_name_variable_do_not_translate} avslutar ({estimated_time_variable_do_not_translate})."
+
+#: audio/player_commands.py:113
+msgid "{track_name_variable_do_not_translate} will start now\n"
+"{current_track_name_variable_do_not_translate} has been skipped."
+msgstr "{track_name_variable_do_not_translate} börjar nu\n"
+"{current_track_name_variable_do_not_translate} har hoppats över."
+
+#: audio/player_commands.py:135
+#, docstring
+msgid "Enqueue a track at the top of the queue."
+msgstr "Ställ in ett spår högst upp i kön."
+
+#: audio/player_commands.py:148
+msgid "You must be in a voice channel to allow me to connect"
+msgstr "Du måste vara i en röstkanal för att jag ska kunna ansluta"
+
+#: audio/player_commands.py:207
+msgid "{number_of_tracks_variable_do_not_translate} tracks have been enqueued."
+msgstr "{number_of_tracks_variable_do_not_translate} spår har varit inringade."
+
+#: audio/player_commands.py:217
+msgid "{track_name_variable_do_not_translate} has been enqueued."
+msgstr "{track_name_variable_do_not_translate} har blivit indragen."
+
+#: audio/player_commands.py:238
+#, docstring
 msgid "\n"
-"Scope must be a valid version of one of the following:\n"
-"​ ​ ​ ​ Global\n"
-"​ ​ ​ ​ Guild\n"
-"​ ​ ​ ​ User\n"
+"        Remove the specified track from the queue.\n\n"
+"        If you specify the `remove_duplicates` argument, all tracks that are the same as your URL or the index track will be removed.\n"
+"        "
 msgstr "\n"
-"Tillämpningsområdet måste vara en giltig version av något av följande:\n"
-"​ ​ ​ ​ Global\n"
-"​ ​ ​ ​ Guild\n"
-"​ ​ ​ ​ User\n"
+"        Ta bort det angivna spåret från kön.\n\n"
+"        Om du anger argumentet `remove_duplicates` alla spår som är samma som din URL eller index spår kommer att tas bort.\n"
+"        "
 
-#: redbot/cogs/audio/converters.py:43
-msgid "\n"
-"Author must be a valid version of one of the following:\n"
-"​ ​ ​ ​ User ID\n"
-"​ ​ ​ ​ User Mention\n"
-"​ ​ ​ ​ User Name#123\n"
-msgstr ""
+#: audio/player_commands.py:253
+msgid "Queue is empty."
+msgstr "Kön är tom."
 
-#: redbot/cogs/audio/converters.py:51
-msgid "\n"
-"Guild must be a valid version of one of the following:\n"
-"​ ​ ​ ​ Guild ID\n"
-"​ ​ ​ ​ Exact guild name\n"
-msgstr ""
+#: audio/player_commands.py:266
+msgid "Track index must be between 1 and {queue_size_variable_do_not_translate}."
+msgstr "Spårindex måste vara mellan 1 och {queue_size_variable_do_not_translate}."
 
-#: redbot/cogs/audio/converters.py:87
-msgid "\"{arg}\" was not found. It must be the ID or complete name of a server which the bot can see."
-msgstr "\"{arg}\" hittades inte. Det måste vara ett ID eller ett komplett namn på en server som roboten kan se."
+#: audio/player_commands.py:281
+msgid "There is no track in position {position_variable_do_not_translate}."
+msgstr "Det finns inget spår på plats {position_variable_do_not_translate}."
 
-#: redbot/cogs/audio/converters.py:96 redbot/cogs/audio/converters.py:138
-msgid "\"{arg}\" does not refer to a unique server. Please use the ID for the server you're trying to specify."
-msgstr "\"{arg}\" refererar inte till en unik server. Använd ID för servern du försöker specificera."
+#: audio/player_commands.py:311
+msgid "{track_name_variable_do_not_translate} not found in queue."
+msgstr "{track_name_variable_do_not_translate} Hittades inte i kö."
 
-#: redbot/cogs/audio/converters.py:129
-msgid "\"{arg}\" was not found. It must be the ID or name or mention a user which the bot can see."
-msgstr "\"{arg}\" hittades inte. Det måste vara ID eller namn eller nämna en användare som roboten kan se."
+#: audio/player_commands.py:323
+msgid "No tracks were removed from the queue."
+msgstr "Inga spår togs bort från kön."
 
-#: redbot/cogs/audio/converters.py:178
-msgid "Could not match '{}' to a playlist."
-msgstr "Kunde inte matcha '{}' till en spellista."
+#: audio/player_commands.py:331
+msgid "I have removed a single entry of {track_name_variable_do_not_translate} from the queue."
+msgstr "Jag har tagit bort en enda post i {track_name_variable_do_not_translate} från kön."
 
-#: redbot/cogs/audio/converters.py:242 redbot/cogs/audio/converters.py:264
-#: redbot/cogs/audio/converters.py:284 redbot/cogs/audio/converters.py:368
-#: redbot/cogs/audio/converters.py:380 redbot/cogs/audio/converters.py:405
-#: redbot/cogs/audio/converters.py:431 redbot/cogs/audio/converters.py:453
-#: redbot/cogs/audio/converters.py:480
-msgid "Nothing"
-msgstr "Ingenting"
+#: audio/player_commands.py:341
+msgid "I have removed {number_of_entries_variable_do_not_translate} entries of {track_name_variable_do_not_translate} from the queue."
+msgstr "Jag har tagit bort {number_of_entries_variable_do_not_translate} poster i {track_name_variable_do_not_translate} från kön."
 
-#: redbot/cogs/audio/converters.py:262
-msgid "You cannot use `--guild`"
-msgstr "Du kan inte använda `--guild`"
+#: audio/slash_commands.py:48
+#, docstring
+msgid "Search for a track then play the selected response."
+msgstr "Sök efter ett spår och spela sedan upp det valda svaret."
 
-#: redbot/cogs/audio/converters.py:402
-msgid "You cannot use `--to-server`"
-msgstr "Du kan inte använda `--to-server`"
+#: audio/slash_commands.py:54
+msgid "You have not selected something to play."
+msgstr "Du har inte valt något att spela."
 
-#: redbot/cogs/audio/converters.py:428
-msgid "You cannot use `--from-server`"
-msgstr "Du kan inte använda `--from-server`"
+#: audio/slash_commands.py:111
+msgid "Searching {service_name_variable_do_not_translate}"
+msgstr "Söka {service_name_variable_do_not_translate}"
+
+#: audio/slash_commands.py:129 audio/slash_commands.py:142
+msgid "No results found on {service_name_variable_do_not_translate}"
+msgstr "Inga resultat hittades på {service_name_variable_do_not_translate}"
+
+#: audio/utility_commands.py:32
+msgid "I am not connected to a voice channel."
+msgstr "Jag är inte ansluten till en röstkanal."
+
+#: audio/utility_commands.py:43
+msgid "Volume limit reached, player volume set to {volume_variable_do_not_translate}%"
+msgstr "Volymgränsen har nåtts, spelarvolymen är inställd på {volume_variable_do_not_translate}%"
+
+#: audio/utility_commands.py:54
+msgid "Minimum volume reached, player volume set to 0%"
+msgstr "Minsta volym nått, spelarvolym inställd på 0%"
+
+#: audio/utility_commands.py:62
+msgid "Player volume set to {volume_variable_do_not_translate}%"
+msgstr "Spelarvolym inställd på {volume_variable_do_not_translate}%"
 

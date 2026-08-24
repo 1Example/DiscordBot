@@ -1,0 +1,188 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 10:26\n"
+"Last-Translator: \n"
+"Language-Team: Hungarian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: hu\n"
+"X-Crowdin-File: /cogs/plnodes/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3321\n"
+"Language: hu_HU\n"
+
+#: plnodes/cog.py:32
+#, docstring
+msgid "Manage the nodes used by PyLav"
+msgstr "A PyLav által használt csomópontok kezelése"
+
+#: plnodes/cog.py:43
+#, docstring
+msgid "Configure PyLav Nodes"
+msgstr "PyLav-csomópontok konfigurálása"
+
+#: plnodes/cog.py:47
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "A Cog és a PyLav verziójának megjelenítése"
+
+#: plnodes/cog.py:63
+msgid "Library / Cog"
+msgstr "Könyvtár / Fogaskerekű"
+
+#: plnodes/cog.py:64
+msgid "Version"
+msgstr "Verzió"
+
+#: plnodes/cog.py:77
+#, docstring
+msgid "Add a node to PyLav"
+msgstr "Csomópont hozzáadása a PyLavhoz"
+
+#: plnodes/cog.py:87
+msgid "Let us add a node to PyLav!"
+msgstr "Adjunk hozzá egy csomópontot a PyLav-hoz!"
+
+#: plnodes/cog.py:88
+msgid "(**1**){space_variable_do_not_translate} - Apply changes and add the node to PyLav.\n"
+"(**2**){space_variable_do_not_translate} - Cancel any changes made and close the menu.\n"
+"(**3**){space_variable_do_not_translate} - Toggle between search-only and search and playback modes.\n"
+"(**4**){space_variable_do_not_translate} - Toggle between SSL on and off.\n"
+"(**5**){space_variable_do_not_translate} - Add a name to the node.\n"
+"(**6**){space_variable_do_not_translate} - Add the host address of the node.\n"
+"(**7**){space_variable_do_not_translate} - Add the port the node uses.\n"
+"(**8**){space_variable_do_not_translate} - Set the password for the node.\n"
+"(**9**){space_variable_do_not_translate} - Set the connection timeout.\n"
+"(**10**) - Select which sources to disable for this node (Multiple can be selected).\n"
+"If you interact with a button multiple times, only the last interaction will take effect.\n\n\n"
+msgstr "(**1**){space_variable_do_not_translate} - Alkalmazza a módosításokat, és adja hozzá a csomópontot a PyLavhoz.\n"
+"(**2**){space_variable_do_not_translate} - Törölje az elvégzett módosításokat és zárja be a menüt.\n"
+"(**3**){space_variable_do_not_translate} - Váltás a csak keresési és a keresési és lejátszási módok között.\n"
+"(**4**){space_variable_do_not_translate} - Váltás az SSL be- és kikapcsolása között.\n"
+"(**5**){space_variable_do_not_translate} - Adjon nevet a csomópontnak.\n"
+"(**6**){space_variable_do_not_translate} - Adja hozzá a csomópont állomáscímét.\n"
+"(**7**){space_variable_do_not_translate} - Adja hozzá a csomópont által használt portot.\n"
+"(**8**){space_variable_do_not_translate} - Állítsa be a csomópont jelszavát.\n"
+"(**9**){space_variable_do_not_translate} - Állítsa be a kapcsolat időtúllépését.\n"
+"(**10**) – Válassza ki, hogy mely forrásokat szeretné letiltani ehhez a csomóponthoz (Több is kiválasztható).\n"
+"Ha többször is interakcióba lép egy gombbal, csak az utolsó interakció lép érvénybe.\n\n\n"
+
+#: plnodes/cog.py:134
+msgid "I have added the {name_variable_do_not_translate} node with the following settings:\n"
+"Host: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Password: {password_variable_do_not_translate}\n"
+"Resume Timeout: {resume_timeout_variable_do_not_translate}\n"
+"Search Only: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Disabled Sources: {disabled_sources_variable_do_not_translate}\n"
+msgstr "Hozzáadtam a {name_variable_do_not_translate} csomópont a következő beállításokkal:\n"
+"Házigazda: {host_variable_do_not_translate}\n"
+"Kikötő: {port_variable_do_not_translate}\n"
+"Jelszó: {password_variable_do_not_translate}\n"
+"Folytatás időtúllépése: {resume_timeout_variable_do_not_translate}\n"
+"Csak keresés: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Letiltott források: {disabled_sources_variable_do_not_translate}\n"
+
+#: plnodes/cog.py:165 plnodes/cog.py:172
+msgid "I am unable to add this node"
+msgstr "Nem tudom hozzáadni ezt a csomópontot"
+
+#: plnodes/cog.py:178
+#, docstring
+msgid "Remove a node from a PyLav instance"
+msgstr "Csomópont eltávolítása PyLav-példányból"
+
+#: plnodes/cog.py:190
+msgid "{name_variable_do_not_translate} is managed by PyLav and cannot be removed."
+msgstr "{name_variable_do_not_translate} a PyLav kezeli, és nem távolítható el."
+
+#: plnodes/cog.py:207
+msgid "I have removed the {name_variable_do_not_translate} node.\n\n"
+"{data_variable_do_not_translate}"
+msgstr "Eltávolítottam a {name_variable_do_not_translate} csomópont.\n\n"
+"{data_variable_do_not_translate}"
+
+#: plnodes/cog.py:220
+msgid "I have removed the {name_variable_do_not_translate} node. A direct message was sent to you with the node details in case you wish to re-add it."
+msgstr "Eltávolítottam a {name_variable_do_not_translate} csomópont. Közvetlen üzenetet küldtünk Önnek a csomópont részleteivel arra az esetre, ha újra hozzá szeretné adni."
+
+#: plnodes/cog.py:230
+#, docstring
+msgid "Manage all nodes in a PyLav instance"
+msgstr "PyLav-példány összes csomópontjának kezelése"
+
+#: plnodes/cog.py:242
+msgid "Let us manage some nodes!"
+msgstr "Kezeljünk néhány csomópontot!"
+
+#: plnodes/cog.py:243
+msgid "(**1**){space_variable_do_not_translate} - Cancel any changes made and close the menu.\n"
+"(**6**){space_variable_do_not_translate} - Show sources enabled for this node.\n"
+"(**7**){space_variable_do_not_translate} - Apply changes and add the node to PyLav.\n"
+"(**8**){space_variable_do_not_translate} - Toggle between search-only and search and playback modes.\n"
+"(**9**){space_variable_do_not_translate} - Toggle between SSL on and off.\n"
+"(**10**) - Add a name to the node.\n"
+"(**11**) - Add the host address of the node.\n"
+"(**12**) - Add the port the node uses.\n"
+"(**13**) - Set the password for the node.\n"
+"(**14**) - Set the connection timeout.\n"
+"(**15**) - Remove this node.\n"
+"(**16**) - Select which sources to disable for this node (Multiple can be selected).\n"
+"If you interact with a button multiple times, only the last interaction will take effect.\n\n\n"
+msgstr "(**1**){space_variable_do_not_translate} - Törölje az elvégzett módosításokat és zárja be a menüt.\n"
+"(**6**){space_variable_do_not_translate} - A csomóponthoz engedélyezett források megjelenítése.\n"
+"(**7**){space_variable_do_not_translate} - Alkalmazza a módosításokat, és adja hozzá a csomópontot a PyLavhoz.\n"
+"(**8**){space_variable_do_not_translate} - Váltás a csak keresési és a keresési és lejátszási módok között.\n"
+"(**9**){space_variable_do_not_translate} - Váltás az SSL be- és kikapcsolása között.\n"
+"(**10**) – Adjon nevet a csomópontnak.\n"
+"(**11**) – Adja hozzá a csomópont állomáscímét.\n"
+"(**12**) – Adja hozzá a csomópont által használt portot.\n"
+"(**13**) – Állítsa be a csomópont jelszavát.\n"
+"(**14**) – Állítsa be a kapcsolat időtúllépését.\n"
+"(**15**) – Távolítsa el ezt a csomópontot.\n"
+"(**16**) – Válassza ki, hogy mely forrásokat szeretné letiltani ehhez a csomóponthoz (több is kiválasztható).\n"
+"Ha többször is interakcióba lép egy gombbal, csak az utolsó interakció lép érvénybe.\n\n\n"
+
+#: plnodes/cog.py:272
+msgid "{name_variable_do_not_translate} is managed by PyLav, and I can not modify it."
+msgstr "{name_variable_do_not_translate} a PyLav kezeli, és nem tudom módosítani."
+
+#: plnodes/cog.py:284
+msgid "I have removed the {name_variable_do_not_translate} node."
+msgstr "Eltávolítottam a {name_variable_do_not_translate} csomópont."
+
+#: plnodes/cog.py:322
+msgid "I have changed the {name_variable_do_not_translate} node to the following settings:\n"
+"Host: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Password: {password_variable_do_not_translate}\n"
+"Resume Timeout: {resume_timeout_variable_do_not_translate}\n"
+"Search Only: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Disabled Sources: {disabled_sources_variable_do_not_translate}\n"
+msgstr "Megváltoztattam a {name_variable_do_not_translate} csomópontot a következő beállításokhoz:\n"
+"Házigazda: {host_variable_do_not_translate}\n"
+"Kikötő: {port_variable_do_not_translate}\n"
+"Jelszó: {password_variable_do_not_translate}\n"
+"Folytatás időtúllépése: {resume_timeout_variable_do_not_translate}\n"
+"Csak keresés: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Letiltott források: {disabled_sources_variable_do_not_translate}\n"
+
+#: plnodes/cog.py:349
+#, docstring
+msgid "List all nodes used by PyLav"
+msgstr "A PyLav által használt összes csomópont felsorolása"
+
+#: plnodes/cog.py:359
+msgid "No nodes were added to PyLav."
+msgstr "A PyLavhoz nem adtak hozzá csomópontokat."
+

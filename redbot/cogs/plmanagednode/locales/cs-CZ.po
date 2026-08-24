@@ -1,0 +1,541 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 10:26\n"
+"Last-Translator: \n"
+"Language-Team: Czech\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=4; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 3;\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: cs\n"
+"X-Crowdin-File: /cogs/plmanagednode/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3323\n"
+"Language: cs_CZ\n"
+
+#: plmanagednode/cog.py:34 plmanagednode/cog.py:46
+#, docstring
+msgid "Configure the managed Lavalink node used by PyLav"
+msgstr "Nastavit spravovaný Lavalink uzel používaný PyLav"
+
+#: plmanagednode/cog.py:50
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Zobrazit verzi Cog a PyLav"
+
+#: plmanagednode/cog.py:66
+msgid "Library / Cog"
+msgstr "Knihovna / Cog"
+
+#: plmanagednode/cog.py:67
+msgid "Version"
+msgstr "Verze"
+
+#: plmanagednode/cog.py:80
+#, docstring
+msgid "Update the managed Lavalink node"
+msgstr "Aktualizovat spravovaný Lavalink uzel"
+
+#: plmanagednode/cog.py:92
+msgid "The managed Lavalink node is already up to date."
+msgstr "Zřízený uzel Lavalink je již aktuální."
+
+#: plmanagednode/cog.py:101
+msgid "Your node is out of date, to update please run `{command_name_variable_do_not_translate}`."
+msgstr "Váš uzel je zastaralý, pro aktualizaci prosím spusťte '{command_name_variable_do_not_translate}`."
+
+#: plmanagednode/cog.py:118
+msgid "The managed Lavalink node has been updated to version {version_variable_do_not_translate}."
+msgstr "Spravovaný uzel Lavalink byl aktualizován na verzi {version_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:130
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Zapněte/vypněte spravovaný uzel.\n\n"
+"        Změny se projeví po restartování.\n"
+"        "
+
+#: plmanagednode/cog.py:145
+msgid "The PyLav managed node has been enabled."
+msgstr "Spravovaný uzel PyLav byl povolen."
+
+#: plmanagednode/cog.py:153
+msgid "The PyLav managed node has been disabled."
+msgstr "Uzel spravovaný PyLav byl zakázán."
+
+#: plmanagednode/cog.py:161
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Zapněte/vypněte automatické aktualizace spravovaného uzlu.\n\n"
+"        Změny se projeví po restartování.\n"
+"        "
+
+#: plmanagednode/cog.py:177
+msgid "The PyLav managed node auto updates have been enabled."
+msgstr "Automatické aktualizace spravovaného uzlu PyLav byly povoleny."
+
+#: plmanagednode/cog.py:185
+msgid "The  PyLav managed node auto updates have been disabled."
+msgstr "Automatické aktualizace spravovaného uzlu PyLav byly zakázány."
+
+#: plmanagednode/cog.py:193
+#, docstring
+msgid "Set the managed Lavalink node maximum heap-size.\n\n"
+"        By default, this value is 2G of available RAM in the host machine represented by (65-1023M|1+G) (256M,\n"
+"        256G for example)\n\n"
+"        This value only represents the maximum amount of RAM allowed to be used at any given point, and does not mean\n"
+"        that the managed Lavalink node will always use this amount of RAM.\n"
+"        "
+msgstr "Nastavte maximální velikost spravovaného uzlu Lavalinku.\n\n"
+"        Ve výchozím nastavení tato hodnota je 2G dostupné RAM v hostitelském zařízení reprezentovaném (65-1023M|1+G) (256M,\n"
+"        256G například)\n\n"
+"        Tato hodnota představuje pouze maximální povolený počet RAM v daném bodě, a neznamená\n"
+"        , že spravovaný uzel Lavalink bude vždy používat toto množství RAM.\n"
+"        "
+
+#: plmanagednode/cog.py:217
+msgid "Heap-size must be a valid measure of size, e.g. 256M, 256G"
+msgstr "Velikost hlavy musí být platná stupnice velikosti, např. 256M, 256G"
+
+#: plmanagednode/cog.py:227
+msgid "Heap-size must be at least 64M, however it is recommended to have it set to at least 1G"
+msgstr "Velikost hlavy musí být alespoň 64M, doporučuje se však nastavit na nejméně 1G"
+
+#: plmanagednode/cog.py:239
+msgid "Heap-size must be less than your system RAM, You currently have {ram_in_bytes_variable_do_not_translate} of RAM available"
+msgstr "Velikost haldy musí být menší než vaše systémová paměť RAM, kterou v současné době máte {ram_in_bytes_variable_do_not_translate} dostupné paměti RAM"
+
+#: plmanagednode/cog.py:251
+msgid "Heap-size must be less than {limit_variable_do_not_translate} due to your system limitations"
+msgstr "Velikost haldy musí být menší než {limit_variable_do_not_translate} z důvodu omezení systému"
+
+#: plmanagednode/cog.py:271
+msgid "The Managed node heap-size set to {bytes_variable_do_not_translate}."
+msgstr "Velikost haldy spravovaného uzlu je nastavena na {bytes_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:281
+#, docstring
+msgid "Change the managed node start up configs"
+msgstr "Změnit konfiguraci startu spravovaného uzlu"
+
+#: plmanagednode/cog.py:285
+#, docstring
+msgid "Set the managed node host"
+msgstr "Nastavení spravovaného hostitele uzlu"
+
+#: plmanagednode/cog.py:297
+msgid "The Managed node host set to {host_variable_do_not_translate}."
+msgstr "Hostitel spravovaného uzlu nastavený na {host_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:307
+#, docstring
+msgid "`Dangerous command` Set the managed Lavalink node connection port.\n\n"
+"        This port is the port the managed Lavalink node binds to, you should only change this if there is a\n"
+"        conflict with the default port because you already have an application using port 2154 on this device.\n\n"
+"        The value by default is `2154`.\n"
+"        "
+msgstr "\"Nebezpečný příkaz\" Nastavte port připojení spravovaného uzlu Lavalink.\n\n"
+"        Tento port je port, na který se váže spravovaný uzel Lavalink, měli byste jej změnit pouze v případě, že existuje\n"
+"        Konflikt s výchozím portem, protože již máte aplikaci používající port 2154 na tomto zařízení.\n\n"
+"        Výchozí hodnota je \"2154\".\n"
+"        "
+
+#: plmanagednode/cog.py:317
+msgid "The port must be between 1024 and 49151"
+msgstr "Přístav musí být mezi 1024 a 49151"
+
+#: plmanagednode/cog.py:329
+msgid "The managed node port set to {port_variable_do_not_translate}."
+msgstr "Port spravovaného uzlu nastavený na {port_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:339
+#, docstring
+msgid "Change the managed node plugins"
+msgstr "Změnit spravované pluginy Node"
+
+#: plmanagednode/cog.py:345
+#, docstring
+msgid "Disabled one of the available plugins"
+msgstr "Vypnuto jeden z dostupných pluginů"
+
+#: plmanagednode/cog.py:361 plmanagednode/cog.py:472
+msgid "The plugin must be one of the following: {plugins_variable_do_not_translate}"
+msgstr "Zásuvný modul musí být jedním z následujících: {plugins_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:446
+msgid "Managed node plugin {plugin_variable_do_not_translate} disabled."
+msgstr "Modul plug-in spravovaného uzlu {plugin_variable_do_not_translate} invalidní."
+
+#: plmanagednode/cog.py:456
+#, docstring
+msgid "Enable one of the available plugins"
+msgstr "Povolit jeden z dostupných pluginů"
+
+#: plmanagednode/cog.py:505
+msgid "Managed node plugin {plugin_variable_do_not_translate} enabled."
+msgstr "Modul plug-in spravovaného uzlu {plugin_variable_do_not_translate} zpřístupněný."
+
+#: plmanagednode/cog.py:515
+#, docstring
+msgid "Update the managed node plugins"
+msgstr "Aktualizovat spravované pluginy Node"
+
+#: plmanagednode/cog.py:589
+msgid "{name_variable_do_not_translate} was updated from {old_variable_do_not_translate} to {new_variable_do_not_translate}\n"
+msgstr "{name_variable_do_not_translate} byl aktualizován z {old_variable_do_not_translate} k {new_variable_do_not_translate}\n"
+
+#: plmanagednode/cog.py:599
+msgid "Managed node plugins updated.\n\n"
+"{update_variable_do_not_translate}"
+msgstr "Byly aktualizovány moduly plug-in spravovaných uzlů.\n\n"
+"{update_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:609
+msgid "The managed node plugins are already up to date."
+msgstr "Moduly plug-in spravovaných uzlů jsou již aktuální."
+
+#: plmanagednode/cog.py:617
+#, docstring
+msgid "Toggle the managed node sources"
+msgstr "Přepnout spravované zdroje uzlu"
+
+#: plmanagednode/cog.py:632
+msgid "Invalid source, {valid_list_variable_do_not_translate} are valid sources"
+msgstr "Neplatný zdroj, {valid_list_variable_do_not_translate} jsou platnými zdroji"
+
+#: plmanagednode/cog.py:648 plmanagednode/cog.py:687
+msgid "enabled"
+msgstr "zpřístupněný"
+
+#: plmanagednode/cog.py:648 plmanagednode/cog.py:687
+msgid "disabled"
+msgstr "invalidní"
+
+#: plmanagednode/cog.py:651
+msgid "Managed node {source_variable_do_not_translate} source set to {state_variable_do_not_translate}."
+msgstr "Spravovaný uzel {source_variable_do_not_translate} Zdroj nastaven na {state_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:664
+#, docstring
+msgid "Toggle the managed node filters"
+msgstr "Přepnout spravované filtry uzlů"
+
+#: plmanagednode/cog.py:676
+msgid "Invalid source, {valid_list_variable_do_not_translate} are valid filters"
+msgstr "Neplatný zdroj, {valid_list_variable_do_not_translate} jsou platné filtry"
+
+#: plmanagednode/cog.py:690
+msgid "Managed node {source_variable_do_not_translate} filter set to {state_variable_do_not_translate}."
+msgstr "Spravovaný uzel {source_variable_do_not_translate} Filtr nastaven na {state_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:703
+#, docstring
+msgid "Configure multiple settings for the managed node.\n\n"
+"        Run `[p]plmanaged settings server <setting> info` to show info about the settings and what they do.\n\n"
+"        **Setting names**:\n"
+"        `bufferDurationMs` : Integer i.e 400 (Default 400) - Set to 0 to disable JDA-NAS\n"
+"        `frameBufferDurationMs` : Integer i.e 1000 (Default 1000)\n"
+"        `trackStuckThresholdMs` : Integer i.e 1000 (Default 1000)\n"
+"        `youtubePlaylistLoadLimit` : Integer i.e 1000 (Default 1000)\n"
+"        `opusEncodingQuality` : Integer i.e 10 (Default 10)\n"
+"        `resamplingQuality` : String i.e LOW (Default HIGH)\n"
+"        `useSeekGhosting` : Boolean i.e True (Default True)\n"
+"        `playerUpdateInterval` : Integer i.e 30 (Default 30)\n"
+"        `youtubeSearchEnabled` : Boolean i.e True (Default True)\n"
+"        `soundcloudSearchEnabled` : Boolean i.e True (Default True)\n"
+"        "
+msgstr "Nakonfigurujte více nastavení pro spravovaný uzel.\n\n"
+"        Spustit '[p]Server spravovaných nastavení <setting> info' zobrazíte informace o nastavení a o tom, co dělají.\n\n"
+"        **Názvy nastavení**:\n"
+"        'bufferDurationMs' : Celé číslo tj. 400 (výchozí hodnota 400) – Nastavením na hodnotu 0 zakážete JDA-NAS\n"
+"        'frameBufferDurationMs' : celé číslo, tj. 1000 (výchozí hodnota 1000)\n"
+"        'trackStuckThresholdMs' : celé číslo, tj. 1000 (výchozí hodnota 1000)\n"
+"        'youtubePlaylistLoadLimit' : Celé číslo, tj. 1000 (výchozí hodnota 1000)\n"
+"        'opusEncodingQuality' : celé číslo tj. 10 (výchozí hodnota 10)\n"
+"        'resamplingQuality' : řetězec, tj. LOW (výchozí hodnota VYSOKÁ)\n"
+"        'useSeekGhosting' : Boolean tj. True (výchozí hodnota true)\n"
+"        'playerUpdateInterval' : celé číslo, tj. 30 (výchozí hodnota 30)\n"
+"        'youtubeSearchEnabled' : Boolean, tj. True (výchozí hodnota true)\n"
+"        'soundcloudSearchEnabled' : Boolean tj. True (výchozí hodnota true)\n"
+"        "
+
+#: plmanagednode/cog.py:743
+msgid "{Setting_variable_do_not_translate} is not a valid Setting; Options are:\n\n"
+"{setting_list_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} není platné nastavení; Možnosti jsou:\n\n"
+"{setting_list_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:757
+msgid "The duration of the NAS buffer in milliseconds. Higher values fare better against longer GC pauses but will increase RAM usage. Minimum of 40ms, lower values may introduce pauses and stutters. Set to 0 to disable JDA-NAS. Accepted values: Range: 0 - 2,000"
+msgstr "Doba trvání NAS vyrovnávací paměti v milisekundách. Vyšší hodnoty jsou lepší oproti delším blokům GC, ale zvýší využití RAM. Minimálně 40 ms, nižší hodnoty mohou zavádět pozastavení a seřaďování. Nastavte 0 pro vypnutí JDA-NAS. Přijaté hodnoty: Rozsah: 0 - 2000"
+
+#: plmanagednode/cog.py:763
+msgid "How many milliseconds of audio to keep buffered, Higher values increase RAM usage. Accepted values: Range: 1,000 - 10,000"
+msgstr "Kolik milisekund zvuku, aby byl zachován vyrovnávací paměť, vyšší hodnoty zvýší využití RAM. Přijaté hodnoty: rozsah: 1000 - 10 000"
+
+#: plmanagednode/cog.py:767
+msgid "The threshold in milliseconds for how long a track can be stuck. A track is stuck if does not return any audio data. Accepted values: Range: 5,000 - 20,000"
+msgstr "Prahová hodnota v milisekundách, jak dlouho lze uvíznout stopu. Trasa je uvězněna, pokud nevrací žádná zvuková data. Přijaté hodnoty: rozsah: 5,000 - 20,000"
+
+#: plmanagednode/cog.py:771
+msgid "Number of pages to return for a YouTube Playlist - Each page contains 100 songs. Accepted values: Range: 5 - 100"
+msgstr "Počet stránek pro návrat na YouTube Playlist - Každá stránka obsahuje 100 skladeb. Přijaté hodnoty: rozsah: 5 - 100"
+
+#: plmanagednode/cog.py:775
+msgid "Opus encoder quality. Valid values range from 0 to 10, where 10 is the best quality but is the most expensive on the CPU."
+msgstr "Kvalita kodéru Opus. Platné hodnoty se pohybují od 0 do 10, kde 10 je nejlepší kvalita, ale je nejdražší na CPU."
+
+#: plmanagednode/cog.py:779
+msgid "Quality of resampling operations. Valid values are LOW, MEDIUM and HIGH, where HIGH uses the most CPU."
+msgstr "Kvalita převzorkování. Platné hodnoty jsou LOW, MEDIUM a HIGH, kde HIGH využívá nejvíce CPU."
+
+#: plmanagednode/cog.py:783
+msgid "Seek ghosting is the effect where whilst a seek is in progress, the audio buffer is read from until empty, or until seek is ready. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "Vyhledej ghosting je efekt, kde probíhá vyhledávání, zvukový vyrovnávací paměť je přečtena do prázdné, nebo dokud není připraven vyhledat. Přijaté hodnoty pro True`, `t`, `1`, Přijaté hodnoty pro False: `False`, `f`, `0`"
+
+#: plmanagednode/cog.py:788
+msgid "How frequently in seconds to send player updates to clients, affects the current position accuracy. Accepted values: Range: 1 - 86400"
+msgstr "Jak často v sekundách zasílání aktualizací hráčů klientům, ovlivňuje aktuální přesnost polohy. Přijaté hodnoty: rozsah: 1 - 86400"
+
+#: plmanagednode/cog.py:792
+msgid "Enable or disable YouTube searches within the node, this will affect AppleMusic, Spotify and any functionality dependent on YouTube. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "Povolte nebo zakažte vyhledávání YouTube v uzlu, ovlivní to AppleMusic, Spotify a všechny funkce závislé na YouTube. Přijímané hodnoty pro True: 'True', 't', '1', Accepted values for False', 'False', 'f', '0'"
+
+#: plmanagednode/cog.py:797
+msgid "Enable or disable SoundCloud searches within the node, this will affect any functionality dependent on SoundCloud. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "Povolte nebo zakažte vyhledávání SoundCloud v rámci uzlu, ovlivní to všechny funkce závislé na SoundCloud. Přijímané hodnoty pro True: 'True', 't', '1', Accepted values for False', 'False', 'f', '0'"
+
+#: plmanagednode/cog.py:806
+msgid "{Setting_variable_do_not_translate} info.\n\n"
+"{info_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} informace.\n\n"
+"{info_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:837
+msgid "{Setting_variable_do_not_translate} valid inputs are:\n\n"
+"Range between: {start_variable_do_not_translate} - {end_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} Platné vstupy jsou:\n\n"
+"Rozsah mezi: {start_variable_do_not_translate} - {end_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:852
+msgid "{Setting_variable_do_not_translate} valid inputs are:\n\n"
+"{setting_list_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} Platné vstupy jsou:\n\n"
+"{setting_list_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:874
+msgid "{Setting_variable_do_not_translate} set to {value_variable_do_not_translate}."
+msgstr "{Setting_variable_do_not_translate} nastaveno na {value_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:885
+#, docstring
+msgid "Configure Lavalink IP Rotation for rate limits.\n\n"
+"        Run `[p]plmanaged settings iprotation 1` to remove the ip rotation\n"
+"        "
+msgstr "Nakonfigurujte rotaci IP adresy Lavalink pro omezení rychlosti.\n\n"
+"        Spustit '[p]plmanaged settings iprotation 1' pro odstranění rotace IP adres\n"
+"        "
+
+#: plmanagednode/cog.py:896
+msgid "Click the button below to configure the IP rotation for your node.\n"
+"More info at: {url_value_1_variable_do_not_translate} and {url_value_2_variable_do_not_translate}"
+msgstr "Kliknutím na tlačítko níže nakonfigurujte rotaci IP adres pro váš uzel.\n"
+"Více informací na: {url_value_1_variable_do_not_translate} a {url_value_2_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:917
+msgid "Removing the IP rotation from your node."
+msgstr "Odstranění otáčení IP z vašeho uzlu."
+
+#: plmanagednode/cog.py:925
+#, docstring
+msgid "Link a Google account to Lavalink to bypass the YouTube age restriction.\n\n"
+"        Run `[p]plmanaged settings googleaccount 1` to remove the linked account.\n"
+"        "
+msgstr "Propojte účet Google s Lavalink, abyste obešli věkové omezení YouTube.\n\n"
+"        Spustit '[p]Plmanaged Settings GoogleAccount 1' pro odstranění propojeného účtu.\n"
+"        "
+
+#: plmanagednode/cog.py:936
+msgid "Click the button below to link a Google account to your node, if you have 2FA setup on this account you will need an application password instead\n"
+"More info at: <https://support.google.com/accounts/answer/185833>"
+msgstr "Kliknutím na tlačítko níže propojíte účet Google s vaším uzlem, pokud máte na tomto účtu nastaveno 2FA, budete místo toho potřebovat heslo aplikace\n"
+"Více informací na: <https://support.google.com/accounts/answer/185833>"
+
+#: plmanagednode/cog.py:955
+msgid "Unlinking Google account from your node."
+msgstr "Odpojování účtu Google z vašeho uzlu."
+
+#: plmanagednode/cog.py:963
+#, docstring
+msgid "Configure a HTTP proxy for Lavalink\n\n"
+"        Run `[p]plmanaged settings httpproxy 1` to remove the proxy.\n"
+"        "
+msgstr "Konfigurace HTTP proxy pro Lavalink\n\n"
+"        Spustit '[p]plmanaged nastavení httpproxy 1' pro odebrání proxy.\n"
+"        "
+
+#: plmanagednode/cog.py:974
+msgid "Click the button below to configure a HTTP proxy for your node"
+msgstr "Klikněte na tlačítko níže pro nastavení HTTP proxy pro váš uzel"
+
+#: plmanagednode/cog.py:988
+msgid "Unlinking HTTP proxy from your node."
+msgstr "Odpojování HTTP proxy od vašeho uzlu."
+
+#: plmanagednode/view.py:37 plmanagednode/view.py:64 plmanagednode/view.py:97
+#: plmanagednode/view.py:178
+msgid "You are not authorized to interact with this."
+msgstr "Nejste oprávněni s tím komunikovat."
+
+#: plmanagednode/view.py:124
+msgid "IP Rotation Configurator."
+msgstr "Konfigurátor rotace IP."
+
+#: plmanagednode/view.py:127
+msgid "IP Blocks."
+msgstr "Bloky IP adres."
+
+#: plmanagednode/view.py:131
+msgid "1.0.0.0/8,...,... - Comma separated list of IP blocks"
+msgstr "1.0.0.0/8,...,... - čárkou oddělený seznam IP bloků"
+
+#: plmanagednode/view.py:136
+msgid "Rotation strategy."
+msgstr "Rotační strategie."
+
+#: plmanagednode/view.py:145
+msgid "Retry limit."
+msgstr "Limit opakování."
+
+#: plmanagednode/view.py:148
+msgid "-1 = default, 0 = infinity, >0 = number of retries"
+msgstr "-1 = výchozí hodnota, 0 = nekonečná, >0 = počet opakování"
+
+#: plmanagednode/view.py:153
+msgid "IPs to exclude."
+msgstr "IP adresy, které chcete vyloučit."
+
+#: plmanagednode/view.py:156
+msgid "Comma separated list of IP to exclude from rotation"
+msgstr "Čárkami oddělený seznam IP pro vyloučení z rotace"
+
+#: plmanagednode/view.py:160
+msgid "Search trigger rotation."
+msgstr "Rotace spouštěče vyhledávání."
+
+#: plmanagednode/view.py:163
+msgid "0 or 1 (0 = disabled, 1 = enabled)"
+msgstr "0 nebo 1 (0 = zakázáno, 1 = povoleno)"
+
+#: plmanagednode/view.py:189
+msgid "The IP block you have provided is not valid; {error_variable_do_not_translate}."
+msgstr "Vámi zadaný blok IP adres není platný; {error_variable_do_not_translate}."
+
+#: plmanagednode/view.py:203
+msgid "No IP blocks were provided."
+msgstr "Nebyly poskytnuty žádné bloky IP."
+
+#: plmanagednode/view.py:215
+msgid "The IP address you have provided is not valid; {error_variable_do_not_translate}"
+msgstr "IP adresa, kterou jste poskytli, není platná; {error_variable_do_not_translate}"
+
+#: plmanagednode/view.py:236
+msgid "The strategy you provided is invalid. You must be one of: {options_variable_do_not_translate}."
+msgstr "Zadaná strategie je neplatná. Musíte být jedním z: {options_variable_do_not_translate}."
+
+#: plmanagednode/view.py:252
+msgid "The retry limit must be a number greater than or equal to -1."
+msgstr "Limit opakování musí být číslo větší nebo rovno -1."
+
+#: plmanagednode/view.py:267
+msgid "The search trigger must be 0 or 1."
+msgstr "Aktivační událost hledání musí být 0 nebo 1."
+
+#: plmanagednode/view.py:286
+msgid "IP rotation settings saved."
+msgstr "Nastavení rotace IP uloženo."
+
+#: plmanagednode/view.py:307
+msgid "Google Account Configurator"
+msgstr "Konfigurátor účtu Google"
+
+#: plmanagednode/view.py:310
+msgid "Email address"
+msgstr "E-mailová adresa"
+
+#: plmanagednode/view.py:313
+msgid "Your Google account email"
+msgstr "E-mail vašeho účtu Google"
+
+#: plmanagednode/view.py:318
+msgid "password"
+msgstr "heslo"
+
+#: plmanagednode/view.py:322
+msgid "If you have 2FA you will need an application password"
+msgstr "Pokud máte 2FA, budete potřebovat heslo aplikace"
+
+#: plmanagednode/view.py:336 plmanagednode/view.py:425
+msgid "You are not authorized to interact with this"
+msgstr "Nemáte oprávnění k interakci s tímto"
+
+#: plmanagednode/view.py:344
+msgid "Invalid email address"
+msgstr "Neplatná e-mailová adresa"
+
+#: plmanagednode/view.py:354
+msgid "Google account linked."
+msgstr "Účet Google je propojen."
+
+#: plmanagednode/view.py:375
+msgid "HTTP Proxy Configurator"
+msgstr "Konfigurátor HTTP Proxy"
+
+#: plmanagednode/view.py:378
+msgid "Hostname"
+msgstr "Název hostitele"
+
+#: plmanagednode/view.py:381
+msgid "Hostname of the proxy, (IP or domain or localhost)"
+msgstr "Název hostitele proxy serveru (IP adresa nebo doména nebo místní hostitel)"
+
+#: plmanagednode/view.py:385
+msgid "Proxy port"
+msgstr "Port proxy serveru"
+
+#: plmanagednode/view.py:388
+msgid "Proxy port, 3128 is the default for squidProxy"
+msgstr "Proxy port, 3128 je výchozí pro squidProxy"
+
+#: plmanagednode/view.py:394
+msgid "User"
+msgstr "Uživatel"
+
+#: plmanagednode/view.py:399
+msgid "Optional user for basic authentication fields. Leave blank if you do not use basic authentication"
+msgstr "Volitelný uživatel pro základní ověřovací pole. Pokud nepoužíváte základní ověřování, ponechte prázdné pole"
+
+#: plmanagednode/view.py:405
+msgid "Password"
+msgstr "Heslo"
+
+#: plmanagednode/view.py:410
+msgid "Optional password for basic authentication fields. Leave blank if you do not use basic authentication."
+msgstr "Volitelné heslo pro základní ověřovací pole. Pokud nepoužíváte základní ověřování, ponechte prázdné."
+
+#: plmanagednode/view.py:436
+msgid "The port provided is not valid. It must be between 0 and 65536."
+msgstr "Poskytnutý port není platný. Musí být mezi 0 a 65536."
+
+#: plmanagednode/view.py:453
+msgid "HTTP proxy settings saved."
+msgstr "Nastavení HTTP proxy uloženo."
+

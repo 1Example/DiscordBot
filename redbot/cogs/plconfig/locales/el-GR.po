@@ -1,0 +1,532 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Greek\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: el\n"
+"X-Crowdin-File: /cogs/plconfig/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3353\n"
+"Language: el_GR\n"
+
+#: plconfig/cog.py:32
+#, docstring
+msgid "Configure PyLav library settings"
+msgstr "Ρύθμιση παραμέτρων βιβλιοθήκης PyLav"
+
+#: plconfig/cog.py:44
+#, docstring
+msgid "Change global settings for PyLav"
+msgstr "Αλλαγή καθολικών ρυθμίσεων για το PyLav"
+
+#: plconfig/cog.py:48
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Δείξτε την έκδοση του Γραναζιού και του PyLav"
+
+#: plconfig/cog.py:64
+msgid "Library / Cog"
+msgstr "Βιβλιοθήκη / Γρανάζι"
+
+#: plconfig/cog.py:65
+msgid "Version"
+msgstr "Εκδοχή"
+
+#: plconfig/cog.py:78
+#, docstring
+msgid "Show the setting values"
+msgstr "Εμφάνιση των τιμών ρύθμισης"
+
+#: plconfig/cog.py:85 plconfig/view.py:57
+msgid "PyLav Settings"
+msgstr "Ρυθμίσεις PyLav"
+
+#: plconfig/cog.py:88
+msgid "Get information about the PyLav library settings."
+msgstr "Λάβετε πληροφορίες σχετικά με τις ρυθμίσεις της βιβλιοθήκης PyLav."
+
+#: plconfig/cog.py:92 plconfig/view.py:162
+msgid "Global Settings"
+msgstr "Καθολικές ρυθμίσεις"
+
+#: plconfig/cog.py:95
+msgid "Get information about bot owner configured settings for the players."
+msgstr "Λάβετε πληροφορίες σχετικά με τις διαμορφωμένες ρυθμίσεις του κατόχου bot για τους παίκτες."
+
+#: plconfig/cog.py:103
+msgid "Contextual Settings"
+msgstr "Ρυθμίσεις με βάση τα συμφραζόμενα"
+
+#: plconfig/cog.py:107
+msgid "Get information about contextual settings for the player, accounting for the global settings."
+msgstr "Λάβετε πληροφορίες σχετικά με τις ρυθμίσεις με βάση τα συμφραζόμενα για το πρόγραμμα αναπαραγωγής, λαμβάνοντας υπόψη τις καθολικές ρυθμίσεις."
+
+#: plconfig/cog.py:114
+msgid "Server Settings"
+msgstr "Ρυθμίσεις διακομιστή"
+
+#: plconfig/cog.py:118
+msgid "Get information about the server configured settings for the player."
+msgstr "Λάβετε πληροφορίες σχετικά με τις ρυθμίσεις που έχουν διαμορφωθεί από το διακομιστή για το πρόγραμμα αναπαραγωγής."
+
+#: plconfig/cog.py:126 plconfig/view.py:499
+msgid "Playlist Tasks"
+msgstr "Εργασίες Λίστας Αναπαραγωγής"
+
+#: plconfig/cog.py:129
+msgid "Get information about the playlist auto update schedule."
+msgstr "Λάβετε πληροφορίες σχετικά με το πρόγραμμα αυτόματης ενημέρωσης της λίστας αναπαραγωγής."
+
+#: plconfig/cog.py:138
+msgid "PyLav Paths"
+msgstr "Διαδρομές PyLav"
+
+#: plconfig/cog.py:140
+msgid "Get information about PyLav paths"
+msgstr "Πληροφορίες σχετικά με τα μονοπάτια PyLav"
+
+#: plconfig/cog.py:147 plconfig/view.py:595
+msgid "Managed Node Settings"
+msgstr "Διαχειριζόμενες ρυθμίσεις κόμβου"
+
+#: plconfig/cog.py:150
+msgid "Get information about the Managed PyLav Lavalink node"
+msgstr "Πληροφορίες σχετικά με τον κόμβο Managed PyLav Lavalink"
+
+#: plconfig/cog.py:160
+#, docstring
+msgid "Checks if a user or role is considered a disc jockey"
+msgstr "Ελέγχει αν ένας χρήστης ή ρόλος θεωρείται δισκοβόλος"
+
+#: plconfig/cog.py:171
+msgid "{role_name_variable_do_not_translate} is a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} είναι ένας ρόλος τζόκεϊ δίσκου."
+
+#: plconfig/cog.py:175
+msgid "{role_name_variable_do_not_translate} is not a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} δεν είναι ένας ρόλος τζόκεϊ δίσκου."
+
+#: plconfig/cog.py:182
+msgid "{user_name_variable_do_not_translate} is a disc jockey."
+msgstr "{user_name_variable_do_not_translate} είναι ένας δίσκος τζόκεϊ."
+
+#: plconfig/cog.py:186
+msgid "{user_name_variable_do_not_translate} is not a disc jockey."
+msgstr "{user_name_variable_do_not_translate} δεν είναι δίσκος τζόκεϊ."
+
+#: plconfig/cog.py:201
+#, docstring
+msgid "Set the local tracks folder for PyLav.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Ορίστε το φάκελο τοπικών κομματιών για το PyLav.\n\n"
+"        Οι αλλαγές θα εφαρμοστούν μετά την επανεκκίνηση.\n"
+"        "
+
+#: plconfig/cog.py:213
+msgid "{folder_path_variable_do_not_translate} is not a folder."
+msgstr "{folder_path_variable_do_not_translate} δεν είναι φάκελος."
+
+#: plconfig/cog.py:229
+msgid "{folder_path_variable_do_not_translate} does not exist, rerun the command with the create argument set to {command_variable_do_not_translate} to create this folder automatically."
+msgstr "{folder_path_variable_do_not_translate} δεν υπάρχει, εκτελέστε ξανά την εντολή με το όρισμα Create ρυθμισμένο σε {command_variable_do_not_translate} για να δημιουργήσετε αυτόματα αυτόν το φάκελο."
+
+#: plconfig/cog.py:246
+msgid "PyLav local tracks folder has been set to {folder_path_variable_do_not_translate}."
+msgstr "Ο τοπικός φάκελος κομματιών PyLav έχει οριστεί σε {folder_path_variable_do_not_translate}."
+
+#: plconfig/cog.py:261
+#, docstring
+msgid "Change the managed node configuration"
+msgstr "Αλλαγή της διαχειριζόμενης ρύθμισης παραμέτρων κόμβου"
+
+#: plconfig/cog.py:265
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Ενεργοποιήστε /απενεργοποιήστε τον διαχειριζόμενο κόμβο.\n\n"
+"        Οι αλλαγές θα εφαρμοστούν μετά την επανεκκίνηση.\n"
+"        "
+
+#: plconfig/cog.py:281
+msgid "I have turned on my managed Lavalink node."
+msgstr "Έχω ενεργοποιήσει τον διαχειριζόμενο κόμβο Lavalink."
+
+#: plconfig/cog.py:289
+msgid "I have turned off my managed Lavalink node."
+msgstr "Έχω απενεργοποιήσει τον διαχειριζόμενο κόμβο Lavalink."
+
+#: plconfig/cog.py:297
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Ενεργοποιήστε / απενεργοποιήστε τις αυτόματες ενημερώσεις του διαχειριζόμενου κόμβου.\n\n"
+"        Οι αλλαγές θα εφαρμοστούν μετά την επανεκκίνηση.\n"
+"        "
+
+#: plconfig/cog.py:313
+msgid "I have turned on the self-update functionality of my managed node."
+msgstr "Έχω ενεργοποιήσει τη λειτουργία αυτόματης ενημέρωσης του διαχειριζόμενου κόμβου μου."
+
+#: plconfig/cog.py:321
+msgid "I have turned off the self-update functionality of my managed node."
+msgstr "Έχω απενεργοποιήσει τη λειτουργία αυτόματης ενημέρωσης του διαχειριζόμενου κόμβου μου."
+
+#: plconfig/cog.py:329
+#, docstring
+msgid "Change the bundled external nodes state"
+msgstr "Αλλαγή της δεσμοποιημένης κατάστασης εξωτερικών κόμβων"
+
+#: plconfig/cog.py:333
+#, docstring
+msgid "Toggle the managed external draper.wtf nodes on/off"
+msgstr "Εναλλαγή των διαχειριζόμενων εξωτερικών κόμβων draper.wtf on/off"
+
+#: plconfig/cog.py:353
+msgid "I have turned on the PyLav external Lavalink nodes."
+msgstr "Έχω ενεργοποιήσει τους εξωτερικούς κόμβους Lavalink PyLav."
+
+#: plconfig/cog.py:363
+msgid "I have turned off the PyLav external Lavalink nodes."
+msgstr "Έχω απενεργοποιήσει τους εξωτερικούς κόμβους Lavalink PyLav."
+
+#: plconfig/cog.py:371
+#, docstring
+msgid "Toggle the managed external lava.link node on/off"
+msgstr "Ενεργοποίηση/απενεργοποίηση του διαχειριζόμενου εξωτερικού κόμβου lava.link"
+
+#: plconfig/cog.py:383
+msgid "I have turned on the lava.link external Lavalink node."
+msgstr "Έχω ενεργοποιήσει τον lava.link εξωτερικό κόμβο Lavalink."
+
+#: plconfig/cog.py:391
+msgid "The PyLav managed lava.link external Lavalink node has been permanently removed."
+msgstr "Ο διαχειριζόμενος από το PyLav lava.link εξωτερικός κόμβος Lavalink έχει αφαιρεθεί οριστικά."
+
+#: plconfig/cog.py:400
+#, docstring
+msgid "Instructions on how to set the Spotify API Tokens"
+msgstr "Οδηγίες για το πώς να ορίσετε το Spotify API Tokens"
+
+#: plconfig/cog.py:401
+msgid "1. Go to Spotify developers and log in with your Spotify account.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. Click on \"Create An App\".\n"
+"3. Fill out the form provided with your application name, etc.\n"
+"4. When asked if you're developing commercial integration select \"No\".\n"
+"5. Accept the terms and conditions.\n"
+"6. Execute the following command replacing {argument_1_variable_do_not_translate} with your client identifier and {argument_2_variable_do_not_translate} with your client secret:\n"
+"  `{command_name_variable_do_not_translate}`"
+msgstr "1. Μεταβείτε στους προγραμματιστές spotify και συνδεθείτε με τον λογαριασμό σας Spotify.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. Κάντε κλικ στο \"Δημιουργία εφαρμογής\".\n"
+"3. Συμπληρώστε τη φόρμα που παρέχεται με το όνομα της αίτησής σας κ.λπ.\n"
+"4. Όταν ερωτηθείτε εάν αναπτύσσετε εμπορική ενσωμάτωση, επιλέξτε \"Όχι\".\n"
+"5. Αποδεχτείτε τους όρους και τις προϋποθέσεις.\n"
+"6. Εκτελέστε την ακόλουθη εντολή αντικαθιστώντας {argument_1_variable_do_not_translate} με το αναγνωριστικό πελάτη και {argument_2_variable_do_not_translate} με το μυστικό του πελάτη σας:\n"
+"  `{command_name_variable_do_not_translate}`"
+
+#: plconfig/cog.py:428
+#, docstring
+msgid "Manage active players"
+msgstr "Διαχείριση ενεργών παικτών"
+
+#: plconfig/cog.py:437
+msgid "I am not currently playing anything in {server_name_variable_do_not_translate}."
+msgstr "Αυτή τη στιγμή δεν παίζω τίποτα στο {server_name_variable_do_not_translate}."
+
+#: plconfig/cog.py:448
+msgid "I am not connected to any voice channel at the moment."
+msgstr "Δεν είμαι συνδεδεμένος με κανένα κανάλι φωνής αυτή τη στιγμή."
+
+#: plconfig/cog.py:465
+#, docstring
+msgid "Toggle whether or not I should update my Discord activity when playing tracks."
+msgstr "Αλλάξτε αν πρέπει ή όχι να ενημερώσω τη δραστηριότητά μου στο Discord όταν παίζω κομμάτια."
+
+#: plconfig/cog.py:476
+msgid "From now on, I will update my activity to reflect the tracks I am playing."
+msgstr "Από τώρα και στο εξής, θα ενημερώνω τη δραστηριότητά μου ώστε να αντικατοπτρίζει τα κομμάτια που παίζω."
+
+#: plconfig/cog.py:485
+msgid "From now on, I will no longer update my activity to reflect the tracks I am playing."
+msgstr "Από εδώ και στο εξής, δεν θα ενημερώνω πλέον τη δραστηριότητά μου ώστε να αντικατοπτρίζει τα κομμάτια που παίζω."
+
+#: plconfig/view.py:27 plconfig/view.py:68 plconfig/view.py:179
+#: plconfig/view.py:289 plconfig/view.py:551
+msgid "Enabled"
+msgstr "Ενεργοποιημένη"
+
+#: plconfig/view.py:28 plconfig/view.py:69 plconfig/view.py:180
+#: plconfig/view.py:290 plconfig/view.py:552
+msgid "Disabled"
+msgstr "Ανάπηρος"
+
+#: plconfig/view.py:32
+msgid "Use Managed Node"
+msgstr "Χρήση Διαχειριζόμενου Κόμβου"
+
+#: plconfig/view.py:36
+msgid "Auto Update\n"
+"Managed Node"
+msgstr "Αυτόματη Ενημέρωση\n"
+"Διαχειριζόμενος Κόμβος"
+
+#: plconfig/view.py:40
+msgid "Change Bot activity"
+msgstr "Αλλαγή δραστηριότητας bot"
+
+#: plconfig/view.py:44
+msgid "Use Bundled\n"
+"PyLav Nodes"
+msgstr "Χρήση δεσμοποιημένων\n"
+"Κόμβων PyLav"
+
+#: plconfig/view.py:48
+msgid "Use Bundled\n"
+"lava.link Nodes"
+msgstr "Χρήση δεσμοποιημένων\n"
+"κόμβων lava.link"
+
+#: plconfig/view.py:58 plconfig/view.py:163 plconfig/view.py:273
+#: plconfig/view.py:461 plconfig/view.py:596
+msgid "Value"
+msgstr "Τιμή"
+
+#: plconfig/view.py:72 plconfig/view.py:253 plconfig/view.py:400
+msgid "Volume"
+msgstr "Όγκος"
+
+#: plconfig/view.py:78 plconfig/view.py:98 plconfig/view.py:118
+#: plconfig/view.py:196 plconfig/view.py:216 plconfig/view.py:236
+#: plconfig/view.py:343 plconfig/view.py:363 plconfig/view.py:383
+msgid "{enabled_variable_do_not_translate}\n"
+"0 seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"0 δευτερόλεπτα"
+
+#: plconfig/view.py:82 plconfig/view.py:102 plconfig/view.py:122
+#: plconfig/view.py:200 plconfig/view.py:220 plconfig/view.py:240
+#: plconfig/view.py:347 plconfig/view.py:367 plconfig/view.py:387
+msgid "{enabled_variable_do_not_translate}\n"
+"1 second"
+msgstr "{enabled_variable_do_not_translate}\n"
+"1 δευτερόλεπτο"
+
+#: plconfig/view.py:86 plconfig/view.py:106 plconfig/view.py:126
+#: plconfig/view.py:204 plconfig/view.py:224 plconfig/view.py:244
+#: plconfig/view.py:351 plconfig/view.py:371 plconfig/view.py:391
+msgid "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} Δευτερόλεπτα"
+
+#: plconfig/view.py:135 plconfig/view.py:254 plconfig/view.py:401
+msgid "Maximum Volume"
+msgstr "Μέγιστος Όγκος"
+
+#: plconfig/view.py:137 plconfig/view.py:256 plconfig/view.py:403
+msgid "AutoPlay"
+msgstr "Αυτόματη Αναπαραγωγή"
+
+#: plconfig/view.py:141 plconfig/view.py:259 plconfig/view.py:419
+msgid "Shuffling"
+msgstr "Ανακάτεμα"
+
+#: plconfig/view.py:145 plconfig/view.py:260 plconfig/view.py:423
+msgid "Auto Shuffle"
+msgstr "Αυτόματη τυχαία σειρά"
+
+#: plconfig/view.py:149 plconfig/view.py:261 plconfig/view.py:427
+msgid "Auto Deafen"
+msgstr "Αυτόματη Εκκωφαντική"
+
+#: plconfig/view.py:152
+msgid "Auto Disconnect"
+msgstr "Αυτόματη Αποσύνδεση"
+
+#: plconfig/view.py:153 plconfig/view.py:263 plconfig/view.py:431
+msgid "Auto Alone Pause"
+msgstr "Αυτόματη Παύση Μόνο"
+
+#: plconfig/view.py:154 plconfig/view.py:264 plconfig/view.py:432
+msgid "Auto Alone Disconnect"
+msgstr "Αυτόματη Αποσύνδεση"
+
+#: plconfig/view.py:176
+msgid "You need to be on a server to show this page."
+msgstr "Πρέπει να βρίσκεστε σε διακομιστή για να εμφανίσετε αυτήν τη σελίδα."
+
+#: plconfig/view.py:262 plconfig/view.py:430
+msgid "Auto Empty Disconnect"
+msgstr "Αυτόματη αποσύνδεση κενού"
+
+#: plconfig/view.py:272
+msgid "Context Player Settings"
+msgstr "Ρυθμίσεις προγράμματος αναπαραγωγής περιβάλλοντος"
+
+#: plconfig/view.py:286
+msgid "You need to be in a server to be able to show this page."
+msgstr "Θα πρέπει να είστε σε ένα διακομιστή για να είναι σε θέση να εμφανίσετε αυτή τη σελίδα."
+
+#: plconfig/view.py:307
+msgid "Too many entries to show ({number_of_users_variable_do_not_translate})"
+msgstr "Πάρα πολλές καταχωρήσεις για εμφάνιση ({number_of_users_variable_do_not_translate})"
+
+#: plconfig/view.py:325
+msgid "Too many entries to show ({number_of_roles_variable_do_not_translate})"
+msgstr "Πάρα πολλές καταχωρήσεις για εμφάνιση ({number_of_roles_variable_do_not_translate})"
+
+#: plconfig/view.py:330 plconfig/view.py:335 plconfig/view.py:437
+#: plconfig/view.py:443 plconfig/view.py:449
+msgid "None"
+msgstr "Κανένας"
+
+#: plconfig/view.py:407
+msgid "AutoPlay Playlist"
+msgstr "Λίστα Αυτόματης Αναπαραγωγή"
+
+#: plconfig/view.py:411
+msgid "Loop track"
+msgstr "Τραγούδι κυκλώματος"
+
+#: plconfig/view.py:415
+msgid "Loop Queue"
+msgstr "Επανάληψη Ουράς"
+
+#: plconfig/view.py:434
+msgid "Forced Voice Channel"
+msgstr "Αναγκαστικό Κανάλι Φωνής"
+
+#: plconfig/view.py:440
+msgid "Forced Command Channel"
+msgstr "Αναγκαστικό Κανάλι Εντολής"
+
+#: plconfig/view.py:446
+msgid "Forced Notification Channel"
+msgstr "Αναγκαστικό Κανάλι Ειδοποιήσεων"
+
+#: plconfig/view.py:451
+msgid "Disc Jockey Users"
+msgstr "Χρήστες δίσκων τζόκεϊ"
+
+#: plconfig/view.py:452
+msgid "Disc Jockey Roles"
+msgstr "Δίσκοι Τζόκεϊ Ρόλοι"
+
+#: plconfig/view.py:460
+msgid "Server Player Settings"
+msgstr "Ρυθμίσεις προγράμματος αναπαραγωγής διακομιστή"
+
+#: plconfig/view.py:475
+msgid "Next Bundled\n"
+"Playlist Update"
+msgstr "Επόμενη Συσσωρευμένη\n"
+"Ενημέρωση λίστας αναπαραγωγής"
+
+#: plconfig/view.py:481
+msgid "Next Bundled External\n"
+"Playlist Update"
+msgstr "Επόμενη Συσσωρευμένη Εξωτερική\n"
+"Ενημέρωση λίστας αναπαραγωγής"
+
+#: plconfig/view.py:487
+msgid "Next External\n"
+"Playlist Update"
+msgstr "Επόμενη Ενημέρωση Εξωτερικής\n"
+"Λίστας αναπαραγωγής"
+
+#: plconfig/view.py:500
+msgid "Date and Time (UTC)"
+msgstr "Ημερομηνία και ώρα (UTC)"
+
+#: plconfig/view.py:513
+msgid "Due to sensitive information, I can only show the contents of this page to my owner."
+msgstr "Λόγω ευαίσθητων πληροφοριών, μπορώ να δείξω μόνο τα περιεχόμενα αυτής της σελίδας στον κάτοχό μου."
+
+#: plconfig/view.py:519
+msgid "Settings Folder"
+msgstr "Φάκελος \"Ρυθμίσεις\""
+
+#: plconfig/view.py:521
+msgid "Local Tracks"
+msgstr "Τοπικά Κομμάτια"
+
+#: plconfig/view.py:524
+msgid "Lavalink Folder"
+msgstr "Φάκελος Lavalink"
+
+#: plconfig/view.py:526
+msgid "Java Executable"
+msgstr "Εκτελέσιμο Java"
+
+#: plconfig/view.py:530
+msgid "Not Found"
+msgstr "Δεν Βρέθηκε"
+
+#: plconfig/view.py:540
+msgid "Paths"
+msgstr "Διαδρομές"
+
+#: plconfig/view.py:541
+msgid "Path"
+msgstr "Διαδρομή"
+
+#: plconfig/view.py:560
+msgid "Java"
+msgstr "Ιάβα"
+
+#: plconfig/view.py:564
+msgid "Lavaplayer"
+msgstr "Παιχνίδι λάβας"
+
+#: plconfig/view.py:568
+msgid "Lavalink Branch"
+msgstr "Υποκατάστημα Lavalink"
+
+#: plconfig/view.py:572
+msgid "Lavalink Version"
+msgstr "Έκδοση Lavalink"
+
+#: plconfig/view.py:576
+msgid "Lavalink Build"
+msgstr "Κατασκευή Lavalink"
+
+#: plconfig/view.py:579
+msgid "Build Time"
+msgstr "Χρόνος Κατασκευής"
+
+#: plconfig/view.py:581
+msgid "Commit"
+msgstr "Υποβολή"
+
+#: plconfig/view.py:585
+msgid "Auto Update"
+msgstr "Αυτόματη Ενημέρωση"
+
+#: plconfig/view.py:623
+msgid "Select an option from the dropdown menu below."
+msgstr "Επιλέξτε μια επιλογή από το αναπτυσσόμενο μενού παρακάτω."
+
+#: plconfig/view.py:638
+msgid "Pick an option to view"
+msgstr "Επιλέξτε μια επιλογή για προβολή"
+
+#: plconfig/view.py:648
+msgid "You are not authorized to interact with this option."
+msgstr "Δεν είστε εξουσιοδοτημένοι να αλληλεπιδράσετε με αυτήν την επιλογή."
+
+#: plconfig/view.py:678
+msgid "You are not authorized to interact with this."
+msgstr "Δεν είστε εξουσιοδοτημένοι να αλληλεπιδράσετε με αυτό."
+

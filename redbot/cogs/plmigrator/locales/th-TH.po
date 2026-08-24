@@ -1,0 +1,58 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-05-05 09:21+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Thai\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: th\n"
+"X-Crowdin-File: /cogs/plmigrator/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3299\n"
+"Language: th_TH\n"
+
+#: plmigrator/cog.py:35
+#, docstring
+msgid "Copy the Red Audio settings over to PyLav"
+msgstr "คัดลอกการตั้งค่าเสียงสีแดงไปยัง PyLav"
+
+#: plmigrator/cog.py:48
+#, docstring
+msgid "Migrate Audio settings to PyLav\n\n"
+"        Please note that this will replace any settings already in PyLav.\n\n"
+"        If you are sure you want to proceed please run this command again with the confirm argument set to 1\n"
+"        i.e `[p]pylavmigrate 1`\n\n"
+"        Once you complete the migration unload this cog and uninstall it as you will not need it again.\n"
+"        "
+msgstr "ย้ายการตั้งค่าเสียงไปยัง PyLav\n\n"
+"        โปรดทราบว่าการดําเนินการนี้จะแทนที่การตั้งค่าใด ๆ ที่มีอยู่แล้วใน PyLav\n\n"
+"        หากคุณแน่ใจว่าต้องการดําเนินการต่อโปรดเรียกใช้คําสั่งนี้อีกครั้งโดยตั้งค่าอาร์กิวเมนต์ยืนยันเป็น 1\n"
+"        เช่น '[p]ไพลาวีมี 1'\n\n"
+"        เมื่อคุณเสร็จสิ้นการโยกย้ายให้ยกเลิกการโหลดฟันเฟืองนี้และถอนการติดตั้งเนื่องจากคุณไม่ต้องการมันอีก\n"
+"        "
+
+#: plmigrator/cog.py:66
+msgid "Migration of Audio cog settings to PyLav complete. Restart the bot for it to take effect.\n"
+"{requester_variable_do_not_translate}."
+msgstr "การโยกย้ายการตั้งค่าฟันเฟืองเสียงไปยัง PyLav เสร็จสมบูรณ์ รีสตาร์ทบอทเพื่อให้มีผล\n"
+"{requester_variable_do_not_translate}."
+
+#: plmigrator/cog.py:76
+#, docstring
+msgid "Reverts the Playlist migration which can cause broken autoplaylists.\n\n"
+"        Please note that this will replace any settings already in PyLav.\n\n"
+"        If you are sure you want to proceed please run this command again with the confirm argument set to 1\n"
+"        i.e `[p]plmigrate-revert 1`\n"
+"        "
+msgstr ""
+
+#: plmigrator/cog.py:178
+msgid "I do not have permission to access {folder_variable_do_not_translate}."
+msgstr "ฉันไม่มีสิทธิ์ในการเข้าถึง {folder_variable_do_not_translate}."
+

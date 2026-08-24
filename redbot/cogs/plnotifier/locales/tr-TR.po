@@ -1,0 +1,542 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-08 22:10+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Turkish\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: tr\n"
+"X-Crowdin-File: /cogs/plnotifier/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3351\n"
+"Language: tr_TR\n"
+
+#: plnotifier/cog.py:84
+#, docstring
+msgid "Listen to events from the PyLav player and send them as messages to the specified channel"
+msgstr "PyLav oynatıcıdan olayları dinleyin ve bunları belirtilen kanala mesaj olarak gönderin"
+
+#: plnotifier/cog.py:230
+#, docstring
+msgid "Configure the PyLavNotifier cog"
+msgstr "PyLavNotifier dişlisini yapılandırma"
+
+#: plnotifier/cog.py:234
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Cog ve PyLav'ın versiyonunu göster"
+
+#: plnotifier/cog.py:250
+msgid "Library / Cog"
+msgstr "Kütüphane / Dişli"
+
+#: plnotifier/cog.py:251
+msgid "Version"
+msgstr "Sürüm"
+
+#: plnotifier/cog.py:266
+#, docstring
+msgid "Set the notify channel for the player"
+msgstr "Oynatıcı için bildirim kanalını ayarlama"
+
+#: plnotifier/cog.py:275 plnotifier/cog.py:345
+msgid "I do not have permission to manage webhooks in {channel_variable_do_not_translate}."
+msgstr "Web kancalarını yönetme iznim yok {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:289
+msgid "I do not have permission to create a thread in {channel_variable_do_not_translate}."
+msgstr "İçinde iş parçacığı oluşturma iznim yok {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:298 plnotifier/cog.py:316 plnotifier/cog.py:355
+msgid "PyLavNotifier"
+msgstr "PyLavNotifier"
+
+#: plnotifier/cog.py:299 plnotifier/cog.py:319 plnotifier/cog.py:356
+msgid "PyLav Notifier - Requested by {author_variable_do_not_translate}."
+msgstr "PyLav Notifier - İsteyen {author_variable_do_not_translate}."
+
+#: plnotifier/cog.py:312
+msgid "This thread will be used by PyLav to post notifications about the player."
+msgstr "Bu konu, PyLav tarafından oyuncu hakkında bildirimler göndermek için kullanılacaktır."
+
+#: plnotifier/cog.py:327 plnotifier/cog.py:363
+msgid "A new webhook was being created."
+msgstr "Yeni bir web kancası oluşturuluyordu."
+
+#: plnotifier/cog.py:377
+msgid "PyLavNotifier channel set to {channel_variable_do_not_translate}."
+msgstr "PyLavNotifier kanalı {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:389
+#, docstring
+msgid "Set whether or not to notify for the specified event.\n\n"
+"        Arguments:\n"
+"            event -- The event to set.\n"
+"            toggle -- Whether or not to notify upon receiving this event.\n"
+"            use_mention -- Whether or not to use a mention instead of the name for the action requested.\n"
+"        "
+msgstr "Belirtilen olay için bildirim yapılıp yapılmayacağını ayarlayın.\n\n"
+"        Bağımsız değişken:\n"
+"            event -- Ayarlanacak olay.\n"
+"            geçiş -- Bu olayı aldıktan sonra bildirimde bulunup bulunmayacağı.\n"
+"            use_mention -- İstenen eylemin adı yerine bir söz kullanılıp kullanılmayacağı.\n"
+"        "
+
+#: plnotifier/cog.py:406
+msgid "Invalid event, possible events are:\n\n"
+"{events_variable_do_not_translate}."
+msgstr "Geçersiz olay, olası olaylar şunlardır:\n\n"
+"{events_variable_do_not_translate}."
+
+#: plnotifier/cog.py:425
+msgid "Event {event_variable_do_not_translate} set to {toggle_variable_do_not_translate}{extras_variable_do_not_translate}."
+msgstr "Olay {event_variable_do_not_translate} olarak ayarlayın {toggle_variable_do_not_translate}{extras_variable_do_not_translate}."
+
+#: plnotifier/cog.py:429
+msgid "notify"
+msgstr "bildirmek"
+
+#: plnotifier/cog.py:429
+msgid "do not notify"
+msgstr "bildirme"
+
+#: plnotifier/cog.py:430
+msgid " with mentions"
+msgstr " sözlerle"
+
+#: plnotifier/cog.py:432
+msgid " without mentions"
+msgstr " bahsetmeden"
+
+#: plnotifier/cog.py:450
+msgid "Track Stuck Event"
+msgstr "Sıkışmış Olayı İzle"
+
+#: plnotifier/cog.py:451
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} is stuck for {threshold_variable_do_not_translate} seconds, skipping."
+msgstr "[Düğüm={node_variable_do_not_translate}] {track_variable_do_not_translate} için sıkışmış {threshold_variable_do_not_translate} saniye, atlama."
+
+#: plnotifier/cog.py:478
+msgid "Track Exception Event"
+msgstr "Özel Durum Olayını İzle"
+
+#: plnotifier/cog.py:479
+msgid "[Node={node_variable_do_not_translate}] There was an error while playing {track_variable_do_not_translate}:\n"
+"{exception_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] Oynarken bir hata oluştu {track_variable_do_not_translate}:\n"
+"{exception_variable_do_not_translate}"
+
+#: plnotifier/cog.py:505
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because the player reached the end of the tracks runtime."
+msgstr "[Düğüm={node_variable_do_not_translate}] {track_variable_do_not_translate} oyuncu parça çalışma süresinin sonuna ulaştığı için çalmayı bitirdi."
+
+#: plnotifier/cog.py:512
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because a new track started playing."
+msgstr "[Düğüm={node_variable_do_not_translate}] {track_variable_do_not_translate} yeni bir parça çalmaya başladığı için çalmayı bitirdi."
+
+#: plnotifier/cog.py:519
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because it failed to start."
+msgstr "[Düğüm={node_variable_do_not_translate}] {track_variable_do_not_translate} başlamadığı için oynamayı bitirdi."
+
+#: plnotifier/cog.py:526
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing becausethe player was stopped."
+msgstr "[Düğüm={node_variable_do_not_translate}] {track_variable_do_not_translate} oyuncu durdurulduğu için oynamayı bitirdi."
+
+#: plnotifier/cog.py:533
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing becausethe node told it to stop."
+msgstr "[Düğüm={node_variable_do_not_translate}] {track_variable_do_not_translate} düğüm durmasını söylediği için oynamayı bitirdi."
+
+#: plnotifier/cog.py:542
+msgid "Track End Event"
+msgstr "Parça Sonu Etkinliği"
+
+#: plnotifier/cog.py:568
+msgid "YouTube Music Track Start Event"
+msgstr "YouTube Müzik Parçası Başlangıç Etkinliği"
+
+#: plnotifier/cog.py:569
+msgid "[Node={node_variable_do_not_translate}] YouTube Music track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] YouTube Müzik parçası: {track_variable_do_not_translate} oynamaya başladı.\n"
+"Talep eden: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:600
+msgid "Deezer Track Start Event"
+msgstr "Deezer Track Başlangıç Etkinliği"
+
+#: plnotifier/cog.py:601
+msgid "[Node={node_variable_do_not_translate}] Deezer track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] Deezer parçası: {track_variable_do_not_translate} oynamaya başladı.\n"
+"Talep eden: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:632
+msgid "Spotify Track Start Event"
+msgstr "Spotify Parça Başlangıç Etkinliği"
+
+#: plnotifier/cog.py:633
+msgid "[Node={node_variable_do_not_translate}] Spotify track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] Spotify parçası: {track_variable_do_not_translate} oynamaya başladı.\n"
+"Talep eden: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:664
+msgid "Apple Music Track Start Event"
+msgstr "Apple Music Parça Başlangıç Etkinliği"
+
+#: plnotifier/cog.py:665
+msgid "[Node={node_variable_do_not_translate}] Apple Music track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] Apple Music parçası: {track_variable_do_not_translate} oynamaya başladı.\n"
+"Talep eden: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:696
+msgid "Local Track Start Event"
+msgstr "Yerel Pist Başlangıç Etkinliği"
+
+#: plnotifier/cog.py:697
+msgid "[Node={node_variable_do_not_translate}] Local track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] Yerel parça: {track_variable_do_not_translate} oynamaya başladı.\n"
+"Talep eden: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:728
+msgid "HTTP Track Start Event"
+msgstr "HTTP İzleme Başlangıç Etkinliği"
+
+#: plnotifier/cog.py:729
+msgid "[Node={node_variable_do_not_translate}] HTTP track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] HTTP izleme: {track_variable_do_not_translate} oynamaya başladı.\n"
+"Talep eden: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:760
+msgid "Text-To-Speech Track Start Event"
+msgstr "Metin Okuma İzleme Başlangıç Etkinliği"
+
+#: plnotifier/cog.py:761
+msgid "[Node={node_variable_do_not_translate}] Text-To-Speech track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}."
+msgstr "[Düğüm={node_variable_do_not_translate}] Metin Okuma yolu: {track_variable_do_not_translate} oynamaya başladı.\n"
+"Talep eden: {requester_variable_do_not_translate}."
+
+#: plnotifier/cog.py:792
+msgid "YouTube Track Start Event"
+msgstr "YouTube Parça Başlangıcı Etkinliği"
+
+#: plnotifier/cog.py:793
+msgid "[Node={node_variable_do_not_translate}] YouTube track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}."
+msgstr "[Düğüm={node_variable_do_not_translate}] YouTube parçası: {track_variable_do_not_translate} oynamaya başladı.\n"
+"Talep eden: {requester_variable_do_not_translate}."
+
+#: plnotifier/cog.py:824 plnotifier/cog.py:859 plnotifier/cog.py:894
+#: plnotifier/cog.py:929 plnotifier/cog.py:964 plnotifier/cog.py:999
+#: plnotifier/cog.py:1034 plnotifier/cog.py:1069 plnotifier/cog.py:1104
+#: plnotifier/cog.py:1139 plnotifier/cog.py:1174 plnotifier/cog.py:1209
+#: plnotifier/cog.py:1244 plnotifier/cog.py:1279
+msgid "{source_variable_do_not_translate} Track Start Event"
+msgstr "{source_variable_do_not_translate} Parça Başlangıç Etkinliği"
+
+#: plnotifier/cog.py:827 plnotifier/cog.py:862 plnotifier/cog.py:897
+#: plnotifier/cog.py:932 plnotifier/cog.py:967 plnotifier/cog.py:1002
+#: plnotifier/cog.py:1037 plnotifier/cog.py:1072 plnotifier/cog.py:1107
+#: plnotifier/cog.py:1142 plnotifier/cog.py:1177 plnotifier/cog.py:1212
+#: plnotifier/cog.py:1247 plnotifier/cog.py:1282
+msgid "[Node={node_variable_do_not_translate}] {source_variable_do_not_translate} track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] {source_variable_do_not_translate} iz: {track_variable_do_not_translate} oynamaya başladı.\n"
+"Talep eden: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1314
+msgid "Track Skipped Event"
+msgstr "Atlanan Olayı İzle"
+
+#: plnotifier/cog.py:1315
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has been skipped.\n"
+"Requested by {requester_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] {track_variable_do_not_translate} atlanmıştır.\n"
+"Talep eden: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1346
+msgid "Track Seek Event"
+msgstr "Parça Arama Etkinliği"
+
+#: plnotifier/cog.py:1347
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} requested that {track_variable_do_not_translate} is sought from position {from_variable_do_not_translate} to position {after_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} talep etti {track_variable_do_not_translate} pozisyonundan aranır {from_variable_do_not_translate} pozisyonuna {after_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1381
+msgid "Track Previous Requested Event"
+msgstr "Önceki İstenen Etkinliği İzle"
+
+#: plnotifier/cog.py:1382
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} requested that the previous track {track_variable_do_not_translate} be played"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} önceki parçanın {track_variable_do_not_translate} oynanacak"
+
+#: plnotifier/cog.py:1413
+msgid "Tracks Requested Event"
+msgstr "İstenen Olayı İzler"
+
+#: plnotifier/cog.py:1414
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} added {track_count_variable_do_not_translate} to the queue."
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} eklendi {track_count_variable_do_not_translate} kuyruğa gidin."
+
+#: plnotifier/cog.py:1417
+msgid "{count_variable_do_not_translate} track"
+msgstr "{count_variable_do_not_translate} iz"
+
+#: plnotifier/cog.py:1444
+msgid "Track AutoPlay Event"
+msgstr "Otomatik Oynatma Etkinliğini İzle"
+
+#: plnotifier/cog.py:1445
+msgid "[Node={node_variable_do_not_translate}] Auto playing {track_variable_do_not_translate}."
+msgstr "[Düğüm={node_variable_do_not_translate}] Otomatik oynatma {track_variable_do_not_translate}."
+
+#: plnotifier/cog.py:1475
+msgid "Track Resumed Event"
+msgstr "Devam Eden Etkinliği İzle"
+
+#: plnotifier/cog.py:1476
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} resumed {track_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} Devam {track_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1507
+msgid "Queue Shuffled Event"
+msgstr "Kuyruk Karıştırılmış Olay"
+
+#: plnotifier/cog.py:1508
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} shuffled the queue"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} kuyruğu karıştırdı"
+
+#: plnotifier/cog.py:1532
+msgid "Queue End Event"
+msgstr "Kuyruk Sonu Olayı"
+
+#: plnotifier/cog.py:1533
+msgid "[Node={node_variable_do_not_translate}] All tracks in the queue have been played"
+msgstr "[Düğüm={node_variable_do_not_translate}] Kuyruktaki tüm parçalar çalındı"
+
+#: plnotifier/cog.py:1560
+msgid "Tracks Removed Event"
+msgstr "Kaldırılan Etkinliği İzler"
+
+#: plnotifier/cog.py:1561
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} removed {track_count_variable_do_not_translate} tracks from the queue"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} Kaldırıldı {track_count_variable_do_not_translate} kuyruktaki izler"
+
+#: plnotifier/cog.py:1592 plnotifier/cog.py:2117
+msgid "Player Paused Event"
+msgstr "Oyuncu Duraklatılmış Etkinliği"
+
+#: plnotifier/cog.py:1593
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} paused the player"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} oynatıcıyı duraklattı"
+
+#: plnotifier/cog.py:1622
+msgid "Player Stopped Event"
+msgstr "Oyuncu Durduruldu Etkinliği"
+
+#: plnotifier/cog.py:1623
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} stopped the player"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} oyuncuyu durdurdu"
+
+#: plnotifier/cog.py:1652 plnotifier/cog.py:2147
+msgid "Player Resumed Event"
+msgstr "Oyuncu Devam Eden Etkinlik"
+
+#: plnotifier/cog.py:1653
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} resumed the player"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} oyuncuyu devam ettirdi"
+
+#: plnotifier/cog.py:1682
+msgid "Player Moved Event"
+msgstr "Oyuncu Taşındı Etkinliği"
+
+#: plnotifier/cog.py:1683
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} moved the player from {before_variable_do_not_translate} to {after_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} oyuncuyu taşıdı {before_variable_do_not_translate} Hedef {after_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1715
+msgid "Player Disconnected Event"
+msgstr "Oyuncunun Bağlantısı Kesildi Etkinliği"
+
+#: plnotifier/cog.py:1716
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} disconnected the player"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} oynatıcının bağlantısı kesildi"
+
+#: plnotifier/cog.py:1745
+msgid "Player Connected Event"
+msgstr "Oyuncu Bağlantılı Etkinlik"
+
+#: plnotifier/cog.py:1746
+msgid "[Node={node}] {requester} connected the player"
+msgstr "[Düğüm={node}] {requester} oynatıcıyı bağladı"
+
+#: plnotifier/cog.py:1773
+msgid "Player Volume Changed Event"
+msgstr "Oyuncu Ses Düzeyi Değişti Olayı"
+
+#: plnotifier/cog.py:1774
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} changed the player volume from {before_variable_do_not_translate} to {after_variable_do_not_translate}."
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} oynatıcı ses seviyesini değiştirdi {before_variable_do_not_translate} Hedef {after_variable_do_not_translate}."
+
+#: plnotifier/cog.py:1808 plnotifier/cog.py:1820 plnotifier/cog.py:1833
+msgid "Player Repeat Event"
+msgstr "Oyuncu Tekrar Etkinliği"
+
+#: plnotifier/cog.py:1809
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} disabled repeat"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} engelli tekrarı"
+
+#: plnotifier/cog.py:1821
+msgid "{requester_variable_do_not_translate} {status_variable_do_not_translate} repeat of the whole queue"
+msgstr "{requester_variable_do_not_translate} {status_variable_do_not_translate} tüm kuyruğun tekrarı"
+
+#: plnotifier/cog.py:1825 plnotifier/cog.py:1838
+msgid "enabled"
+msgstr "Etkin"
+
+#: plnotifier/cog.py:1825 plnotifier/cog.py:1838
+msgid "disabled"
+msgstr "sakat"
+
+#: plnotifier/cog.py:1834
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} {status_variable_do_not_translate} repeat for {track_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} {status_variable_do_not_translate} için tekrarla {track_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1868
+msgid "Player Restored Event"
+msgstr "Oyuncu Geri Yüklenen Etkinliği"
+
+#: plnotifier/cog.py:1869
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} restored the player"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} oynatıcıyı geri yükledi"
+
+#: plnotifier/cog.py:1894
+msgid "an intro section"
+msgstr "giriş bölümü"
+
+#: plnotifier/cog.py:1896
+msgid "an outro section"
+msgstr "bir outro bölümü"
+
+#: plnotifier/cog.py:1898
+msgid "a preview section"
+msgstr "önizleme bölümü"
+
+#: plnotifier/cog.py:1900
+msgid "an off-topic section"
+msgstr "konu dışı bir bölüm"
+
+#: plnotifier/cog.py:1902
+msgid "a filler section"
+msgstr "dolgu bölümü"
+
+#: plnotifier/cog.py:1904
+msgid "a sponsor section"
+msgstr "sponsor bölümü"
+
+#: plnotifier/cog.py:1906
+msgid "a self-promotion section"
+msgstr "kendini tanıtma bölümü"
+
+#: plnotifier/cog.py:1908
+msgid "an interaction section"
+msgstr "etkileşim bölümü"
+
+#: plnotifier/cog.py:1912
+msgid "Sponsor Segment Skipped Event"
+msgstr "Sponsor Segmenti Atlanan Etkinlik"
+
+#: plnotifier/cog.py:1913
+msgid "[Node={node_variable_do_not_translate}] Sponsorblock: Skipped {category_variable_do_not_translate} running from {start_variable_do_not_translate}s to {to_variable_do_not_translate}s"
+msgstr "[Düğüm={node_variable_do_not_translate}] Sponsorblock: Atlandı {category_variable_do_not_translate} 'den kaçmak {start_variable_do_not_translate}s için {to_variable_do_not_translate}s"
+
+#: plnotifier/cog.py:1943
+msgid "Effect"
+msgstr "Etki"
+
+#: plnotifier/cog.py:1944
+msgid "Not changed"
+msgstr "Değişmedi"
+
+#: plnotifier/cog.py:1945
+msgid "Values"
+msgstr "Değer"
+
+#: plnotifier/cog.py:1985
+msgid "Filters Applied Event"
+msgstr "Uygulanan Filtre Olayı"
+
+#: plnotifier/cog.py:1988
+msgid "None"
+msgstr "Hiç kimse"
+
+#: plnotifier/cog.py:1989
+msgid "Currently Applied"
+msgstr "Şu Anda Uygulananlar"
+
+#: plnotifier/cog.py:1991
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} changed the player filters"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} oynatıcı filtrelerini değiştirdi"
+
+#: plnotifier/cog.py:2013
+msgid "Node Connected Event"
+msgstr "Düğüm Bağlantılı Olay"
+
+#: plnotifier/cog.py:2014
+msgid "Node {name_variable_do_not_translate} has been connected"
+msgstr "Düğüm {name_variable_do_not_translate} bağlandı"
+
+#: plnotifier/cog.py:2032
+msgid "Node Disconnected Event"
+msgstr "Düğüm Bağlantısı Kesilmiş Olay"
+
+#: plnotifier/cog.py:2033
+msgid "Node {name_variable_do_not_translate} has been disconnected with code {code_variable_do_not_translate} and reason: {reason_variable_do_not_translate}"
+msgstr "Düğüm {name_variable_do_not_translate} kod ile bağlantısı kesildi {code_variable_do_not_translate} ve nedeni: {reason_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2059
+msgid "Node Changed Event"
+msgstr "Düğüm Değiştirme Olayı"
+
+#: plnotifier/cog.py:2060
+msgid "The node which the player is connected to changed from {from_variable_do_not_translate} to {to_variable_do_not_translate}"
+msgstr "Oynatıcının bağlı olduğu düğüm değiştirildi {from_variable_do_not_translate} Hedef {to_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2084
+msgid "WebSocket Closed Event"
+msgstr "WebSocket Kapalı Olayı"
+
+#: plnotifier/cog.py:2085
+msgid "[Node={node_variable_do_not_translate}] The Lavalink websocket connection to Discord closed with code {code_variable_do_not_translate} and reason {reason_variable_do_not_translate}"
+msgstr "[Düğüm={node_variable_do_not_translate}] Discord'a Lavalink web soketi bağlantısı kodla kapatıldı {code_variable_do_not_translate} ve sebep {reason_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2118
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically paused the player due to configured values"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} yapılandırılan değerler nedeniyle oynatıcıyı otomatik olarak duraklattı"
+
+#: plnotifier/cog.py:2148
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically resumed the player due to configured values"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} yapılandırılan değerler nedeniyle oynatıcıyı otomatik olarak devam ettirdi"
+
+#: plnotifier/cog.py:2177 plnotifier/cog.py:2209
+msgid "Auto Player Disconnected Event"
+msgstr "Otomatik Oynatıcı Bağlantısı Kesildi Olayı"
+
+#: plnotifier/cog.py:2178
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically disconnected the player as there is no one listening"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} dinleyen kimse olmadığı için oynatıcının bağlantısını otomatik olarak kesti"
+
+#: plnotifier/cog.py:2210
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically disconnected the player as the queue is empty"
+msgstr "[Düğüm={node_variable_do_not_translate}] {requester_variable_do_not_translate} kuyruk boş olduğu için oynatıcının bağlantısı otomatik olarak kesilir"
+

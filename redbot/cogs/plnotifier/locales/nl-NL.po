@@ -1,0 +1,542 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-08 22:10+0000\n"
+"PO-Revision-Date: 2023-05-19 10:26\n"
+"Last-Translator: \n"
+"Language-Team: Dutch\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: nl\n"
+"X-Crowdin-File: /cogs/plnotifier/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3351\n"
+"Language: nl_NL\n"
+
+#: plnotifier/cog.py:84
+#, docstring
+msgid "Listen to events from the PyLav player and send them as messages to the specified channel"
+msgstr "Luister naar gebeurtenissen van de PyLav speler en stuur ze als berichten naar het opgegeven kanaal"
+
+#: plnotifier/cog.py:230
+#, docstring
+msgid "Configure the PyLavNotifier cog"
+msgstr "Configureer de PyLavNotifier cog"
+
+#: plnotifier/cog.py:234
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Toon de versie van de Cog en PyLav"
+
+#: plnotifier/cog.py:250
+msgid "Library / Cog"
+msgstr "Bibliotheek / Cog"
+
+#: plnotifier/cog.py:251
+msgid "Version"
+msgstr "Versie"
+
+#: plnotifier/cog.py:266
+#, docstring
+msgid "Set the notify channel for the player"
+msgstr "Stel het notificatie-kanaal voor de speler in"
+
+#: plnotifier/cog.py:275 plnotifier/cog.py:345
+msgid "I do not have permission to manage webhooks in {channel_variable_do_not_translate}."
+msgstr "Ik heb geen toestemming om webhooks te beheren in {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:289
+msgid "I do not have permission to create a thread in {channel_variable_do_not_translate}."
+msgstr "Ik heb geen toestemming om een thread te maken in {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:298 plnotifier/cog.py:316 plnotifier/cog.py:355
+msgid "PyLavNotifier"
+msgstr "PyLavnotifier"
+
+#: plnotifier/cog.py:299 plnotifier/cog.py:319 plnotifier/cog.py:356
+msgid "PyLav Notifier - Requested by {author_variable_do_not_translate}."
+msgstr "PyLav Notifier - Aangevraagd door {author_variable_do_not_translate}."
+
+#: plnotifier/cog.py:312
+msgid "This thread will be used by PyLav to post notifications about the player."
+msgstr "Deze thread wordt door PyLav gebruikt om meldingen over de speler te plaatsen."
+
+#: plnotifier/cog.py:327 plnotifier/cog.py:363
+msgid "A new webhook was being created."
+msgstr "Er werd een nieuwe webhook gemaakt."
+
+#: plnotifier/cog.py:377
+msgid "PyLavNotifier channel set to {channel_variable_do_not_translate}."
+msgstr "PyLavNotifier-kanaal ingesteld op {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:389
+#, docstring
+msgid "Set whether or not to notify for the specified event.\n\n"
+"        Arguments:\n"
+"            event -- The event to set.\n"
+"            toggle -- Whether or not to notify upon receiving this event.\n"
+"            use_mention -- Whether or not to use a mention instead of the name for the action requested.\n"
+"        "
+msgstr "Stel in of geen melding wordt gemaakt van de opgegeven gebeurtenis.\n\n"
+"        Argumenten:\n"
+"            event -- Het evenement om in te stellen.\n"
+"            schakel uit -- Of er nu wel of niet een melding moet worden gemaakt van deze gebeurtenis.\n"
+"            use_mention -- Of u een vermelding wilt gebruiken in plaats van de naam van de gevraagde actie.\n"
+"        "
+
+#: plnotifier/cog.py:406
+msgid "Invalid event, possible events are:\n\n"
+"{events_variable_do_not_translate}."
+msgstr "Ongeldige gebeurtenis, mogelijke gebeurtenissen zijn:\n\n"
+"{events_variable_do_not_translate}."
+
+#: plnotifier/cog.py:425
+msgid "Event {event_variable_do_not_translate} set to {toggle_variable_do_not_translate}{extras_variable_do_not_translate}."
+msgstr "Gebeurtenis {event_variable_do_not_translate} instellen op {toggle_variable_do_not_translate}{extras_variable_do_not_translate}."
+
+#: plnotifier/cog.py:429
+msgid "notify"
+msgstr "melding"
+
+#: plnotifier/cog.py:429
+msgid "do not notify"
+msgstr "niet melden"
+
+#: plnotifier/cog.py:430
+msgid " with mentions"
+msgstr " met vermeldingen"
+
+#: plnotifier/cog.py:432
+msgid " without mentions"
+msgstr " zonder vermeldingen"
+
+#: plnotifier/cog.py:450
+msgid "Track Stuck Event"
+msgstr "Track Vastzetten Evenement"
+
+#: plnotifier/cog.py:451
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} is stuck for {threshold_variable_do_not_translate} seconds, skipping."
+msgstr "[Knooppunt={node_variable_do_not_translate}] {track_variable_do_not_translate} zit vast voor {threshold_variable_do_not_translate} seconden, overslaan."
+
+#: plnotifier/cog.py:478
+msgid "Track Exception Event"
+msgstr "Track uitzondering gebeurtenis"
+
+#: plnotifier/cog.py:479
+msgid "[Node={node_variable_do_not_translate}] There was an error while playing {track_variable_do_not_translate}:\n"
+"{exception_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] Er is een fout opgetreden tijdens het spelen {track_variable_do_not_translate}:\n"
+"{exception_variable_do_not_translate}"
+
+#: plnotifier/cog.py:505
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because the player reached the end of the tracks runtime."
+msgstr "[Knooppunt={node_variable_do_not_translate}] {track_variable_do_not_translate} is klaar met spelen omdat de speler het einde van de looptijd van het nummer heeft bereikt."
+
+#: plnotifier/cog.py:512
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because a new track started playing."
+msgstr "[Knooppunt={node_variable_do_not_translate}] {track_variable_do_not_translate} is klaar met spelen omdat er een nieuw nummer is gaan spelen."
+
+#: plnotifier/cog.py:519
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because it failed to start."
+msgstr "[Knooppunt={node_variable_do_not_translate}] {track_variable_do_not_translate} is klaar met spelen omdat het niet kon starten."
+
+#: plnotifier/cog.py:526
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing becausethe player was stopped."
+msgstr "[Knooppunt={node_variable_do_not_translate}] {track_variable_do_not_translate} is uitgespeeld omdat de speler is gestopt."
+
+#: plnotifier/cog.py:533
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing becausethe node told it to stop."
+msgstr "[Knooppunt={node_variable_do_not_translate}] {track_variable_do_not_translate} is klaar met spelen omdat het knooppunt heeft gezegd dat het moest stoppen."
+
+#: plnotifier/cog.py:542
+msgid "Track End Event"
+msgstr "Track einde evenement"
+
+#: plnotifier/cog.py:568
+msgid "YouTube Music Track Start Event"
+msgstr "YouTube Muziek Track Start Event"
+
+#: plnotifier/cog.py:569
+msgid "[Node={node_variable_do_not_translate}] YouTube Music track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] YouTube Music-track: {track_variable_do_not_translate} is begonnen met spelen.\n"
+"Aangevraagd door: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:600
+msgid "Deezer Track Start Event"
+msgstr "Deezer Track Start Evenement"
+
+#: plnotifier/cog.py:601
+msgid "[Node={node_variable_do_not_translate}] Deezer track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] Deezer spoor: {track_variable_do_not_translate} is begonnen met spelen.\n"
+"Aangevraagd door: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:632
+msgid "Spotify Track Start Event"
+msgstr "Spotify Track Start Evenement"
+
+#: plnotifier/cog.py:633
+msgid "[Node={node_variable_do_not_translate}] Spotify track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] Spotify-track: {track_variable_do_not_translate} is begonnen met spelen.\n"
+"Aangevraagd door: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:664
+msgid "Apple Music Track Start Event"
+msgstr "Apple Music Track Start-evenement"
+
+#: plnotifier/cog.py:665
+msgid "[Node={node_variable_do_not_translate}] Apple Music track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] Apple Music-track: {track_variable_do_not_translate} is begonnen met spelen.\n"
+"Aangevraagd door: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:696
+msgid "Local Track Start Event"
+msgstr "Lokale track start gebeurtenis"
+
+#: plnotifier/cog.py:697
+msgid "[Node={node_variable_do_not_translate}] Local track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] Lokale track: {track_variable_do_not_translate} is begonnen met spelen.\n"
+"Aangevraagd door: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:728
+msgid "HTTP Track Start Event"
+msgstr "HTTP Track start event"
+
+#: plnotifier/cog.py:729
+msgid "[Node={node_variable_do_not_translate}] HTTP track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] HTTP-track: {track_variable_do_not_translate} is begonnen met spelen.\n"
+"Aangevraagd door: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:760
+msgid "Text-To-Speech Track Start Event"
+msgstr "Tekst-Spraak Track Start Evenement"
+
+#: plnotifier/cog.py:761
+msgid "[Node={node_variable_do_not_translate}] Text-To-Speech track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}."
+msgstr "[Knooppunt={node_variable_do_not_translate}] Tekst-naar-spraak track: {track_variable_do_not_translate} is begonnen met spelen.\n"
+"Aangevraagd door: {requester_variable_do_not_translate}."
+
+#: plnotifier/cog.py:792
+msgid "YouTube Track Start Event"
+msgstr "YouTube track start event"
+
+#: plnotifier/cog.py:793
+msgid "[Node={node_variable_do_not_translate}] YouTube track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}."
+msgstr "[Knooppunt={node_variable_do_not_translate}] YouTube-track: {track_variable_do_not_translate} is begonnen met spelen.\n"
+"Aangevraagd door: {requester_variable_do_not_translate}."
+
+#: plnotifier/cog.py:824 plnotifier/cog.py:859 plnotifier/cog.py:894
+#: plnotifier/cog.py:929 plnotifier/cog.py:964 plnotifier/cog.py:999
+#: plnotifier/cog.py:1034 plnotifier/cog.py:1069 plnotifier/cog.py:1104
+#: plnotifier/cog.py:1139 plnotifier/cog.py:1174 plnotifier/cog.py:1209
+#: plnotifier/cog.py:1244 plnotifier/cog.py:1279
+msgid "{source_variable_do_not_translate} Track Start Event"
+msgstr "{source_variable_do_not_translate} Startgebeurtenis bijhouden"
+
+#: plnotifier/cog.py:827 plnotifier/cog.py:862 plnotifier/cog.py:897
+#: plnotifier/cog.py:932 plnotifier/cog.py:967 plnotifier/cog.py:1002
+#: plnotifier/cog.py:1037 plnotifier/cog.py:1072 plnotifier/cog.py:1107
+#: plnotifier/cog.py:1142 plnotifier/cog.py:1177 plnotifier/cog.py:1212
+#: plnotifier/cog.py:1247 plnotifier/cog.py:1282
+msgid "[Node={node_variable_do_not_translate}] {source_variable_do_not_translate} track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {source_variable_do_not_translate} spoor: {track_variable_do_not_translate} is begonnen met spelen.\n"
+"Aangevraagd door: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1314
+msgid "Track Skipped Event"
+msgstr "Track overgeslagen evenement"
+
+#: plnotifier/cog.py:1315
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has been skipped.\n"
+"Requested by {requester_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {track_variable_do_not_translate} is overgeslagen.\n"
+"Aangevraagd door {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1346
+msgid "Track Seek Event"
+msgstr "Volg Seek Evenement"
+
+#: plnotifier/cog.py:1347
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} requested that {track_variable_do_not_translate} is sought from position {from_variable_do_not_translate} to position {after_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} verzocht dat {track_variable_do_not_translate} wordt gezocht vanuit positie {from_variable_do_not_translate} naar positie {after_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1381
+msgid "Track Previous Requested Event"
+msgstr "Track vorige gevraagde gebeurtenis"
+
+#: plnotifier/cog.py:1382
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} requested that the previous track {track_variable_do_not_translate} be played"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} verzocht dat het vorige spoor {track_variable_do_not_translate} worden gespeeld"
+
+#: plnotifier/cog.py:1413
+msgid "Tracks Requested Event"
+msgstr "Tracks aangevraagd Evenement"
+
+#: plnotifier/cog.py:1414
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} added {track_count_variable_do_not_translate} to the queue."
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} toegevoegd {track_count_variable_do_not_translate} naar de wachtrij."
+
+#: plnotifier/cog.py:1417
+msgid "{count_variable_do_not_translate} track"
+msgstr "{count_variable_do_not_translate} spoor"
+
+#: plnotifier/cog.py:1444
+msgid "Track AutoPlay Event"
+msgstr "Volg AutoPlay Evenement"
+
+#: plnotifier/cog.py:1445
+msgid "[Node={node_variable_do_not_translate}] Auto playing {track_variable_do_not_translate}."
+msgstr "[Knooppunt={node_variable_do_not_translate}] Automatisch afspelen {track_variable_do_not_translate}."
+
+#: plnotifier/cog.py:1475
+msgid "Track Resumed Event"
+msgstr "Track hervat evenement"
+
+#: plnotifier/cog.py:1476
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} resumed {track_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} Hervat {track_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1507
+msgid "Queue Shuffled Event"
+msgstr "Wachtrij shuffled Evenement"
+
+#: plnotifier/cog.py:1508
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} shuffled the queue"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} de wachtrij door elkaar geschud"
+
+#: plnotifier/cog.py:1532
+msgid "Queue End Event"
+msgstr "Wachtrij Einde Event"
+
+#: plnotifier/cog.py:1533
+msgid "[Node={node_variable_do_not_translate}] All tracks in the queue have been played"
+msgstr "[Knooppunt={node_variable_do_not_translate}] Alle nummers in de wachtrij zijn afgespeeld"
+
+#: plnotifier/cog.py:1560
+msgid "Tracks Removed Event"
+msgstr "Nummers verwijderd Evenement"
+
+#: plnotifier/cog.py:1561
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} removed {track_count_variable_do_not_translate} tracks from the queue"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} Verwijderd {track_count_variable_do_not_translate} tracks uit de wachtrij"
+
+#: plnotifier/cog.py:1592 plnotifier/cog.py:2117
+msgid "Player Paused Event"
+msgstr "Speler gepauzeerd evenement"
+
+#: plnotifier/cog.py:1593
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} paused the player"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} de speler gepauzeerd"
+
+#: plnotifier/cog.py:1622
+msgid "Player Stopped Event"
+msgstr "Speler gestopt evenement"
+
+#: plnotifier/cog.py:1623
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} stopped the player"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} stopte de speler"
+
+#: plnotifier/cog.py:1652 plnotifier/cog.py:2147
+msgid "Player Resumed Event"
+msgstr "Speler hervat Evenement"
+
+#: plnotifier/cog.py:1653
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} resumed the player"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} hervatte de speler"
+
+#: plnotifier/cog.py:1682
+msgid "Player Moved Event"
+msgstr "Speler verplaatst evenement"
+
+#: plnotifier/cog.py:1683
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} moved the player from {before_variable_do_not_translate} to {after_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} de speler verplaatst van {before_variable_do_not_translate} Aan {after_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1715
+msgid "Player Disconnected Event"
+msgstr "Speler verbinding verbroken gebeurtenis"
+
+#: plnotifier/cog.py:1716
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} disconnected the player"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} de speler is losgekoppeld"
+
+#: plnotifier/cog.py:1745
+msgid "Player Connected Event"
+msgstr "Speler Verbonden Event"
+
+#: plnotifier/cog.py:1746
+msgid "[Node={node}] {requester} connected the player"
+msgstr "[Node={node}] {requester} heeft de speler aangesloten"
+
+#: plnotifier/cog.py:1773
+msgid "Player Volume Changed Event"
+msgstr "Speler Volume Gewijzigd Gebeurtenis"
+
+#: plnotifier/cog.py:1774
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} changed the player volume from {before_variable_do_not_translate} to {after_variable_do_not_translate}."
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} het volume van de speler gewijzigd van {before_variable_do_not_translate} Aan {after_variable_do_not_translate}."
+
+#: plnotifier/cog.py:1808 plnotifier/cog.py:1820 plnotifier/cog.py:1833
+msgid "Player Repeat Event"
+msgstr "Speler herhalen evenement"
+
+#: plnotifier/cog.py:1809
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} disabled repeat"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} uitgeschakelde herhaling"
+
+#: plnotifier/cog.py:1821
+msgid "{requester_variable_do_not_translate} {status_variable_do_not_translate} repeat of the whole queue"
+msgstr "{requester_variable_do_not_translate} {status_variable_do_not_translate} herhaling van de hele wachtrij"
+
+#: plnotifier/cog.py:1825 plnotifier/cog.py:1838
+msgid "enabled"
+msgstr "Ingeschakeld"
+
+#: plnotifier/cog.py:1825 plnotifier/cog.py:1838
+msgid "disabled"
+msgstr "invalide"
+
+#: plnotifier/cog.py:1834
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} {status_variable_do_not_translate} repeat for {track_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} {status_variable_do_not_translate} herhaal voor {track_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1868
+msgid "Player Restored Event"
+msgstr "Speler hersteld evenement"
+
+#: plnotifier/cog.py:1869
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} restored the player"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} herstelde de speler"
+
+#: plnotifier/cog.py:1894
+msgid "an intro section"
+msgstr "een intro sectie"
+
+#: plnotifier/cog.py:1896
+msgid "an outro section"
+msgstr "een outro sectie"
+
+#: plnotifier/cog.py:1898
+msgid "a preview section"
+msgstr "een sectie voorbeeld"
+
+#: plnotifier/cog.py:1900
+msgid "an off-topic section"
+msgstr "een off-topic sectie"
+
+#: plnotifier/cog.py:1902
+msgid "a filler section"
+msgstr "een vuller sectie"
+
+#: plnotifier/cog.py:1904
+msgid "a sponsor section"
+msgstr "een sponsor sectie"
+
+#: plnotifier/cog.py:1906
+msgid "a self-promotion section"
+msgstr "een zelf-promotie sectie"
+
+#: plnotifier/cog.py:1908
+msgid "an interaction section"
+msgstr "een interactiesectie"
+
+#: plnotifier/cog.py:1912
+msgid "Sponsor Segment Skipped Event"
+msgstr "Sponsor Segment overgeslagen evenement"
+
+#: plnotifier/cog.py:1913
+msgid "[Node={node_variable_do_not_translate}] Sponsorblock: Skipped {category_variable_do_not_translate} running from {start_variable_do_not_translate}s to {to_variable_do_not_translate}s"
+msgstr "[Knooppunt={node_variable_do_not_translate}] Sponsorblok: Overgeslagen {category_variable_do_not_translate} rennen van {start_variable_do_not_translate}s tot {to_variable_do_not_translate}s"
+
+#: plnotifier/cog.py:1943
+msgid "Effect"
+msgstr "Effect"
+
+#: plnotifier/cog.py:1944
+msgid "Not changed"
+msgstr "Niet gewijzigd"
+
+#: plnotifier/cog.py:1945
+msgid "Values"
+msgstr "Waarden"
+
+#: plnotifier/cog.py:1985
+msgid "Filters Applied Event"
+msgstr "Toegepaste filters"
+
+#: plnotifier/cog.py:1988
+msgid "None"
+msgstr "Geen"
+
+#: plnotifier/cog.py:1989
+msgid "Currently Applied"
+msgstr "Momenteel toegepast"
+
+#: plnotifier/cog.py:1991
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} changed the player filters"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} de spelersfilters gewijzigd"
+
+#: plnotifier/cog.py:2013
+msgid "Node Connected Event"
+msgstr "Gebeurtenis Verbonden knooppunt"
+
+#: plnotifier/cog.py:2014
+msgid "Node {name_variable_do_not_translate} has been connected"
+msgstr "Knoop {name_variable_do_not_translate} is aangesloten"
+
+#: plnotifier/cog.py:2032
+msgid "Node Disconnected Event"
+msgstr "Node losgekoppeld Evenement"
+
+#: plnotifier/cog.py:2033
+msgid "Node {name_variable_do_not_translate} has been disconnected with code {code_variable_do_not_translate} and reason: {reason_variable_do_not_translate}"
+msgstr "Knoop {name_variable_do_not_translate} is losgekoppeld met code {code_variable_do_not_translate} en reden: {reason_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2059
+msgid "Node Changed Event"
+msgstr "Knooppunt gewijzigd evenement"
+
+#: plnotifier/cog.py:2060
+msgid "The node which the player is connected to changed from {from_variable_do_not_translate} to {to_variable_do_not_translate}"
+msgstr "Het knooppunt waarmee de speler is verbonden, is gewijzigd van {from_variable_do_not_translate} Aan {to_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2084
+msgid "WebSocket Closed Event"
+msgstr "WebSocket Gesloten Gebeurtenis"
+
+#: plnotifier/cog.py:2085
+msgid "[Node={node_variable_do_not_translate}] The Lavalink websocket connection to Discord closed with code {code_variable_do_not_translate} and reason {reason_variable_do_not_translate}"
+msgstr "[Knooppunt={node_variable_do_not_translate}] De Lavalink websocket verbinding met Discord afgesloten met code {code_variable_do_not_translate} en reden {reason_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2118
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically paused the player due to configured values"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatisch gepauzeerd de speler vanwege geconfigureerde waarden"
+
+#: plnotifier/cog.py:2148
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically resumed the player due to configured values"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatisch hervat de speler als gevolg van geconfigureerde waarden"
+
+#: plnotifier/cog.py:2177 plnotifier/cog.py:2209
+msgid "Auto Player Disconnected Event"
+msgstr "Auto Speler verbinding verbroken gebeurtenis"
+
+#: plnotifier/cog.py:2178
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically disconnected the player as there is no one listening"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatisch de speler losgekoppeld omdat er niemand luistert"
+
+#: plnotifier/cog.py:2210
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically disconnected the player as the queue is empty"
+msgstr "[Knooppunt={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatisch de speler losgekoppeld omdat de wachtrij leeg is"
+

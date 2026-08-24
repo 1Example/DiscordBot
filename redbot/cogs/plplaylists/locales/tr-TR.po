@@ -1,0 +1,279 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-26 21:22+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Turkish\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: tr\n"
+"X-Crowdin-File: /cogs/plplaylists/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3319\n"
+"Language: tr_TR\n"
+
+#: plplaylists/cog.py:47
+#, docstring
+msgid "PyLav playlist management commands"
+msgstr "PyLav çalma listesi yönetim komutları"
+
+#: plplaylists/cog.py:55
+msgid "Control PyLav playlists"
+msgstr "PyLav çalma listelerini kontrol etme"
+
+#: plplaylists/cog.py:77
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Cog ve PyLav'ın versiyonunu göster"
+
+#: plplaylists/cog.py:92
+msgid "Library / Cog"
+msgstr "Kütüphane / Dişli"
+
+#: plplaylists/cog.py:93
+msgid "Version"
+msgstr "Sürüm"
+
+#: plplaylists/cog.py:130
+msgid "Let us create a playlist!"
+msgstr "Bir çalma listesi oluşturalım!"
+
+#: plplaylists/cog.py:131
+msgid "(**1**) - Apply changes to playlist.\n"
+"(**2**) - Cancel any changes made.\n"
+"(**3**) - Add a name to the playlist.\n"
+"(**4**) - Link this playlist to an existing playlist/album.\n"
+"(**5**) - Add all tracks from the queue to the playlist.\n\n"
+"If you want the playlist name to be as the original playlist simply set the URL but no name.\n\n"
+msgstr "(**1**) - Değişiklikleri çalma listesine uygulayın.\n"
+"(**2**) - Yapılan değişiklikleri iptal edin.\n"
+"(**3**) - Çalma listesine bir ad ekleyin.\n"
+"(**4**) - Bu çalma listesini mevcut bir çalma listesine/albüme bağlayın.\n"
+"(**5**) - Kuyruktaki tüm parçaları çalma listesine ekleyin.\n\n"
+"Çalma listesi adının orijinal oynatma listesi gibi olmasını istiyorsanız, URL'yi ayarlamanız ancak ad vermemeniz yeterlidir.\n\n"
+
+#: plplaylists/cog.py:165
+msgid "I did not create this playlist."
+msgstr "Bu çalma listesini ben oluşturmadım."
+
+#: plplaylists/cog.py:166
+msgid "No tracks were provided in time."
+msgstr "Zamanında hiçbir parça sağlanmadı."
+
+#: plplaylists/cog.py:179
+msgid "I have created a new playlist."
+msgstr "Yeni bir çalma listesi oluşturdum."
+
+#: plplaylists/cog.py:180
+msgid "Name: `{name_variable_do_not_translate}`\n"
+"Identifier: `{id_variable_do_not_translate}`\n"
+"Tracks: `{track_count_variable_do_not_translate}`"
+msgstr "İsim: '{name_variable_do_not_translate}`\n"
+"Tanımlayıcı: '{id_variable_do_not_translate}`\n"
+"Parçalar: '{track_count_variable_do_not_translate}`"
+
+#: plplaylists/cog.py:208
+msgid "You have no playlists"
+msgstr "Çalma listeniz yok"
+
+#: plplaylists/cog.py:250 plplaylists/cog.py:642
+msgid "Nothing to save"
+msgstr "Kaydedilecek bir şey yok"
+
+#: plplaylists/cog.py:251 plplaylists/cog.py:643
+msgid "There is nothing in the queue to save."
+msgstr "Kuyrukta kaydedilecek hiçbir şey yok."
+
+#: plplaylists/cog.py:288 plplaylists/cog.py:574 plplaylists/cog.py:660
+msgid "{user_variable_do_not_translate}, playlist {playlist_name_variable_do_not_translate} cannot be managed by yourself."
+msgstr "{user_variable_do_not_translate}Çalma listesi {playlist_name_variable_do_not_translate} kendiniz yönetilemez."
+
+#: plplaylists/cog.py:300
+msgid "(**1**){space_variable_do_not_translate} - Apply changes to playlist.\n"
+"(**2**){space_variable_do_not_translate} - Cancel any changes made and close the menu.\n"
+"(**3**){space_variable_do_not_translate} - Delete this playlist.\n"
+"(**4**){space_variable_do_not_translate} - Remove all tracks from this playlist.\n"
+"(**5**){space_variable_do_not_translate} - Update the playlist with the latest tracks.\n"
+"Please note that this action will ignore any tracks added/removed via this menu.\n"
+"(**6**){space_variable_do_not_translate} - Change the name of the playlist.\n"
+"(**7**){space_variable_do_not_translate} - Link this playlist to an existing playlist/album.\n"
+"(**8**){space_variable_do_not_translate} - Add a query to this playlist.\n"
+"(**9**){space_variable_do_not_translate} - Remove a query from this playlist.\n"
+"(**10**) - Download the playlist file.\n"
+"(**11**) - Add current playlist to the queue.\n"
+"(**12**) - Show tracks in current playlist.\n"
+"(**13**) - Add tracks from queue to this playlist.\n"
+"(**14**) - Remove duplicate entries in the playlist.\n\n"
+"The add/remove track buttons can be used multiple times to add/remove multiple tracks and playlists at once.\n\n"
+"A query is anything playable by the play command - any query can be used by the add/remove buttons\n\n"
+"The clear button will always be run first before any other operations.\n"
+"The URL button will always run last - Linking a playlist via the URL will overwrite any tracks added or removed to this playlist.\n\n"
+"If you interact with a button multiple times other than the add/remove buttons only the last interaction will take effect.\n\n\n"
+msgstr "(**1**){space_variable_do_not_translate} - Çalma listesine değişiklikler uygulayın.\n"
+"(**2**){space_variable_do_not_translate} - Yapılan değişiklikleri iptal edin ve menüyü kapatın.\n"
+"(**3**){space_variable_do_not_translate} - Bu çalma listesini silin.\n"
+"(**4**){space_variable_do_not_translate} - Bu çalma listesinden tüm parçaları kaldırın.\n"
+"(**5**){space_variable_do_not_translate} - Çalma listesini en son parçalarla güncelleyin.\n"
+"Bu eylemin, bu menü aracılığıyla eklenen/kaldırılan tüm parçaları yok sayacağını lütfen unutmayın.\n"
+"(**6**){space_variable_do_not_translate} - Çalma listesinin adını değiştirin.\n"
+"(**7**){space_variable_do_not_translate} - Bu çalma listesini mevcut bir çalma listesine / albüme bağlayın.\n"
+"(**8**){space_variable_do_not_translate} - Bu çalma listesine bir sorgu ekleyin.\n"
+"(**9**){space_variable_do_not_translate} - Bu çalma listesinden bir sorguyu kaldırın.\n"
+"(**10**) - Çalma listesi dosyasını indirin.\n"
+"(**11**) - Geçerli çalma listesini kuyruğa ekleyin.\n"
+"(**12**) - Geçerli çalma listesindeki parçaları göster.\n"
+"(**13**) - Kuyruktaki parçaları bu çalma listesine ekleyin.\n"
+"(**14**) - Çalma listesindeki yinelenen girişleri kaldırın.\n\n"
+"Parça ekle/kaldır düğmeleri, aynı anda birden fazla parça ve çalma listesi eklemek/kaldırmak için birden çok kez kullanılabilir.\n\n"
+"Sorgu, play komutu tarafından oynatılabilen herhangi bir şeydir - herhangi bir sorgu ekle/kaldır düğmeleri tarafından kullanılabilir\n\n"
+"Temizle düğmesi her zaman diğer işlemlerden önce çalıştırılır.\n"
+"URL düğmesi her zaman en son çalışır - Bir oynatma listesini URL üzerinden bağlamak, bu oynatma listesine eklenen veya kaldırılan tüm parçaların üzerine yazılır.\n\n"
+"Bir düğmeyle ekle/kaldır düğmeleri dışında birden çok kez etkileşim kurarsanız, yalnızca son etkileşim etkili olur.\n\n\n"
+
+#: plplaylists/cog.py:326
+msgid "(**1**) - Close the menu.\n"
+"(**2**) - Update the playlist with the latest tracks.\n"
+"(**3**) - Download the playlist file.\n"
+"(**4**) - Add current playlist to the queue.\n"
+"(**5**) - Show tracks in current playlist.\n\n\n"
+msgstr "(**1**) - Menüyü kapatın.\n"
+"(**2**) - Çalma listesini en son parçalarla güncelleyin.\n"
+"(**3**) - Çalma listesi dosyasını indirin.\n"
+"(**4**) - Geçerli çalma listesini kuyruğa ekleyin.\n"
+"(**5**) - Geçerli çalma listesindeki parçaları göster.\n\n\n"
+
+#: plplaylists/cog.py:334
+msgid "__**Currently managing**__:\n"
+"**Name**:{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{playlist_name_variable_do_not_translate}\n"
+"**Scope**:{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{scope_variable_do_not_translate}\n"
+"**Author**:{space_variable_do_not_translate}{space_variable_do_not_translate}{author_variable_do_not_translate}\n"
+"**Tracks**:{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{tracks_variable_do_not_translate} tracks\n"
+"**URL**:{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{url_variable_do_not_translate}\n"
+msgstr "__**Şu anda yönetiliyor**__:\n"
+"**Ad**:{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{playlist_name_variable_do_not_translate}\n"
+"**Kapsam**:{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{scope_variable_do_not_translate}\n"
+"**Yaratıcı**:{space_variable_do_not_translate}{space_variable_do_not_translate}{author_variable_do_not_translate}\n"
+"**Parça**:{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{tracks_variable_do_not_translate} Parça\n"
+"**URL**:{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{space_variable_do_not_translate}{url_variable_do_not_translate}\n"
+
+#: plplaylists/cog.py:352
+msgid "Let us manage: {playlist_name_variable_do_not_translate}."
+msgstr "Yönetelim: {playlist_name_variable_do_not_translate}."
+
+#: plplaylists/cog.py:356
+msgid "Let us take a look at: {playlist_name_variable_do_not_translate}."
+msgstr "Bir göz atalım: {playlist_name_variable_do_not_translate}."
+
+#: plplaylists/cog.py:367
+msgid "N/A"
+msgstr "Yok"
+
+#: plplaylists/cog.py:390
+msgid "I have deleted a playlist."
+msgstr "Bir çalma listesini sildim."
+
+#: plplaylists/cog.py:392 plplaylists/cog.py:589
+msgid "{user_variable_do_not_translate}, playlist {playlist_name_variable_do_not_translate} has been deleted."
+msgstr "{user_variable_do_not_translate}Çalma listesi {playlist_name_variable_do_not_translate} silindi."
+
+#: plplaylists/cog.py:446
+msgid "Playlist {playlist_name_variable_do_not_translate} could not be updated with URL: {url_variable_do_not_translate}"
+msgstr "Çalma listesi {playlist_name_variable_do_not_translate} URL ile güncellenemedi: {url_variable_do_not_translate}"
+
+#: plplaylists/cog.py:491
+msgid "\n"
+"1 track was removed from the playlist."
+msgstr "\n"
+"Çalma listesinden 1 parça kaldırıldı."
+
+#: plplaylists/cog.py:493
+msgid "\n"
+"{track_count_variable_do_not_translate} tracks were removed from the playlist."
+msgstr "\n"
+"{track_count_variable_do_not_translate} parçalar çalma listesinden kaldırıldı."
+
+#: plplaylists/cog.py:499 plplaylists/cog.py:683
+msgid "\n"
+"1 track was added to the playlist."
+msgstr "\n"
+"Çalma listesine 1 parça eklendi."
+
+#: plplaylists/cog.py:501 plplaylists/cog.py:685
+msgid "\n"
+"{track_count_variable_do_not_translate} tracks were added to the playlist."
+msgstr "\n"
+"{track_count_variable_do_not_translate} parçalar çalma listesine eklendi."
+
+#: plplaylists/cog.py:507 plplaylists/cog.py:694
+msgid "Playlist updated"
+msgstr "Çalma listesi güncellendi"
+
+#: plplaylists/cog.py:508 plplaylists/cog.py:695
+msgid "{user_variable_do_not_translate}, playlist {playlist_name_variable_do_not_translate} has been updated.{extras_variable_do_not_translate}."
+msgstr "{user_variable_do_not_translate}Çalma listesi {playlist_name_variable_do_not_translate} güncellendi.{extras_variable_do_not_translate}."
+
+#: plplaylists/cog.py:522 plplaylists/cog.py:710
+msgid "Playlist unchanged"
+msgstr "Çalma listesi değişmedi"
+
+#: plplaylists/cog.py:523
+msgid "{user_variable_do_not_translate}, playlist {playlist_name_variable_do_not_translate} has not been updated."
+msgstr "{user_variable_do_not_translate}Çalma listesi {playlist_name_variable_do_not_translate} güncellenmemiştir."
+
+#: plplaylists/cog.py:587
+msgid "Playlist deleted"
+msgstr "Çalma listesi silindi"
+
+#: plplaylists/cog.py:711
+msgid "{user_variable_do_not_translate}, playlist {playlist_name_variable_do_not_translate} has not been updated"
+msgstr "{user_variable_do_not_translate}Çalma listesi {playlist_name_variable_do_not_translate} güncellenmedi"
+
+#: plplaylists/cog.py:742
+msgid "You must either provide a URL or attach a playlist file to upload a playlist."
+msgstr "Oynatma listesi yüklemek için bir URL sağlamanız veya bir oynatma listesi dosyası eklemeniz gerekir."
+
+#: plplaylists/cog.py:754
+msgid "No valid playlist file provided"
+msgstr "Geçerli bir çalma listesi dosyası sağlanmadı"
+
+#: plplaylists/cog.py:763
+msgid "Multiple playlist files are provided. Currently, only 1 per message is allowed."
+msgstr "Birden çok çalma listesi dosyası sağlanır. Şu anda ileti başına yalnızca 1 adete izin verilmektedir."
+
+#: plplaylists/cog.py:780
+msgid "Failed to save any of the requested playlists."
+msgstr "İstenen çalma listelerinden hiçbiri kaydedilemedi."
+
+#: plplaylists/cog.py:789
+msgid "Failed to save the following playlists:\n"
+"{invalid_playlists_variable_do_not_translate}."
+msgstr "Aşağıdaki çalma listeleri kaydedilemedi:\n"
+"{invalid_playlists_variable_do_not_translate}."
+
+#: plplaylists/cog.py:798
+msgid "Successfully saved the following playlists:\n"
+"{saved_playlists_variable_do_not_translate}."
+msgstr "Aşağıdaki çalma listeleri başarıyla kaydedildi:\n"
+"{saved_playlists_variable_do_not_translate}."
+
+#: plplaylists/cog.py:824
+msgid "You must be in a voice channel, so I can connect to it."
+msgstr "Bir ses kanalında olmalısın, böylece ona bağlanabilirim."
+
+#: plplaylists/cog.py:832
+msgid "I do not have permission to connect or speak in {channel_variable_do_not_translate}."
+msgstr "Bağlanma veya konuşma iznim yok {channel_variable_do_not_translate}."
+
+#: plplaylists/cog.py:854
+msgid "Playlist"
+msgstr "Çalma listesi"
+
+#: plplaylists/cog.py:859
+msgid "{track_count_variable_do_not_translate} tracks enqueued.{playlist_name_variable_do_not_translate}."
+msgstr "{track_count_variable_do_not_translate} kuyruğa alınmış parçalar.{playlist_name_variable_do_not_translate}."
+

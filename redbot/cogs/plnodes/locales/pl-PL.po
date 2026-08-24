@@ -1,0 +1,188 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Polish\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=4; plural=(n==1 ? 0 : (n%10>=2 && n%10<=4) && (n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: pl\n"
+"X-Crowdin-File: /cogs/plnodes/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3321\n"
+"Language: pl_PL\n"
+
+#: plnodes/cog.py:32
+#, docstring
+msgid "Manage the nodes used by PyLav"
+msgstr "Zarządzaj węzłami używanymi przez PyLav"
+
+#: plnodes/cog.py:43
+#, docstring
+msgid "Configure PyLav Nodes"
+msgstr "Konfiguruj węzły PyLav"
+
+#: plnodes/cog.py:47
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Pokaż wersję Cog i PyLav"
+
+#: plnodes/cog.py:63
+msgid "Library / Cog"
+msgstr "Biblioteka / Cog"
+
+#: plnodes/cog.py:64
+msgid "Version"
+msgstr "Wersja"
+
+#: plnodes/cog.py:77
+#, docstring
+msgid "Add a node to PyLav"
+msgstr "Dodaj węzeł do PyLav"
+
+#: plnodes/cog.py:87
+msgid "Let us add a node to PyLav!"
+msgstr "Dodajmy węzeł do PyLav!"
+
+#: plnodes/cog.py:88
+msgid "(**1**){space_variable_do_not_translate} - Apply changes and add the node to PyLav.\n"
+"(**2**){space_variable_do_not_translate} - Cancel any changes made and close the menu.\n"
+"(**3**){space_variable_do_not_translate} - Toggle between search-only and search and playback modes.\n"
+"(**4**){space_variable_do_not_translate} - Toggle between SSL on and off.\n"
+"(**5**){space_variable_do_not_translate} - Add a name to the node.\n"
+"(**6**){space_variable_do_not_translate} - Add the host address of the node.\n"
+"(**7**){space_variable_do_not_translate} - Add the port the node uses.\n"
+"(**8**){space_variable_do_not_translate} - Set the password for the node.\n"
+"(**9**){space_variable_do_not_translate} - Set the connection timeout.\n"
+"(**10**) - Select which sources to disable for this node (Multiple can be selected).\n"
+"If you interact with a button multiple times, only the last interaction will take effect.\n\n\n"
+msgstr "(**1**){space_variable_do_not_translate} - Zastosuj zmiany i dodaj węzeł do PyLav.\n"
+"(**2**){space_variable_do_not_translate} - Anuluj wszelkie wprowadzone zmiany i zamknij menu.\n"
+"(**3**){space_variable_do_not_translate} - Przełączaj się między trybami tylko wyszukiwania oraz wyszukiwania i odtwarzania.\n"
+"(**4**){space_variable_do_not_translate} - Przełącz między włączonym i wyłączonym SSL.\n"
+"(**5**){space_variable_do_not_translate} - Dodaj nazwę do węzła.\n"
+"(**6**){space_variable_do_not_translate} - Dodaj adres hosta węzła.\n"
+"(**7**){space_variable_do_not_translate} - Dodaj port, z którego korzysta węzeł.\n"
+"(**8**){space_variable_do_not_translate} - Ustaw hasło dla węzła.\n"
+"(**9**){space_variable_do_not_translate} - Ustaw limit czasu połączenia.\n"
+"(**10**) - Wybierz źródła do wyłączenia dla tego węzła (można wybrać wiele).\n"
+"Jeśli użytkownik wielokrotnie korzysta z przycisku, zastosowanie będzie miała tylko ostatnia interakcja.\n\n\n"
+
+#: plnodes/cog.py:134
+msgid "I have added the {name_variable_do_not_translate} node with the following settings:\n"
+"Host: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Password: {password_variable_do_not_translate}\n"
+"Resume Timeout: {resume_timeout_variable_do_not_translate}\n"
+"Search Only: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Disabled Sources: {disabled_sources_variable_do_not_translate}\n"
+msgstr "Dodałem {name_variable_do_not_translate} z następującymi ustawieniami:\n"
+"Gospodarz: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Hasło: {password_variable_do_not_translate}\n"
+"Limit czasu wznawiania: {resume_timeout_variable_do_not_translate}\n"
+"Tylko wyszukiwanie: {search_only_variable_do_not_translate}\n"
+"Protokół SSL: {ssl_variable_do_not_translate}\n"
+"Wyłączone źródła: {disabled_sources_variable_do_not_translate}\n"
+
+#: plnodes/cog.py:165 plnodes/cog.py:172
+msgid "I am unable to add this node"
+msgstr "Nie mogę dodać tego węzła"
+
+#: plnodes/cog.py:178
+#, docstring
+msgid "Remove a node from a PyLav instance"
+msgstr "Usuń węzeł z instancji PyLav"
+
+#: plnodes/cog.py:190
+msgid "{name_variable_do_not_translate} is managed by PyLav and cannot be removed."
+msgstr "{name_variable_do_not_translate} jest zarządzany przez PyLav i nie można go usunąć."
+
+#: plnodes/cog.py:207
+msgid "I have removed the {name_variable_do_not_translate} node.\n\n"
+"{data_variable_do_not_translate}"
+msgstr "Usunąłem {name_variable_do_not_translate} węzeł.\n\n"
+"{data_variable_do_not_translate}"
+
+#: plnodes/cog.py:220
+msgid "I have removed the {name_variable_do_not_translate} node. A direct message was sent to you with the node details in case you wish to re-add it."
+msgstr "Usunąłem {name_variable_do_not_translate} węzeł. Bezpośrednia wiadomość została wysłana do Ciebie ze szczegółami węzła na wypadek, gdybyś chciał go ponownie dodać."
+
+#: plnodes/cog.py:230
+#, docstring
+msgid "Manage all nodes in a PyLav instance"
+msgstr "Zarządzaj wszystkimi węzłami w instancji PyLav"
+
+#: plnodes/cog.py:242
+msgid "Let us manage some nodes!"
+msgstr "Pozwól nam zarządzać niektórymi węzłami!"
+
+#: plnodes/cog.py:243
+msgid "(**1**){space_variable_do_not_translate} - Cancel any changes made and close the menu.\n"
+"(**6**){space_variable_do_not_translate} - Show sources enabled for this node.\n"
+"(**7**){space_variable_do_not_translate} - Apply changes and add the node to PyLav.\n"
+"(**8**){space_variable_do_not_translate} - Toggle between search-only and search and playback modes.\n"
+"(**9**){space_variable_do_not_translate} - Toggle between SSL on and off.\n"
+"(**10**) - Add a name to the node.\n"
+"(**11**) - Add the host address of the node.\n"
+"(**12**) - Add the port the node uses.\n"
+"(**13**) - Set the password for the node.\n"
+"(**14**) - Set the connection timeout.\n"
+"(**15**) - Remove this node.\n"
+"(**16**) - Select which sources to disable for this node (Multiple can be selected).\n"
+"If you interact with a button multiple times, only the last interaction will take effect.\n\n\n"
+msgstr "(**1**){space_variable_do_not_translate} - Anuluj wszelkie wprowadzone zmiany i zamknij menu.\n"
+"(**6**){space_variable_do_not_translate} - Pokaż źródła włączone dla tego węzła.\n"
+"(**7**){space_variable_do_not_translate} - Zastosuj zmiany i dodaj węzeł do PyLav.\n"
+"(**8**){space_variable_do_not_translate} - Przełączaj się między trybami tylko wyszukiwania oraz wyszukiwania i odtwarzania.\n"
+"(**9**){space_variable_do_not_translate} - Przełącz między włączonym i wyłączonym SSL.\n"
+"(**10**) - Dodaj nazwę do węzła.\n"
+"(**11**) - Dodaj adres hosta węzła.\n"
+"(**12**) - Dodaj port używany przez węzeł.\n"
+"(**13**) - Ustaw hasło dla węzła.\n"
+"(**14**) - Ustaw limit czasu połączenia.\n"
+"(**15**) - Usuń ten węzeł.\n"
+"(**16**) - Wybierz źródła do wyłączenia dla tego węzła (można wybrać wiele).\n"
+"Jeśli użytkownik wielokrotnie korzysta z przycisku, zastosowanie będzie miała tylko ostatnia interakcja.\n\n\n"
+
+#: plnodes/cog.py:272
+msgid "{name_variable_do_not_translate} is managed by PyLav, and I can not modify it."
+msgstr "{name_variable_do_not_translate} jest zarządzany przez PyLav i nie mogę go modyfikować."
+
+#: plnodes/cog.py:284
+msgid "I have removed the {name_variable_do_not_translate} node."
+msgstr "Usunąłem {name_variable_do_not_translate} węzeł."
+
+#: plnodes/cog.py:322
+msgid "I have changed the {name_variable_do_not_translate} node to the following settings:\n"
+"Host: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Password: {password_variable_do_not_translate}\n"
+"Resume Timeout: {resume_timeout_variable_do_not_translate}\n"
+"Search Only: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Disabled Sources: {disabled_sources_variable_do_not_translate}\n"
+msgstr "Zmieniłem {name_variable_do_not_translate} do następujących ustawień:\n"
+"Gospodarz: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Hasło: {password_variable_do_not_translate}\n"
+"Limit czasu wznawiania: {resume_timeout_variable_do_not_translate}\n"
+"Tylko wyszukiwanie: {search_only_variable_do_not_translate}\n"
+"Protokół SSL: {ssl_variable_do_not_translate}\n"
+"Wyłączone źródła: {disabled_sources_variable_do_not_translate}\n"
+
+#: plnodes/cog.py:349
+#, docstring
+msgid "List all nodes used by PyLav"
+msgstr "Lista wszystkich węzłów używanych przez PyLav"
+
+#: plnodes/cog.py:359
+msgid "No nodes were added to PyLav."
+msgstr "Do PyLav nie dodano żadnych węzłów."
+

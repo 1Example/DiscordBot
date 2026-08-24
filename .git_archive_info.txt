@@ -1,2 +1,2 @@
-$Format:%h$
-$Format:%(describe:tags=true)$
+61484f28f7f
+3.5.24-60-g61484f28f7f

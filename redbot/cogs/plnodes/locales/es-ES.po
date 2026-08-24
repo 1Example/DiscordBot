@@ -1,0 +1,188 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Spanish\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: es-ES\n"
+"X-Crowdin-File: /cogs/plnodes/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3321\n"
+"Language: es_ES\n"
+
+#: plnodes/cog.py:32
+#, docstring
+msgid "Manage the nodes used by PyLav"
+msgstr "Administrar los nodos usados por PyLav"
+
+#: plnodes/cog.py:43
+#, docstring
+msgid "Configure PyLav Nodes"
+msgstr "Configurar nodos PyLav"
+
+#: plnodes/cog.py:47
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Mostrar la versión del Cog y PyLav"
+
+#: plnodes/cog.py:63
+msgid "Library / Cog"
+msgstr "Biblioteca / Engranaje"
+
+#: plnodes/cog.py:64
+msgid "Version"
+msgstr "Versión"
+
+#: plnodes/cog.py:77
+#, docstring
+msgid "Add a node to PyLav"
+msgstr "Añadir un nodo a PyLav"
+
+#: plnodes/cog.py:87
+msgid "Let us add a node to PyLav!"
+msgstr "¡Agreguemos un nodo a PyLav!"
+
+#: plnodes/cog.py:88
+msgid "(**1**){space_variable_do_not_translate} - Apply changes and add the node to PyLav.\n"
+"(**2**){space_variable_do_not_translate} - Cancel any changes made and close the menu.\n"
+"(**3**){space_variable_do_not_translate} - Toggle between search-only and search and playback modes.\n"
+"(**4**){space_variable_do_not_translate} - Toggle between SSL on and off.\n"
+"(**5**){space_variable_do_not_translate} - Add a name to the node.\n"
+"(**6**){space_variable_do_not_translate} - Add the host address of the node.\n"
+"(**7**){space_variable_do_not_translate} - Add the port the node uses.\n"
+"(**8**){space_variable_do_not_translate} - Set the password for the node.\n"
+"(**9**){space_variable_do_not_translate} - Set the connection timeout.\n"
+"(**10**) - Select which sources to disable for this node (Multiple can be selected).\n"
+"If you interact with a button multiple times, only the last interaction will take effect.\n\n\n"
+msgstr "(**1**){space_variable_do_not_translate} - Aplicar cambios y añadir el nodo a PyLav.\n"
+"(**2**){space_variable_do_not_translate} - Cancelar cualquier cambio realizado y cerrar el menú.\n"
+"(**3**){space_variable_do_not_translate} - Alternar entre los modos de solo búsqueda y búsqueda y reproducción.\n"
+"(**4**){space_variable_do_not_translate} - Alternar entre SSL activado y desactivado.\n"
+"(**5**){space_variable_do_not_translate} - Añadir un nombre al nodo.\n"
+"(**6**){space_variable_do_not_translate} - Añadir la dirección de host del nodo.\n"
+"(**7**){space_variable_do_not_translate} - Añadir el puerto que utiliza el nodo.\n"
+"(**8**){space_variable_do_not_translate} - Establecer la contraseña para el nodo.\n"
+"(**9**){space_variable_do_not_translate} - Establecer el tiempo de espera de conexión.\n"
+"(**10**): seleccione las fuentes que desea deshabilitar para este nodo (se puede seleccionar varios).\n"
+"Si interactúa con un botón varias veces, solo la última interacción surtirá efecto.\n\n\n"
+
+#: plnodes/cog.py:134
+msgid "I have added the {name_variable_do_not_translate} node with the following settings:\n"
+"Host: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Password: {password_variable_do_not_translate}\n"
+"Resume Timeout: {resume_timeout_variable_do_not_translate}\n"
+"Search Only: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Disabled Sources: {disabled_sources_variable_do_not_translate}\n"
+msgstr "He añadido el {name_variable_do_not_translate} con la siguiente configuración:\n"
+"Anfitrión: {host_variable_do_not_translate}\n"
+"Puerto: {port_variable_do_not_translate}\n"
+"Contraseña: {password_variable_do_not_translate}\n"
+"Tiempo de espera de reanudación: {resume_timeout_variable_do_not_translate}\n"
+"Sólo búsqueda: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Fuentes deshabilitadas: {disabled_sources_variable_do_not_translate}\n"
+
+#: plnodes/cog.py:165 plnodes/cog.py:172
+msgid "I am unable to add this node"
+msgstr "No puedo agregar este nodo"
+
+#: plnodes/cog.py:178
+#, docstring
+msgid "Remove a node from a PyLav instance"
+msgstr "Remueve un nodo de una instancia de PyLav"
+
+#: plnodes/cog.py:190
+msgid "{name_variable_do_not_translate} is managed by PyLav and cannot be removed."
+msgstr "{name_variable_do_not_translate} es administrado por PyLav y no se puede eliminar."
+
+#: plnodes/cog.py:207
+msgid "I have removed the {name_variable_do_not_translate} node.\n\n"
+"{data_variable_do_not_translate}"
+msgstr "He eliminado el {name_variable_do_not_translate} nodo.\n\n"
+"{data_variable_do_not_translate}"
+
+#: plnodes/cog.py:220
+msgid "I have removed the {name_variable_do_not_translate} node. A direct message was sent to you with the node details in case you wish to re-add it."
+msgstr "He eliminado el {name_variable_do_not_translate} nodo. Se le envió un mensaje directo con los detalles del nodo en caso de que desee volver a agregarlo."
+
+#: plnodes/cog.py:230
+#, docstring
+msgid "Manage all nodes in a PyLav instance"
+msgstr "Administrar todos los nodos en una instancia de PyLav"
+
+#: plnodes/cog.py:242
+msgid "Let us manage some nodes!"
+msgstr "¡Vamos a gestionar algunos nodos!"
+
+#: plnodes/cog.py:243
+msgid "(**1**){space_variable_do_not_translate} - Cancel any changes made and close the menu.\n"
+"(**6**){space_variable_do_not_translate} - Show sources enabled for this node.\n"
+"(**7**){space_variable_do_not_translate} - Apply changes and add the node to PyLav.\n"
+"(**8**){space_variable_do_not_translate} - Toggle between search-only and search and playback modes.\n"
+"(**9**){space_variable_do_not_translate} - Toggle between SSL on and off.\n"
+"(**10**) - Add a name to the node.\n"
+"(**11**) - Add the host address of the node.\n"
+"(**12**) - Add the port the node uses.\n"
+"(**13**) - Set the password for the node.\n"
+"(**14**) - Set the connection timeout.\n"
+"(**15**) - Remove this node.\n"
+"(**16**) - Select which sources to disable for this node (Multiple can be selected).\n"
+"If you interact with a button multiple times, only the last interaction will take effect.\n\n\n"
+msgstr "(**1**){space_variable_do_not_translate} - Cancelar cualquier cambio realizado y cerrar el menú.\n"
+"(**6**){space_variable_do_not_translate} - Mostrar fuentes habilitadas para este nodo.\n"
+"(**7**){space_variable_do_not_translate} - Aplicar cambios y añadir el nodo a PyLav.\n"
+"(**8**){space_variable_do_not_translate} - Alternar entre los modos de solo búsqueda y búsqueda y reproducción.\n"
+"(**9**){space_variable_do_not_translate} - Alternar entre SSL activado y desactivado.\n"
+"(**10**): agregue un nombre al nodo.\n"
+"(**11**): agregue la dirección de host del nodo.\n"
+"(**12**): agregue el puerto que utiliza el nodo.\n"
+"(**13**): establezca la contraseña para el nodo.\n"
+"(**14**): establece el tiempo de espera de conexión.\n"
+"(**15**): elimine este nodo.\n"
+"(**16**): seleccione las fuentes que desea deshabilitar para este nodo (se puede seleccionar varios).\n"
+"Si interactúa con un botón varias veces, solo la última interacción surtirá efecto.\n\n\n"
+
+#: plnodes/cog.py:272
+msgid "{name_variable_do_not_translate} is managed by PyLav, and I can not modify it."
+msgstr "{name_variable_do_not_translate} es administrado por PyLav, y no puedo modificarlo."
+
+#: plnodes/cog.py:284
+msgid "I have removed the {name_variable_do_not_translate} node."
+msgstr "He eliminado el {name_variable_do_not_translate} nodo."
+
+#: plnodes/cog.py:322
+msgid "I have changed the {name_variable_do_not_translate} node to the following settings:\n"
+"Host: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Password: {password_variable_do_not_translate}\n"
+"Resume Timeout: {resume_timeout_variable_do_not_translate}\n"
+"Search Only: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Disabled Sources: {disabled_sources_variable_do_not_translate}\n"
+msgstr "He cambiado el {name_variable_do_not_translate} a la siguiente configuración:\n"
+"Anfitrión: {host_variable_do_not_translate}\n"
+"Puerto: {port_variable_do_not_translate}\n"
+"Contraseña: {password_variable_do_not_translate}\n"
+"Tiempo de espera de reanudación: {resume_timeout_variable_do_not_translate}\n"
+"Sólo búsqueda: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Fuentes deshabilitadas: {disabled_sources_variable_do_not_translate}\n"
+
+#: plnodes/cog.py:349
+#, docstring
+msgid "List all nodes used by PyLav"
+msgstr "Listar todos los nodos usados por PyLav"
+
+#: plnodes/cog.py:359
+msgid "No nodes were added to PyLav."
+msgstr "No se agregaron nodos a PyLav."
+

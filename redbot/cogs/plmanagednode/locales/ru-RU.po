@@ -1,0 +1,541 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Russian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=4; plural=((n%10==1 && n%100!=11) ? 0 : ((n%10 >= 2 && n%10 <=4 && (n%100 < 12 || n%100 > 14)) ? 1 : ((n%10 == 0 || (n%10 >= 5 && n%10 <=9)) || (n%100 >= 11 && n%100 <= 14)) ? 2 : 3));\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: ru\n"
+"X-Crowdin-File: /cogs/plmanagednode/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3323\n"
+"Language: ru_RU\n"
+
+#: plmanagednode/cog.py:34 plmanagednode/cog.py:46
+#, docstring
+msgid "Configure the managed Lavalink node used by PyLav"
+msgstr "Настроить управляемый узел Lavalink используемый PyLav"
+
+#: plmanagednode/cog.py:50
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Показать версию Cog и PyLav"
+
+#: plmanagednode/cog.py:66
+msgid "Library / Cog"
+msgstr "Библиотека / Винтик"
+
+#: plmanagednode/cog.py:67
+msgid "Version"
+msgstr "Версия"
+
+#: plmanagednode/cog.py:80
+#, docstring
+msgid "Update the managed Lavalink node"
+msgstr "Обновить управляемый Lavalink узел"
+
+#: plmanagednode/cog.py:92
+msgid "The managed Lavalink node is already up to date."
+msgstr "Управляемый узел Lavalink уже обновлен."
+
+#: plmanagednode/cog.py:101
+msgid "Your node is out of date, to update please run `{command_name_variable_do_not_translate}`."
+msgstr "Ваш узел устарел, для обновления, пожалуйста, запустите '{command_name_variable_do_not_translate}`."
+
+#: plmanagednode/cog.py:118
+msgid "The managed Lavalink node has been updated to version {version_variable_do_not_translate}."
+msgstr "Управляемый узел Lavalink обновлен до версии {version_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:130
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Включите/выключите управляемый узел.\n\n"
+"        Изменения будут применены после перезагрузки.\n"
+"        "
+
+#: plmanagednode/cog.py:145
+msgid "The PyLav managed node has been enabled."
+msgstr "Управляемый узел PyLav включен."
+
+#: plmanagednode/cog.py:153
+msgid "The PyLav managed node has been disabled."
+msgstr "Управляемый узел PyLav отключен."
+
+#: plmanagednode/cog.py:161
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Включите/выключите автоматическое обновление управляемого узла.\n\n"
+"        Изменения будут применены после перезагрузки.\n"
+"        "
+
+#: plmanagednode/cog.py:177
+msgid "The PyLav managed node auto updates have been enabled."
+msgstr "Автоматическое обновление управляемого узла PyLav включено."
+
+#: plmanagednode/cog.py:185
+msgid "The  PyLav managed node auto updates have been disabled."
+msgstr "Автоматическое обновление управляемого узла PyLav отключено."
+
+#: plmanagednode/cog.py:193
+#, docstring
+msgid "Set the managed Lavalink node maximum heap-size.\n\n"
+"        By default, this value is 2G of available RAM in the host machine represented by (65-1023M|1+G) (256M,\n"
+"        256G for example)\n\n"
+"        This value only represents the maximum amount of RAM allowed to be used at any given point, and does not mean\n"
+"        that the managed Lavalink node will always use this amount of RAM.\n"
+"        "
+msgstr "Задайте для управляемого узла Lavalink максимальный размер кучи.\n\n"
+"        По умолчанию это значение равно 2G доступной оперативной памяти на хост-машине, представленной (65-1023M|1+G) (256M,\n"
+"        256G, например)\n\n"
+"        Это значение представляет только максимальный объем ОЗУ, разрешенный для использования в любой заданной точке, и не означает, что\n"
+"        что управляемый узел Lavalink всегда будет использовать этот объем ОЗУ.\n"
+"        "
+
+#: plmanagednode/cog.py:217
+msgid "Heap-size must be a valid measure of size, e.g. 256M, 256G"
+msgstr "Размер кучи должен быть допустимым показателем размера, например 256M, 256G"
+
+#: plmanagednode/cog.py:227
+msgid "Heap-size must be at least 64M, however it is recommended to have it set to at least 1G"
+msgstr "Размер кучи должен быть по крайней мере 64M, однако рекомендуется иметь хотя бы 1G"
+
+#: plmanagednode/cog.py:239
+msgid "Heap-size must be less than your system RAM, You currently have {ram_in_bytes_variable_do_not_translate} of RAM available"
+msgstr "Размер кучи должен быть меньше, чем ваша системная оперативная память, у вас в настоящее время есть {ram_in_bytes_variable_do_not_translate} доступной оперативной памяти"
+
+#: plmanagednode/cog.py:251
+msgid "Heap-size must be less than {limit_variable_do_not_translate} due to your system limitations"
+msgstr "Размер кучи должен быть меньше {limit_variable_do_not_translate} из-за системных ограничений"
+
+#: plmanagednode/cog.py:271
+msgid "The Managed node heap-size set to {bytes_variable_do_not_translate}."
+msgstr "Размер кучи управляемого узла, установленный равным {bytes_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:281
+#, docstring
+msgid "Change the managed node start up configs"
+msgstr "Изменить настройки запуска управляемого узла"
+
+#: plmanagednode/cog.py:285
+#, docstring
+msgid "Set the managed node host"
+msgstr "Установить хост управляемого узла"
+
+#: plmanagednode/cog.py:297
+msgid "The Managed node host set to {host_variable_do_not_translate}."
+msgstr "Для узла управляемого узла задано значение {host_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:307
+#, docstring
+msgid "`Dangerous command` Set the managed Lavalink node connection port.\n\n"
+"        This port is the port the managed Lavalink node binds to, you should only change this if there is a\n"
+"        conflict with the default port because you already have an application using port 2154 on this device.\n\n"
+"        The value by default is `2154`.\n"
+"        "
+msgstr "'Опасная команда' Установите управляемый порт подключения узла Lavalink.\n\n"
+"        Этот порт является портом, к которому привязывается управляемый узел Lavalink, его следует изменять только в том случае, если есть\n"
+"        конфликт с портом по умолчанию, так как у вас уже есть приложение, использующее порт 2154 на этом устройстве.\n\n"
+"        Значение по умолчанию — '2154'.\n"
+"        "
+
+#: plmanagednode/cog.py:317
+msgid "The port must be between 1024 and 49151"
+msgstr "Порт должен быть от 1024 до 49151"
+
+#: plmanagednode/cog.py:329
+msgid "The managed node port set to {port_variable_do_not_translate}."
+msgstr "Порт управляемого узла, для которого установлено значение {port_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:339
+#, docstring
+msgid "Change the managed node plugins"
+msgstr "Изменить плагины управляемого узла"
+
+#: plmanagednode/cog.py:345
+#, docstring
+msgid "Disabled one of the available plugins"
+msgstr "Отключено из доступных плагинов"
+
+#: plmanagednode/cog.py:361 plmanagednode/cog.py:472
+msgid "The plugin must be one of the following: {plugins_variable_do_not_translate}"
+msgstr "Плагин должен быть одним из следующих: {plugins_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:446
+msgid "Managed node plugin {plugin_variable_do_not_translate} disabled."
+msgstr "Плагин управляемого узла {plugin_variable_do_not_translate} нетрудоспособный."
+
+#: plmanagednode/cog.py:456
+#, docstring
+msgid "Enable one of the available plugins"
+msgstr "Включить один из доступных плагинов"
+
+#: plmanagednode/cog.py:505
+msgid "Managed node plugin {plugin_variable_do_not_translate} enabled."
+msgstr "Плагин управляемого узла {plugin_variable_do_not_translate} Включен."
+
+#: plmanagednode/cog.py:515
+#, docstring
+msgid "Update the managed node plugins"
+msgstr "Обновить плагины управляемого узла"
+
+#: plmanagednode/cog.py:589
+msgid "{name_variable_do_not_translate} was updated from {old_variable_do_not_translate} to {new_variable_do_not_translate}\n"
+msgstr "{name_variable_do_not_translate} было обновлено с {old_variable_do_not_translate} Кому {new_variable_do_not_translate}\n"
+
+#: plmanagednode/cog.py:599
+msgid "Managed node plugins updated.\n\n"
+"{update_variable_do_not_translate}"
+msgstr "Обновлены плагины управляемых узлов.\n\n"
+"{update_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:609
+msgid "The managed node plugins are already up to date."
+msgstr "Плагины управляемых узлов уже обновлены."
+
+#: plmanagednode/cog.py:617
+#, docstring
+msgid "Toggle the managed node sources"
+msgstr "Переключить источники управляемых узлов"
+
+#: plmanagednode/cog.py:632
+msgid "Invalid source, {valid_list_variable_do_not_translate} are valid sources"
+msgstr "Недопустимый источник, {valid_list_variable_do_not_translate} являются допустимыми источниками"
+
+#: plmanagednode/cog.py:648 plmanagednode/cog.py:687
+msgid "enabled"
+msgstr "Включен"
+
+#: plmanagednode/cog.py:648 plmanagednode/cog.py:687
+msgid "disabled"
+msgstr "нетрудоспособный"
+
+#: plmanagednode/cog.py:651
+msgid "Managed node {source_variable_do_not_translate} source set to {state_variable_do_not_translate}."
+msgstr "Управляемый узел {source_variable_do_not_translate} Источник установлен в значение {state_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:664
+#, docstring
+msgid "Toggle the managed node filters"
+msgstr "Переключить фильтры управляемых узлов"
+
+#: plmanagednode/cog.py:676
+msgid "Invalid source, {valid_list_variable_do_not_translate} are valid filters"
+msgstr "Недопустимый источник, {valid_list_variable_do_not_translate} являются допустимыми фильтрами"
+
+#: plmanagednode/cog.py:690
+msgid "Managed node {source_variable_do_not_translate} filter set to {state_variable_do_not_translate}."
+msgstr "Управляемый узел {source_variable_do_not_translate} для фильтра установлено значение {state_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:703
+#, docstring
+msgid "Configure multiple settings for the managed node.\n\n"
+"        Run `[p]plmanaged settings server <setting> info` to show info about the settings and what they do.\n\n"
+"        **Setting names**:\n"
+"        `bufferDurationMs` : Integer i.e 400 (Default 400) - Set to 0 to disable JDA-NAS\n"
+"        `frameBufferDurationMs` : Integer i.e 1000 (Default 1000)\n"
+"        `trackStuckThresholdMs` : Integer i.e 1000 (Default 1000)\n"
+"        `youtubePlaylistLoadLimit` : Integer i.e 1000 (Default 1000)\n"
+"        `opusEncodingQuality` : Integer i.e 10 (Default 10)\n"
+"        `resamplingQuality` : String i.e LOW (Default HIGH)\n"
+"        `useSeekGhosting` : Boolean i.e True (Default True)\n"
+"        `playerUpdateInterval` : Integer i.e 30 (Default 30)\n"
+"        `youtubeSearchEnabled` : Boolean i.e True (Default True)\n"
+"        `soundcloudSearchEnabled` : Boolean i.e True (Default True)\n"
+"        "
+msgstr "Настройте несколько параметров для управляемого узла.\n\n"
+"        Выполнить '[p]сервер настроек plmanaged <setting> info', чтобы показать информацию о настройках и о том, что они делают.\n\n"
+"        **Имена настроек**:\n"
+"        'bufferDurationMs' : Целое число, т.е. 400 (по умолчанию 400) - Установите значение 0, чтобы отключить JDA-NAS\n"
+"        'frameBufferDurationMs' : Целое число, т.е. 1000 (по умолчанию 1000)\n"
+"        'trackStuckThresholdMs' : Целое число, т.е. 1000 (по умолчанию 1000)\n"
+"        'youtubePlaylistLoadLimit' : Целое число, т.е. 1000 (по умолчанию 1000)\n"
+"        'opusEncodingQuality' : Целое число, т.е. 10 (по умолчанию 10)\n"
+"        'resamplingQuality' : String, т.е. LOW (по умолчанию HIGH)\n"
+"        'useSeekGhosting' : Boolean, т.е. True (значение по умолчанию True)\n"
+"        'playerUpdateInterval' : Целое число, т.е. 30 (по умолчанию 30)\n"
+"        'youtubeSearchEnabled' : Boolean, т.е. True (значение по умолчанию True)\n"
+"        'soundcloudSearchEnabled' : Boolean, т.е. True (значение по умолчанию True)\n"
+"        "
+
+#: plmanagednode/cog.py:743
+msgid "{Setting_variable_do_not_translate} is not a valid Setting; Options are:\n\n"
+"{setting_list_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} не является допустимым параметром; Возможны следующие варианты:\n\n"
+"{setting_list_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:757
+msgid "The duration of the NAS buffer in milliseconds. Higher values fare better against longer GC pauses but will increase RAM usage. Minimum of 40ms, lower values may introduce pauses and stutters. Set to 0 to disable JDA-NAS. Accepted values: Range: 0 - 2,000"
+msgstr "Продолжительность буфера NAS в миллисекундах. Чем больше значение повышается по сравнению с длинными паузами GC, но увеличит использование памяти. Минимум 40 мс, меньшие значения могут вводить паузы и заглушки. Установите 0 для отключения JDA-NAS. Принятые значения: Range: 0 - 2000"
+
+#: plmanagednode/cog.py:763
+msgid "How many milliseconds of audio to keep buffered, Higher values increase RAM usage. Accepted values: Range: 1,000 - 10,000"
+msgstr "Сколько миллисекунд аудио для поддержания буфера, большие значения увеличивают использование ОЗУ. Принимаемые значения: Диапазон: 1000 - 10,000"
+
+#: plmanagednode/cog.py:767
+msgid "The threshold in milliseconds for how long a track can be stuck. A track is stuck if does not return any audio data. Accepted values: Range: 5,000 - 20,000"
+msgstr "Порог в миллисекундах для того, как долго трек может быть застрял. Трек застрял, если не возвращает аудиоданные. Принятые значения: Диапазон: 5,000 - 20,000"
+
+#: plmanagednode/cog.py:771
+msgid "Number of pages to return for a YouTube Playlist - Each page contains 100 songs. Accepted values: Range: 5 - 100"
+msgstr "Количество страниц, возвращаемых для плейлиста YouTube. Каждая страница содержит 100 песен. Допустимые значения: Диапа: 5 - 100"
+
+#: plmanagednode/cog.py:775
+msgid "Opus encoder quality. Valid values range from 0 to 10, where 10 is the best quality but is the most expensive on the CPU."
+msgstr "Качество кодировщика Opus. Допустимые значения варьируются от 0 до 10, где 10 является лучшим качеством, но является самым дорогим на процессоре."
+
+#: plmanagednode/cog.py:779
+msgid "Quality of resampling operations. Valid values are LOW, MEDIUM and HIGH, where HIGH uses the most CPU."
+msgstr "Качество операций ресамплинга. Допустимыми значениями являются LOW, MEDIUM и HIGH, где HIGH использует больше всего ЦП."
+
+#: plmanagednode/cog.py:783
+msgid "Seek ghosting is the effect where whilst a seek is in progress, the audio buffer is read from until empty, or until seek is ready. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "Перемотка ghosting - это эффект, когда идёт поиск запроса, аудио буфер читается от пока не пустой или пока поиск не будет готов. Принятые значения для True: `True`, `t`, `1`, Принятые значения для False: `False`, `f`, `0`"
+
+#: plmanagednode/cog.py:788
+msgid "How frequently in seconds to send player updates to clients, affects the current position accuracy. Accepted values: Range: 1 - 86400"
+msgstr "Как часто в секундах посылать клиентам обновления игроков, влияют на текущую точность позиции. Принятые значения: 1 - 86400"
+
+#: plmanagednode/cog.py:792
+msgid "Enable or disable YouTube searches within the node, this will affect AppleMusic, Spotify and any functionality dependent on YouTube. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "Включите или отключите поиск YouTube в узле, это повлияет на AppleMusic, Spotify и любые функции, зависящие от YouTube. Допустимые значения для True: 'True', 't', '1', Допустимые значения для False: 'False', 'f', '0'"
+
+#: plmanagednode/cog.py:797
+msgid "Enable or disable SoundCloud searches within the node, this will affect any functionality dependent on SoundCloud. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "Включите или отключите поиск SoundCloud внутри узла, это повлияет на любую функциональность, зависящую от SoundCloud. Допустимые значения для True: 'True', 't', '1', Допустимые значения для False: 'False', 'f', '0'"
+
+#: plmanagednode/cog.py:806
+msgid "{Setting_variable_do_not_translate} info.\n\n"
+"{info_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} информация.\n\n"
+"{info_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:837
+msgid "{Setting_variable_do_not_translate} valid inputs are:\n\n"
+"Range between: {start_variable_do_not_translate} - {end_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} Допустимыми входными данными являются:\n\n"
+"Диапазон между: {start_variable_do_not_translate} - {end_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:852
+msgid "{Setting_variable_do_not_translate} valid inputs are:\n\n"
+"{setting_list_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} Допустимыми входными данными являются:\n\n"
+"{setting_list_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:874
+msgid "{Setting_variable_do_not_translate} set to {value_variable_do_not_translate}."
+msgstr "{Setting_variable_do_not_translate} установите значение {value_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:885
+#, docstring
+msgid "Configure Lavalink IP Rotation for rate limits.\n\n"
+"        Run `[p]plmanaged settings iprotation 1` to remove the ip rotation\n"
+"        "
+msgstr "Настройте поворот IP-адресов Lavalink для ограничения скорости.\n\n"
+"        Выполнить '[p]plmanaged настройки iprotation 1' для удаления ip-поворота\n"
+"        "
+
+#: plmanagednode/cog.py:896
+msgid "Click the button below to configure the IP rotation for your node.\n"
+"More info at: {url_value_1_variable_do_not_translate} and {url_value_2_variable_do_not_translate}"
+msgstr "Нажмите кнопку ниже, чтобы настроить поворот IP-адресов для узла.\n"
+"Более подробная информация по адресу: {url_value_1_variable_do_not_translate} и {url_value_2_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:917
+msgid "Removing the IP rotation from your node."
+msgstr "Удаление поворота IP с вашего узла."
+
+#: plmanagednode/cog.py:925
+#, docstring
+msgid "Link a Google account to Lavalink to bypass the YouTube age restriction.\n\n"
+"        Run `[p]plmanaged settings googleaccount 1` to remove the linked account.\n"
+"        "
+msgstr "Свяжите аккаунт Google с Lavalink, чтобы обойти возрастное ограничение YouTube.\n\n"
+"        Выполнить '[p]plmanage настройки googleaccount 1' для удаления связанной учетной записи.\n"
+"        "
+
+#: plmanagednode/cog.py:936
+msgid "Click the button below to link a Google account to your node, if you have 2FA setup on this account you will need an application password instead\n"
+"More info at: <https://support.google.com/accounts/answer/185833>"
+msgstr "Нажмите кнопку ниже, чтобы связать учетную запись Google с вашим узлом, если у вас есть настройка 2FA для этой учетной записи, вам понадобится пароль приложения\n"
+"Более подробная информация по адресу: <https://support.google.com/accounts/answer/185833>"
+
+#: plmanagednode/cog.py:955
+msgid "Unlinking Google account from your node."
+msgstr "Отключение Google аккаунта из вашего узла."
+
+#: plmanagednode/cog.py:963
+#, docstring
+msgid "Configure a HTTP proxy for Lavalink\n\n"
+"        Run `[p]plmanaged settings httpproxy 1` to remove the proxy.\n"
+"        "
+msgstr "Настройка HTTP-прокси для Lavalink\n\n"
+"        Выполнить '[p]plmanage настройки httpproxy 1' для удаления прокси.\n"
+"        "
+
+#: plmanagednode/cog.py:974
+msgid "Click the button below to configure a HTTP proxy for your node"
+msgstr "Нажмите на кнопку ниже, чтобы настроить HTTP прокси для вашего узла"
+
+#: plmanagednode/cog.py:988
+msgid "Unlinking HTTP proxy from your node."
+msgstr "Отсоединение HTTP-прокси с вашего узла."
+
+#: plmanagednode/view.py:37 plmanagednode/view.py:64 plmanagednode/view.py:97
+#: plmanagednode/view.py:178
+msgid "You are not authorized to interact with this."
+msgstr "Вы не имеете права взаимодействовать с этим."
+
+#: plmanagednode/view.py:124
+msgid "IP Rotation Configurator."
+msgstr "Конфигуратор ip-вращения."
+
+#: plmanagednode/view.py:127
+msgid "IP Blocks."
+msgstr "IP-блоки."
+
+#: plmanagednode/view.py:131
+msgid "1.0.0.0/8,...,... - Comma separated list of IP blocks"
+msgstr "1.0.0.0/8,...,... - Список блоков, разделенных запятыми"
+
+#: plmanagednode/view.py:136
+msgid "Rotation strategy."
+msgstr "Стратегия ротации."
+
+#: plmanagednode/view.py:145
+msgid "Retry limit."
+msgstr "Ограничение повторных попыток."
+
+#: plmanagednode/view.py:148
+msgid "-1 = default, 0 = infinity, >0 = number of retries"
+msgstr "-1 = по умолчанию, 0 = бесконечность, >0 = количество попыток"
+
+#: plmanagednode/view.py:153
+msgid "IPs to exclude."
+msgstr "IP-адреса для исключения."
+
+#: plmanagednode/view.py:156
+msgid "Comma separated list of IP to exclude from rotation"
+msgstr "Разделенный запятыми список IP для исключения из вращения"
+
+#: plmanagednode/view.py:160
+msgid "Search trigger rotation."
+msgstr "Поиск вращения триггера."
+
+#: plmanagednode/view.py:163
+msgid "0 or 1 (0 = disabled, 1 = enabled)"
+msgstr "0 или 1 (0 = выключено, 1 = включено)"
+
+#: plmanagednode/view.py:189
+msgid "The IP block you have provided is not valid; {error_variable_do_not_translate}."
+msgstr "Предоставленный вами блок IP недействителен; {error_variable_do_not_translate}."
+
+#: plmanagednode/view.py:203
+msgid "No IP blocks were provided."
+msgstr "Блоки IP не были предоставлены."
+
+#: plmanagednode/view.py:215
+msgid "The IP address you have provided is not valid; {error_variable_do_not_translate}"
+msgstr "Ip-адрес, который вы указали, недействителен; {error_variable_do_not_translate}"
+
+#: plmanagednode/view.py:236
+msgid "The strategy you provided is invalid. You must be one of: {options_variable_do_not_translate}."
+msgstr "Указанная вами стратегия недействительна. Вы должны быть одним из: {options_variable_do_not_translate}."
+
+#: plmanagednode/view.py:252
+msgid "The retry limit must be a number greater than or equal to -1."
+msgstr "Предел повторных попыток должен быть больше или равен -1."
+
+#: plmanagednode/view.py:267
+msgid "The search trigger must be 0 or 1."
+msgstr "Триггер поиска должен иметь значение 0 или 1."
+
+#: plmanagednode/view.py:286
+msgid "IP rotation settings saved."
+msgstr "Настройки поворота IP сохранены."
+
+#: plmanagednode/view.py:307
+msgid "Google Account Configurator"
+msgstr "Конфигуратор аккаунта Google"
+
+#: plmanagednode/view.py:310
+msgid "Email address"
+msgstr "Email адрес"
+
+#: plmanagednode/view.py:313
+msgid "Your Google account email"
+msgstr "Email вашего аккаунта Google"
+
+#: plmanagednode/view.py:318
+msgid "password"
+msgstr "пароль"
+
+#: plmanagednode/view.py:322
+msgid "If you have 2FA you will need an application password"
+msgstr "Если у вас есть 2FA, вам понадобится пароль приложения"
+
+#: plmanagednode/view.py:336 plmanagednode/view.py:425
+msgid "You are not authorized to interact with this"
+msgstr "Вы не авторизованы для взаимодействия с этим"
+
+#: plmanagednode/view.py:344
+msgid "Invalid email address"
+msgstr "Неверный адрес электронной почты"
+
+#: plmanagednode/view.py:354
+msgid "Google account linked."
+msgstr "Учетная запись Google привязана."
+
+#: plmanagednode/view.py:375
+msgid "HTTP Proxy Configurator"
+msgstr "Конфигуратор HTTP-прокси"
+
+#: plmanagednode/view.py:378
+msgid "Hostname"
+msgstr "Имя хоста"
+
+#: plmanagednode/view.py:381
+msgid "Hostname of the proxy, (IP or domain or localhost)"
+msgstr "Имя хоста прокси-сервера (IP, домен или localhost)"
+
+#: plmanagednode/view.py:385
+msgid "Proxy port"
+msgstr "Порт прокси"
+
+#: plmanagednode/view.py:388
+msgid "Proxy port, 3128 is the default for squidProxy"
+msgstr "Порт прокси-сервера, 3128 по умолчанию для squidProxy"
+
+#: plmanagednode/view.py:394
+msgid "User"
+msgstr "Пользователь"
+
+#: plmanagednode/view.py:399
+msgid "Optional user for basic authentication fields. Leave blank if you do not use basic authentication"
+msgstr "Необязательный пользователь для полей обычной проверки подлинности. Оставьте поле пустым, если не используется обычная проверка подлинности"
+
+#: plmanagednode/view.py:405
+msgid "Password"
+msgstr "Пароль"
+
+#: plmanagednode/view.py:410
+msgid "Optional password for basic authentication fields. Leave blank if you do not use basic authentication."
+msgstr "Необязательный пароль для полей обычной проверки подлинности. Оставьте поле пустым, если не используется обычная проверка подлинности."
+
+#: plmanagednode/view.py:436
+msgid "The port provided is not valid. It must be between 0 and 65536."
+msgstr "Указанный порт недействителен. Он должен находиться в диапазоне от 0 до 65536."
+
+#: plmanagednode/view.py:453
+msgid "HTTP proxy settings saved."
+msgstr "Параметры HTTP прокси сохранены."
+

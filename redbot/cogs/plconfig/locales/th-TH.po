@@ -1,0 +1,532 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Thai\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: th\n"
+"X-Crowdin-File: /cogs/plconfig/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3353\n"
+"Language: th_TH\n"
+
+#: plconfig/cog.py:32
+#, docstring
+msgid "Configure PyLav library settings"
+msgstr "กําหนดการตั้งค่าไลบรารี PyLav"
+
+#: plconfig/cog.py:44
+#, docstring
+msgid "Change global settings for PyLav"
+msgstr "เปลี่ยนการตั้งค่าส่วนกลางสําหรับ PyLav"
+
+#: plconfig/cog.py:48
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "แสดงเวอร์ชันของ Cog และ PyLav"
+
+#: plconfig/cog.py:64
+msgid "Library / Cog"
+msgstr "ห้องสมุด / ฟันเฟือง"
+
+#: plconfig/cog.py:65
+msgid "Version"
+msgstr "เวอร์ชัน"
+
+#: plconfig/cog.py:78
+#, docstring
+msgid "Show the setting values"
+msgstr "แสดงค่าการตั้งค่า"
+
+#: plconfig/cog.py:85 plconfig/view.py:57
+msgid "PyLav Settings"
+msgstr "การตั้งค่า PyLav"
+
+#: plconfig/cog.py:88
+msgid "Get information about the PyLav library settings."
+msgstr "รับข้อมูลเกี่ยวกับการตั้งค่าไลบรารี PyLav"
+
+#: plconfig/cog.py:92 plconfig/view.py:162
+msgid "Global Settings"
+msgstr "การตั้งค่าส่วนกลาง"
+
+#: plconfig/cog.py:95
+msgid "Get information about bot owner configured settings for the players."
+msgstr "รับข้อมูลเกี่ยวกับการตั้งค่าที่เจ้าของบอทกําหนดสําหรับผู้เล่น"
+
+#: plconfig/cog.py:103
+msgid "Contextual Settings"
+msgstr "การตั้งค่าตามบริบท"
+
+#: plconfig/cog.py:107
+msgid "Get information about contextual settings for the player, accounting for the global settings."
+msgstr "รับข้อมูลเกี่ยวกับการตั้งค่าตามบริบทสําหรับโปรแกรมเล่น โดยพิจารณาจากการตั้งค่าส่วนกลาง"
+
+#: plconfig/cog.py:114
+msgid "Server Settings"
+msgstr "การตั้งค่าเซิร์ฟเวอร์"
+
+#: plconfig/cog.py:118
+msgid "Get information about the server configured settings for the player."
+msgstr "รับข้อมูลเกี่ยวกับการตั้งค่าที่เซิร์ฟเวอร์กําหนดสําหรับโปรแกรมเล่น"
+
+#: plconfig/cog.py:126 plconfig/view.py:499
+msgid "Playlist Tasks"
+msgstr "งานเพลย์ลิสต์"
+
+#: plconfig/cog.py:129
+msgid "Get information about the playlist auto update schedule."
+msgstr "ดูข้อมูลเกี่ยวกับกําหนดการอัปเดตเพลย์ลิสต์อัตโนมัติ"
+
+#: plconfig/cog.py:138
+msgid "PyLav Paths"
+msgstr "เส้นทางไพลาฟ"
+
+#: plconfig/cog.py:140
+msgid "Get information about PyLav paths"
+msgstr "รับข้อมูลเกี่ยวกับเส้นทาง PyLav"
+
+#: plconfig/cog.py:147 plconfig/view.py:595
+msgid "Managed Node Settings"
+msgstr "การตั้งค่าโหนดที่มีการจัดการ"
+
+#: plconfig/cog.py:150
+msgid "Get information about the Managed PyLav Lavalink node"
+msgstr "รับข้อมูลเกี่ยวกับโหนด PyLav Lavalink ที่มีการจัดการ"
+
+#: plconfig/cog.py:160
+#, docstring
+msgid "Checks if a user or role is considered a disc jockey"
+msgstr "ตรวจสอบว่าผู้ใช้หรือบทบาทนั้นถือเป็นดิสก์จ็อกกี้หรือไม่"
+
+#: plconfig/cog.py:171
+msgid "{role_name_variable_do_not_translate} is a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} เป็นบทบาทดีเจ"
+
+#: plconfig/cog.py:175
+msgid "{role_name_variable_do_not_translate} is not a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} ไม่ใช่บทบาทจ๊อกกี้ดิสก์"
+
+#: plconfig/cog.py:182
+msgid "{user_name_variable_do_not_translate} is a disc jockey."
+msgstr "{user_name_variable_do_not_translate} เป็นดีเจจ๊อกกี้"
+
+#: plconfig/cog.py:186
+msgid "{user_name_variable_do_not_translate} is not a disc jockey."
+msgstr "{user_name_variable_do_not_translate} ไม่ใช่ดีเจจ๊อกกี้"
+
+#: plconfig/cog.py:201
+#, docstring
+msgid "Set the local tracks folder for PyLav.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "ตั้งค่าโฟลเดอร์แทร็กในเครื่องสําหรับ PyLav\n\n"
+"        การเปลี่ยนแปลงจะถูกนําไปใช้หลังจากที่ฉันรีสตาร์ท\n"
+"        "
+
+#: plconfig/cog.py:213
+msgid "{folder_path_variable_do_not_translate} is not a folder."
+msgstr "{folder_path_variable_do_not_translate} ไม่ใช่โฟลเดอร์"
+
+#: plconfig/cog.py:229
+msgid "{folder_path_variable_do_not_translate} does not exist, rerun the command with the create argument set to {command_variable_do_not_translate} to create this folder automatically."
+msgstr "{folder_path_variable_do_not_translate} ไม่มีอยู่ ให้เรียกใช้คําสั่งอีกครั้งโดยตั้งค่าอาร์กิวเมนต์ create เป็น {command_variable_do_not_translate} เพื่อสร้างโฟลเดอร์นี้โดยอัตโนมัติ"
+
+#: plconfig/cog.py:246
+msgid "PyLav local tracks folder has been set to {folder_path_variable_do_not_translate}."
+msgstr "โฟลเดอร์แทร็กในเครื่อง PyLav ถูกตั้งค่าเป็น {folder_path_variable_do_not_translate}."
+
+#: plconfig/cog.py:261
+#, docstring
+msgid "Change the managed node configuration"
+msgstr "เปลี่ยนการกําหนดค่าโหนดที่มีการจัดการ"
+
+#: plconfig/cog.py:265
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "สลับเปิด/ปิดโหนดที่มีการจัดการ\n\n"
+"        การเปลี่ยนแปลงจะถูกนําไปใช้หลังจากที่ฉันรีสตาร์ท\n"
+"        "
+
+#: plconfig/cog.py:281
+msgid "I have turned on my managed Lavalink node."
+msgstr "ฉันได้เปิดโหนด Lavalink ที่มีการจัดการของฉันแล้ว"
+
+#: plconfig/cog.py:289
+msgid "I have turned off my managed Lavalink node."
+msgstr "ฉันได้ปิดโหนด Lavalink ที่มีการจัดการของฉันแล้ว"
+
+#: plconfig/cog.py:297
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "สลับเปิด/ปิดการอัปเดตอัตโนมัติของโหนดที่มีการจัดการ\n\n"
+"        การเปลี่ยนแปลงจะถูกนําไปใช้หลังจากที่ฉันรีสตาร์ท\n"
+"        "
+
+#: plconfig/cog.py:313
+msgid "I have turned on the self-update functionality of my managed node."
+msgstr "ฉันได้เปิดฟังก์ชันการอัปเดตด้วยตนเองของโหนดที่มีการจัดการของฉัน"
+
+#: plconfig/cog.py:321
+msgid "I have turned off the self-update functionality of my managed node."
+msgstr "ฉันได้ปิดฟังก์ชันการอัปเดตด้วยตนเองของโหนดที่มีการจัดการของฉัน"
+
+#: plconfig/cog.py:329
+#, docstring
+msgid "Change the bundled external nodes state"
+msgstr "เปลี่ยนสถานะโหนดภายนอกที่แถมมา"
+
+#: plconfig/cog.py:333
+#, docstring
+msgid "Toggle the managed external draper.wtf nodes on/off"
+msgstr "สลับเปิด/ปิดโหนด draper.wtf ภายนอกที่มีการจัดการ"
+
+#: plconfig/cog.py:353
+msgid "I have turned on the PyLav external Lavalink nodes."
+msgstr "ฉันได้เปิดโหนด Lavalink ภายนอกของ PyLav แล้ว"
+
+#: plconfig/cog.py:363
+msgid "I have turned off the PyLav external Lavalink nodes."
+msgstr "ฉันได้ปิดโหนด Lavalink ภายนอก PyLav แล้ว"
+
+#: plconfig/cog.py:371
+#, docstring
+msgid "Toggle the managed external lava.link node on/off"
+msgstr "สลับเปิด/ปิดโหนด lava.link ภายนอกที่มีการจัดการ"
+
+#: plconfig/cog.py:383
+msgid "I have turned on the lava.link external Lavalink node."
+msgstr "ฉันได้เปิดโหนด Lavalink ภายนอก lava.link"
+
+#: plconfig/cog.py:391
+msgid "The PyLav managed lava.link external Lavalink node has been permanently removed."
+msgstr "โหนด Lavalink ภายนอกที่จัดการโดย PyLav lava.link ถูกลบออกอย่างถาวร"
+
+#: plconfig/cog.py:400
+#, docstring
+msgid "Instructions on how to set the Spotify API Tokens"
+msgstr "คําแนะนําเกี่ยวกับวิธีตั้งค่าโทเค็น API ของ Spotify"
+
+#: plconfig/cog.py:401
+msgid "1. Go to Spotify developers and log in with your Spotify account.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. Click on \"Create An App\".\n"
+"3. Fill out the form provided with your application name, etc.\n"
+"4. When asked if you're developing commercial integration select \"No\".\n"
+"5. Accept the terms and conditions.\n"
+"6. Execute the following command replacing {argument_1_variable_do_not_translate} with your client identifier and {argument_2_variable_do_not_translate} with your client secret:\n"
+"  `{command_name_variable_do_not_translate}`"
+msgstr "1. ไปที่นักพัฒนา Spotify และเข้าสู่ระบบด้วยบัญชี Spotify ของคุณ\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. คลิกที่ \"สร้างแอพ\"\n"
+"3. กรอกแบบฟอร์มที่มีชื่อใบสมัครของคุณ ฯลฯ\n"
+"4. เมื่อถามว่าคุณกําลังพัฒนาการรวมเชิงพาณิชย์หรือไม่ให้เลือก \"ไม่\"\n"
+"5. ยอมรับข้อกําหนดและเงื่อนไข\n"
+"6. ดําเนินการคําสั่งต่อไปนี้แทนที่ {argument_1_variable_do_not_translate} ด้วยตัวระบุลูกค้าของคุณและ {argument_2_variable_do_not_translate} ด้วยความลับของลูกค้าของคุณ:\n"
+"  `{command_name_variable_do_not_translate}`"
+
+#: plconfig/cog.py:428
+#, docstring
+msgid "Manage active players"
+msgstr "จัดการผู้เล่นที่ใช้งานอยู่"
+
+#: plconfig/cog.py:437
+msgid "I am not currently playing anything in {server_name_variable_do_not_translate}."
+msgstr "ฉันไม่ได้เล่นอะไรใน {server_name_variable_do_not_translate}."
+
+#: plconfig/cog.py:448
+msgid "I am not connected to any voice channel at the moment."
+msgstr "ฉันไม่ได้เชื่อมต่อกับช่องสัญญาณเสียงใด ๆ ในขณะนี้"
+
+#: plconfig/cog.py:465
+#, docstring
+msgid "Toggle whether or not I should update my Discord activity when playing tracks."
+msgstr "สลับว่าฉันควรอัปเดตกิจกรรม Discord ของฉันเมื่อเล่นแทร็กหรือไม่"
+
+#: plconfig/cog.py:476
+msgid "From now on, I will update my activity to reflect the tracks I am playing."
+msgstr "จากนี้ไปฉันจะอัปเดตกิจกรรมของฉันเพื่อสะท้อนถึงแทร็กที่ฉันกําลังเล่น"
+
+#: plconfig/cog.py:485
+msgid "From now on, I will no longer update my activity to reflect the tracks I am playing."
+msgstr "จากนี้ไปฉันจะไม่อัปเดตกิจกรรมของฉันเพื่อสะท้อนถึงแทร็กที่ฉันกําลังเล่นอีกต่อไป"
+
+#: plconfig/view.py:27 plconfig/view.py:68 plconfig/view.py:179
+#: plconfig/view.py:289 plconfig/view.py:551
+msgid "Enabled"
+msgstr "เปิด"
+
+#: plconfig/view.py:28 plconfig/view.py:69 plconfig/view.py:180
+#: plconfig/view.py:290 plconfig/view.py:552
+msgid "Disabled"
+msgstr "พิการ"
+
+#: plconfig/view.py:32
+msgid "Use Managed Node"
+msgstr "ใช้โหนดที่มีการจัดการ"
+
+#: plconfig/view.py:36
+msgid "Auto Update\n"
+"Managed Node"
+msgstr "อัปเดตอัตโนมัติ\n"
+"โหนดที่มีการจัดการ"
+
+#: plconfig/view.py:40
+msgid "Change Bot activity"
+msgstr "เปลี่ยนกิจกรรมบอท"
+
+#: plconfig/view.py:44
+msgid "Use Bundled\n"
+"PyLav Nodes"
+msgstr "ใช้ชุดรวม\n"
+"โหนด PyLav"
+
+#: plconfig/view.py:48
+msgid "Use Bundled\n"
+"lava.link Nodes"
+msgstr "ใช้ชุดรวม\n"
+"lava.link โหนด"
+
+#: plconfig/view.py:58 plconfig/view.py:163 plconfig/view.py:273
+#: plconfig/view.py:461 plconfig/view.py:596
+msgid "Value"
+msgstr "ค่า"
+
+#: plconfig/view.py:72 plconfig/view.py:253 plconfig/view.py:400
+msgid "Volume"
+msgstr "ปริมาตร"
+
+#: plconfig/view.py:78 plconfig/view.py:98 plconfig/view.py:118
+#: plconfig/view.py:196 plconfig/view.py:216 plconfig/view.py:236
+#: plconfig/view.py:343 plconfig/view.py:363 plconfig/view.py:383
+msgid "{enabled_variable_do_not_translate}\n"
+"0 seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"0 วินาที"
+
+#: plconfig/view.py:82 plconfig/view.py:102 plconfig/view.py:122
+#: plconfig/view.py:200 plconfig/view.py:220 plconfig/view.py:240
+#: plconfig/view.py:347 plconfig/view.py:367 plconfig/view.py:387
+msgid "{enabled_variable_do_not_translate}\n"
+"1 second"
+msgstr "{enabled_variable_do_not_translate}\n"
+"1 วินาที"
+
+#: plconfig/view.py:86 plconfig/view.py:106 plconfig/view.py:126
+#: plconfig/view.py:204 plconfig/view.py:224 plconfig/view.py:244
+#: plconfig/view.py:351 plconfig/view.py:371 plconfig/view.py:391
+msgid "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} วินาที"
+
+#: plconfig/view.py:135 plconfig/view.py:254 plconfig/view.py:401
+msgid "Maximum Volume"
+msgstr "ปริมาณสูงสุด"
+
+#: plconfig/view.py:137 plconfig/view.py:256 plconfig/view.py:403
+msgid "AutoPlay"
+msgstr "เล่นอัตโนมัติ"
+
+#: plconfig/view.py:141 plconfig/view.py:259 plconfig/view.py:419
+msgid "Shuffling"
+msgstr "การสับเปลี่ยน"
+
+#: plconfig/view.py:145 plconfig/view.py:260 plconfig/view.py:423
+msgid "Auto Shuffle"
+msgstr "สุ่มอัตโนมัติ"
+
+#: plconfig/view.py:149 plconfig/view.py:261 plconfig/view.py:427
+msgid "Auto Deafen"
+msgstr "ออโต้ หูหนวก"
+
+#: plconfig/view.py:152
+msgid "Auto Disconnect"
+msgstr "ตัดการเชื่อมต่ออัตโนมัติ"
+
+#: plconfig/view.py:153 plconfig/view.py:263 plconfig/view.py:431
+msgid "Auto Alone Pause"
+msgstr "หยุดชั่วคราวอัตโนมัติเพียงอย่างเดียว"
+
+#: plconfig/view.py:154 plconfig/view.py:264 plconfig/view.py:432
+msgid "Auto Alone Disconnect"
+msgstr "ตัดการเชื่อมต่ออัตโนมัติเพียงอย่างเดียว"
+
+#: plconfig/view.py:176
+msgid "You need to be on a server to show this page."
+msgstr "คุณต้องอยู่บนเซิร์ฟเวอร์เพื่อแสดงหน้านี้"
+
+#: plconfig/view.py:262 plconfig/view.py:430
+msgid "Auto Empty Disconnect"
+msgstr "ตัดการเชื่อมต่ออัตโนมัติที่ว่างเปล่า"
+
+#: plconfig/view.py:272
+msgid "Context Player Settings"
+msgstr "การตั้งค่าโปรแกรมเล่นบริบท"
+
+#: plconfig/view.py:286
+msgid "You need to be in a server to be able to show this page."
+msgstr "คุณต้องอยู่ในเซิร์ฟเวอร์จึงจะสามารถแสดงหน้านี้ได้"
+
+#: plconfig/view.py:307
+msgid "Too many entries to show ({number_of_users_variable_do_not_translate})"
+msgstr "มีรายการมากเกินไปที่จะแสดง ({number_of_users_variable_do_not_translate})"
+
+#: plconfig/view.py:325
+msgid "Too many entries to show ({number_of_roles_variable_do_not_translate})"
+msgstr "มีรายการมากเกินไปที่จะแสดง ({number_of_roles_variable_do_not_translate})"
+
+#: plconfig/view.py:330 plconfig/view.py:335 plconfig/view.py:437
+#: plconfig/view.py:443 plconfig/view.py:449
+msgid "None"
+msgstr "ไม่มีใคร"
+
+#: plconfig/view.py:407
+msgid "AutoPlay Playlist"
+msgstr "เล่นรายการที่จะเล่นอัตโนมัติ"
+
+#: plconfig/view.py:411
+msgid "Loop track"
+msgstr "ติดตามลูป"
+
+#: plconfig/view.py:415
+msgid "Loop Queue"
+msgstr "วนคิว"
+
+#: plconfig/view.py:434
+msgid "Forced Voice Channel"
+msgstr "ช่องเสียงบังคับ"
+
+#: plconfig/view.py:440
+msgid "Forced Command Channel"
+msgstr "ช่องคําสั่งบังคับ"
+
+#: plconfig/view.py:446
+msgid "Forced Notification Channel"
+msgstr "ช่องทางการแจ้งเตือนที่ถูกบังคับ"
+
+#: plconfig/view.py:451
+msgid "Disc Jockey Users"
+msgstr "ผู้ใช้ดิสก์จ๊อกกี้"
+
+#: plconfig/view.py:452
+msgid "Disc Jockey Roles"
+msgstr "บทบาทดิสก์จ๊อกกี้"
+
+#: plconfig/view.py:460
+msgid "Server Player Settings"
+msgstr "การตั้งค่าโปรแกรมเล่นเซิร์ฟเวอร์"
+
+#: plconfig/view.py:475
+msgid "Next Bundled\n"
+"Playlist Update"
+msgstr "รวมชุดต่อไป\n"
+"อัปเดตเพลย์ลิสต์"
+
+#: plconfig/view.py:481
+msgid "Next Bundled External\n"
+"Playlist Update"
+msgstr "ถัดไปรวมภายนอก\n"
+"อัปเดตเพลย์ลิสต์"
+
+#: plconfig/view.py:487
+msgid "Next External\n"
+"Playlist Update"
+msgstr "ภายนอกถัดไป\n"
+"อัปเดตเพลย์ลิสต์"
+
+#: plconfig/view.py:500
+msgid "Date and Time (UTC)"
+msgstr "วันที่และเวลา (UTC)"
+
+#: plconfig/view.py:513
+msgid "Due to sensitive information, I can only show the contents of this page to my owner."
+msgstr "เนื่องจากข้อมูลที่ละเอียดอ่อนฉันสามารถแสดงเนื้อหาของหน้านี้ให้กับเจ้าของของฉันเท่านั้น"
+
+#: plconfig/view.py:519
+msgid "Settings Folder"
+msgstr "โฟลเดอร์การตั้งค่า"
+
+#: plconfig/view.py:521
+msgid "Local Tracks"
+msgstr "แทร็กท้องถิ่น"
+
+#: plconfig/view.py:524
+msgid "Lavalink Folder"
+msgstr "โฟลเดอร์ลาวาลิงค์"
+
+#: plconfig/view.py:526
+msgid "Java Executable"
+msgstr "Java ปฏิบัติการ"
+
+#: plconfig/view.py:530
+msgid "Not Found"
+msgstr "ไม่พบ"
+
+#: plconfig/view.py:540
+msgid "Paths"
+msgstr "เส้น ทาง"
+
+#: plconfig/view.py:541
+msgid "Path"
+msgstr "ทาง"
+
+#: plconfig/view.py:560
+msgid "Java"
+msgstr "ชวา"
+
+#: plconfig/view.py:564
+msgid "Lavaplayer"
+msgstr "ลาวาเพลเยอร์"
+
+#: plconfig/view.py:568
+msgid "Lavalink Branch"
+msgstr "สาขาลาวาลิงค์"
+
+#: plconfig/view.py:572
+msgid "Lavalink Version"
+msgstr "เวอร์ชันลาวาลิงค์"
+
+#: plconfig/view.py:576
+msgid "Lavalink Build"
+msgstr "สร้างลาวาลิงค์"
+
+#: plconfig/view.py:579
+msgid "Build Time"
+msgstr "สร้างเวลา"
+
+#: plconfig/view.py:581
+msgid "Commit"
+msgstr "มอบ"
+
+#: plconfig/view.py:585
+msgid "Auto Update"
+msgstr "อัปเดตอัตโนมัติ"
+
+#: plconfig/view.py:623
+msgid "Select an option from the dropdown menu below."
+msgstr "เลือกตัวเลือกจากเมนูดร็อปดาวน์ด้านล่าง"
+
+#: plconfig/view.py:638
+msgid "Pick an option to view"
+msgstr "เลือกตัวเลือกเพื่อดู"
+
+#: plconfig/view.py:648
+msgid "You are not authorized to interact with this option."
+msgstr "คุณไม่ได้รับอนุญาตให้โต้ตอบกับตัวเลือกนี้"
+
+#: plconfig/view.py:678
+msgid "You are not authorized to interact with this."
+msgstr "คุณไม่ได้รับอนุญาตให้โต้ตอบกับสิ่งนี้"
+

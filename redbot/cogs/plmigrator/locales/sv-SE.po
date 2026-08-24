@@ -1,0 +1,58 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-05-05 09:21+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Swedish\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: sv-SE\n"
+"X-Crowdin-File: /cogs/plmigrator/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3299\n"
+"Language: sv_SE\n"
+
+#: plmigrator/cog.py:35
+#, docstring
+msgid "Copy the Red Audio settings over to PyLav"
+msgstr "Kopiera inställningarna för rött ljud till PyLav"
+
+#: plmigrator/cog.py:48
+#, docstring
+msgid "Migrate Audio settings to PyLav\n\n"
+"        Please note that this will replace any settings already in PyLav.\n\n"
+"        If you are sure you want to proceed please run this command again with the confirm argument set to 1\n"
+"        i.e `[p]pylavmigrate 1`\n\n"
+"        Once you complete the migration unload this cog and uninstall it as you will not need it again.\n"
+"        "
+msgstr "Migrera ljudinställningar till PyLav\n\n"
+"        Observera att detta kommer att ersätta alla inställningar som redan finns i PyLav.\n\n"
+"        Om du är säker på att du vill fortsätta, kör det här kommandot igen med bekräftelseargumentet inställt på 1\n"
+"        d.v.s. \"[p]pylavivera 1'\n\n"
+"        När du har slutfört migreringen lossar du den här kuggen och avinstallerar den eftersom du inte behöver den igen.\n"
+"        "
+
+#: plmigrator/cog.py:66
+msgid "Migration of Audio cog settings to PyLav complete. Restart the bot for it to take effect.\n"
+"{requester_variable_do_not_translate}."
+msgstr "Migrering av ljudkuggeinställningar till PyLav slutförd. Starta om roboten för att den ska träda i kraft.\n"
+"{requester_variable_do_not_translate}."
+
+#: plmigrator/cog.py:76
+#, docstring
+msgid "Reverts the Playlist migration which can cause broken autoplaylists.\n\n"
+"        Please note that this will replace any settings already in PyLav.\n\n"
+"        If you are sure you want to proceed please run this command again with the confirm argument set to 1\n"
+"        i.e `[p]plmigrate-revert 1`\n"
+"        "
+msgstr ""
+
+#: plmigrator/cog.py:178
+msgid "I do not have permission to access {folder_variable_do_not_translate}."
+msgstr "Jag har inte behörighet att komma åt {folder_variable_do_not_translate}."
+

@@ -1,0 +1,542 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-08 22:10+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Indonesian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: id\n"
+"X-Crowdin-File: /cogs/plnotifier/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3351\n"
+"Language: id_ID\n"
+
+#: plnotifier/cog.py:84
+#, docstring
+msgid "Listen to events from the PyLav player and send them as messages to the specified channel"
+msgstr "Dengarkan peristiwa dari pemutar PyLav dan kirimkan sebagai pesan ke saluran yang ditentukan"
+
+#: plnotifier/cog.py:230
+#, docstring
+msgid "Configure the PyLavNotifier cog"
+msgstr "Mengonfigurasi roda gigi PyLavNotifier"
+
+#: plnotifier/cog.py:234
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Tampilkan versi Cog dan PyLav"
+
+#: plnotifier/cog.py:250
+msgid "Library / Cog"
+msgstr "Perpustakaan / Cog"
+
+#: plnotifier/cog.py:251
+msgid "Version"
+msgstr "Versi"
+
+#: plnotifier/cog.py:266
+#, docstring
+msgid "Set the notify channel for the player"
+msgstr "Mengatur saluran pemberitahuan untuk pemutar"
+
+#: plnotifier/cog.py:275 plnotifier/cog.py:345
+msgid "I do not have permission to manage webhooks in {channel_variable_do_not_translate}."
+msgstr "Saya tidak memiliki izin untuk mengelola webhook di {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:289
+msgid "I do not have permission to create a thread in {channel_variable_do_not_translate}."
+msgstr "Saya tidak memiliki izin untuk membuat utas di {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:298 plnotifier/cog.py:316 plnotifier/cog.py:355
+msgid "PyLavNotifier"
+msgstr "PyLavNotifier"
+
+#: plnotifier/cog.py:299 plnotifier/cog.py:319 plnotifier/cog.py:356
+msgid "PyLav Notifier - Requested by {author_variable_do_not_translate}."
+msgstr "PyLav Notifier - Diminta oleh {author_variable_do_not_translate}."
+
+#: plnotifier/cog.py:312
+msgid "This thread will be used by PyLav to post notifications about the player."
+msgstr "Thread ini akan digunakan oleh PyLav untuk memposting notifikasi tentang pemain."
+
+#: plnotifier/cog.py:327 plnotifier/cog.py:363
+msgid "A new webhook was being created."
+msgstr "Webhook baru sedang dibuat."
+
+#: plnotifier/cog.py:377
+msgid "PyLavNotifier channel set to {channel_variable_do_not_translate}."
+msgstr "Saluran PyLavNotifier diatur ke {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:389
+#, docstring
+msgid "Set whether or not to notify for the specified event.\n\n"
+"        Arguments:\n"
+"            event -- The event to set.\n"
+"            toggle -- Whether or not to notify upon receiving this event.\n"
+"            use_mention -- Whether or not to use a mention instead of the name for the action requested.\n"
+"        "
+msgstr "Atur apakah akan memberi tahu atau tidak untuk acara yang ditentukan.\n\n"
+"        Argumen:\n"
+"            event -- Acara yang akan disetel.\n"
+"            beralih -- Apakah akan memberi tahu atau tidak setelah menerima acara ini.\n"
+"            use_mention -- Apakah akan menggunakan penyebutan atau tidak alih-alih nama untuk tindakan yang diminta.\n"
+"        "
+
+#: plnotifier/cog.py:406
+msgid "Invalid event, possible events are:\n\n"
+"{events_variable_do_not_translate}."
+msgstr "Peristiwa tidak valid, kemungkinan peristiwa adalah:\n\n"
+"{events_variable_do_not_translate}."
+
+#: plnotifier/cog.py:425
+msgid "Event {event_variable_do_not_translate} set to {toggle_variable_do_not_translate}{extras_variable_do_not_translate}."
+msgstr "Peristiwa {event_variable_do_not_translate} Atur ke {toggle_variable_do_not_translate}{extras_variable_do_not_translate}."
+
+#: plnotifier/cog.py:429
+msgid "notify"
+msgstr "Memberitahu"
+
+#: plnotifier/cog.py:429
+msgid "do not notify"
+msgstr "jangan beri tahu"
+
+#: plnotifier/cog.py:430
+msgid " with mentions"
+msgstr " dengan menyebutkan"
+
+#: plnotifier/cog.py:432
+msgid " without mentions"
+msgstr " tanpa menyebutkan"
+
+#: plnotifier/cog.py:450
+msgid "Track Stuck Event"
+msgstr "Lacak Acara Terjebak"
+
+#: plnotifier/cog.py:451
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} is stuck for {threshold_variable_do_not_translate} seconds, skipping."
+msgstr "[Simpul={node_variable_do_not_translate}] {track_variable_do_not_translate} macet untuk {threshold_variable_do_not_translate} detik, melompat."
+
+#: plnotifier/cog.py:478
+msgid "Track Exception Event"
+msgstr "Lacak Peristiwa Pengecualian"
+
+#: plnotifier/cog.py:479
+msgid "[Node={node_variable_do_not_translate}] There was an error while playing {track_variable_do_not_translate}:\n"
+"{exception_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] Ada kesalahan saat bermain {track_variable_do_not_translate}:\n"
+"{exception_variable_do_not_translate}"
+
+#: plnotifier/cog.py:505
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because the player reached the end of the tracks runtime."
+msgstr "[Simpul={node_variable_do_not_translate}] {track_variable_do_not_translate} telah selesai bermain karena pemain mencapai akhir runtime trek."
+
+#: plnotifier/cog.py:512
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because a new track started playing."
+msgstr "[Simpul={node_variable_do_not_translate}] {track_variable_do_not_translate} telah selesai bermain karena trek baru mulai diputar."
+
+#: plnotifier/cog.py:519
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because it failed to start."
+msgstr "[Simpul={node_variable_do_not_translate}] {track_variable_do_not_translate} telah selesai bermain karena gagal untuk memulai."
+
+#: plnotifier/cog.py:526
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing becausethe player was stopped."
+msgstr "[Simpul={node_variable_do_not_translate}] {track_variable_do_not_translate} telah selesai bermain karena pemain dihentikan."
+
+#: plnotifier/cog.py:533
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing becausethe node told it to stop."
+msgstr "[Simpul={node_variable_do_not_translate}] {track_variable_do_not_translate} telah selesai bermain karena node menyuruhnya berhenti."
+
+#: plnotifier/cog.py:542
+msgid "Track End Event"
+msgstr "Lacak Acara Akhir"
+
+#: plnotifier/cog.py:568
+msgid "YouTube Music Track Start Event"
+msgstr "Acara Mulai Jalur Musik YouTube"
+
+#: plnotifier/cog.py:569
+msgid "[Node={node_variable_do_not_translate}] YouTube Music track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] Lagu YouTube Music: {track_variable_do_not_translate} sudah mulai bermain.\n"
+"Diminta oleh: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:600
+msgid "Deezer Track Start Event"
+msgstr "Acara Deezer Track Start"
+
+#: plnotifier/cog.py:601
+msgid "[Node={node_variable_do_not_translate}] Deezer track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] Jalur Deezer: {track_variable_do_not_translate} sudah mulai bermain.\n"
+"Diminta oleh: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:632
+msgid "Spotify Track Start Event"
+msgstr "Spotify Lacak Mulai Acara"
+
+#: plnotifier/cog.py:633
+msgid "[Node={node_variable_do_not_translate}] Spotify track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] Trek Spotify: {track_variable_do_not_translate} sudah mulai bermain.\n"
+"Diminta oleh: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:664
+msgid "Apple Music Track Start Event"
+msgstr "Acara Mulai Track Apple Music"
+
+#: plnotifier/cog.py:665
+msgid "[Node={node_variable_do_not_translate}] Apple Music track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] Trek Apple Music: {track_variable_do_not_translate} sudah mulai bermain.\n"
+"Diminta oleh: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:696
+msgid "Local Track Start Event"
+msgstr "Acara Mulai Jalur Lokal"
+
+#: plnotifier/cog.py:697
+msgid "[Node={node_variable_do_not_translate}] Local track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] Jalur lokal: {track_variable_do_not_translate} sudah mulai bermain.\n"
+"Diminta oleh: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:728
+msgid "HTTP Track Start Event"
+msgstr "Acara Mulai Jalur HTTP"
+
+#: plnotifier/cog.py:729
+msgid "[Node={node_variable_do_not_translate}] HTTP track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] Jalur HTTP: {track_variable_do_not_translate} sudah mulai bermain.\n"
+"Diminta oleh: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:760
+msgid "Text-To-Speech Track Start Event"
+msgstr "Acara Mulai Lacak Text-To-Speech"
+
+#: plnotifier/cog.py:761
+msgid "[Node={node_variable_do_not_translate}] Text-To-Speech track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}."
+msgstr "[Simpul={node_variable_do_not_translate}] Jalur Text-To-Speech: {track_variable_do_not_translate} sudah mulai bermain.\n"
+"Diminta oleh: {requester_variable_do_not_translate}."
+
+#: plnotifier/cog.py:792
+msgid "YouTube Track Start Event"
+msgstr "Acara Mulai YouTube Track"
+
+#: plnotifier/cog.py:793
+msgid "[Node={node_variable_do_not_translate}] YouTube track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}."
+msgstr "[Simpul={node_variable_do_not_translate}] Trek YouTube: {track_variable_do_not_translate} sudah mulai bermain.\n"
+"Diminta oleh: {requester_variable_do_not_translate}."
+
+#: plnotifier/cog.py:824 plnotifier/cog.py:859 plnotifier/cog.py:894
+#: plnotifier/cog.py:929 plnotifier/cog.py:964 plnotifier/cog.py:999
+#: plnotifier/cog.py:1034 plnotifier/cog.py:1069 plnotifier/cog.py:1104
+#: plnotifier/cog.py:1139 plnotifier/cog.py:1174 plnotifier/cog.py:1209
+#: plnotifier/cog.py:1244 plnotifier/cog.py:1279
+msgid "{source_variable_do_not_translate} Track Start Event"
+msgstr "{source_variable_do_not_translate} Lacak Mulai Acara"
+
+#: plnotifier/cog.py:827 plnotifier/cog.py:862 plnotifier/cog.py:897
+#: plnotifier/cog.py:932 plnotifier/cog.py:967 plnotifier/cog.py:1002
+#: plnotifier/cog.py:1037 plnotifier/cog.py:1072 plnotifier/cog.py:1107
+#: plnotifier/cog.py:1142 plnotifier/cog.py:1177 plnotifier/cog.py:1212
+#: plnotifier/cog.py:1247 plnotifier/cog.py:1282
+msgid "[Node={node_variable_do_not_translate}] {source_variable_do_not_translate} track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] {source_variable_do_not_translate} Melacak: {track_variable_do_not_translate} sudah mulai bermain.\n"
+"Diminta oleh: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1314
+msgid "Track Skipped Event"
+msgstr "Lacak Acara yang Dilewati"
+
+#: plnotifier/cog.py:1315
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has been skipped.\n"
+"Requested by {requester_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] {track_variable_do_not_translate} telah dilewati.\n"
+"Diminta oleh {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1346
+msgid "Track Seek Event"
+msgstr "Lacak Acara Pencarian"
+
+#: plnotifier/cog.py:1347
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} requested that {track_variable_do_not_translate} is sought from position {from_variable_do_not_translate} to position {after_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} meminta agar {track_variable_do_not_translate} dicari dari posisi {from_variable_do_not_translate} ke posisi {after_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1381
+msgid "Track Previous Requested Event"
+msgstr "Lacak Acara yang Diminta Sebelumnya"
+
+#: plnotifier/cog.py:1382
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} requested that the previous track {track_variable_do_not_translate} be played"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} meminta agar trek sebelumnya {track_variable_do_not_translate} dimainkan"
+
+#: plnotifier/cog.py:1413
+msgid "Tracks Requested Event"
+msgstr "Melacak acara yang diminta"
+
+#: plnotifier/cog.py:1414
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} added {track_count_variable_do_not_translate} to the queue."
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} Ditambahkan {track_count_variable_do_not_translate} ke antrian."
+
+#: plnotifier/cog.py:1417
+msgid "{count_variable_do_not_translate} track"
+msgstr "{count_variable_do_not_translate} Melacak"
+
+#: plnotifier/cog.py:1444
+msgid "Track AutoPlay Event"
+msgstr "Lacak Acara AutoPlay"
+
+#: plnotifier/cog.py:1445
+msgid "[Node={node_variable_do_not_translate}] Auto playing {track_variable_do_not_translate}."
+msgstr "[Simpul={node_variable_do_not_translate}] Putar otomatis {track_variable_do_not_translate}."
+
+#: plnotifier/cog.py:1475
+msgid "Track Resumed Event"
+msgstr "Lacak Acara yang Dilanjutkan"
+
+#: plnotifier/cog.py:1476
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} resumed {track_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} Dilanjutkan {track_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1507
+msgid "Queue Shuffled Event"
+msgstr "Antrean Acak Acara"
+
+#: plnotifier/cog.py:1508
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} shuffled the queue"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} mengocok antrian"
+
+#: plnotifier/cog.py:1532
+msgid "Queue End Event"
+msgstr "Acara Akhir Antrean"
+
+#: plnotifier/cog.py:1533
+msgid "[Node={node_variable_do_not_translate}] All tracks in the queue have been played"
+msgstr "[Simpul={node_variable_do_not_translate}] Semua trek dalam antrian telah diputar"
+
+#: plnotifier/cog.py:1560
+msgid "Tracks Removed Event"
+msgstr "Melacak peristiwa yang dihapus"
+
+#: plnotifier/cog.py:1561
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} removed {track_count_variable_do_not_translate} tracks from the queue"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} Dihapus {track_count_variable_do_not_translate} Trek dari antrian"
+
+#: plnotifier/cog.py:1592 plnotifier/cog.py:2117
+msgid "Player Paused Event"
+msgstr "Acara Jeda Pemain"
+
+#: plnotifier/cog.py:1593
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} paused the player"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} menjeda pemain"
+
+#: plnotifier/cog.py:1622
+msgid "Player Stopped Event"
+msgstr "Acara Dihentikan Pemain"
+
+#: plnotifier/cog.py:1623
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} stopped the player"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} menghentikan pemain"
+
+#: plnotifier/cog.py:1652 plnotifier/cog.py:2147
+msgid "Player Resumed Event"
+msgstr "Acara Dilanjutkan Pemain"
+
+#: plnotifier/cog.py:1653
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} resumed the player"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} melanjutkan pemain"
+
+#: plnotifier/cog.py:1682
+msgid "Player Moved Event"
+msgstr "Acara Pindah Pemain"
+
+#: plnotifier/cog.py:1683
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} moved the player from {before_variable_do_not_translate} to {after_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} memindahkan pemain dari {before_variable_do_not_translate} ke {after_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1715
+msgid "Player Disconnected Event"
+msgstr "Acara Pemutusan Pemain"
+
+#: plnotifier/cog.py:1716
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} disconnected the player"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} memutuskan sambungan pemutar"
+
+#: plnotifier/cog.py:1745
+msgid "Player Connected Event"
+msgstr "Acara Player Connected"
+
+#: plnotifier/cog.py:1746
+msgid "[Node={node}] {requester} connected the player"
+msgstr "[Simpul={node}] {requester} menghubungkan pemain"
+
+#: plnotifier/cog.py:1773
+msgid "Player Volume Changed Event"
+msgstr "Volume Pemain Mengubah Acara"
+
+#: plnotifier/cog.py:1774
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} changed the player volume from {before_variable_do_not_translate} to {after_variable_do_not_translate}."
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} mengubah volume pemutar dari {before_variable_do_not_translate} ke {after_variable_do_not_translate}."
+
+#: plnotifier/cog.py:1808 plnotifier/cog.py:1820 plnotifier/cog.py:1833
+msgid "Player Repeat Event"
+msgstr "Acara Pengulangan Pemain"
+
+#: plnotifier/cog.py:1809
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} disabled repeat"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} pengulangan dinonaktifkan"
+
+#: plnotifier/cog.py:1821
+msgid "{requester_variable_do_not_translate} {status_variable_do_not_translate} repeat of the whole queue"
+msgstr "{requester_variable_do_not_translate} {status_variable_do_not_translate} ulangi seluruh antrian"
+
+#: plnotifier/cog.py:1825 plnotifier/cog.py:1838
+msgid "enabled"
+msgstr "Diaktifkan"
+
+#: plnotifier/cog.py:1825 plnotifier/cog.py:1838
+msgid "disabled"
+msgstr "cacat"
+
+#: plnotifier/cog.py:1834
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} {status_variable_do_not_translate} repeat for {track_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} {status_variable_do_not_translate} ulangi untuk {track_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1868
+msgid "Player Restored Event"
+msgstr "Acara yang Dipulihkan Pemain"
+
+#: plnotifier/cog.py:1869
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} restored the player"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} memulihkan pemain"
+
+#: plnotifier/cog.py:1894
+msgid "an intro section"
+msgstr "bagian intro"
+
+#: plnotifier/cog.py:1896
+msgid "an outro section"
+msgstr "bagian outro"
+
+#: plnotifier/cog.py:1898
+msgid "a preview section"
+msgstr "bagian pratinjau"
+
+#: plnotifier/cog.py:1900
+msgid "an off-topic section"
+msgstr "bagian di luar topik"
+
+#: plnotifier/cog.py:1902
+msgid "a filler section"
+msgstr "bagian pengisi"
+
+#: plnotifier/cog.py:1904
+msgid "a sponsor section"
+msgstr "Bagian Sponsor"
+
+#: plnotifier/cog.py:1906
+msgid "a self-promotion section"
+msgstr "Bagian promosi diri"
+
+#: plnotifier/cog.py:1908
+msgid "an interaction section"
+msgstr "bagian interaksi"
+
+#: plnotifier/cog.py:1912
+msgid "Sponsor Segment Skipped Event"
+msgstr "Acara yang Dilewati Segmen Sponsor"
+
+#: plnotifier/cog.py:1913
+msgid "[Node={node_variable_do_not_translate}] Sponsorblock: Skipped {category_variable_do_not_translate} running from {start_variable_do_not_translate}s to {to_variable_do_not_translate}s"
+msgstr "[Simpul={node_variable_do_not_translate}] Sponsorblock: Dilewati {category_variable_do_not_translate} berlari dari {start_variable_do_not_translate}s untuk {to_variable_do_not_translate}s"
+
+#: plnotifier/cog.py:1943
+msgid "Effect"
+msgstr "Efek"
+
+#: plnotifier/cog.py:1944
+msgid "Not changed"
+msgstr "Tidak berubah"
+
+#: plnotifier/cog.py:1945
+msgid "Values"
+msgstr "Nilai"
+
+#: plnotifier/cog.py:1985
+msgid "Filters Applied Event"
+msgstr "Memfilter Peristiwa yang Diterapkan"
+
+#: plnotifier/cog.py:1988
+msgid "None"
+msgstr "Tidak"
+
+#: plnotifier/cog.py:1989
+msgid "Currently Applied"
+msgstr "Saat Ini Diterapkan"
+
+#: plnotifier/cog.py:1991
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} changed the player filters"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} mengubah filter pemutar"
+
+#: plnotifier/cog.py:2013
+msgid "Node Connected Event"
+msgstr "Acara Node Connected"
+
+#: plnotifier/cog.py:2014
+msgid "Node {name_variable_do_not_translate} has been connected"
+msgstr "Simpul {name_variable_do_not_translate} telah terhubung"
+
+#: plnotifier/cog.py:2032
+msgid "Node Disconnected Event"
+msgstr "Peristiwa Node Terputus"
+
+#: plnotifier/cog.py:2033
+msgid "Node {name_variable_do_not_translate} has been disconnected with code {code_variable_do_not_translate} and reason: {reason_variable_do_not_translate}"
+msgstr "Simpul {name_variable_do_not_translate} telah terputus dengan kode {code_variable_do_not_translate} dan alasan: {reason_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2059
+msgid "Node Changed Event"
+msgstr "Peristiwa Perubahan Node"
+
+#: plnotifier/cog.py:2060
+msgid "The node which the player is connected to changed from {from_variable_do_not_translate} to {to_variable_do_not_translate}"
+msgstr "Node tempat pemutar terhubung berubah dari {from_variable_do_not_translate} ke {to_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2084
+msgid "WebSocket Closed Event"
+msgstr "Acara Tertutup WebSocket"
+
+#: plnotifier/cog.py:2085
+msgid "[Node={node_variable_do_not_translate}] The Lavalink websocket connection to Discord closed with code {code_variable_do_not_translate} and reason {reason_variable_do_not_translate}"
+msgstr "[Simpul={node_variable_do_not_translate}] Koneksi websocket Lavalink ke Discord ditutup dengan kode {code_variable_do_not_translate} dan alasan {reason_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2118
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically paused the player due to configured values"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} secara otomatis menjeda pemutar karena nilai yang dikonfigurasi"
+
+#: plnotifier/cog.py:2148
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically resumed the player due to configured values"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} secara otomatis melanjutkan pemutar karena nilai yang dikonfigurasi"
+
+#: plnotifier/cog.py:2177 plnotifier/cog.py:2209
+msgid "Auto Player Disconnected Event"
+msgstr "Acara Pemutusan Pemutar Otomatis"
+
+#: plnotifier/cog.py:2178
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically disconnected the player as there is no one listening"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} secara otomatis memutuskan sambungan pemutar karena tidak ada yang mendengarkan"
+
+#: plnotifier/cog.py:2210
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically disconnected the player as the queue is empty"
+msgstr "[Simpul={node_variable_do_not_translate}] {requester_variable_do_not_translate} secara otomatis memutuskan sambungan pemutar saat antrian kosong"
+

@@ -1,0 +1,58 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-05-05 09:21+0000\n"
+"PO-Revision-Date: 2023-05-19 10:26\n"
+"Last-Translator: \n"
+"Language-Team: Greek\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: el\n"
+"X-Crowdin-File: /cogs/plmigrator/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3299\n"
+"Language: el_GR\n"
+
+#: plmigrator/cog.py:35
+#, docstring
+msgid "Copy the Red Audio settings over to PyLav"
+msgstr "Αντιγράψτε τις ρυθμίσεις κόκκινου ήχου στο PyLav"
+
+#: plmigrator/cog.py:48
+#, docstring
+msgid "Migrate Audio settings to PyLav\n\n"
+"        Please note that this will replace any settings already in PyLav.\n\n"
+"        If you are sure you want to proceed please run this command again with the confirm argument set to 1\n"
+"        i.e `[p]pylavmigrate 1`\n\n"
+"        Once you complete the migration unload this cog and uninstall it as you will not need it again.\n"
+"        "
+msgstr "Μετεγκατάσταση ρυθμίσεων ήχου στο PyLav\n\n"
+"        Λάβετε υπόψη ότι αυτό θα αντικαταστήσει τυχόν ρυθμίσεις που υπάρχουν ήδη στο PyLav.\n\n"
+"        Εάν είστε βέβαιοι ότι θέλετε να συνεχίσετε, εκτελέστε ξανά αυτήν την εντολή με το όρισμα επιβεβαίωσης ρυθμισμένο σε 1\n"
+"        Δηλ.[p]πυλαβικό 1'\n\n"
+"        Μόλις ολοκληρώσετε τη μετεγκατάσταση, ξεφορτώστε αυτό το γρανάζι και απεγκαταστήστε το, καθώς δεν θα το χρειαστείτε ξανά.\n"
+"        "
+
+#: plmigrator/cog.py:66
+msgid "Migration of Audio cog settings to PyLav complete. Restart the bot for it to take effect.\n"
+"{requester_variable_do_not_translate}."
+msgstr "Ολοκληρώθηκε η μετεγκατάσταση των ρυθμίσεων γραναζιού ήχου στο PyLav. Επανεκκινήστε το bot για να τεθεί σε ισχύ.\n"
+"{requester_variable_do_not_translate}."
+
+#: plmigrator/cog.py:76
+#, docstring
+msgid "Reverts the Playlist migration which can cause broken autoplaylists.\n\n"
+"        Please note that this will replace any settings already in PyLav.\n\n"
+"        If you are sure you want to proceed please run this command again with the confirm argument set to 1\n"
+"        i.e `[p]plmigrate-revert 1`\n"
+"        "
+msgstr ""
+
+#: plmigrator/cog.py:178
+msgid "I do not have permission to access {folder_variable_do_not_translate}."
+msgstr "Δεν έχω δικαίωμα πρόσβασης {folder_variable_do_not_translate}."
+

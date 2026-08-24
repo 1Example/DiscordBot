@@ -1,0 +1,71 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: aaa3a-cogs\n"
+"POT-Creation-Date: 2024-07-20 22:14+0200\n"
+"PO-Revision-Date: 2024-07-21 15:12\n"
+"Last-Translator: \n"
+"Language-Team: German\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: aaa3a-cogs\n"
+"X-Crowdin-Project-ID: 531090\n"
+"X-Crowdin-Language: de\n"
+"X-Crowdin-File: /[AAA3A-AAA3A.AAA3A-cogs] main/dashboard/locales/messages.pot\n"
+"X-Crowdin-File-ID: 308\n"
+"Language: de_DE\n"
+
+#: dashboard\dashboard.py:32
+msgid "This is not a valid URL."
+msgstr "Dies ist keine gültige URL."
+
+#: dashboard\dashboard.py:35
+msgid "This is not a valid Dashboard redirect URI: it must end with `/callback`."
+msgstr "Dies ist kein gültiger Dashboard-Redirect-URI: Er muss mit `/callback` enden."
+
+#: dashboard\dashboard.py:44
+msgid "This third party is not available."
+msgstr "Diese dritte Partei ist nicht verfügbar."
+
+#: dashboard\dashboard.py:50
+#, docstring
+msgid "Interact with your bot through a web Dashboard!\n\n"
+"    **Installation guide:** https://red-web-dashboard.readthedocs.io/en/latest\n"
+"    ⚠️ This package is a fork of Neuro Assassin's work, and isn't endorsed by the Org at all.\n"
+"    "
+msgstr "Interagieren Sie mit Ihrem Bot über ein Web-Dashboard!\n\n"
+"    **Installationsanleitung:** https://red-web-dashboard.readthedocs.io/en/latest\n"
+"    ⚠️ Dieses Paket ist eine Abspaltung der Arbeit von Neuro Assassin und wird von der Org in keiner Weise befürwortet.\n"
+"    "
+
+#: dashboard\dashboard.py:347
+msgid "Red-Web-Dashboard is not installed. Check <https://red-web-dashboard.readthedocs.io>."
+msgstr "Red-Web-Dashboard ist nicht installiert. Prüfen Sie <https://red-web-dashboard.readthedocs.io>."
+
+#: dashboard\dashboard.py:352
+msgid "You can't access the Dashboard."
+msgstr "Sie können nicht auf das Dashboard zugreifen."
+
+#: dashboard\dashboard.py:354
+msgid "Red-Web-Dashboard"
+msgstr "Red-Web-Dashboard"
+
+#: dashboard\dashboard.py:374
+#, docstring
+msgid "Set the client secret needed for Discord OAuth."
+msgstr "Legen Sie das Client-Geheimnis fest, das für Discord OAuth benötigt wird."
+
+#: dashboard\dashboard.py:383
+msgid "Discord Secret"
+msgstr "Diskord Geheimnis"
+
+#: dashboard\dashboard.py:391
+msgid "Discord OAuth secret set."
+msgstr "Discord OAuth-Geheimsatz."
+
+#: dashboard\dashboard.py:427
+msgid "Click on the button below to set a secret for Discord OAuth."
+msgstr "Klicken Sie auf die Schaltfläche unten, um ein Geheimnis für Discord OAuth festzulegen."
+

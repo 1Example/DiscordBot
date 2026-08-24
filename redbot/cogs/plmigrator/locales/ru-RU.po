@@ -1,0 +1,58 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-05-05 09:21+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Russian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=4; plural=((n%10==1 && n%100!=11) ? 0 : ((n%10 >= 2 && n%10 <=4 && (n%100 < 12 || n%100 > 14)) ? 1 : ((n%10 == 0 || (n%10 >= 5 && n%10 <=9)) || (n%100 >= 11 && n%100 <= 14)) ? 2 : 3));\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: ru\n"
+"X-Crowdin-File: /cogs/plmigrator/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3299\n"
+"Language: ru_RU\n"
+
+#: plmigrator/cog.py:35
+#, docstring
+msgid "Copy the Red Audio settings over to PyLav"
+msgstr "Скопируйте настройки Red Audio в PyLav"
+
+#: plmigrator/cog.py:48
+#, docstring
+msgid "Migrate Audio settings to PyLav\n\n"
+"        Please note that this will replace any settings already in PyLav.\n\n"
+"        If you are sure you want to proceed please run this command again with the confirm argument set to 1\n"
+"        i.e `[p]pylavmigrate 1`\n\n"
+"        Once you complete the migration unload this cog and uninstall it as you will not need it again.\n"
+"        "
+msgstr "Перенос настроек звука в PyLav\n\n"
+"        Обратите внимание, что это заменит любые настройки, уже находящиеся в PyLav.\n\n"
+"        Если вы уверены, что хотите продолжить, выполните эту команду еще раз с аргументом подтверждения, равным 1\n"
+"        т.е. '[p]пилавмиграт 1'\n\n"
+"        Как только вы завершите миграцию, выгрузите этот винтик и удалите его, так как он вам больше не понадобится.\n"
+"        "
+
+#: plmigrator/cog.py:66
+msgid "Migration of Audio cog settings to PyLav complete. Restart the bot for it to take effect.\n"
+"{requester_variable_do_not_translate}."
+msgstr "Перенос настроек звукового шестеренки в PyLav завершен. Перезапустите бота, чтобы он вступил в силу.\n"
+"{requester_variable_do_not_translate}."
+
+#: plmigrator/cog.py:76
+#, docstring
+msgid "Reverts the Playlist migration which can cause broken autoplaylists.\n\n"
+"        Please note that this will replace any settings already in PyLav.\n\n"
+"        If you are sure you want to proceed please run this command again with the confirm argument set to 1\n"
+"        i.e `[p]plmigrate-revert 1`\n"
+"        "
+msgstr ""
+
+#: plmigrator/cog.py:178
+msgid "I do not have permission to access {folder_variable_do_not_translate}."
+msgstr "У меня нет разрешения на доступ {folder_variable_do_not_translate}."
+

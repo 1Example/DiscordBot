@@ -1,0 +1,542 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-08 22:10+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Russian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=4; plural=((n%10==1 && n%100!=11) ? 0 : ((n%10 >= 2 && n%10 <=4 && (n%100 < 12 || n%100 > 14)) ? 1 : ((n%10 == 0 || (n%10 >= 5 && n%10 <=9)) || (n%100 >= 11 && n%100 <= 14)) ? 2 : 3));\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: ru\n"
+"X-Crowdin-File: /cogs/plnotifier/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3351\n"
+"Language: ru_RU\n"
+
+#: plnotifier/cog.py:84
+#, docstring
+msgid "Listen to events from the PyLav player and send them as messages to the specified channel"
+msgstr "Слушать события из плеера PyLav и отправлять их как сообщения на указанный канал"
+
+#: plnotifier/cog.py:230
+#, docstring
+msgid "Configure the PyLavNotifier cog"
+msgstr "Настройте ког PyLavNotifier"
+
+#: plnotifier/cog.py:234
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Показать версию Cog и PyLav"
+
+#: plnotifier/cog.py:250
+msgid "Library / Cog"
+msgstr "Библиотека / Винтик"
+
+#: plnotifier/cog.py:251
+msgid "Version"
+msgstr "Версия"
+
+#: plnotifier/cog.py:266
+#, docstring
+msgid "Set the notify channel for the player"
+msgstr "Установить канал уведомлений для плеера"
+
+#: plnotifier/cog.py:275 plnotifier/cog.py:345
+msgid "I do not have permission to manage webhooks in {channel_variable_do_not_translate}."
+msgstr "У меня нет разрешения на управление веб-перехватчиками в {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:289
+msgid "I do not have permission to create a thread in {channel_variable_do_not_translate}."
+msgstr "У меня нет разрешения на создание потока в {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:298 plnotifier/cog.py:316 plnotifier/cog.py:355
+msgid "PyLavNotifier"
+msgstr "PyLavNotifier"
+
+#: plnotifier/cog.py:299 plnotifier/cog.py:319 plnotifier/cog.py:356
+msgid "PyLav Notifier - Requested by {author_variable_do_not_translate}."
+msgstr "Уведомитель PyLav - По запросу {author_variable_do_not_translate}."
+
+#: plnotifier/cog.py:312
+msgid "This thread will be used by PyLav to post notifications about the player."
+msgstr "Эта тема будет использоваться PyLav для публикации уведомлений об игроке."
+
+#: plnotifier/cog.py:327 plnotifier/cog.py:363
+msgid "A new webhook was being created."
+msgstr "Создавался новый веб-перехватчик."
+
+#: plnotifier/cog.py:377
+msgid "PyLavNotifier channel set to {channel_variable_do_not_translate}."
+msgstr "Канал PyLavNotifier настроен на {channel_variable_do_not_translate}."
+
+#: plnotifier/cog.py:389
+#, docstring
+msgid "Set whether or not to notify for the specified event.\n\n"
+"        Arguments:\n"
+"            event -- The event to set.\n"
+"            toggle -- Whether or not to notify upon receiving this event.\n"
+"            use_mention -- Whether or not to use a mention instead of the name for the action requested.\n"
+"        "
+msgstr "Определяет, уведомлять ли об указанном событии.\n\n"
+"        Аргументы:\n"
+"            событие -- Событие для установки.\n"
+"            включить/выключить -- Уведомлять ли об этом событии.\n"
+"            use_mention -- Нужно ли использовать упоминание вместо имени запрошенного действия.\n"
+"        "
+
+#: plnotifier/cog.py:406
+msgid "Invalid event, possible events are:\n\n"
+"{events_variable_do_not_translate}."
+msgstr "Недопустимое событие, возможные события:\n\n"
+"{events_variable_do_not_translate}."
+
+#: plnotifier/cog.py:425
+msgid "Event {event_variable_do_not_translate} set to {toggle_variable_do_not_translate}{extras_variable_do_not_translate}."
+msgstr "Событие {event_variable_do_not_translate} установите значение {toggle_variable_do_not_translate}{extras_variable_do_not_translate}."
+
+#: plnotifier/cog.py:429
+msgid "notify"
+msgstr "уведомлять"
+
+#: plnotifier/cog.py:429
+msgid "do not notify"
+msgstr "не уведомлять"
+
+#: plnotifier/cog.py:430
+msgid " with mentions"
+msgstr " с упоминаниями"
+
+#: plnotifier/cog.py:432
+msgid " without mentions"
+msgstr " без упоминаний"
+
+#: plnotifier/cog.py:450
+msgid "Track Stuck Event"
+msgstr "Событие \"Отслеживание\""
+
+#: plnotifier/cog.py:451
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} is stuck for {threshold_variable_do_not_translate} seconds, skipping."
+msgstr "[Узел={node_variable_do_not_translate}] {track_variable_do_not_translate} застрял для {threshold_variable_do_not_translate} секунд, пропуск."
+
+#: plnotifier/cog.py:478
+msgid "Track Exception Event"
+msgstr "Событие Отслеживание Исключений"
+
+#: plnotifier/cog.py:479
+msgid "[Node={node_variable_do_not_translate}] There was an error while playing {track_variable_do_not_translate}:\n"
+"{exception_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] Произошла ошибка во время игры {track_variable_do_not_translate}:\n"
+"{exception_variable_do_not_translate}"
+
+#: plnotifier/cog.py:505
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because the player reached the end of the tracks runtime."
+msgstr "[Узел={node_variable_do_not_translate}] {track_variable_do_not_translate} закончил воспроизведение, потому что проигрыватель достиг конца времени выполнения треков."
+
+#: plnotifier/cog.py:512
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because a new track started playing."
+msgstr "[Узел={node_variable_do_not_translate}] {track_variable_do_not_translate} закончил играть, потому что начал играть новый трек."
+
+#: plnotifier/cog.py:519
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing because it failed to start."
+msgstr "[Узел={node_variable_do_not_translate}] {track_variable_do_not_translate} закончил игру, потому что не смог начать."
+
+#: plnotifier/cog.py:526
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing becausethe player was stopped."
+msgstr "[Узел={node_variable_do_not_translate}] {track_variable_do_not_translate} закончил играть, потому что игрок был остановлен."
+
+#: plnotifier/cog.py:533
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has finished playing becausethe node told it to stop."
+msgstr "[Узел={node_variable_do_not_translate}] {track_variable_do_not_translate} закончил игру, потому что узел сказал ей остановиться."
+
+#: plnotifier/cog.py:542
+msgid "Track End Event"
+msgstr "Отслеживать конец события"
+
+#: plnotifier/cog.py:568
+msgid "YouTube Music Track Start Event"
+msgstr "Событие YouTube Music Track Start"
+
+#: plnotifier/cog.py:569
+msgid "[Node={node_variable_do_not_translate}] YouTube Music track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] Музыкальный трек YouTube: {track_variable_do_not_translate} начал играть.\n"
+"По просьбе: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:600
+msgid "Deezer Track Start Event"
+msgstr "Событие Пуск Глубокого Трека"
+
+#: plnotifier/cog.py:601
+msgid "[Node={node_variable_do_not_translate}] Deezer track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] Трек Deezer: {track_variable_do_not_translate} начал играть.\n"
+"По просьбе: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:632
+msgid "Spotify Track Start Event"
+msgstr "Начальное событие Spotify"
+
+#: plnotifier/cog.py:633
+msgid "[Node={node_variable_do_not_translate}] Spotify track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] Трек Spotify: {track_variable_do_not_translate} начал играть.\n"
+"По просьбе: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:664
+msgid "Apple Music Track Start Event"
+msgstr "Событие Apple Music Track Start"
+
+#: plnotifier/cog.py:665
+msgid "[Node={node_variable_do_not_translate}] Apple Music track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] Трек Apple Music: {track_variable_do_not_translate} начал играть.\n"
+"По просьбе: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:696
+msgid "Local Track Start Event"
+msgstr "Событие \"Локальный Пуск\""
+
+#: plnotifier/cog.py:697
+msgid "[Node={node_variable_do_not_translate}] Local track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] Локальная трасса: {track_variable_do_not_translate} начал играть.\n"
+"По просьбе: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:728
+msgid "HTTP Track Start Event"
+msgstr "Событие начала HTTP трека"
+
+#: plnotifier/cog.py:729
+msgid "[Node={node_variable_do_not_translate}] HTTP track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] HTTP трек: {track_variable_do_not_translate} начал играть.\n"
+"По просьбе: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:760
+msgid "Text-To-Speech Track Start Event"
+msgstr "Начальное событие Text-To-Speech Track"
+
+#: plnotifier/cog.py:761
+msgid "[Node={node_variable_do_not_translate}] Text-To-Speech track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}."
+msgstr "[Узел={node_variable_do_not_translate}] Трек преобразования текста в речь: {track_variable_do_not_translate} начал играть.\n"
+"По просьбе: {requester_variable_do_not_translate}."
+
+#: plnotifier/cog.py:792
+msgid "YouTube Track Start Event"
+msgstr "Событие начала YouTube трека"
+
+#: plnotifier/cog.py:793
+msgid "[Node={node_variable_do_not_translate}] YouTube track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}."
+msgstr "[Узел={node_variable_do_not_translate}] Трек на YouTube: {track_variable_do_not_translate} начал играть.\n"
+"По просьбе: {requester_variable_do_not_translate}."
+
+#: plnotifier/cog.py:824 plnotifier/cog.py:859 plnotifier/cog.py:894
+#: plnotifier/cog.py:929 plnotifier/cog.py:964 plnotifier/cog.py:999
+#: plnotifier/cog.py:1034 plnotifier/cog.py:1069 plnotifier/cog.py:1104
+#: plnotifier/cog.py:1139 plnotifier/cog.py:1174 plnotifier/cog.py:1209
+#: plnotifier/cog.py:1244 plnotifier/cog.py:1279
+msgid "{source_variable_do_not_translate} Track Start Event"
+msgstr "{source_variable_do_not_translate} Событие \"Старт трека\""
+
+#: plnotifier/cog.py:827 plnotifier/cog.py:862 plnotifier/cog.py:897
+#: plnotifier/cog.py:932 plnotifier/cog.py:967 plnotifier/cog.py:1002
+#: plnotifier/cog.py:1037 plnotifier/cog.py:1072 plnotifier/cog.py:1107
+#: plnotifier/cog.py:1142 plnotifier/cog.py:1177 plnotifier/cog.py:1212
+#: plnotifier/cog.py:1247 plnotifier/cog.py:1282
+msgid "[Node={node_variable_do_not_translate}] {source_variable_do_not_translate} track: {track_variable_do_not_translate} has started playing.\n"
+"Requested by: {requester_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] {source_variable_do_not_translate} дорожка: {track_variable_do_not_translate} начал играть.\n"
+"По просьбе: {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1314
+msgid "Track Skipped Event"
+msgstr "Пропущенное событие трека"
+
+#: plnotifier/cog.py:1315
+msgid "[Node={node_variable_do_not_translate}] {track_variable_do_not_translate} has been skipped.\n"
+"Requested by {requester_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] {track_variable_do_not_translate} был пропущен.\n"
+"По просьбе {requester_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1346
+msgid "Track Seek Event"
+msgstr "Событие Трек Seek"
+
+#: plnotifier/cog.py:1347
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} requested that {track_variable_do_not_translate} is sought from position {from_variable_do_not_translate} to position {after_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} просила, чтобы {track_variable_do_not_translate} разыскивается с должности {from_variable_do_not_translate} на позицию {after_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1381
+msgid "Track Previous Requested Event"
+msgstr "Отслеживать предыдущее запрошенное событие"
+
+#: plnotifier/cog.py:1382
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} requested that the previous track {track_variable_do_not_translate} be played"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} просил, чтобы предыдущий трек {track_variable_do_not_translate} быть сыгранным"
+
+#: plnotifier/cog.py:1413
+msgid "Tracks Requested Event"
+msgstr "Треки запрошенного события"
+
+#: plnotifier/cog.py:1414
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} added {track_count_variable_do_not_translate} to the queue."
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} Добавили {track_count_variable_do_not_translate} в очередь."
+
+#: plnotifier/cog.py:1417
+msgid "{count_variable_do_not_translate} track"
+msgstr "{count_variable_do_not_translate} дорожка"
+
+#: plnotifier/cog.py:1444
+msgid "Track AutoPlay Event"
+msgstr "Автовоспроизведение события"
+
+#: plnotifier/cog.py:1445
+msgid "[Node={node_variable_do_not_translate}] Auto playing {track_variable_do_not_translate}."
+msgstr "[Узел={node_variable_do_not_translate}] Автоматическое воспроизведение {track_variable_do_not_translate}."
+
+#: plnotifier/cog.py:1475
+msgid "Track Resumed Event"
+msgstr "Отслеживать возобновленное событие"
+
+#: plnotifier/cog.py:1476
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} resumed {track_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} Возобновил {track_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1507
+msgid "Queue Shuffled Event"
+msgstr "Событие в очереди перемешивание"
+
+#: plnotifier/cog.py:1508
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} shuffled the queue"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} перетасовка очереди"
+
+#: plnotifier/cog.py:1532
+msgid "Queue End Event"
+msgstr "Событие окончания очереди"
+
+#: plnotifier/cog.py:1533
+msgid "[Node={node_variable_do_not_translate}] All tracks in the queue have been played"
+msgstr "[Узел={node_variable_do_not_translate}] Все треки в очереди были воспроизведены"
+
+#: plnotifier/cog.py:1560
+msgid "Tracks Removed Event"
+msgstr "Событие удаления треков"
+
+#: plnotifier/cog.py:1561
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} removed {track_count_variable_do_not_translate} tracks from the queue"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} удаленный {track_count_variable_do_not_translate} треки из очереди"
+
+#: plnotifier/cog.py:1592 plnotifier/cog.py:2117
+msgid "Player Paused Event"
+msgstr "Игрок приостановлен"
+
+#: plnotifier/cog.py:1593
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} paused the player"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} Проигрыватель приостановил"
+
+#: plnotifier/cog.py:1622
+msgid "Player Stopped Event"
+msgstr "Событие остановки игрока"
+
+#: plnotifier/cog.py:1623
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} stopped the player"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} остановил игрока"
+
+#: plnotifier/cog.py:1652 plnotifier/cog.py:2147
+msgid "Player Resumed Event"
+msgstr "Плеер возобновил событие"
+
+#: plnotifier/cog.py:1653
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} resumed the player"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} возобновил игру"
+
+#: plnotifier/cog.py:1682
+msgid "Player Moved Event"
+msgstr "Событие Перемещено"
+
+#: plnotifier/cog.py:1683
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} moved the player from {before_variable_do_not_translate} to {after_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} переместил игрока из {before_variable_do_not_translate} Кому {after_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1715
+msgid "Player Disconnected Event"
+msgstr "Событие отключения игрока"
+
+#: plnotifier/cog.py:1716
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} disconnected the player"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} отключил проигрыватель"
+
+#: plnotifier/cog.py:1745
+msgid "Player Connected Event"
+msgstr "Подключено к событию"
+
+#: plnotifier/cog.py:1746
+msgid "[Node={node}] {requester} connected the player"
+msgstr "[Узел={node}] {requester} присоединил игрока"
+
+#: plnotifier/cog.py:1773
+msgid "Player Volume Changed Event"
+msgstr "Событие громкости игрока изменено"
+
+#: plnotifier/cog.py:1774
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} changed the player volume from {before_variable_do_not_translate} to {after_variable_do_not_translate}."
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} изменена громкость проигрывателя с {before_variable_do_not_translate} Кому {after_variable_do_not_translate}."
+
+#: plnotifier/cog.py:1808 plnotifier/cog.py:1820 plnotifier/cog.py:1833
+msgid "Player Repeat Event"
+msgstr "Повторить событие"
+
+#: plnotifier/cog.py:1809
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} disabled repeat"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} отключено повторение"
+
+#: plnotifier/cog.py:1821
+msgid "{requester_variable_do_not_translate} {status_variable_do_not_translate} repeat of the whole queue"
+msgstr "{requester_variable_do_not_translate} {status_variable_do_not_translate} повторение всей очереди"
+
+#: plnotifier/cog.py:1825 plnotifier/cog.py:1838
+msgid "enabled"
+msgstr "Включен"
+
+#: plnotifier/cog.py:1825 plnotifier/cog.py:1838
+msgid "disabled"
+msgstr "нетрудоспособный"
+
+#: plnotifier/cog.py:1834
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} {status_variable_do_not_translate} repeat for {track_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} {status_variable_do_not_translate} повторить для {track_variable_do_not_translate}"
+
+#: plnotifier/cog.py:1868
+msgid "Player Restored Event"
+msgstr "Восстановлено событие игрока"
+
+#: plnotifier/cog.py:1869
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} restored the player"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} восстановлен плеер"
+
+#: plnotifier/cog.py:1894
+msgid "an intro section"
+msgstr "вводный раздел"
+
+#: plnotifier/cog.py:1896
+msgid "an outro section"
+msgstr "outro раздел"
+
+#: plnotifier/cog.py:1898
+msgid "a preview section"
+msgstr "секция предварительного просмотра"
+
+#: plnotifier/cog.py:1900
+msgid "an off-topic section"
+msgstr "секция вне темы"
+
+#: plnotifier/cog.py:1902
+msgid "a filler section"
+msgstr "секция наполнителя"
+
+#: plnotifier/cog.py:1904
+msgid "a sponsor section"
+msgstr "раздел спонсора"
+
+#: plnotifier/cog.py:1906
+msgid "a self-promotion section"
+msgstr "секция саморекламы"
+
+#: plnotifier/cog.py:1908
+msgid "an interaction section"
+msgstr "секция взаимодействия"
+
+#: plnotifier/cog.py:1912
+msgid "Sponsor Segment Skipped Event"
+msgstr "Сегмент спонсора пропущено событие"
+
+#: plnotifier/cog.py:1913
+msgid "[Node={node_variable_do_not_translate}] Sponsorblock: Skipped {category_variable_do_not_translate} running from {start_variable_do_not_translate}s to {to_variable_do_not_translate}s"
+msgstr "[Узел={node_variable_do_not_translate}] Спонсорский блок: Пропущено {category_variable_do_not_translate} бег от {start_variable_do_not_translate}s до {to_variable_do_not_translate}s"
+
+#: plnotifier/cog.py:1943
+msgid "Effect"
+msgstr "Эффект"
+
+#: plnotifier/cog.py:1944
+msgid "Not changed"
+msgstr "Не изменено"
+
+#: plnotifier/cog.py:1945
+msgid "Values"
+msgstr "Значения"
+
+#: plnotifier/cog.py:1985
+msgid "Filters Applied Event"
+msgstr "Фильтры примененного события"
+
+#: plnotifier/cog.py:1988
+msgid "None"
+msgstr "Никакой"
+
+#: plnotifier/cog.py:1989
+msgid "Currently Applied"
+msgstr "Применяется в настоящее время"
+
+#: plnotifier/cog.py:1991
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} changed the player filters"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} изменены фильтры плеера"
+
+#: plnotifier/cog.py:2013
+msgid "Node Connected Event"
+msgstr "Подключенное событие"
+
+#: plnotifier/cog.py:2014
+msgid "Node {name_variable_do_not_translate} has been connected"
+msgstr "Узел {name_variable_do_not_translate} был подключен"
+
+#: plnotifier/cog.py:2032
+msgid "Node Disconnected Event"
+msgstr "Событие отключения узла"
+
+#: plnotifier/cog.py:2033
+msgid "Node {name_variable_do_not_translate} has been disconnected with code {code_variable_do_not_translate} and reason: {reason_variable_do_not_translate}"
+msgstr "Узел {name_variable_do_not_translate} был отключен с кодом {code_variable_do_not_translate} и причина: {reason_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2059
+msgid "Node Changed Event"
+msgstr "Событие изменения узла"
+
+#: plnotifier/cog.py:2060
+msgid "The node which the player is connected to changed from {from_variable_do_not_translate} to {to_variable_do_not_translate}"
+msgstr "Узел, к которому подключен проигрыватель, изменился с {from_variable_do_not_translate} Кому {to_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2084
+msgid "WebSocket Closed Event"
+msgstr "Событие закрытия WebSocket"
+
+#: plnotifier/cog.py:2085
+msgid "[Node={node_variable_do_not_translate}] The Lavalink websocket connection to Discord closed with code {code_variable_do_not_translate} and reason {reason_variable_do_not_translate}"
+msgstr "[Узел={node_variable_do_not_translate}] Соединение Lavalink с Discord, закрытое кодом {code_variable_do_not_translate} и причины {reason_variable_do_not_translate}"
+
+#: plnotifier/cog.py:2118
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically paused the player due to configured values"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} автоматически приостановил проигрыватель из-за настроенных значений"
+
+#: plnotifier/cog.py:2148
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically resumed the player due to configured values"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} автоматически возобновляется проигрыватель благодаря настроенным значениям"
+
+#: plnotifier/cog.py:2177 plnotifier/cog.py:2209
+msgid "Auto Player Disconnected Event"
+msgstr "Событие автоотключения игрока"
+
+#: plnotifier/cog.py:2178
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically disconnected the player as there is no one listening"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} автоматически отключается плеер, так как его никто не слушает"
+
+#: plnotifier/cog.py:2210
+msgid "[Node={node_variable_do_not_translate}] {requester_variable_do_not_translate} automatically disconnected the player as the queue is empty"
+msgstr "[Узел={node_variable_do_not_translate}] {requester_variable_do_not_translate} автоматически отключается проигрыватель, так как очередь пуста"
+

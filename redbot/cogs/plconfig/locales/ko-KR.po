@@ -1,0 +1,532 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Korean\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: ko\n"
+"X-Crowdin-File: /cogs/plconfig/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3353\n"
+"Language: ko_KR\n"
+
+#: plconfig/cog.py:32
+#, docstring
+msgid "Configure PyLav library settings"
+msgstr "PyLav 라이브러리 설정 구성"
+
+#: plconfig/cog.py:44
+#, docstring
+msgid "Change global settings for PyLav"
+msgstr "PyLav에 대한 전역 설정 변경"
+
+#: plconfig/cog.py:48
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "톱니바퀴와 PyLav의 버전 표시"
+
+#: plconfig/cog.py:64
+msgid "Library / Cog"
+msgstr "도서관 / 톱니바퀴"
+
+#: plconfig/cog.py:65
+msgid "Version"
+msgstr "버전"
+
+#: plconfig/cog.py:78
+#, docstring
+msgid "Show the setting values"
+msgstr "설정 값 표시"
+
+#: plconfig/cog.py:85 plconfig/view.py:57
+msgid "PyLav Settings"
+msgstr "파일라브 설정"
+
+#: plconfig/cog.py:88
+msgid "Get information about the PyLav library settings."
+msgstr "PyLav 라이브러리 설정에 대한 정보를 가져옵니다."
+
+#: plconfig/cog.py:92 plconfig/view.py:162
+msgid "Global Settings"
+msgstr "전역 설정"
+
+#: plconfig/cog.py:95
+msgid "Get information about bot owner configured settings for the players."
+msgstr "플레이어에 대해 봇 소유자가 구성한 설정에 대한 정보를 가져옵니다."
+
+#: plconfig/cog.py:103
+msgid "Contextual Settings"
+msgstr "상황별 설정"
+
+#: plconfig/cog.py:107
+msgid "Get information about contextual settings for the player, accounting for the global settings."
+msgstr "플레이어의 상황별 설정에 대한 정보를 얻고 전역 설정을 고려합니다."
+
+#: plconfig/cog.py:114
+msgid "Server Settings"
+msgstr "서버 설정"
+
+#: plconfig/cog.py:118
+msgid "Get information about the server configured settings for the player."
+msgstr "플레이어에 대해 서버 구성 설정에 대한 정보를 가져옵니다."
+
+#: plconfig/cog.py:126 plconfig/view.py:499
+msgid "Playlist Tasks"
+msgstr "재생 목록 작업"
+
+#: plconfig/cog.py:129
+msgid "Get information about the playlist auto update schedule."
+msgstr "재생 목록 자동 업데이트 일정에 대한 정보를 가져옵니다."
+
+#: plconfig/cog.py:138
+msgid "PyLav Paths"
+msgstr "파이라브 경로"
+
+#: plconfig/cog.py:140
+msgid "Get information about PyLav paths"
+msgstr "PyLav 경로에 대한 정보 얻기"
+
+#: plconfig/cog.py:147 plconfig/view.py:595
+msgid "Managed Node Settings"
+msgstr "관리 노드 설정"
+
+#: plconfig/cog.py:150
+msgid "Get information about the Managed PyLav Lavalink node"
+msgstr "관리형 PyLav 라발링크 노드에 대한 정보 가져오기"
+
+#: plconfig/cog.py:160
+#, docstring
+msgid "Checks if a user or role is considered a disc jockey"
+msgstr "사용자 또는 역할이 디스크 자키로 간주되는지 확인합니다."
+
+#: plconfig/cog.py:171
+msgid "{role_name_variable_do_not_translate} is a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} 디스크 자키 역할입니다."
+
+#: plconfig/cog.py:175
+msgid "{role_name_variable_do_not_translate} is not a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} 디스크 자키 역할이 아닙니다."
+
+#: plconfig/cog.py:182
+msgid "{user_name_variable_do_not_translate} is a disc jockey."
+msgstr "{user_name_variable_do_not_translate} 디스크 자키입니다."
+
+#: plconfig/cog.py:186
+msgid "{user_name_variable_do_not_translate} is not a disc jockey."
+msgstr "{user_name_variable_do_not_translate} 디스크 자키가 아닙니다."
+
+#: plconfig/cog.py:201
+#, docstring
+msgid "Set the local tracks folder for PyLav.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "PyLav에 대한 로컬 트랙 폴더를 설정합니다.\n\n"
+"        변경 사항은 다시 시작한 후에 적용됩니다.\n"
+"        "
+
+#: plconfig/cog.py:213
+msgid "{folder_path_variable_do_not_translate} is not a folder."
+msgstr "{folder_path_variable_do_not_translate} 은(는) 폴더가 아닙니다."
+
+#: plconfig/cog.py:229
+msgid "{folder_path_variable_do_not_translate} does not exist, rerun the command with the create argument set to {command_variable_do_not_translate} to create this folder automatically."
+msgstr "{folder_path_variable_do_not_translate} 존재하지 않는 경우 create 인수를 다음으로 설정하여 명령을 다시 실행합니다. {command_variable_do_not_translate} 이 폴더를 자동으로 만듭니다."
+
+#: plconfig/cog.py:246
+msgid "PyLav local tracks folder has been set to {folder_path_variable_do_not_translate}."
+msgstr "PyLav 로컬 트랙 폴더가 다음으로 설정되었습니다. {folder_path_variable_do_not_translate}."
+
+#: plconfig/cog.py:261
+#, docstring
+msgid "Change the managed node configuration"
+msgstr "관리 노드 구성 변경"
+
+#: plconfig/cog.py:265
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "관리 노드를 켜기/끄기로 전환합니다.\n\n"
+"        변경 사항은 다시 시작한 후에 적용됩니다.\n"
+"        "
+
+#: plconfig/cog.py:281
+msgid "I have turned on my managed Lavalink node."
+msgstr "관리되는 Lavalink 노드를 켰습니다."
+
+#: plconfig/cog.py:289
+msgid "I have turned off my managed Lavalink node."
+msgstr "관리되는 Lavalink 노드를 해제했습니다."
+
+#: plconfig/cog.py:297
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "관리 노드 자동 업데이트를 켜거나 끕니다.\n\n"
+"        변경 사항은 다시 시작한 후에 적용됩니다.\n"
+"        "
+
+#: plconfig/cog.py:313
+msgid "I have turned on the self-update functionality of my managed node."
+msgstr "관리 노드의 자체 업데이트 기능을 켰습니다."
+
+#: plconfig/cog.py:321
+msgid "I have turned off the self-update functionality of my managed node."
+msgstr "관리 노드의 자체 업데이트 기능을 해제했습니다."
+
+#: plconfig/cog.py:329
+#, docstring
+msgid "Change the bundled external nodes state"
+msgstr "번들된 외부 노드 상태 변경"
+
+#: plconfig/cog.py:333
+#, docstring
+msgid "Toggle the managed external draper.wtf nodes on/off"
+msgstr "관리되는 외부 드레이퍼.wtf 노드 켜기/끄기"
+
+#: plconfig/cog.py:353
+msgid "I have turned on the PyLav external Lavalink nodes."
+msgstr "PyLav 외부 라발 링크 노드를 켰습니다."
+
+#: plconfig/cog.py:363
+msgid "I have turned off the PyLav external Lavalink nodes."
+msgstr "PyLav 외부 라발 링크 노드를 껐습니다."
+
+#: plconfig/cog.py:371
+#, docstring
+msgid "Toggle the managed external lava.link node on/off"
+msgstr "관리되는 외부 lava.link 노드 켜기/끄기"
+
+#: plconfig/cog.py:383
+msgid "I have turned on the lava.link external Lavalink node."
+msgstr "lava.link 외부 Lavalink 노드를 켰습니다."
+
+#: plconfig/cog.py:391
+msgid "The PyLav managed lava.link external Lavalink node has been permanently removed."
+msgstr "PyLav 관리 lava.link 외부 Lavalink 노드가 영구적으로 제거되었습니다."
+
+#: plconfig/cog.py:400
+#, docstring
+msgid "Instructions on how to set the Spotify API Tokens"
+msgstr "스포티 파이 API 토큰을 설정하는 방법에 대한 지침"
+
+#: plconfig/cog.py:401
+msgid "1. Go to Spotify developers and log in with your Spotify account.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. Click on \"Create An App\".\n"
+"3. Fill out the form provided with your application name, etc.\n"
+"4. When asked if you're developing commercial integration select \"No\".\n"
+"5. Accept the terms and conditions.\n"
+"6. Execute the following command replacing {argument_1_variable_do_not_translate} with your client identifier and {argument_2_variable_do_not_translate} with your client secret:\n"
+"  `{command_name_variable_do_not_translate}`"
+msgstr "1. Spotify 개발자로 이동하여 Spotify 계정으로 로그인하십시오.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. \"앱 만들기\"를 클릭합니다.\n"
+"3. 신청서 이름 등을 기재하여 양식을 작성하십시오.\n"
+"4. 상업적 통합을 개발하고 있는지 묻는 질문에 \"아니오\"를 선택합니다.\n"
+"5. 이용 약관에 동의합니다.\n"
+"6. 다음 명령을 실행합니다. {argument_1_variable_do_not_translate} 클라이언트 식별자 및 {argument_2_variable_do_not_translate} 클라이언트 암호로 :\n"
+"  `{command_name_variable_do_not_translate}`"
+
+#: plconfig/cog.py:428
+#, docstring
+msgid "Manage active players"
+msgstr "활성 플레이어 관리"
+
+#: plconfig/cog.py:437
+msgid "I am not currently playing anything in {server_name_variable_do_not_translate}."
+msgstr "나는 현재 아무것도 연주하지 않습니다 {server_name_variable_do_not_translate}."
+
+#: plconfig/cog.py:448
+msgid "I am not connected to any voice channel at the moment."
+msgstr "현재 음성 채널에 연결되어 있지 않습니다."
+
+#: plconfig/cog.py:465
+#, docstring
+msgid "Toggle whether or not I should update my Discord activity when playing tracks."
+msgstr "트랙을 재생할 때 Discord 활동을 업데이트해야 하는지 여부를 전환합니다."
+
+#: plconfig/cog.py:476
+msgid "From now on, I will update my activity to reflect the tracks I am playing."
+msgstr "이제부터는 내가 연주하는 트랙을 반영하도록 활동을 업데이트 할 것입니다."
+
+#: plconfig/cog.py:485
+msgid "From now on, I will no longer update my activity to reflect the tracks I am playing."
+msgstr "이제부터는 더 이상 내가 연주하는 트랙을 반영하기 위해 활동을 업데이트하지 않습니다."
+
+#: plconfig/view.py:27 plconfig/view.py:68 plconfig/view.py:179
+#: plconfig/view.py:289 plconfig/view.py:551
+msgid "Enabled"
+msgstr "사용"
+
+#: plconfig/view.py:28 plconfig/view.py:69 plconfig/view.py:180
+#: plconfig/view.py:290 plconfig/view.py:552
+msgid "Disabled"
+msgstr "비활성화"
+
+#: plconfig/view.py:32
+msgid "Use Managed Node"
+msgstr "관리 노드 사용"
+
+#: plconfig/view.py:36
+msgid "Auto Update\n"
+"Managed Node"
+msgstr "자동 업데이트\n"
+"관리 노드"
+
+#: plconfig/view.py:40
+msgid "Change Bot activity"
+msgstr "봇 활동 변경"
+
+#: plconfig/view.py:44
+msgid "Use Bundled\n"
+"PyLav Nodes"
+msgstr "번들 사용\n"
+"파이라브 노드"
+
+#: plconfig/view.py:48
+msgid "Use Bundled\n"
+"lava.link Nodes"
+msgstr "번들 사용\n"
+"lava.link 노드"
+
+#: plconfig/view.py:58 plconfig/view.py:163 plconfig/view.py:273
+#: plconfig/view.py:461 plconfig/view.py:596
+msgid "Value"
+msgstr "값"
+
+#: plconfig/view.py:72 plconfig/view.py:253 plconfig/view.py:400
+msgid "Volume"
+msgstr "음량"
+
+#: plconfig/view.py:78 plconfig/view.py:98 plconfig/view.py:118
+#: plconfig/view.py:196 plconfig/view.py:216 plconfig/view.py:236
+#: plconfig/view.py:343 plconfig/view.py:363 plconfig/view.py:383
+msgid "{enabled_variable_do_not_translate}\n"
+"0 seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"0 초"
+
+#: plconfig/view.py:82 plconfig/view.py:102 plconfig/view.py:122
+#: plconfig/view.py:200 plconfig/view.py:220 plconfig/view.py:240
+#: plconfig/view.py:347 plconfig/view.py:367 plconfig/view.py:387
+msgid "{enabled_variable_do_not_translate}\n"
+"1 second"
+msgstr "{enabled_variable_do_not_translate}\n"
+"1초"
+
+#: plconfig/view.py:86 plconfig/view.py:106 plconfig/view.py:126
+#: plconfig/view.py:204 plconfig/view.py:224 plconfig/view.py:244
+#: plconfig/view.py:351 plconfig/view.py:371 plconfig/view.py:391
+msgid "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} 초"
+
+#: plconfig/view.py:135 plconfig/view.py:254 plconfig/view.py:401
+msgid "Maximum Volume"
+msgstr "최대 볼륨"
+
+#: plconfig/view.py:137 plconfig/view.py:256 plconfig/view.py:403
+msgid "AutoPlay"
+msgstr "자동 실행"
+
+#: plconfig/view.py:141 plconfig/view.py:259 plconfig/view.py:419
+msgid "Shuffling"
+msgstr "걸어 갔다"
+
+#: plconfig/view.py:145 plconfig/view.py:260 plconfig/view.py:423
+msgid "Auto Shuffle"
+msgstr "자동 셔플"
+
+#: plconfig/view.py:149 plconfig/view.py:261 plconfig/view.py:427
+msgid "Auto Deafen"
+msgstr "자동 청각 장애인"
+
+#: plconfig/view.py:152
+msgid "Auto Disconnect"
+msgstr "자동 연결 해제"
+
+#: plconfig/view.py:153 plconfig/view.py:263 plconfig/view.py:431
+msgid "Auto Alone Pause"
+msgstr "자동 단독 일시 중지"
+
+#: plconfig/view.py:154 plconfig/view.py:264 plconfig/view.py:432
+msgid "Auto Alone Disconnect"
+msgstr "자동 단독 연결 끊기"
+
+#: plconfig/view.py:176
+msgid "You need to be on a server to show this page."
+msgstr "이 페이지를 표시하려면 서버에 있어야 합니다."
+
+#: plconfig/view.py:262 plconfig/view.py:430
+msgid "Auto Empty Disconnect"
+msgstr "자동 비우기 연결 끊기"
+
+#: plconfig/view.py:272
+msgid "Context Player Settings"
+msgstr "컨텍스트 플레이어 설정"
+
+#: plconfig/view.py:286
+msgid "You need to be in a server to be able to show this page."
+msgstr "이 페이지를 표시하려면 서버에 있어야 합니다."
+
+#: plconfig/view.py:307
+msgid "Too many entries to show ({number_of_users_variable_do_not_translate})"
+msgstr "표시할 항목이 너무 많습니다({number_of_users_variable_do_not_translate})"
+
+#: plconfig/view.py:325
+msgid "Too many entries to show ({number_of_roles_variable_do_not_translate})"
+msgstr "표시할 항목이 너무 많습니다({number_of_roles_variable_do_not_translate})"
+
+#: plconfig/view.py:330 plconfig/view.py:335 plconfig/view.py:437
+#: plconfig/view.py:443 plconfig/view.py:449
+msgid "None"
+msgstr "없음"
+
+#: plconfig/view.py:407
+msgid "AutoPlay Playlist"
+msgstr "자동 재생 재생 목록"
+
+#: plconfig/view.py:411
+msgid "Loop track"
+msgstr "루프 트랙"
+
+#: plconfig/view.py:415
+msgid "Loop Queue"
+msgstr "루프 큐"
+
+#: plconfig/view.py:434
+msgid "Forced Voice Channel"
+msgstr "강제 음성 채널"
+
+#: plconfig/view.py:440
+msgid "Forced Command Channel"
+msgstr "강제 명령 채널"
+
+#: plconfig/view.py:446
+msgid "Forced Notification Channel"
+msgstr "강제 통지 채널"
+
+#: plconfig/view.py:451
+msgid "Disc Jockey Users"
+msgstr "디스크 자키 사용자"
+
+#: plconfig/view.py:452
+msgid "Disc Jockey Roles"
+msgstr "디스크 자키 역할"
+
+#: plconfig/view.py:460
+msgid "Server Player Settings"
+msgstr "서버 플레이어 설정"
+
+#: plconfig/view.py:475
+msgid "Next Bundled\n"
+"Playlist Update"
+msgstr "다음 번들\n"
+"재생 목록 업데이트"
+
+#: plconfig/view.py:481
+msgid "Next Bundled External\n"
+"Playlist Update"
+msgstr "다음 번들 외부\n"
+"재생 목록 업데이트"
+
+#: plconfig/view.py:487
+msgid "Next External\n"
+"Playlist Update"
+msgstr "다음 외부\n"
+"재생 목록 업데이트"
+
+#: plconfig/view.py:500
+msgid "Date and Time (UTC)"
+msgstr "날짜 및 시간(UTC)"
+
+#: plconfig/view.py:513
+msgid "Due to sensitive information, I can only show the contents of this page to my owner."
+msgstr "민감한 정보로 인해이 페이지의 내용을 소유자에게만 표시 할 수 있습니다."
+
+#: plconfig/view.py:519
+msgid "Settings Folder"
+msgstr "설정 폴더"
+
+#: plconfig/view.py:521
+msgid "Local Tracks"
+msgstr "로컬 트랙"
+
+#: plconfig/view.py:524
+msgid "Lavalink Folder"
+msgstr "라발링크 폴더"
+
+#: plconfig/view.py:526
+msgid "Java Executable"
+msgstr "자바 실행 파일"
+
+#: plconfig/view.py:530
+msgid "Not Found"
+msgstr "찾을 수 없음"
+
+#: plconfig/view.py:540
+msgid "Paths"
+msgstr "경로"
+
+#: plconfig/view.py:541
+msgid "Path"
+msgstr "길"
+
+#: plconfig/view.py:560
+msgid "Java"
+msgstr "자바"
+
+#: plconfig/view.py:564
+msgid "Lavaplayer"
+msgstr "용암 플레이어"
+
+#: plconfig/view.py:568
+msgid "Lavalink Branch"
+msgstr "라발링크 브랜치"
+
+#: plconfig/view.py:572
+msgid "Lavalink Version"
+msgstr "라발링크 버전"
+
+#: plconfig/view.py:576
+msgid "Lavalink Build"
+msgstr "라발링크 빌드"
+
+#: plconfig/view.py:579
+msgid "Build Time"
+msgstr "빌드 시간"
+
+#: plconfig/view.py:581
+msgid "Commit"
+msgstr "저지르다"
+
+#: plconfig/view.py:585
+msgid "Auto Update"
+msgstr "자동 업데이트"
+
+#: plconfig/view.py:623
+msgid "Select an option from the dropdown menu below."
+msgstr "아래 드롭다운 메뉴에서 옵션을 선택합니다."
+
+#: plconfig/view.py:638
+msgid "Pick an option to view"
+msgstr "보기 옵션 선택"
+
+#: plconfig/view.py:648
+msgid "You are not authorized to interact with this option."
+msgstr "이 옵션과 상호 작용할 권한이 없습니다."
+
+#: plconfig/view.py:678
+msgid "You are not authorized to interact with this."
+msgstr "귀하는 이와 상호 작용할 권한이 없습니다."
+

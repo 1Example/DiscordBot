@@ -1,0 +1,50 @@
+{
+  "author": ["Vertyco"],
+  "description": "Your friendly neighborhood leveling system",
+  "disabled": false,
+  "end_user_data_statement": "This cog stores Discord IDs, counts of user messages, and their time spent in voice channels. No private info is stored about users.",
+  "hidden": false,
+  "install_msg": "Thank you for installing LevelUp! To enable leveling in this server type `[p]lset toggle`.\n\nDOCUMENTATION: https://github.com/vertyco/vrt-cogs/blob/main/levelup/README.md",
+  "min_bot_version": "3.5.0",
+  "min_python_version": [3, 9, 0],
+  "permissions": [
+    "read_messages",
+    "send_messages",
+    "manage_roles",
+    "attach_files",
+    "embed_links"
+  ],
+  "required_cogs": {},
+  "requirements": [
+    "aiocache",
+    "aiohttp>=3.9.5",
+    "colorgram.py",
+    "emoji",
+    "fastapi",
+    "msgpack",
+    "plotly",
+    "pydantic>=2.11,<2.12",
+    "python-multipart",
+    "python-decouple",
+    "python-dotenv",
+    "psutil",
+    "rapidfuzz",
+    "requests",
+    "tenacity",
+    "ujson",
+    "uvicorn",
+    "jinja2"
+  ],
+  "short": "Discord leveling system",
+  "tags": [
+    "activity",
+    "level",
+    "leveler",
+    "leveling",
+    "levelup",
+    "rank",
+    "utility",
+    "vert"
+  ],
+  "type": "COG"
+}

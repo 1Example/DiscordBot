@@ -1,7 +1,8 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: red-discordbot\n"
-"POT-Creation-Date: 2023-06-14 02:57+0000\n"
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-05-07 19:17+0000\n"
+"PO-Revision-Date: 2023-05-19 10:26\n"
 "Last-Translator: \n"
 "Language-Team: Chinese Traditional\n"
 "MIME-Version: 1.0\n"
@@ -9,79 +10,825 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: redgettext 3.4.2\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Crowdin-Project: red-discordbot\n"
-"X-Crowdin-Project-ID: 289505\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
 "X-Crowdin-Language: zh-TW\n"
-"X-Crowdin-File-ID: 51\n"
+"X-Crowdin-File: /cogs/audio/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3301\n"
 "Language: zh_TW\n"
 
-#: redbot/cogs/audio/converters.py:35
+#: audio/cog.py:35
+#, docstring
+msgid "A Media player using the PyLav library"
+msgstr "使用 PyLav 資料庫的媒體播放器"
+
+#: audio/cog.py:49
+msgid "Play from activity"
+msgstr "從活動中播放"
+
+#: audio/cog.py:52
+msgid "Play from message"
+msgstr "從消息播放"
+
+#: audio/config_commands.py:40
+#, docstring
+msgid "Notifies PyLav that a Player is having issues.\n\n"
+"        If enough (50% or more of currently playing players) report issues, PyLav will automatically\n"
+"        switch to a different node or restart the current node where possible.\n"
+"        "
+msgstr "通知 PyLav 玩家有問題。\n\n"
+"        如果有足夠多的玩家（50%或更多當前玩遊戲的玩家）報告問題，PyLav 將自動\n"
+"        切換到其他節點或重新啟動當前節點（如果可能）。\n"
+"        "
+
+#: audio/config_commands.py:48
+msgid "This server already voted recently. Please, try again in 10 minutes."
+msgstr "此伺服器最近已投票。請在 10 分鐘後重試。"
+
+#: audio/config_commands.py:59
+msgid "Thank you for your report."
+msgstr "感謝您報告的資訊。"
+
+#: audio/config_commands.py:69
+#, docstring
+msgid "Removes a vote for a Player being down.\n\n"
+"        If enough (50% or more of currently active players) report issues, PyLav will automatically\n"
+"        switch to a different node or restart the current node where possible.\n\n"
+"        This command is only valid if your server previously voted for a node to be down and is now back up.\n"
+"        "
+msgstr "刪除玩家被關閉的投票。\n\n"
+"        如果有足夠多的玩家（50%或更多當前活躍的玩家）報告問題，PyLav 將自動\n"
+"        切換到其他節點或重新啟動當前節點（如果可能）。\n\n"
+"        僅當伺服器之前投票支援節點關閉並且現在已備份時，此命令才有效。\n"
+"        "
+
+#: audio/config_commands.py:79
+msgid "There are no active votes for the current audio node."
+msgstr "當前音訊節點沒有活動投票。"
+
+#: audio/config_commands.py:89
+msgid "I have removed your report."
+msgstr "我已經刪除了你的報告。"
+
+#: audio/config_commands.py:97
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "顯示齒輪和 PyLav 的版本"
+
+#: audio/config_commands.py:113
+msgid "Library / Cog"
+msgstr "圖書館/齒輪"
+
+#: audio/config_commands.py:114
+msgid "Version"
+msgstr "版本"
+
+#: audio/config_commands.py:128
+#, docstring
+msgid "Bot-wide settings."
+msgstr "機器人範圍的設置。"
+
+#: audio/config_commands.py:132
+#, docstring
+msgid "Set the maximum volume a server can set"
+msgstr "設置伺務器可以使用的最大音量"
+
+#: audio/config_commands.py:140
+msgid "You have to specify a volume less than or equal to 1,000%."
+msgstr "您必須指定小於或等於 1，000% 的卷。"
+
+#: audio/config_commands.py:148 audio/config_commands.py:626
+msgid "The maximum volume must be greater than 0%."
+msgstr "最大音量必須大於 0%。"
+
+#: audio/config_commands.py:156
+msgid "The maximum volume I will allow anyone in any server is now set to {volume_variable_do_not_translate}%"
+msgstr "我允許任何人在任何伺服器中的最大音量現在設置為 {volume_variable_do_not_translate}%"
+
+#: audio/config_commands.py:166 audio/config_commands.py:679
+#, docstring
+msgid "Set whether I should deafen myself when playing."
+msgstr "設置我是否應該在玩遊戲時震耳欲聾。"
+
+#: audio/config_commands.py:175
+msgid "From now on, I will deafen myself when joining a voice channel."
+msgstr "從現在開始，加入語音頻道時我會震耳欲聾。"
+
+#: audio/config_commands.py:177
+msgid "From now on, I will no longer deafen myself when joining a voice channel."
+msgstr "從現在開始，加入語音頻道時，我將不再震耳欲聾。"
+
+#: audio/config_commands.py:185
+#, docstring
+msgid "Set whether the server is allowed to enable auto shuffle."
+msgstr "設置是否允許伺服器啟用自動隨機播放。"
+
+#: audio/config_commands.py:195
+msgid "From now on, I will auto shuffle my track queue when new songs are added."
+msgstr "從現在開始，當添加新歌曲時，我將自動隨機播放我的曲目佇列。"
+
+#: audio/config_commands.py:197
+msgid "From now on, I will no longer auto shuffle my track queue when new songs are added."
+msgstr "從現在開始，添加新歌曲時，我將不再自動隨機播放我的曲目佇列。"
+
+#: audio/config_commands.py:205 audio/config_commands.py:747
+#, docstring
+msgid "Set whether I should allow users to shuffle the queue"
+msgstr "設置我是否應允許使用者隨機播放佇列"
+
+#: audio/config_commands.py:215
+msgid "From now on, I will allow users to shuffle the queue."
+msgstr "從現在開始，我將允許用戶洗牌佇列。"
+
+#: audio/config_commands.py:217
+msgid "From now on, I will no longer allow users to shuffle the queue."
+msgstr "從現在開始，我將不再允許使用者隨機排列佇列。"
+
+#: audio/config_commands.py:225
+#, docstring
+msgid "Set whether I should automatically play songs when the queue is empty."
+msgstr "設置在隊列為空時是否應自動播放歌曲。"
+
+#: audio/config_commands.py:234
+msgid "From now on, I will automatically play songs from the specified playlist when the queue is empty."
+msgstr "從現在開始，當隊列為空時，我將自動播放指定播放清單中的歌曲。"
+
+#: audio/config_commands.py:238
+msgid "From now on, I will no longer automatically play songs from the specified playlist when the queue is empty."
+msgstr "從現在開始，當隊列為空時，我將不再自動播放指定播放清單中的歌曲。"
+
+#: audio/config_commands.py:248
+#, docstring
+msgid "Set whether I should disconnect from the voice channel."
+msgstr "設置我是否應斷開與語音通道的連接。"
+
+#: audio/config_commands.py:258
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when the queue is empty.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: Whether I should disconnect from the voice channel when the queue is empty.\n"
+"            - `<duration>`: How long after the queue is empty should the player be disconnected? The default is 60 seconds.\n"
+"            Accepts second, minutes, hours, days and weeks (if no unit is specified, the duration is assumed to be given in seconds)\n"
+"        "
+msgstr "設置當隊列為空時是否應斷開與語音通道的連接。\n\n"
+"        參數：\n"
+"            - `<toggle>'：當隊列為空時，我是否應斷開與語音通道的連接。\n"
+"            - `<duration>'：隊列為空后多久應斷開播放機的連接？預設值為 60 秒。\n"
+"            接受秒、分鐘、小時、天和周（如果未指定單位，則假定持續時間以秒為單位）\n"
+"        "
+
+#: audio/config_commands.py:278 audio/config_commands.py:869
+msgid "I will disconnect from the voice channel when the queue is empty after {time_to_dc_variable_do_not_translate}."
+msgstr "當隊列為空時，我將斷開與語音通道的連接 {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:282 audio/config_commands.py:873
+msgid "I will disconnect from the voice channel when the queue is empty after 60 seconds."
+msgstr "當佇列在 60 秒後為空時，我將斷開與語音通道的連接。"
+
+#: audio/config_commands.py:284 audio/config_commands.py:875
+msgid "I will no longer disconnect from the voice channel when the queue is empty."
+msgstr "當隊列為空時，我將不再斷開與語音通道的連接。"
+
+#: audio/config_commands.py:301
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when alone.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: Whether I should disconnect from the voice channel when I detect that I am alone in a voice channel.\n"
+"            - `<duration>`: How longer after detecting should the player be disconnected? The default is 60 seconds.\n"
+"            Accepts second, minutes, hours, days and weeks.\n"
+"            If no unit is specified, the duration is assumed to be given in seconds.\n"
+"        "
+msgstr "設置我獨自一人時是否應斷開與語音通道的連接。\n\n"
+"        參數：\n"
+"            - `<toggle>'：當我檢測到語音通道中只有我一個人時，我是否應該斷開與語音通道的連接。\n"
+"            - `<duration>'：檢測到播放機后多久應該斷開連接？預設值為 60 秒。\n"
+"            接受秒、分鐘、小時、天和周。\n"
+"            如果未指定單位，則假定持續時間以秒為單位。\n"
+"        "
+
+#: audio/config_commands.py:322 audio/config_commands.py:939
+msgid "I will disconnect from the voice channel when alone after {time_to_dc_variable_do_not_translate}."
+msgstr "之後我會在獨處時斷開語音通道 {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:326 audio/config_commands.py:943
+msgid "I will disconnect from the voice channel when alone after 60 seconds."
+msgstr "60 秒后，我將獨自一人時斷開與語音通道的連接。"
+
+#: audio/config_commands.py:328 audio/config_commands.py:945
+msgid "I will no longer disconnect from the voice channel when alone."
+msgstr "獨自一人時，我將不再斷開與語音通道的連接。"
+
+#: audio/config_commands.py:342
+#, docstring
+msgid "Server-specific settings."
+msgstr "特定於伺服器的設置。"
+
+#: audio/config_commands.py:346
+#, docstring
+msgid "Add, remove or show the disc jockey roles and users for this server."
+msgstr "添加、刪除或顯示此伺服器的光碟騎師角色和使用者。"
+
+#: audio/config_commands.py:352
+#, docstring
+msgid "Add disc jockey roles or users to this server."
+msgstr "將唱片騎師角色或使用者添加到此伺服器。"
+
+#: audio/config_commands.py:365 audio/config_commands.py:388
+msgid "I have added {role_list_variable_do_not_translate} to the disc jockey roles."
+msgstr "我已添加 {role_list_variable_do_not_translate} 到唱片騎師角色。"
+
+#: audio/config_commands.py:370 audio/config_commands.py:394
+msgid "I have added {user_list_variable_do_not_translate} to the disc jockey users."
+msgstr "我已添加 {user_list_variable_do_not_translate} 給唱片騎師使用者。"
+
+#: audio/config_commands.py:379
+msgid "I have added {role_list_variable_do_not_translate} to the disc jockey roles and {user_list_variable_do_not_translate} to the disc jockey users."
+msgstr "我已添加 {role_list_variable_do_not_translate} 到唱片騎師角色和 {user_list_variable_do_not_translate} 給唱片騎師使用者。"
+
+#: audio/config_commands.py:411
+#, docstring
+msgid "Remove disc jockey roles or users in this server."
+msgstr "刪除此伺服器中的磁碟騎師角色或使用者。"
+
+#: audio/config_commands.py:443
+msgid "I have removed {role_list_variable_do_not_translate} from the disc jockey roles and {user_list_variable_do_not_translate} from the disc jockey users, as well as {number_list_variable_do_not_translate} from the disc jockey roles and users."
+msgstr "我已刪除 {role_list_variable_do_not_translate} 從唱片騎師角色和 {user_list_variable_do_not_translate} 來自唱片騎師使用者，以及 {number_list_variable_do_not_translate} 從光碟騎師角色和使用者。"
+
+#: audio/config_commands.py:451
+msgid "I have removed {role_list_variable_do_not_translate} from the disc jockey roles and {user_list_variable_do_not_translate} from the disc jockey users."
+msgstr "我已刪除 {role_list_variable_do_not_translate} 從唱片騎師角色和 {user_list_variable_do_not_translate} 來自光碟騎師使用者。"
+
+#: audio/config_commands.py:459
+msgid "I have removed {role_list_variable_do_not_translate} from the disc jockey roles."
+msgstr "我已刪除 {role_list_variable_do_not_translate} 從唱片騎師角色。"
+
+#: audio/config_commands.py:465
+msgid "I have removed {user_list_variable_do_not_translate} from the disc jockey users."
+msgstr "我已刪除 {user_list_variable_do_not_translate} 來自光碟騎師使用者。"
+
+#: audio/config_commands.py:471
+msgid "I have removed {user_or_role_id_list_variable_do_not_translate} from the disc jockey roles and users."
+msgstr "我已刪除 {user_or_role_id_list_variable_do_not_translate} 從光碟騎師角色和使用者。"
+
+#: audio/config_commands.py:486
+msgid "I have Removed `{user_or_role_id_variable_do_not_translate}` from the disc jockey roles and users."
+msgstr "我已刪除”{user_or_role_id_variable_do_not_translate}' 來自唱片騎師角色和使用者。"
+
+#: audio/config_commands.py:490
+msgid "I have removed {role_name_variable_do_not_translate} from the disc jockey roles."
+msgstr "我已刪除 {role_name_variable_do_not_translate} 從唱片騎師角色。"
+
+#: audio/config_commands.py:495
+msgid "I have removed {user_name_variable_do_not_translate} from the disc jockey users."
+msgstr "我已刪除 {user_name_variable_do_not_translate} 來自光碟騎師使用者。"
+
+#: audio/config_commands.py:503
+#, docstring
+msgid "List the disc jockey roles and users for this server."
+msgstr "列出此伺服器的光碟騎師角色和使用者。"
+
+#: audio/config_commands.py:554
+msgid "There are no disc jockey roles or disc jockey users set in this server."
+msgstr "此伺服器中未設置唱片騎師角色或唱片騎師使用者。"
+
+#: audio/config_commands.py:565 audio/config_commands.py:570
+msgid "Disc Jockey Roles"
+msgstr "唱片騎師角色"
+
+#: audio/config_commands.py:576 audio/config_commands.py:581
+msgid "Disc Jockey Users"
+msgstr "唱片騎師使用者"
+
+#: audio/config_commands.py:589
+#, docstring
+msgid "Clear the disc jockey roles and users for this server."
+msgstr "清除此伺服器的光碟騎師角色和使用者。"
+
+#: audio/config_commands.py:601
+msgid "I have removed all disc jockey roles and users from this server."
+msgstr "我已從此伺服器中刪除了所有光碟騎師角色和使用者。"
+
+#: audio/config_commands.py:609
+#, docstring
+msgid "Set the maximum volume a user can set."
+msgstr "設置使用者可以設置的最大音量。"
+
+#: audio/config_commands.py:618
+msgid "The maximum volume must be less than 1,000%."
+msgstr "最大音量必須小於 1，000%。"
+
+#: audio/config_commands.py:635
+msgid "My owner has told me that server-specific volume must be between 0% and {volume_variable_do_not_translate}%."
+msgstr "我的主人告訴我，特定於伺服器的卷必須在 0% 到 {volume_variable_do_not_translate}%."
+
+#: audio/config_commands.py:655
+msgid "The maximum volume must be between 0% and {volume_variable_do_not_translate}%."
+msgstr "最大音量必須介於 0% 和 {volume_variable_do_not_translate}%."
+
+#: audio/config_commands.py:669
+msgid "The maximum volume users can set in this server is now {volume_variable_do_not_translate}%."
+msgstr "使用者可以在此伺服器中設置的最大卷現在是 {volume_variable_do_not_translate}%."
+
+#: audio/config_commands.py:688
+msgid "My owner has requested that I always deafen myself when joining a voice channel."
+msgstr "我的主人要求我在加入語音頻道時總是振聾。"
+
+#: audio/config_commands.py:705
+msgid "I will deafen myself when joining voice channels on this server."
+msgstr "在此伺服器上加入語音頻道時，我會震耳欲聾。"
+
+#: audio/config_commands.py:707
+msgid "I will no longer deafen myself when joining voice channels on this server."
+msgstr "在此伺服器上加入語音頻道時，我將不再震耳欲聾。"
+
+#: audio/config_commands.py:715
+#, docstring
+msgid "Set whether I should shuffle the queue after adding every new song."
+msgstr "設置添加每首新歌曲后是否應該洗牌佇列。"
+
+#: audio/config_commands.py:723
+msgid "My owner has turned off the auto shuffle capability for all servers."
+msgstr "我的所有者已關閉所有伺服器的自動隨機播放功能。"
+
+#: audio/config_commands.py:737
+msgid "Auto shuffle turned on for this server."
+msgstr "為此伺服器打開了自動隨機播放。"
+
+#: audio/config_commands.py:739
+msgid "Auto shuffle turned off for this server."
+msgstr "此伺服器的自動隨機播放已關閉。"
+
+#: audio/config_commands.py:757
+msgid "My owner has turned off the shuffle capability for all servers."
+msgstr "我的所有者已關閉所有伺服器的隨機播放功能。"
+
+#: audio/config_commands.py:770
+msgid "Shuffling turned on for this server."
+msgstr "為此伺服器打開了隨機播放。"
+
+#: audio/config_commands.py:772
+msgid "Shuffling turned off for this server."
+msgstr "此伺服器的隨機播放已關閉。"
+
+#: audio/config_commands.py:780
+#, docstring
+msgid "Set whether the bot should automatically play songs when the queue is empty."
+msgstr "設置機器人是否應在隊列為空時自動播放歌曲。"
+
+#: audio/config_commands.py:789
+msgid "My owner has turned off the autoplay capability for all servers."
+msgstr "我的所有者已關閉所有伺服器的自動播放功能。"
+
+#: audio/config_commands.py:806
+msgid "From now on, I will automatically play songs when the queue is empty."
+msgstr "從現在開始，我將在隊列為空時自動播放歌曲。"
+
+#: audio/config_commands.py:808
+msgid "From now on, I will no longer automatically play songs when the queue is empty."
+msgstr "從現在開始，我將不再在隊列為空時自動播放歌曲。"
+
+#: audio/config_commands.py:816
+#, docstring
+msgid "Set whether the bot should disconnect from the voice channel"
+msgstr "設置機器人是否斷開與語音頻道的連接"
+
+#: audio/config_commands.py:826
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when the queue is empty.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: I should disconnect from the voice channel when the queue is empty.\n"
+"            - `<duration>`: How long after the queue is empty should I disconnect?\n"
+"            The Default is 60 seconds.\n"
+"            Accept seconds, minutes, hours, days, and weeks.\n"
+"            If no unit is specified, the duration is assumed to be seconds.\n"
+"        "
+msgstr "設置當隊列為空時是否應斷開與語音通道的連接。\n\n"
+"        參數：\n"
+"            - `<toggle>'：當隊列為空時，我應該斷開與語音通道的連接。\n"
+"            - `<duration>'：隊列為空后多久我應該斷開連接？\n"
+"            預設值為 60 秒。\n"
+"            接受秒、分鐘、小時、天和周。\n"
+"            如果未指定單位，則假定持續時間為秒。\n"
+"        "
+
+#: audio/config_commands.py:844
+msgid "My owner has told me to disconnect from the voice channel when the queue is empty after {time_to_dc_variable_do_not_translate}."
+msgstr "我的主人告訴我在隊列為空后斷開與語音通道的連接 {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:893
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when alone.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: I should disconnect from the voice channel when it detects that it is\n"
+"            alone.\n"
+"            - `<duration>`: How longer after detecting should I disconnect?\n"
+"            The Default is 60 seconds.\n"
+"            Accept seconds, minutes, hours, days, and weeks.\n"
+"            If no unit is specified, the duration is assumed to be seconds.\n"
+"        "
+msgstr "設置我獨自一人時是否應斷開與語音通道的連接。\n\n"
+"        參數：\n"
+"            - `<toggle>'：當它檢測到語音通道時，我應該斷開與語音通道的連接\n"
+"            獨自。\n"
+"            - `<duration>'： 檢測後多久應斷開連接？\n"
+"            預設值為 60 秒。\n"
+"            接受秒、分鐘、小時、天和周。\n"
+"            如果未指定單位，則假定持續時間為秒。\n"
+"        "
+
+#: audio/config_commands.py:913
+msgid "My owner has told me to disconnect from the voice channel when alone after {time_to_dc_variable_do_not_translate}."
+msgstr "我的主人告訴我在獨自一人之後斷開與語音頻道的連接 {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:957
+#, docstring
+msgid "Specify a playlist to be used for autoplay."
+msgstr "指定要用於自動播放的播放清單。"
+
+#: audio/config_commands.py:974
+msgid "From now on, I will use {playlist_name_variable_do_not_translate} to select songs for autoplay."
+msgstr "從現在開始，我將使用 {playlist_name_variable_do_not_translate} 以選擇要自動播放的歌曲。"
+
+#: audio/config_commands.py:984
+#, docstring
+msgid "Restrict which channels where I can be used."
+msgstr "限制可以使用我的頻道。"
+
+#: audio/config_commands.py:990
+#, docstring
+msgid "Restrict me only to accept PyLav commands executed from the specified channel."
+msgstr "限制我只接受從指定通道執行的 PyLav 命令。"
+
+#: audio/config_commands.py:1005
+msgid "I do not have permission to send messages or send embed links or read messages in {channel_name_variable_do_not_translate}."
+msgstr "我無權發送消息或發送嵌入連結或閱讀消息 {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1022
+msgid "I will only accept PyLav commands executed from {channel_name_variable_do_not_translate}."
+msgstr "我只接受從 {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1032
+msgid "I will accept PyLav commands executed in all channels I can see in the server."
+msgstr "我將接受在伺服器中看到的所有通道中執行的 PyLav 命令。"
+
+#: audio/config_commands.py:1040
+#, docstring
+msgid "Restrict me only to join the specified voice channel."
+msgstr "限制我只能加入指定的語音頻道。"
+
+#: audio/config_commands.py:1052 audio/hybrid_commands.py:107
+#: audio/player_commands.py:158
+msgid "I do not have permission to connect or speak in {channel_name_variable_do_not_translate}."
+msgstr "我無權連接或發言 {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1070
+msgid "I will only be allowed to join {channel_name_variable_do_not_translate}."
+msgstr "我只被允許加入 {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1080
+msgid "I am allowed to join any voice channel in the server."
+msgstr "我可以加入伺服器中的任何語音通道。"
+
+#: audio/context_menus.py:27 audio/context_menus.py:138
+msgid "I can not play songs in direct messages. Sorry, try again on a server."
+msgstr "我無法在直接消息中播放歌曲。抱歉，請在伺服器上重試。"
+
+#: audio/context_menus.py:38
+msgid "You need to be a disc jockey in this server to play tracks in this server."
+msgstr "您需要成為此伺服器的光碟騎師才能在此伺服器中播放曲目。"
+
+#: audio/context_menus.py:55 audio/context_menus.py:164
+msgid "This command is unavailable in this channel. Please use {channel_name_variable_do_not_translate} instead."
+msgstr "此命令在此通道中不可用。請使用 {channel_name_variable_do_not_translate} 相反。"
+
+#: audio/context_menus.py:84
+msgid "I could not find any suitable matches in this message."
+msgstr "我在此消息中找不到任何合適的匹配項。"
+
+#: audio/context_menus.py:86
+msgid "I found many suitable matches in this message."
+msgstr "我在此消息中找到了許多合適的匹配項。"
+
+#: audio/context_menus.py:88
+msgid "I found a single suitable match in this message."
+msgstr "我在此消息中找到了一個合適的匹配項。"
+
+#: audio/context_menus.py:149
+msgid "You need to be a disc jockey to play tracks in this server."
+msgstr "您需要成為光碟騎師才能在此伺服器中播放曲目。"
+
+#: audio/context_menus.py:183
+msgid "I could not find any supported activity in the activities {user_name_variable_do_not_translate} is partaking."
+msgstr "我在活動中找不到任何受支持的活動 {user_name_variable_do_not_translate} 是分手。"
+
+#: audio/context_menus.py:215
+msgid "I could not find a valid Apple Music track in the activity {user_name_variable_do_not_translate} is partaking in."
+msgstr "我在活動中找到有效的蘋果音樂曲目 {user_name_variable_do_not_translate} 正在參與。"
+
+#: audio/context_menus.py:231
+msgid "I could not find any tracks matching {query_variable_do_not_translate}."
+msgstr "我找不到任何匹配的曲目 {query_variable_do_not_translate}."
+
+#: audio/context_menus.py:248
+msgid "I could not figure out what {user_name_variable_do_not_translate} is listening to."
+msgstr "我不知道是什麼 {user_name_variable_do_not_translate} 正在聽。"
+
+#: audio/hybrid_commands.py:82
+msgid "You need to give me a query to enqueue."
+msgstr "你需要給我一個查詢來排隊。"
+
+#: audio/hybrid_commands.py:96
+msgid "You must be in a voice channel, so I can connect to it."
+msgstr "您必須在語音通道中，以便我可以連接到它。"
+
+#: audio/hybrid_commands.py:147
+msgid "{track_name_variable_do_not_translate} enqueued."
+msgstr "{track_name_variable_do_not_translate} 已排隊。"
+
+#: audio/hybrid_commands.py:152 audio/player_commands.py:228
+msgid "No tracks were found for your query."
+msgstr "未找到查詢的曲目。"
+
+#: audio/hybrid_commands.py:154
+msgid "{number_of_tracks_variable_do_not_translate} tracks enqueued."
+msgstr "{number_of_tracks_variable_do_not_translate} 跟蹤已排隊。"
+
+#: audio/hybrid_commands.py:218
+msgid "You need to be in a voice channel if you do not specify which channel I should connect to."
+msgstr "如果您沒有指定我應該連接到哪個頻道，則需要在語音通道中。"
+
+#: audio/hybrid_commands.py:230
+msgid "I do not have permission to connect to {channel_name_variable_do_not_translate}."
+msgstr "我沒有連接到 {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:234
+msgid "I do not have permission to speak in {channel_name_variable_do_not_translate}."
+msgstr "我無權發言 {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:252
+msgid "You do not have permission to connect to {channel_name_variable_do_not_translate}."
+msgstr "您沒有連線到 的許可權 {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:269
+msgid "I have been told only to join {channel_name_variable_do_not_translate} on this server."
+msgstr "我只被告知要加入 {channel_name_variable_do_not_translate} 在此伺服器上。"
+
+#: audio/hybrid_commands.py:279
+msgid "I have successfully connected to {channel_name_variable_do_not_translate}."
+msgstr "我已成功連接到 {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:305 audio/hybrid_commands.py:330
+#: audio/hybrid_commands.py:366 audio/hybrid_commands.py:397
+#: audio/hybrid_commands.py:430 audio/hybrid_commands.py:457
+#: audio/hybrid_commands.py:509 audio/hybrid_commands.py:548
+#: audio/hybrid_commands.py:586 audio/hybrid_commands.py:644
+#: audio/hybrid_commands.py:696 audio/hybrid_commands.py:705
+#: audio/hybrid_commands.py:847
+msgid "I am not currently playing anything on this server."
+msgstr "我目前沒有在此伺服器上播放任何內容。"
+
+#: audio/hybrid_commands.py:338
+msgid "I have skipped {track_name_variable_do_not_translate} as requested."
+msgstr "我跳過了 {track_name_variable_do_not_translate} 根據要求。"
+
+#: audio/hybrid_commands.py:374
+msgid "I have stopped the playback and cleared the queue as requested."
+msgstr "我已停止播放並按照要求清除佇列。"
+
+#: audio/hybrid_commands.py:406
+msgid "I have disconnected from {channel_name_variable_do_not_translate} as requested."
+msgstr "我已斷開與 {channel_name_variable_do_not_translate} 根據要求。"
+
+#: audio/hybrid_commands.py:465
+msgid "The server queue is currently empty."
+msgstr "伺服器佇列當前為空。"
+
+#: audio/hybrid_commands.py:473
+msgid "You are not allowed to shuffle the queue."
+msgstr "不允許隨機排列佇列。"
+
+#: audio/hybrid_commands.py:481
+msgid "{queue_size_variable_do_not_translate} tracks shuffled."
+msgstr "{queue_size_variable_do_not_translate} 軌道被洗牌。"
+
+#: audio/hybrid_commands.py:517
+msgid "From now on, I will now repeat the entire queue."
+msgstr "從現在開始，我現在將重複整個佇列。"
+
+#: audio/hybrid_commands.py:520
+msgid "From now on, I will no longer repeat any tracks."
+msgstr "從現在開始，我將不再重複任何曲目。"
+
+#: audio/hybrid_commands.py:524
+msgid "From now on, I will now repeat {track_name_variable_do_not_translate}."
+msgstr "從現在開始，我現在重複一遍 {track_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:530
+msgid "From now on, I will now repeat the current track."
+msgstr "從現在開始，我現在將重複當前的曲目。"
+
+#: audio/hybrid_commands.py:554
+msgid "The player is already paused, did you mean to run {command_name_variable_do_not_translate}."
+msgstr "玩家已經暫停了，你的意思是跑嗎 {command_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:568
+msgid "I have now paused the player as requested."
+msgstr "我現在已經按照要求暫停了播放機。"
+
+#: audio/hybrid_commands.py:592
+msgid "The player already resumed, did you mean to run {command_name_variable_do_not_translate}."
+msgstr "播放機已經恢復了，你的意思是跑嗎 {command_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:606
+msgid "I have now resumed the player as requested."
+msgstr "我現在已經按照要求恢復了播放機。"
+
+#: audio/hybrid_commands.py:628
+msgid "I can not set the volume above 1,000%."
+msgstr "我無法將音量設置為1，000%以上。"
+
+#: audio/hybrid_commands.py:636
+msgid "I can not set the volume lower than 0%"
+msgstr "我不能將音量設置為低於0%"
+
+#: audio/hybrid_commands.py:653
+msgid "I have been told to restrict the maximum volume to {max_volume_variable_do_not_translate}%."
+msgstr "我被告知將最大音量限制為 {max_volume_variable_do_not_translate}%."
+
+#: audio/hybrid_commands.py:664
+msgid "I have set the player volume to {volume_variable_do_not_translate}%."
+msgstr "我已將播放機音量設置為 {volume_variable_do_not_translate}%."
+
+#: audio/hybrid_commands.py:715 audio/hybrid_commands.py:724
+#: audio/hybrid_commands.py:737 audio/hybrid_commands.py:758
+#: audio/hybrid_commands.py:768 audio/hybrid_commands.py:778
+msgid "Unable to seek track"
+msgstr "無法移動音軌時間"
+
+#: audio/hybrid_commands.py:716
+msgid "I can not seek this track as the server reports it is a live stream."
+msgstr "我無法尋找此曲目，因為伺服器報告它是即時流。"
+
+#: audio/hybrid_commands.py:725
+msgid "I can not seek this track as the server report that this track does not support seeking."
+msgstr "我無法查找此軌道，因為伺服器報告此軌道不支援查找。"
+
+#: audio/hybrid_commands.py:738
+msgid "I can not seek the current track while the player is paused."
+msgstr "當播放機暫停時，我無法尋找當前曲目。"
+
+#: audio/hybrid_commands.py:759
+msgid "I can not seek the current track to an invalid percentage."
+msgstr ""
+
+#: audio/hybrid_commands.py:769
+msgid "I can not seek the current track past 100%."
+msgstr ""
+
+#: audio/hybrid_commands.py:779
+msgid "I can not seek the current track before 0%."
+msgstr ""
+
+#: audio/hybrid_commands.py:799
+msgid "I have moved the current track forward {number_of_seconds_variable_do_not_translate} seconds to the end of the track."
+msgstr "我已將當前軌道向前移動 {number_of_seconds_variable_do_not_translate} 秒到曲目結束。"
+
+#: audio/hybrid_commands.py:803
+msgid "I have moved the current track forward {number_of_seconds} seconds to position {timestamp_variable_do_not_translate}."
+msgstr "我已將當前軌道向前移動 {number_of_seconds} 秒到位置 {timestamp_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:808
+msgid "I have moved the current track back {number_of_seconds_variable_do_not_translate} seconds to the beginning."
+msgstr "我已將當前曲目移回 {number_of_seconds_variable_do_not_translate} 幾秒鐘到開始。"
+
+#: audio/hybrid_commands.py:812
+msgid "I have moved the current track back {number_of_seconds} seconds to position {timestamp_variable_do_not_translate}."
+msgstr "我已將當前曲目移回 {number_of_seconds} 秒到位置 {timestamp_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:818
+msgid "I have moved the current track to the beginning."
+msgstr "我已將當前曲目移至開頭。"
+
+#: audio/hybrid_commands.py:856
+msgid "The history of tracks is currently empty."
+msgstr "曲目的歷史記錄當前為空。"
+
+#: audio/hybrid_commands.py:864
+msgid "Playing previous track: {track_name_variable_do_not_translate}."
+msgstr "播放上一首曲目： {track_name_variable_do_not_translate}."
+
+#: audio/player_commands.py:31
+msgid "Plays the specified track from the queue."
+msgstr "播放佇列中的指定曲目。"
+
+#: audio/player_commands.py:51
+msgid "There are no songs in the queue."
+msgstr "佇列中沒有歌曲。"
+
+#: audio/player_commands.py:60
+msgid "Track index must be between 1 and {size_of_queue_variable_do_not_translate}"
+msgstr "軌道索引必須介於 1 和 1 之間 {size_of_queue_variable_do_not_translate}"
+
+#: audio/player_commands.py:78
+msgid "There are no tracks in position {queue_position_variable_do_not_translate}."
+msgstr "沒有軌道就位 {queue_position_variable_do_not_translate}."
+
+#: audio/player_commands.py:90
+msgid "{track_name_variable_do_not_translate} will play after {current_track_name_variable_do_not_translate} finishes ({estimated_time_variable_do_not_translate})."
+msgstr "{track_name_variable_do_not_translate} 之後會玩 {current_track_name_variable_do_not_translate} 飾面 （{estimated_time_variable_do_not_translate})."
+
+#: audio/player_commands.py:113
+msgid "{track_name_variable_do_not_translate} will start now\n"
+"{current_track_name_variable_do_not_translate} has been skipped."
+msgstr "{track_name_variable_do_not_translate} 將立即開始\n"
+"{current_track_name_variable_do_not_translate} 已被跳過。"
+
+#: audio/player_commands.py:135
+#, docstring
+msgid "Enqueue a track at the top of the queue."
+msgstr "將佇列頂部的軌道排隊。"
+
+#: audio/player_commands.py:148
+msgid "You must be in a voice channel to allow me to connect"
+msgstr "你必須在語音頻道中我才能連接"
+
+#: audio/player_commands.py:207
+msgid "{number_of_tracks_variable_do_not_translate} tracks have been enqueued."
+msgstr "{number_of_tracks_variable_do_not_translate} 軌道已排隊。"
+
+#: audio/player_commands.py:217
+msgid "{track_name_variable_do_not_translate} has been enqueued."
+msgstr "{track_name_variable_do_not_translate} 已排隊。"
+
+#: audio/player_commands.py:238
+#, docstring
 msgid "\n"
-"Scope must be a valid version of one of the following:\n"
-"​ ​ ​ ​ Global\n"
-"​ ​ ​ ​ Guild\n"
-"​ ​ ​ ​ User\n"
+"        Remove the specified track from the queue.\n\n"
+"        If you specify the `remove_duplicates` argument, all tracks that are the same as your URL or the index track will be removed.\n"
+"        "
 msgstr "\n"
-"範圍必須是以下之一的有效數值：\n"
-" Global全球\n"
-" Guild伺服器\n"
-" User用戶\n"
+"        清單中刪除指定的曲目。\n\n"
+"         如果您指定 `remove_duplicates` 參數，所有與您的 URL 或索引曲目相同的曲目都將被刪除。\n"
+"        "
 
-#: redbot/cogs/audio/converters.py:43
-msgid "\n"
-"Author must be a valid version of one of the following:\n"
-"​ ​ ​ ​ User ID\n"
-"​ ​ ​ ​ User Mention\n"
-"​ ​ ​ ​ User Name#123\n"
-msgstr "\n"
-"作者必須是以下之一的有效數值：\n"
-" 用戶ID\n"
-" 提及用戶\n"
-" 用戶名#0000\n"
+#: audio/player_commands.py:253
+msgid "Queue is empty."
+msgstr "隊列為空。"
 
-#: redbot/cogs/audio/converters.py:51
-msgid "\n"
-"Guild must be a valid version of one of the following:\n"
-"​ ​ ​ ​ Guild ID\n"
-"​ ​ ​ ​ Exact guild name\n"
-msgstr "\n"
-"公會必須是以下其中一項的有效數值：\n"
-" 伺服器ID\n"
-" 完整的伺服器名稱\n"
+#: audio/player_commands.py:266
+msgid "Track index must be between 1 and {queue_size_variable_do_not_translate}."
+msgstr "軌道索引必須介於 1 和 1 之間 {queue_size_variable_do_not_translate}."
 
-#: redbot/cogs/audio/converters.py:87
-msgid "\"{arg}\" was not found. It must be the ID or complete name of a server which the bot can see."
-msgstr "未找到“{arg}”。 它必須是機器人所在的伺務器 ID 或完整的伺服器名稱。"
+#: audio/player_commands.py:281
+msgid "There is no track in position {position_variable_do_not_translate}."
+msgstr "沒有軌道就位 {position_variable_do_not_translate}."
 
-#: redbot/cogs/audio/converters.py:96 redbot/cogs/audio/converters.py:138
-msgid "\"{arg}\" does not refer to a unique server. Please use the ID for the server you're trying to specify."
-msgstr "“{arg}”不是指唯一的服務器。 請使用您要指定的服務器的 ID。"
+#: audio/player_commands.py:311
+msgid "{track_name_variable_do_not_translate} not found in queue."
+msgstr "{track_name_variable_do_not_translate} 在佇列中找不到。"
 
-#: redbot/cogs/audio/converters.py:129
-msgid "\"{arg}\" was not found. It must be the ID or name or mention a user which the bot can see."
-msgstr "未找到“{arg}”。 它必須是機器人可以讀取的 ID 或完整名稱或提及用戶。"
+#: audio/player_commands.py:323
+msgid "No tracks were removed from the queue."
+msgstr "未從佇列中刪除任何曲目。"
 
-#: redbot/cogs/audio/converters.py:178
-msgid "Could not match '{}' to a playlist."
-msgstr "無法將“{}”與播放列表匹配。"
+#: audio/player_commands.py:331
+msgid "I have removed a single entry of {track_name_variable_do_not_translate} from the queue."
+msgstr "我刪除了單個條目 {track_name_variable_do_not_translate} 從佇列中。"
 
-#: redbot/cogs/audio/converters.py:242 redbot/cogs/audio/converters.py:264
-#: redbot/cogs/audio/converters.py:284 redbot/cogs/audio/converters.py:368
-#: redbot/cogs/audio/converters.py:380 redbot/cogs/audio/converters.py:405
-#: redbot/cogs/audio/converters.py:431 redbot/cogs/audio/converters.py:453
-#: redbot/cogs/audio/converters.py:480
-msgid "Nothing"
-msgstr "沒有"
+#: audio/player_commands.py:341
+msgid "I have removed {number_of_entries_variable_do_not_translate} entries of {track_name_variable_do_not_translate} from the queue."
+msgstr "我已刪除 {number_of_entries_variable_do_not_translate} 的條目 {track_name_variable_do_not_translate} 從佇列中。"
 
-#: redbot/cogs/audio/converters.py:262
-msgid "You cannot use `--guild`"
-msgstr "你無法使用 `--guild`"
+#: audio/slash_commands.py:48
+#, docstring
+msgid "Search for a track then play the selected response."
+msgstr "搜索曲目，然後播放所選回應。"
 
-#: redbot/cogs/audio/converters.py:402
-msgid "You cannot use `--to-server`"
-msgstr "你無法使用 `--to-server`"
+#: audio/slash_commands.py:54
+msgid "You have not selected something to play."
+msgstr "您尚未選擇要播放的內容。"
 
-#: redbot/cogs/audio/converters.py:428
-msgid "You cannot use `--from-server`"
-msgstr "你無法使用 `--from-server`"
+#: audio/slash_commands.py:111
+msgid "Searching {service_name_variable_do_not_translate}"
+msgstr "搜索 {service_name_variable_do_not_translate}"
+
+#: audio/slash_commands.py:129 audio/slash_commands.py:142
+msgid "No results found on {service_name_variable_do_not_translate}"
+msgstr "未找到結果 {service_name_variable_do_not_translate}"
+
+#: audio/utility_commands.py:32
+msgid "I am not connected to a voice channel."
+msgstr "我沒有連接到語音通道。"
+
+#: audio/utility_commands.py:43
+msgid "Volume limit reached, player volume set to {volume_variable_do_not_translate}%"
+msgstr "已達到音量限制，播放器音量設置為 {volume_variable_do_not_translate}%"
+
+#: audio/utility_commands.py:54
+msgid "Minimum volume reached, player volume set to 0%"
+msgstr "達到最小音量，播放器音量設置為 0%"
+
+#: audio/utility_commands.py:62
+msgid "Player volume set to {volume_variable_do_not_translate}%"
+msgstr "播放機音量設置為 {volume_variable_do_not_translate}%"
 

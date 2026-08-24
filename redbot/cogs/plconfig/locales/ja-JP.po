@@ -1,0 +1,532 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 10:26\n"
+"Last-Translator: \n"
+"Language-Team: Japanese\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: ja\n"
+"X-Crowdin-File: /cogs/plconfig/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3353\n"
+"Language: ja_JP\n"
+
+#: plconfig/cog.py:32
+#, docstring
+msgid "Configure PyLav library settings"
+msgstr "PyLav ライブラリ設定の構成"
+
+#: plconfig/cog.py:44
+#, docstring
+msgid "Change global settings for PyLav"
+msgstr "PyLav のグローバル設定を変更する"
+
+#: plconfig/cog.py:48
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "コグとパイラヴのバージョンを表示する"
+
+#: plconfig/cog.py:64
+msgid "Library / Cog"
+msgstr "図書館 / コグ"
+
+#: plconfig/cog.py:65
+msgid "Version"
+msgstr "バージョン"
+
+#: plconfig/cog.py:78
+#, docstring
+msgid "Show the setting values"
+msgstr "設定値を表示する"
+
+#: plconfig/cog.py:85 plconfig/view.py:57
+msgid "PyLav Settings"
+msgstr "パイラブ設定"
+
+#: plconfig/cog.py:88
+msgid "Get information about the PyLav library settings."
+msgstr "PyLav ライブラリの設定に関する情報を取得します。"
+
+#: plconfig/cog.py:92 plconfig/view.py:162
+msgid "Global Settings"
+msgstr "グローバル設定"
+
+#: plconfig/cog.py:95
+msgid "Get information about bot owner configured settings for the players."
+msgstr "ボット所有者がプレーヤーに対して構成した設定に関する情報を取得します。"
+
+#: plconfig/cog.py:103
+msgid "Contextual Settings"
+msgstr "コンテキスト設定"
+
+#: plconfig/cog.py:107
+msgid "Get information about contextual settings for the player, accounting for the global settings."
+msgstr "グローバル設定を考慮して、プレーヤーのコンテキスト設定に関する情報を取得します。"
+
+#: plconfig/cog.py:114
+msgid "Server Settings"
+msgstr "サーバー設定"
+
+#: plconfig/cog.py:118
+msgid "Get information about the server configured settings for the player."
+msgstr "プレーヤーのサーバーで構成された設定に関する情報を取得します。"
+
+#: plconfig/cog.py:126 plconfig/view.py:499
+msgid "Playlist Tasks"
+msgstr "プレイリストタスク"
+
+#: plconfig/cog.py:129
+msgid "Get information about the playlist auto update schedule."
+msgstr "プレイリストの自動更新スケジュールに関する情報を取得します。"
+
+#: plconfig/cog.py:138
+msgid "PyLav Paths"
+msgstr "パイラヴパス"
+
+#: plconfig/cog.py:140
+msgid "Get information about PyLav paths"
+msgstr "PyLav パスについての情報を取得する"
+
+#: plconfig/cog.py:147 plconfig/view.py:595
+msgid "Managed Node Settings"
+msgstr "マネージドノードの設定"
+
+#: plconfig/cog.py:150
+msgid "Get information about the Managed PyLav Lavalink node"
+msgstr "Managed PyLav Lavalinkノードについての情報を取得する"
+
+#: plconfig/cog.py:160
+#, docstring
+msgid "Checks if a user or role is considered a disc jockey"
+msgstr "ユーザーまたはロールがディスクジョッキーと見なされるかどうかを確認します。"
+
+#: plconfig/cog.py:171
+msgid "{role_name_variable_do_not_translate} is a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} ディスクジョッキーの役割です。"
+
+#: plconfig/cog.py:175
+msgid "{role_name_variable_do_not_translate} is not a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} ディスクジョッキーの役割ではありません。"
+
+#: plconfig/cog.py:182
+msgid "{user_name_variable_do_not_translate} is a disc jockey."
+msgstr "{user_name_variable_do_not_translate} ディスクジョッキーです。"
+
+#: plconfig/cog.py:186
+msgid "{user_name_variable_do_not_translate} is not a disc jockey."
+msgstr "{user_name_variable_do_not_translate} ディスクジョッキーではありません。"
+
+#: plconfig/cog.py:201
+#, docstring
+msgid "Set the local tracks folder for PyLav.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "PyLavのローカルトラックフォルダを設定します。\n\n"
+"        再起動後に変更が適用されます。\n"
+"        "
+
+#: plconfig/cog.py:213
+msgid "{folder_path_variable_do_not_translate} is not a folder."
+msgstr "{folder_path_variable_do_not_translate} はフォルダではありません。"
+
+#: plconfig/cog.py:229
+msgid "{folder_path_variable_do_not_translate} does not exist, rerun the command with the create argument set to {command_variable_do_not_translate} to create this folder automatically."
+msgstr "{folder_path_variable_do_not_translate} が存在しない場合は、create 引数を に設定してコマンドを再実行します。 {command_variable_do_not_translate} をクリックして、このフォルダを自動的に作成します。"
+
+#: plconfig/cog.py:246
+msgid "PyLav local tracks folder has been set to {folder_path_variable_do_not_translate}."
+msgstr "PyLavローカルトラックフォルダはに設定されています {folder_path_variable_do_not_translate}."
+
+#: plconfig/cog.py:261
+#, docstring
+msgid "Change the managed node configuration"
+msgstr "管理ノードの設定を変更する"
+
+#: plconfig/cog.py:265
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "マネージドノードのオン/オフを切り替えます。\n\n"
+"        再起動後に変更が適用されます。\n"
+"        "
+
+#: plconfig/cog.py:281
+msgid "I have turned on my managed Lavalink node."
+msgstr "管理対象のLavalinkノードをオンにしました。"
+
+#: plconfig/cog.py:289
+msgid "I have turned off my managed Lavalink node."
+msgstr "管理対象のLavalinkノードをオフにしました。"
+
+#: plconfig/cog.py:297
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "マネージドノードの自動更新のオン/オフを切り替えます。\n\n"
+"        再起動後に変更が適用されます。\n"
+"        "
+
+#: plconfig/cog.py:313
+msgid "I have turned on the self-update functionality of my managed node."
+msgstr "マネージドノードのセルフアップデート機能をオンにしました。"
+
+#: plconfig/cog.py:321
+msgid "I have turned off the self-update functionality of my managed node."
+msgstr "マネージドノードの自己更新機能をオフにしました。"
+
+#: plconfig/cog.py:329
+#, docstring
+msgid "Change the bundled external nodes state"
+msgstr "バンドルされている外部ノードの状態を変更する"
+
+#: plconfig/cog.py:333
+#, docstring
+msgid "Toggle the managed external draper.wtf nodes on/off"
+msgstr "管理された外部ドレーパーを切り替えます。wtfノードのオン/オフ"
+
+#: plconfig/cog.py:353
+msgid "I have turned on the PyLav external Lavalink nodes."
+msgstr "PyLav外部ラバリンクノードをオンにしました。"
+
+#: plconfig/cog.py:363
+msgid "I have turned off the PyLav external Lavalink nodes."
+msgstr "PyLav外部Lavalinkノードをオフにしました。"
+
+#: plconfig/cog.py:371
+#, docstring
+msgid "Toggle the managed external lava.link node on/off"
+msgstr "管理されている外部 lava.link ノードのオン/オフを切り替えます"
+
+#: plconfig/cog.py:383
+msgid "I have turned on the lava.link external Lavalink node."
+msgstr "lava.link 外部Lavalinkノードをオンにしました。"
+
+#: plconfig/cog.py:391
+msgid "The PyLav managed lava.link external Lavalink node has been permanently removed."
+msgstr "PyLav 管理 lava.link 外部 Lavalink ノードは完全に削除されました。"
+
+#: plconfig/cog.py:400
+#, docstring
+msgid "Instructions on how to set the Spotify API Tokens"
+msgstr "Spotify API トークンの設定方法"
+
+#: plconfig/cog.py:401
+msgid "1. Go to Spotify developers and log in with your Spotify account.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. Click on \"Create An App\".\n"
+"3. Fill out the form provided with your application name, etc.\n"
+"4. When asked if you're developing commercial integration select \"No\".\n"
+"5. Accept the terms and conditions.\n"
+"6. Execute the following command replacing {argument_1_variable_do_not_translate} with your client identifier and {argument_2_variable_do_not_translate} with your client secret:\n"
+"  `{command_name_variable_do_not_translate}`"
+msgstr "1. Spotify開発者に移動し、Spotifyアカウントでログインします。\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. 「アプリの作成」をクリックします。\n"
+"3. 提供されたフォームにアプリケーション名などを記入します。\n"
+"4.商用統合を開発しているかどうかを尋ねられたら、「いいえ」を選択します。\n"
+"5. 利用規約に同意します。\n"
+"6.次のコマンドを置き換えて実行します {argument_1_variable_do_not_translate} クライアント識別子と {argument_2_variable_do_not_translate} クライアントシークレットを使用します。\n"
+"  `{command_name_variable_do_not_translate}`"
+
+#: plconfig/cog.py:428
+#, docstring
+msgid "Manage active players"
+msgstr "アクティブなプレイヤーを管理"
+
+#: plconfig/cog.py:437
+msgid "I am not currently playing anything in {server_name_variable_do_not_translate}."
+msgstr "私は現在何もプレイしていません {server_name_variable_do_not_translate}."
+
+#: plconfig/cog.py:448
+msgid "I am not connected to any voice channel at the moment."
+msgstr "現在、どの音声チャネルにも接続していません。"
+
+#: plconfig/cog.py:465
+#, docstring
+msgid "Toggle whether or not I should update my Discord activity when playing tracks."
+msgstr "トラックの再生時にDiscordアクティビティを更新するかどうかを切り替えます。"
+
+#: plconfig/cog.py:476
+msgid "From now on, I will update my activity to reflect the tracks I am playing."
+msgstr "これからは、再生しているトラックを反映するようにアクティビティを更新します。"
+
+#: plconfig/cog.py:485
+msgid "From now on, I will no longer update my activity to reflect the tracks I am playing."
+msgstr "今後は、再生しているトラックを反映するようにアクティビティを更新しなくなります。"
+
+#: plconfig/view.py:27 plconfig/view.py:68 plconfig/view.py:179
+#: plconfig/view.py:289 plconfig/view.py:551
+msgid "Enabled"
+msgstr "有効"
+
+#: plconfig/view.py:28 plconfig/view.py:69 plconfig/view.py:180
+#: plconfig/view.py:290 plconfig/view.py:552
+msgid "Disabled"
+msgstr "無効"
+
+#: plconfig/view.py:32
+msgid "Use Managed Node"
+msgstr "マネージドノードを使用"
+
+#: plconfig/view.py:36
+msgid "Auto Update\n"
+"Managed Node"
+msgstr "管理対象ノードを\n"
+"自動更新"
+
+#: plconfig/view.py:40
+msgid "Change Bot activity"
+msgstr "ボットアクティビティを変更"
+
+#: plconfig/view.py:44
+msgid "Use Bundled\n"
+"PyLav Nodes"
+msgstr "バンドルされた\n"
+"の PyLav ノードを使用する"
+
+#: plconfig/view.py:48
+msgid "Use Bundled\n"
+"lava.link Nodes"
+msgstr "バンドルされた\n"
+"lava.link ノードを使用する"
+
+#: plconfig/view.py:58 plconfig/view.py:163 plconfig/view.py:273
+#: plconfig/view.py:461 plconfig/view.py:596
+msgid "Value"
+msgstr "価値"
+
+#: plconfig/view.py:72 plconfig/view.py:253 plconfig/view.py:400
+msgid "Volume"
+msgstr "音量"
+
+#: plconfig/view.py:78 plconfig/view.py:98 plconfig/view.py:118
+#: plconfig/view.py:196 plconfig/view.py:216 plconfig/view.py:236
+#: plconfig/view.py:343 plconfig/view.py:363 plconfig/view.py:383
+msgid "{enabled_variable_do_not_translate}\n"
+"0 seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"0秒"
+
+#: plconfig/view.py:82 plconfig/view.py:102 plconfig/view.py:122
+#: plconfig/view.py:200 plconfig/view.py:220 plconfig/view.py:240
+#: plconfig/view.py:347 plconfig/view.py:367 plconfig/view.py:387
+msgid "{enabled_variable_do_not_translate}\n"
+"1 second"
+msgstr "{enabled_variable_do_not_translate}\n"
+"1秒"
+
+#: plconfig/view.py:86 plconfig/view.py:106 plconfig/view.py:126
+#: plconfig/view.py:204 plconfig/view.py:224 plconfig/view.py:244
+#: plconfig/view.py:351 plconfig/view.py:371 plconfig/view.py:391
+msgid "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} お代わり"
+
+#: plconfig/view.py:135 plconfig/view.py:254 plconfig/view.py:401
+msgid "Maximum Volume"
+msgstr "最大ボリューム"
+
+#: plconfig/view.py:137 plconfig/view.py:256 plconfig/view.py:403
+msgid "AutoPlay"
+msgstr "自動再生"
+
+#: plconfig/view.py:141 plconfig/view.py:259 plconfig/view.py:419
+msgid "Shuffling"
+msgstr "シャッフル"
+
+#: plconfig/view.py:145 plconfig/view.py:260 plconfig/view.py:423
+msgid "Auto Shuffle"
+msgstr "自動シャッフル"
+
+#: plconfig/view.py:149 plconfig/view.py:261 plconfig/view.py:427
+msgid "Auto Deafen"
+msgstr "自動聴覚障害者"
+
+#: plconfig/view.py:152
+msgid "Auto Disconnect"
+msgstr "自動的に切断"
+
+#: plconfig/view.py:153 plconfig/view.py:263 plconfig/view.py:431
+msgid "Auto Alone Pause"
+msgstr "自動で一時停止する"
+
+#: plconfig/view.py:154 plconfig/view.py:264 plconfig/view.py:432
+msgid "Auto Alone Disconnect"
+msgstr "自動的に一人で切断する"
+
+#: plconfig/view.py:176
+msgid "You need to be on a server to show this page."
+msgstr "このページを表示するには、サーバー上にいる必要があります。"
+
+#: plconfig/view.py:262 plconfig/view.py:430
+msgid "Auto Empty Disconnect"
+msgstr "自動空切断"
+
+#: plconfig/view.py:272
+msgid "Context Player Settings"
+msgstr "コンテキストプレーヤーの設定"
+
+#: plconfig/view.py:286
+msgid "You need to be in a server to be able to show this page."
+msgstr "このページを表示するにはサーバーにいる必要があります。"
+
+#: plconfig/view.py:307
+msgid "Too many entries to show ({number_of_users_variable_do_not_translate})"
+msgstr "表示するエントリが多すぎます ({number_of_users_variable_do_not_translate})"
+
+#: plconfig/view.py:325
+msgid "Too many entries to show ({number_of_roles_variable_do_not_translate})"
+msgstr "表示するエントリが多すぎます ({number_of_roles_variable_do_not_translate})"
+
+#: plconfig/view.py:330 plconfig/view.py:335 plconfig/view.py:437
+#: plconfig/view.py:443 plconfig/view.py:449
+msgid "None"
+msgstr "何一つ"
+
+#: plconfig/view.py:407
+msgid "AutoPlay Playlist"
+msgstr "自動プレイリスト"
+
+#: plconfig/view.py:411
+msgid "Loop track"
+msgstr "トラックをループ"
+
+#: plconfig/view.py:415
+msgid "Loop Queue"
+msgstr "ループキュー"
+
+#: plconfig/view.py:434
+msgid "Forced Voice Channel"
+msgstr "強制ボイスチャンネル"
+
+#: plconfig/view.py:440
+msgid "Forced Command Channel"
+msgstr "強制コマンドチャンネル"
+
+#: plconfig/view.py:446
+msgid "Forced Notification Channel"
+msgstr "強制通知チャンネル"
+
+#: plconfig/view.py:451
+msgid "Disc Jockey Users"
+msgstr "ディスクジョッキーユーザー"
+
+#: plconfig/view.py:452
+msgid "Disc Jockey Roles"
+msgstr "ディスクジョッキーの役割"
+
+#: plconfig/view.py:460
+msgid "Server Player Settings"
+msgstr "サーバープレーヤーの設定"
+
+#: plconfig/view.py:475
+msgid "Next Bundled\n"
+"Playlist Update"
+msgstr "次のバンドルされた\n"
+"プレイリストの更新"
+
+#: plconfig/view.py:481
+msgid "Next Bundled External\n"
+"Playlist Update"
+msgstr "次のバンドルされた外部\n"
+"プレイリストの更新"
+
+#: plconfig/view.py:487
+msgid "Next External\n"
+"Playlist Update"
+msgstr "次の外部\n"
+"プレイリストの更新"
+
+#: plconfig/view.py:500
+msgid "Date and Time (UTC)"
+msgstr "日時 (UTC)"
+
+#: plconfig/view.py:513
+msgid "Due to sensitive information, I can only show the contents of this page to my owner."
+msgstr "機密情報のため、このページの内容は所有者にのみ表示できます。"
+
+#: plconfig/view.py:519
+msgid "Settings Folder"
+msgstr "設定フォルダ"
+
+#: plconfig/view.py:521
+msgid "Local Tracks"
+msgstr "ローカルトラック"
+
+#: plconfig/view.py:524
+msgid "Lavalink Folder"
+msgstr "ラバルリンクフォルダ"
+
+#: plconfig/view.py:526
+msgid "Java Executable"
+msgstr "Java 実行可能ファイル"
+
+#: plconfig/view.py:530
+msgid "Not Found"
+msgstr "見つかりませんでした"
+
+#: plconfig/view.py:540
+msgid "Paths"
+msgstr "パス"
+
+#: plconfig/view.py:541
+msgid "Path"
+msgstr "パス"
+
+#: plconfig/view.py:560
+msgid "Java"
+msgstr "ジャワ"
+
+#: plconfig/view.py:564
+msgid "Lavaplayer"
+msgstr "ラバプレイヤー"
+
+#: plconfig/view.py:568
+msgid "Lavalink Branch"
+msgstr "Lavalinkブランチ"
+
+#: plconfig/view.py:572
+msgid "Lavalink Version"
+msgstr "Lavalinkバージョン"
+
+#: plconfig/view.py:576
+msgid "Lavalink Build"
+msgstr "Lavalinkビルド"
+
+#: plconfig/view.py:579
+msgid "Build Time"
+msgstr "ビルド時間"
+
+#: plconfig/view.py:581
+msgid "Commit"
+msgstr "コミット"
+
+#: plconfig/view.py:585
+msgid "Auto Update"
+msgstr "自動アップデート"
+
+#: plconfig/view.py:623
+msgid "Select an option from the dropdown menu below."
+msgstr "下のドロップダウンメニューからオプションを選択します。"
+
+#: plconfig/view.py:638
+msgid "Pick an option to view"
+msgstr "表示するオプションを選択"
+
+#: plconfig/view.py:648
+msgid "You are not authorized to interact with this option."
+msgstr "このオプションを操作する権限がありません。"
+
+#: plconfig/view.py:678
+msgid "You are not authorized to interact with this."
+msgstr "これと対話する権限がありません。"
+

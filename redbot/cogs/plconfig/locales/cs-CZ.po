@@ -1,0 +1,532 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 10:26\n"
+"Last-Translator: \n"
+"Language-Team: Czech\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=4; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 3;\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: cs\n"
+"X-Crowdin-File: /cogs/plconfig/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3353\n"
+"Language: cs_CZ\n"
+
+#: plconfig/cog.py:32
+#, docstring
+msgid "Configure PyLav library settings"
+msgstr "Konfigurace nastavení PyLav knihovny"
+
+#: plconfig/cog.py:44
+#, docstring
+msgid "Change global settings for PyLav"
+msgstr "Změnit globální nastavení pro PyLav"
+
+#: plconfig/cog.py:48
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Zobrazit verzi Cog a PyLav"
+
+#: plconfig/cog.py:64
+msgid "Library / Cog"
+msgstr "Knihovna / Cog"
+
+#: plconfig/cog.py:65
+msgid "Version"
+msgstr "Verze"
+
+#: plconfig/cog.py:78
+#, docstring
+msgid "Show the setting values"
+msgstr "Zobrazení hodnot nastavení"
+
+#: plconfig/cog.py:85 plconfig/view.py:57
+msgid "PyLav Settings"
+msgstr "Nastavení PyLav"
+
+#: plconfig/cog.py:88
+msgid "Get information about the PyLav library settings."
+msgstr "Získejte informace o nastavení knihovny PyLav."
+
+#: plconfig/cog.py:92 plconfig/view.py:162
+msgid "Global Settings"
+msgstr "Globální nastavení"
+
+#: plconfig/cog.py:95
+msgid "Get information about bot owner configured settings for the players."
+msgstr "Získejte informace o nastavení nakonfigurovaných vlastníkem bota pro hráče."
+
+#: plconfig/cog.py:103
+msgid "Contextual Settings"
+msgstr "Kontextová nastavení"
+
+#: plconfig/cog.py:107
+msgid "Get information about contextual settings for the player, accounting for the global settings."
+msgstr "Získejte informace o kontextových nastaveních pro přehrávač, včetně globálních nastavení."
+
+#: plconfig/cog.py:114
+msgid "Server Settings"
+msgstr "Nastavení serveru"
+
+#: plconfig/cog.py:118
+msgid "Get information about the server configured settings for the player."
+msgstr "Získejte informace o nastavení serveru nakonfigurovaném pro přehrávač."
+
+#: plconfig/cog.py:126 plconfig/view.py:499
+msgid "Playlist Tasks"
+msgstr "Úkoly playlistu"
+
+#: plconfig/cog.py:129
+msgid "Get information about the playlist auto update schedule."
+msgstr "Získejte informace o plánu automatických aktualizací seznamu stop."
+
+#: plconfig/cog.py:138
+msgid "PyLav Paths"
+msgstr "PyLav cesty"
+
+#: plconfig/cog.py:140
+msgid "Get information about PyLav paths"
+msgstr "Získat informace o PyLav cestách"
+
+#: plconfig/cog.py:147 plconfig/view.py:595
+msgid "Managed Node Settings"
+msgstr "Nastavení spravovaného uzlu"
+
+#: plconfig/cog.py:150
+msgid "Get information about the Managed PyLav Lavalink node"
+msgstr "Získejte informace o uzlu Managed PyLav Lavalink"
+
+#: plconfig/cog.py:160
+#, docstring
+msgid "Checks if a user or role is considered a disc jockey"
+msgstr "Kontroluje, zda je uživatel nebo role považována za diskžokeje"
+
+#: plconfig/cog.py:171
+msgid "{role_name_variable_do_not_translate} is a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} je role diskžokeje."
+
+#: plconfig/cog.py:175
+msgid "{role_name_variable_do_not_translate} is not a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} není role diskžokeje."
+
+#: plconfig/cog.py:182
+msgid "{user_name_variable_do_not_translate} is a disc jockey."
+msgstr "{user_name_variable_do_not_translate} je diskžokej."
+
+#: plconfig/cog.py:186
+msgid "{user_name_variable_do_not_translate} is not a disc jockey."
+msgstr "{user_name_variable_do_not_translate} není diskžokej."
+
+#: plconfig/cog.py:201
+#, docstring
+msgid "Set the local tracks folder for PyLav.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Nastavte složku místních stop pro PyLav.\n\n"
+"        Změny se projeví po restartování.\n"
+"        "
+
+#: plconfig/cog.py:213
+msgid "{folder_path_variable_do_not_translate} is not a folder."
+msgstr "{folder_path_variable_do_not_translate} není složka."
+
+#: plconfig/cog.py:229
+msgid "{folder_path_variable_do_not_translate} does not exist, rerun the command with the create argument set to {command_variable_do_not_translate} to create this folder automatically."
+msgstr "{folder_path_variable_do_not_translate} neexistuje, spusťte příkaz znovu s argumentem create nastaveným na {command_variable_do_not_translate} tuto složku vytvoříte automaticky."
+
+#: plconfig/cog.py:246
+msgid "PyLav local tracks folder has been set to {folder_path_variable_do_not_translate}."
+msgstr "Složka místních tratí PyLav byla nastavena na {folder_path_variable_do_not_translate}."
+
+#: plconfig/cog.py:261
+#, docstring
+msgid "Change the managed node configuration"
+msgstr "Změnit spravovanou konfiguraci uzlu"
+
+#: plconfig/cog.py:265
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Zapněte/vypněte spravovaný uzel.\n\n"
+"        Změny se projeví po restartování.\n"
+"        "
+
+#: plconfig/cog.py:281
+msgid "I have turned on my managed Lavalink node."
+msgstr "Zapnul jsem svůj spravovaný uzel Lavalink."
+
+#: plconfig/cog.py:289
+msgid "I have turned off my managed Lavalink node."
+msgstr "Vypnul jsem svůj spravovaný uzel Lavalink."
+
+#: plconfig/cog.py:297
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Zapněte/vypněte automatické aktualizace spravovaného uzlu.\n\n"
+"        Změny se projeví po restartování.\n"
+"        "
+
+#: plconfig/cog.py:313
+msgid "I have turned on the self-update functionality of my managed node."
+msgstr "Zapnul(a) jsem funkci automatické aktualizace spravovaného uzlu."
+
+#: plconfig/cog.py:321
+msgid "I have turned off the self-update functionality of my managed node."
+msgstr "Vypnul(a) jsem funkci automatické aktualizace spravovaného uzlu."
+
+#: plconfig/cog.py:329
+#, docstring
+msgid "Change the bundled external nodes state"
+msgstr "Změnit stav propojených externích uzlů"
+
+#: plconfig/cog.py:333
+#, docstring
+msgid "Toggle the managed external draper.wtf nodes on/off"
+msgstr "Zapnout/vypnout spravované externí draper.wtf uzly"
+
+#: plconfig/cog.py:353
+msgid "I have turned on the PyLav external Lavalink nodes."
+msgstr "Zapnul jsem externí uzly Lavalink PyLav."
+
+#: plconfig/cog.py:363
+msgid "I have turned off the PyLav external Lavalink nodes."
+msgstr "Vypnul jsem externí uzly Lavalink PyLav."
+
+#: plconfig/cog.py:371
+#, docstring
+msgid "Toggle the managed external lava.link node on/off"
+msgstr "Zapnout/vypnout spravovaný externí lava.link uzel"
+
+#: plconfig/cog.py:383
+msgid "I have turned on the lava.link external Lavalink node."
+msgstr "Zapnul jsem lava.link externí uzel Lavalink."
+
+#: plconfig/cog.py:391
+msgid "The PyLav managed lava.link external Lavalink node has been permanently removed."
+msgstr "PyLav spravovaný lava.link externí uzel Lavalink byl trvale odebrán."
+
+#: plconfig/cog.py:400
+#, docstring
+msgid "Instructions on how to set the Spotify API Tokens"
+msgstr "Pokyny k nastavení Spotify API tokenů"
+
+#: plconfig/cog.py:401
+msgid "1. Go to Spotify developers and log in with your Spotify account.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. Click on \"Create An App\".\n"
+"3. Fill out the form provided with your application name, etc.\n"
+"4. When asked if you're developing commercial integration select \"No\".\n"
+"5. Accept the terms and conditions.\n"
+"6. Execute the following command replacing {argument_1_variable_do_not_translate} with your client identifier and {argument_2_variable_do_not_translate} with your client secret:\n"
+"  `{command_name_variable_do_not_translate}`"
+msgstr "1. Přejděte na vývojáře Spotify a přihlaste se pomocí svého účtu Spotify.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. Klikněte na \"Vytvořit aplikaci\".\n"
+"3. Vyplňte formulář, který je součástí názvu vaší žádosti atd.\n"
+"4. Až budete dotázáni, zda vyvíjíte komerční integraci, zvolte \"Ne\".\n"
+"5. Přijměte smluvní podmínky.\n"
+"6. Proveďte následující příkaz: nahraďte {argument_1_variable_do_not_translate} s identifikátorem klienta a {argument_2_variable_do_not_translate} s tajným klíčem klienta:\n"
+"  `{command_name_variable_do_not_translate}`"
+
+#: plconfig/cog.py:428
+#, docstring
+msgid "Manage active players"
+msgstr "Spravovat aktivní hráče"
+
+#: plconfig/cog.py:437
+msgid "I am not currently playing anything in {server_name_variable_do_not_translate}."
+msgstr "V současné době nehraji nic v {server_name_variable_do_not_translate}."
+
+#: plconfig/cog.py:448
+msgid "I am not connected to any voice channel at the moment."
+msgstr "V tuto chvíli nejsem připojen k žádnému hlasovému kanálu."
+
+#: plconfig/cog.py:465
+#, docstring
+msgid "Toggle whether or not I should update my Discord activity when playing tracks."
+msgstr "Přepnout, zda mám nebo nemám aktualizovat svou aktivitu na Discordu při přehrávání skladeb."
+
+#: plconfig/cog.py:476
+msgid "From now on, I will update my activity to reflect the tracks I am playing."
+msgstr "Od této chvíle budu aktualizovat svou aktivitu tak, aby odrážela skladby, které hraji."
+
+#: plconfig/cog.py:485
+msgid "From now on, I will no longer update my activity to reflect the tracks I am playing."
+msgstr "Od této chvíle již nebudu aktualizovat svou aktivitu tak, aby odrážela skladby, které hraji."
+
+#: plconfig/view.py:27 plconfig/view.py:68 plconfig/view.py:179
+#: plconfig/view.py:289 plconfig/view.py:551
+msgid "Enabled"
+msgstr "Zpřístupněný"
+
+#: plconfig/view.py:28 plconfig/view.py:69 plconfig/view.py:180
+#: plconfig/view.py:290 plconfig/view.py:552
+msgid "Disabled"
+msgstr "Invalidní"
+
+#: plconfig/view.py:32
+msgid "Use Managed Node"
+msgstr "Použít spravovaný uzel"
+
+#: plconfig/view.py:36
+msgid "Auto Update\n"
+"Managed Node"
+msgstr "Automatická aktualizace\n"
+"Spravovaný uzel"
+
+#: plconfig/view.py:40
+msgid "Change Bot activity"
+msgstr "Změnit Bot aktivitu"
+
+#: plconfig/view.py:44
+msgid "Use Bundled\n"
+"PyLav Nodes"
+msgstr "Použít svazované\n"
+"PyLav uzly"
+
+#: plconfig/view.py:48
+msgid "Use Bundled\n"
+"lava.link Nodes"
+msgstr "Použít svazované\n"
+"láva.link uzly"
+
+#: plconfig/view.py:58 plconfig/view.py:163 plconfig/view.py:273
+#: plconfig/view.py:461 plconfig/view.py:596
+msgid "Value"
+msgstr "Hodnota"
+
+#: plconfig/view.py:72 plconfig/view.py:253 plconfig/view.py:400
+msgid "Volume"
+msgstr "Objem"
+
+#: plconfig/view.py:78 plconfig/view.py:98 plconfig/view.py:118
+#: plconfig/view.py:196 plconfig/view.py:216 plconfig/view.py:236
+#: plconfig/view.py:343 plconfig/view.py:363 plconfig/view.py:383
+msgid "{enabled_variable_do_not_translate}\n"
+"0 seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"0 sekund"
+
+#: plconfig/view.py:82 plconfig/view.py:102 plconfig/view.py:122
+#: plconfig/view.py:200 plconfig/view.py:220 plconfig/view.py:240
+#: plconfig/view.py:347 plconfig/view.py:367 plconfig/view.py:387
+msgid "{enabled_variable_do_not_translate}\n"
+"1 second"
+msgstr "{enabled_variable_do_not_translate}\n"
+"1 sekunda"
+
+#: plconfig/view.py:86 plconfig/view.py:106 plconfig/view.py:126
+#: plconfig/view.py:204 plconfig/view.py:224 plconfig/view.py:244
+#: plconfig/view.py:351 plconfig/view.py:371 plconfig/view.py:391
+msgid "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} sekundy"
+
+#: plconfig/view.py:135 plconfig/view.py:254 plconfig/view.py:401
+msgid "Maximum Volume"
+msgstr "Maximální hlasitost"
+
+#: plconfig/view.py:137 plconfig/view.py:256 plconfig/view.py:403
+msgid "AutoPlay"
+msgstr "Automatické přehrávání"
+
+#: plconfig/view.py:141 plconfig/view.py:259 plconfig/view.py:419
+msgid "Shuffling"
+msgstr "Míchání"
+
+#: plconfig/view.py:145 plconfig/view.py:260 plconfig/view.py:423
+msgid "Auto Shuffle"
+msgstr "Automatické náhodné přehrávání"
+
+#: plconfig/view.py:149 plconfig/view.py:261 plconfig/view.py:427
+msgid "Auto Deafen"
+msgstr "Auto hluchý"
+
+#: plconfig/view.py:152
+msgid "Auto Disconnect"
+msgstr "Automatické odpojení"
+
+#: plconfig/view.py:153 plconfig/view.py:263 plconfig/view.py:431
+msgid "Auto Alone Pause"
+msgstr "Automatická pozastavení"
+
+#: plconfig/view.py:154 plconfig/view.py:264 plconfig/view.py:432
+msgid "Auto Alone Disconnect"
+msgstr "Automatické odpojení zvuku"
+
+#: plconfig/view.py:176
+msgid "You need to be on a server to show this page."
+msgstr "Chcete-li zobrazit tuto stránku, musíte být na serveru."
+
+#: plconfig/view.py:262 plconfig/view.py:430
+msgid "Auto Empty Disconnect"
+msgstr "Automatické odpojení prázdného"
+
+#: plconfig/view.py:272
+msgid "Context Player Settings"
+msgstr "Nastavení kontextového přehrávače"
+
+#: plconfig/view.py:286
+msgid "You need to be in a server to be able to show this page."
+msgstr "Musíte být na serveru, abyste mohli zobrazit tuto stránku."
+
+#: plconfig/view.py:307
+msgid "Too many entries to show ({number_of_users_variable_do_not_translate})"
+msgstr "Příliš mnoho položek k zobrazení ({number_of_users_variable_do_not_translate})"
+
+#: plconfig/view.py:325
+msgid "Too many entries to show ({number_of_roles_variable_do_not_translate})"
+msgstr "Příliš mnoho položek k zobrazení ({number_of_roles_variable_do_not_translate})"
+
+#: plconfig/view.py:330 plconfig/view.py:335 plconfig/view.py:437
+#: plconfig/view.py:443 plconfig/view.py:449
+msgid "None"
+msgstr "Žádný"
+
+#: plconfig/view.py:407
+msgid "AutoPlay Playlist"
+msgstr "Automaticky přehrávat playlist"
+
+#: plconfig/view.py:411
+msgid "Loop track"
+msgstr "Opakovat trasu"
+
+#: plconfig/view.py:415
+msgid "Loop Queue"
+msgstr "Fronta smyčky"
+
+#: plconfig/view.py:434
+msgid "Forced Voice Channel"
+msgstr "Vynucený hlasový kanál"
+
+#: plconfig/view.py:440
+msgid "Forced Command Channel"
+msgstr "Vynucený velitelský kanál"
+
+#: plconfig/view.py:446
+msgid "Forced Notification Channel"
+msgstr "Vynucený kanál oznámení"
+
+#: plconfig/view.py:451
+msgid "Disc Jockey Users"
+msgstr "Uživatelé diskžokejů"
+
+#: plconfig/view.py:452
+msgid "Disc Jockey Roles"
+msgstr "Role diskžokejů"
+
+#: plconfig/view.py:460
+msgid "Server Player Settings"
+msgstr "Nastavení přehrávače serveru"
+
+#: plconfig/view.py:475
+msgid "Next Bundled\n"
+"Playlist Update"
+msgstr "Další balíček\n"
+"Aktualizace playlistu"
+
+#: plconfig/view.py:481
+msgid "Next Bundled External\n"
+"Playlist Update"
+msgstr "Další externí\n"
+"seznam skladeb"
+
+#: plconfig/view.py:487
+msgid "Next External\n"
+"Playlist Update"
+msgstr "Další aktualizace externího\n"
+"playlistu"
+
+#: plconfig/view.py:500
+msgid "Date and Time (UTC)"
+msgstr "Datum a čas (UTC)"
+
+#: plconfig/view.py:513
+msgid "Due to sensitive information, I can only show the contents of this page to my owner."
+msgstr "Vzhledem k citlivým informacím mohu zobrazit obsah této stránky pouze svému majiteli."
+
+#: plconfig/view.py:519
+msgid "Settings Folder"
+msgstr "Složka Nastavení"
+
+#: plconfig/view.py:521
+msgid "Local Tracks"
+msgstr "Místní skladby"
+
+#: plconfig/view.py:524
+msgid "Lavalink Folder"
+msgstr "Složka Lavalink"
+
+#: plconfig/view.py:526
+msgid "Java Executable"
+msgstr "Spustitelný Java"
+
+#: plconfig/view.py:530
+msgid "Not Found"
+msgstr "Nenalezeno"
+
+#: plconfig/view.py:540
+msgid "Paths"
+msgstr "Cesty"
+
+#: plconfig/view.py:541
+msgid "Path"
+msgstr "Cesta"
+
+#: plconfig/view.py:560
+msgid "Java"
+msgstr "Jáva"
+
+#: plconfig/view.py:564
+msgid "Lavaplayer"
+msgstr "Lavaplayer"
+
+#: plconfig/view.py:568
+msgid "Lavalink Branch"
+msgstr "Lavalink větev"
+
+#: plconfig/view.py:572
+msgid "Lavalink Version"
+msgstr "Verze Lavalink"
+
+#: plconfig/view.py:576
+msgid "Lavalink Build"
+msgstr "Sestavení Lavalinku"
+
+#: plconfig/view.py:579
+msgid "Build Time"
+msgstr "Čas sestavení"
+
+#: plconfig/view.py:581
+msgid "Commit"
+msgstr "Potvrdit"
+
+#: plconfig/view.py:585
+msgid "Auto Update"
+msgstr "Automatická aktualizace"
+
+#: plconfig/view.py:623
+msgid "Select an option from the dropdown menu below."
+msgstr "Vyberte možnost z rozbalovacího menu níže."
+
+#: plconfig/view.py:638
+msgid "Pick an option to view"
+msgstr "Vyberte možnost zobrazení"
+
+#: plconfig/view.py:648
+msgid "You are not authorized to interact with this option."
+msgstr "Nejste oprávněni s touto možností pracovat."
+
+#: plconfig/view.py:678
+msgid "You are not authorized to interact with this."
+msgstr "Nejste oprávněni s tím komunikovat."
+

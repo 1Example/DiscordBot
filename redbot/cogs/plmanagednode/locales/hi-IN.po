@@ -1,0 +1,541 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Hindi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: hi\n"
+"X-Crowdin-File: /cogs/plmanagednode/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3323\n"
+"Language: hi_IN\n"
+
+#: plmanagednode/cog.py:34 plmanagednode/cog.py:46
+#, docstring
+msgid "Configure the managed Lavalink node used by PyLav"
+msgstr "PyLav द्वारा उपयोग किए जाने वाले प्रबंधित Lavalink नोड को कॉन्फ़िगर करें"
+
+#: plmanagednode/cog.py:50
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Cog और PyLav का संस्करण दिखाएँ"
+
+#: plmanagednode/cog.py:66
+msgid "Library / Cog"
+msgstr "पुस्तकालय /"
+
+#: plmanagednode/cog.py:67
+msgid "Version"
+msgstr "संस्करण"
+
+#: plmanagednode/cog.py:80
+#, docstring
+msgid "Update the managed Lavalink node"
+msgstr "प्रबंधित Lavalink नोड अद्यतन करें"
+
+#: plmanagednode/cog.py:92
+msgid "The managed Lavalink node is already up to date."
+msgstr "प्रबंधित लावालिंक नोड पहले से ही अद्यतित है।"
+
+#: plmanagednode/cog.py:101
+msgid "Your node is out of date, to update please run `{command_name_variable_do_not_translate}`."
+msgstr "आपका नोड पुराना हो गया है, अपडेट करने के लिए कृपया चलाएं '{command_name_variable_do_not_translate}`."
+
+#: plmanagednode/cog.py:118
+msgid "The managed Lavalink node has been updated to version {version_variable_do_not_translate}."
+msgstr "प्रबंधित Lavalink नोड संस्करण में अद्यतन किया गया है {version_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:130
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "प्रबंधित नोड को चालू/बंद करें.\n\n"
+"        मेरे पुनरारंभ करने के बाद परिवर्तन लागू किए जाएंगे।\n"
+"        "
+
+#: plmanagednode/cog.py:145
+msgid "The PyLav managed node has been enabled."
+msgstr "PyLav प्रबंधित नोड सक्षम किया गया है।"
+
+#: plmanagednode/cog.py:153
+msgid "The PyLav managed node has been disabled."
+msgstr "PyLav प्रबंधित नोड अक्षम कर दिया गया है।"
+
+#: plmanagednode/cog.py:161
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "प्रबंधित नोड ऑटो अपडेट चालू /बंद करें।\n\n"
+"        मेरे पुनरारंभ करने के बाद परिवर्तन लागू किए जाएंगे।\n"
+"        "
+
+#: plmanagednode/cog.py:177
+msgid "The PyLav managed node auto updates have been enabled."
+msgstr "PyLav प्रबंधित नोड ऑटो अद्यतन सक्षम किया गया है।"
+
+#: plmanagednode/cog.py:185
+msgid "The  PyLav managed node auto updates have been disabled."
+msgstr "PyLav प्रबंधित नोड ऑटो अद्यतन अक्षम कर दिया गया है।"
+
+#: plmanagednode/cog.py:193
+#, docstring
+msgid "Set the managed Lavalink node maximum heap-size.\n\n"
+"        By default, this value is 2G of available RAM in the host machine represented by (65-1023M|1+G) (256M,\n"
+"        256G for example)\n\n"
+"        This value only represents the maximum amount of RAM allowed to be used at any given point, and does not mean\n"
+"        that the managed Lavalink node will always use this amount of RAM.\n"
+"        "
+msgstr "प्रबंधित लावालिंक नोड अधिकतम हीप-आकार सेट करें।\n\n"
+"        डिफ़ॉल्ट रूप से, यह मान (65-1023M|1+G) (256M, 256M, ) द्वारा दर्शाई गई होस्ट मशीन में उपलब्ध RAM का 2G है।\n"
+"        उदाहरण के लिए 256G)\n\n"
+"        यह मान केवल किसी भी बिंदु पर उपयोग किए जाने वाले रैम की अधिकतम मात्रा का प्रतिनिधित्व करता है, और इसका मतलब यह नहीं है\n"
+"        कि प्रबंधित लावालिंक नोड हमेशा रैम की इस मात्रा का उपयोग करेगा।\n"
+"        "
+
+#: plmanagednode/cog.py:217
+msgid "Heap-size must be a valid measure of size, e.g. 256M, 256G"
+msgstr "हीप-आकार आकार का एक वैध माप होना चाहिए, जैसे 256M, 256G"
+
+#: plmanagednode/cog.py:227
+msgid "Heap-size must be at least 64M, however it is recommended to have it set to at least 1G"
+msgstr "हीप-आकार कम से कम 64 M होना चाहिए, हालांकि इसे कम से कम 1G पर सेट करने की सिफारिश की जाती है"
+
+#: plmanagednode/cog.py:239
+msgid "Heap-size must be less than your system RAM, You currently have {ram_in_bytes_variable_do_not_translate} of RAM available"
+msgstr "हीप-आकार आपके सिस्टम रैम से कम होना चाहिए, वर्तमान में आपके पास है {ram_in_bytes_variable_do_not_translate} उपलब्ध रैम की संख्या"
+
+#: plmanagednode/cog.py:251
+msgid "Heap-size must be less than {limit_variable_do_not_translate} due to your system limitations"
+msgstr "हीप का आकार इससे कम होना चाहिए {limit_variable_do_not_translate} आपकी सिस्टम सीमाओं के कारण"
+
+#: plmanagednode/cog.py:271
+msgid "The Managed node heap-size set to {bytes_variable_do_not_translate}."
+msgstr "प्रबंधित नोड हीप-आकार सेट पर सेट {bytes_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:281
+#, docstring
+msgid "Change the managed node start up configs"
+msgstr "प्रबंधित नोड स्टार्ट अप कॉन्फ़िगरेशन बदलें"
+
+#: plmanagednode/cog.py:285
+#, docstring
+msgid "Set the managed node host"
+msgstr "प्रबंधित नोड होस्ट सेट करें"
+
+#: plmanagednode/cog.py:297
+msgid "The Managed node host set to {host_variable_do_not_translate}."
+msgstr "प्रबंधित नोड होस्ट पर सेट {host_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:307
+#, docstring
+msgid "`Dangerous command` Set the managed Lavalink node connection port.\n\n"
+"        This port is the port the managed Lavalink node binds to, you should only change this if there is a\n"
+"        conflict with the default port because you already have an application using port 2154 on this device.\n\n"
+"        The value by default is `2154`.\n"
+"        "
+msgstr "'खतरनाक कमांड' प्रबंधित लावालिंक नोड कनेक्शन पोर्ट सेट करें।\n\n"
+"        यह पोर्ट वह पोर्ट है जिसे प्रबंधित लावालिंक नोड बांधता है, आपको इसे केवल तभी बदलना चाहिए जब कोई हो\n"
+"        डिफ़ॉल्ट पोर्ट के साथ विरोध क्योंकि आपके पास पहले से ही इस डिवाइस पर पोर्ट 2154 का उपयोग कर कोई अनुप्रयोग है।\n\n"
+"        डिफ़ॉल्ट रूप से मान '2154' है।\n"
+"        "
+
+#: plmanagednode/cog.py:317
+msgid "The port must be between 1024 and 49151"
+msgstr "पोर्ट 1024 और 49151 के बीच होना चाहिए"
+
+#: plmanagednode/cog.py:329
+msgid "The managed node port set to {port_variable_do_not_translate}."
+msgstr "प्रबंधित नोड पोर्ट पर सेट {port_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:339
+#, docstring
+msgid "Change the managed node plugins"
+msgstr "प्रबंधित नोड प्लगइन्स परिवर्तित करें"
+
+#: plmanagednode/cog.py:345
+#, docstring
+msgid "Disabled one of the available plugins"
+msgstr "उपलब्ध प्लगइन्स में से एक को अक्षम किया"
+
+#: plmanagednode/cog.py:361 plmanagednode/cog.py:472
+msgid "The plugin must be one of the following: {plugins_variable_do_not_translate}"
+msgstr "प्लगइन निम्न में से एक होना चाहिए: {plugins_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:446
+msgid "Managed node plugin {plugin_variable_do_not_translate} disabled."
+msgstr "प्रबंधित नोड प्लगइन {plugin_variable_do_not_translate} विकलांग।"
+
+#: plmanagednode/cog.py:456
+#, docstring
+msgid "Enable one of the available plugins"
+msgstr "उपलब्ध प्लगइन्स में से एक सक्षम करें"
+
+#: plmanagednode/cog.py:505
+msgid "Managed node plugin {plugin_variable_do_not_translate} enabled."
+msgstr "प्रबंधित नोड प्लगइन {plugin_variable_do_not_translate} सक्षम।"
+
+#: plmanagednode/cog.py:515
+#, docstring
+msgid "Update the managed node plugins"
+msgstr "प्रबंधित नोड प्लगइन्स अद्यतन करें"
+
+#: plmanagednode/cog.py:589
+msgid "{name_variable_do_not_translate} was updated from {old_variable_do_not_translate} to {new_variable_do_not_translate}\n"
+msgstr "{name_variable_do_not_translate} से अद्यतन किया गया था {old_variable_do_not_translate} तक {new_variable_do_not_translate}\n"
+
+#: plmanagednode/cog.py:599
+msgid "Managed node plugins updated.\n\n"
+"{update_variable_do_not_translate}"
+msgstr "प्रबंधित नोड प्लगइन्स अद्यतन.\n\n"
+"{update_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:609
+msgid "The managed node plugins are already up to date."
+msgstr "प्रबंधित नोड प्लगइन्स पहले से ही अद्यतित हैं।"
+
+#: plmanagednode/cog.py:617
+#, docstring
+msgid "Toggle the managed node sources"
+msgstr "प्रबंधित नोड स्रोतों को टॉगल करें"
+
+#: plmanagednode/cog.py:632
+msgid "Invalid source, {valid_list_variable_do_not_translate} are valid sources"
+msgstr "अमान्य स्रोत, {valid_list_variable_do_not_translate} मान्य स्रोत हैं"
+
+#: plmanagednode/cog.py:648 plmanagednode/cog.py:687
+msgid "enabled"
+msgstr "सक्षम"
+
+#: plmanagednode/cog.py:648 plmanagednode/cog.py:687
+msgid "disabled"
+msgstr "विकलांग"
+
+#: plmanagednode/cog.py:651
+msgid "Managed node {source_variable_do_not_translate} source set to {state_variable_do_not_translate}."
+msgstr "प्रबंधित नोड {source_variable_do_not_translate} स्रोत सेट करें {state_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:664
+#, docstring
+msgid "Toggle the managed node filters"
+msgstr "प्रबंधित नोड फ़िल्टर को टॉगल करें"
+
+#: plmanagednode/cog.py:676
+msgid "Invalid source, {valid_list_variable_do_not_translate} are valid filters"
+msgstr "अमान्य स्रोत, {valid_list_variable_do_not_translate} मान्य फ़िल्टर हैं"
+
+#: plmanagednode/cog.py:690
+msgid "Managed node {source_variable_do_not_translate} filter set to {state_variable_do_not_translate}."
+msgstr "प्रबंधित नोड {source_variable_do_not_translate} फ़िल्टर सेट करें {state_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:703
+#, docstring
+msgid "Configure multiple settings for the managed node.\n\n"
+"        Run `[p]plmanaged settings server <setting> info` to show info about the settings and what they do.\n\n"
+"        **Setting names**:\n"
+"        `bufferDurationMs` : Integer i.e 400 (Default 400) - Set to 0 to disable JDA-NAS\n"
+"        `frameBufferDurationMs` : Integer i.e 1000 (Default 1000)\n"
+"        `trackStuckThresholdMs` : Integer i.e 1000 (Default 1000)\n"
+"        `youtubePlaylistLoadLimit` : Integer i.e 1000 (Default 1000)\n"
+"        `opusEncodingQuality` : Integer i.e 10 (Default 10)\n"
+"        `resamplingQuality` : String i.e LOW (Default HIGH)\n"
+"        `useSeekGhosting` : Boolean i.e True (Default True)\n"
+"        `playerUpdateInterval` : Integer i.e 30 (Default 30)\n"
+"        `youtubeSearchEnabled` : Boolean i.e True (Default True)\n"
+"        `soundcloudSearchEnabled` : Boolean i.e True (Default True)\n"
+"        "
+msgstr "प्रबंधित नोड के लिए एकाधिक सेटिंग्स कॉन्फ़िगर करें.\n\n"
+"        रन '[p]plmanaged सेटिंग्स सर्वर <setting> सेटिंग्स के बारे में जानकारी दिखाने के लिए और वे क्या करते हैं।\n\n"
+"        ** नाम सेट करना **:\n"
+"        'बफर ड्यूरेशनएम': पूर्णांक यानी 400 (डिफ़ॉल्ट 400) - जेडीए-एनएएस को अक्षम करने के लिए 0 पर सेट करें\n"
+"        'फ़्रेमबफ़र ड्यूरेशनएमएस': पूर्णांक यानी 1000 (डिफ़ॉल्ट 1000)\n"
+"        'trackStuckThresholdMs': पूर्णांक यानी 1000 (डिफ़ॉल्ट 1000)\n"
+"        'youtubePlaylistLoadLimit': पूर्णांक यानी 1000 (डिफ़ॉल्ट 1000)\n"
+"        'opusEncodingQuality': पूर्णांक यानी 10 (डिफ़ॉल्ट 10)\n"
+"        'रीसैंपलिंग गुणवत्ता': स्ट्रिंग यानी कम (डिफ़ॉल्ट उच्च)\n"
+"        'उपयोग करें SeekGhosting': Boolean यानी True (डिफ़ॉल्ट सत्य)\n"
+"        'प्लेयर अपडेट इंटरवल': पूर्णांक यानी 30 (डिफ़ॉल्ट 30)\n"
+"        'youtubeSearchEnabled': बूलियन यानी ट्रू (डिफ़ॉल्ट सत्य)\n"
+"        'साउंडक्लाउडसर्च एनेबल्ड': बुलियन यानी ट्रू (डिफ़ॉल्ट ट्रू)\n"
+"        "
+
+#: plmanagednode/cog.py:743
+msgid "{Setting_variable_do_not_translate} is not a valid Setting; Options are:\n\n"
+"{setting_list_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} कोई मान्य सेटिंग नहीं है; विकल्प हैं:\n\n"
+"{setting_list_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:757
+msgid "The duration of the NAS buffer in milliseconds. Higher values fare better against longer GC pauses but will increase RAM usage. Minimum of 40ms, lower values may introduce pauses and stutters. Set to 0 to disable JDA-NAS. Accepted values: Range: 0 - 2,000"
+msgstr "मिलीसेकंड में एनएएस बफर की अवधि। उच्च मान लंबे जीसी ठहराव के मुकाबले बेहतर होते हैं लेकिन रैम उपयोग में वृद्धि करेंगे। न्यूनतम 40 मीटर, निम्न मान विराम और हकलाने का परिचय दे सकते हैं। जेडीए-एनएएस को अक्षम करने के लिए 0 पर सेट करें। स्वीकृत मान: श्रेणी: 0 - 2,000"
+
+#: plmanagednode/cog.py:763
+msgid "How many milliseconds of audio to keep buffered, Higher values increase RAM usage. Accepted values: Range: 1,000 - 10,000"
+msgstr "कितने मिलीसेकंड ऑडियो को बफर रखने के लिए, उच्च मान रैम उपयोग को बढ़ाते हैं। स्वीकृत मान: श्रेणी: 1,000 - 10,000"
+
+#: plmanagednode/cog.py:767
+msgid "The threshold in milliseconds for how long a track can be stuck. A track is stuck if does not return any audio data. Accepted values: Range: 5,000 - 20,000"
+msgstr "मिलीसेकंड में सीमा कि ट्रैक कितनी देर तक अटका रह सकता है। यदि कोई ऑडियो डेटा वापस नहीं आता है तो एक ट्रैक अटक जाता है। स्वीकृत मान: श्रेणी: 5,000 - 20,000"
+
+#: plmanagednode/cog.py:771
+msgid "Number of pages to return for a YouTube Playlist - Each page contains 100 songs. Accepted values: Range: 5 - 100"
+msgstr "YouTube प्लेलिस्ट के लिए लौटने वाले पृष्ठों की संख्या - प्रत्येक पृष्ठ में 100 गाने हैं। स्वीकृत मान: श्रेणी: 5 - 100"
+
+#: plmanagednode/cog.py:775
+msgid "Opus encoder quality. Valid values range from 0 to 10, where 10 is the best quality but is the most expensive on the CPU."
+msgstr "ओपस एनकोडर गुणवत्ता। मान्य मान 0 से 10 तक होते हैं, जहां 10 सबसे अच्छी गुणवत्ता है लेकिन सीपीयू पर सबसे महंगा है।"
+
+#: plmanagednode/cog.py:779
+msgid "Quality of resampling operations. Valid values are LOW, MEDIUM and HIGH, where HIGH uses the most CPU."
+msgstr "पुन: नमूनाकरण संचालन की गुणवत्ता। मान्य मान कम, मध्यम और उच्च हैं, जहां उच्च सबसे अधिक सीपीयू का उपयोग करता है।"
+
+#: plmanagednode/cog.py:783
+msgid "Seek ghosting is the effect where whilst a seek is in progress, the audio buffer is read from until empty, or until seek is ready. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "भूतिया की तलाश वह प्रभाव है जहां जब एक खोज प्रगति पर होती है, तो ऑडियो बफर को खाली होने तक पढ़ा जाता है, या जब तक खोज तैयार नहीं होती है। सत्य के लिए स्वीकृत मान: 'सत्य', 't', '1', असत्य के लिए स्वीकृत मान: 'असत्य', 'f', '0'"
+
+#: plmanagednode/cog.py:788
+msgid "How frequently in seconds to send player updates to clients, affects the current position accuracy. Accepted values: Range: 1 - 86400"
+msgstr "क्लाइंट को प्लेयर अपडेट भेजने के लिए सेकंड में कितनी बार, वर्तमान स्थिति सटीकता को प्रभावित करता है। स्वीकृत मान: श्रेणी: 1 - 86400"
+
+#: plmanagednode/cog.py:792
+msgid "Enable or disable YouTube searches within the node, this will affect AppleMusic, Spotify and any functionality dependent on YouTube. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "नोड के भीतर YouTube खोजों को सक्षम या अक्षम करें, यह AppleMusic, Spotify और YouTube पर निर्भर किसी भी कार्यक्षमता को प्रभावित करेगा। सत्य के लिए स्वीकृत मान: 'सत्य', 't', '1', असत्य के लिए स्वीकृत मान: 'असत्य', 'f', '0'"
+
+#: plmanagednode/cog.py:797
+msgid "Enable or disable SoundCloud searches within the node, this will affect any functionality dependent on SoundCloud. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "नोड के भीतर साउंडक्लाउड खोजों को सक्षम या अक्षम करें, यह साउंडक्लाउड पर निर्भर किसी भी कार्यक्षमता को प्रभावित करेगा। सत्य के लिए स्वीकृत मान: 'सत्य', 't', '1', असत्य के लिए स्वीकृत मान: 'असत्य', 'f', '0'"
+
+#: plmanagednode/cog.py:806
+msgid "{Setting_variable_do_not_translate} info.\n\n"
+"{info_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} जानकारी।\n\n"
+"{info_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:837
+msgid "{Setting_variable_do_not_translate} valid inputs are:\n\n"
+"Range between: {start_variable_do_not_translate} - {end_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} मान्य इनपुट हैं:\n\n"
+"के बीच की सीमा: {start_variable_do_not_translate} - {end_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:852
+msgid "{Setting_variable_do_not_translate} valid inputs are:\n\n"
+"{setting_list_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} मान्य इनपुट हैं:\n\n"
+"{setting_list_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:874
+msgid "{Setting_variable_do_not_translate} set to {value_variable_do_not_translate}."
+msgstr "{Setting_variable_do_not_translate} सेट करें {value_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:885
+#, docstring
+msgid "Configure Lavalink IP Rotation for rate limits.\n\n"
+"        Run `[p]plmanaged settings iprotation 1` to remove the ip rotation\n"
+"        "
+msgstr "दर सीमाओं के लिए Lavalink IP रोटेशन कॉन्फ़िगर करें।\n\n"
+"        रन '[p]आईपी रोटेशन को हटाने के लिए प्लमैनेज्ड सेटिंग्स आईप्रोटेशन 1 '\n"
+"        "
+
+#: plmanagednode/cog.py:896
+msgid "Click the button below to configure the IP rotation for your node.\n"
+"More info at: {url_value_1_variable_do_not_translate} and {url_value_2_variable_do_not_translate}"
+msgstr "अपने नोड के लिए IP रोटेशन कॉन्फ़िगर करने के लिए नीचे दिए गए बटन पर क्लिक करें।\n"
+"अधिक जानकारी यहाँ: {url_value_1_variable_do_not_translate} और {url_value_2_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:917
+msgid "Removing the IP rotation from your node."
+msgstr "अपने नोड से आईपी रोटेशन को हटाना।"
+
+#: plmanagednode/cog.py:925
+#, docstring
+msgid "Link a Google account to Lavalink to bypass the YouTube age restriction.\n\n"
+"        Run `[p]plmanaged settings googleaccount 1` to remove the linked account.\n"
+"        "
+msgstr "YouTube आयु प्रतिबंध को बायपास करने के लिए Google खाते को लावालिंक से लिंक करें.\n\n"
+"        रन '[p]लिंक किए गए खाते को हटाने के लिए Google खाता 1' की सेटिंग करें।\n"
+"        "
+
+#: plmanagednode/cog.py:936
+msgid "Click the button below to link a Google account to your node, if you have 2FA setup on this account you will need an application password instead\n"
+"More info at: <https://support.google.com/accounts/answer/185833>"
+msgstr "Google खाते को अपने नोड से लिंक करने के लिए नीचे दिए गए बटन पर क्लिक करें, यदि आपके पास इस खाते पर 2FA सेटअप है तो आपको इसके बजाय एक एप्लिकेशन पासवर्ड की आवश्यकता होगी\n"
+"अधिक जानकारी यहाँ: <https://support.google.com/accounts/answer/185833>"
+
+#: plmanagednode/cog.py:955
+msgid "Unlinking Google account from your node."
+msgstr "अपने नोड से Google खाते को अनलिंक करना."
+
+#: plmanagednode/cog.py:963
+#, docstring
+msgid "Configure a HTTP proxy for Lavalink\n\n"
+"        Run `[p]plmanaged settings httpproxy 1` to remove the proxy.\n"
+"        "
+msgstr "Lavalink के लिए कोई HTTP प्रॉक्सी कॉन्फ़िगर करें\n\n"
+"        रन '[p]प्रॉक्सी को हटाने के लिए सेटिंग्स httpproxy 1' को हटा दिया।\n"
+"        "
+
+#: plmanagednode/cog.py:974
+msgid "Click the button below to configure a HTTP proxy for your node"
+msgstr "अपने नोड के लिए HTTP प्रॉक्सी कॉन्फ़िगर करने के लिए नीचे दिए गए बटन पर क्लिक करें"
+
+#: plmanagednode/cog.py:988
+msgid "Unlinking HTTP proxy from your node."
+msgstr "अपने नोड से HTTP प्रॉक्सी को अनलिंक करना."
+
+#: plmanagednode/view.py:37 plmanagednode/view.py:64 plmanagednode/view.py:97
+#: plmanagednode/view.py:178
+msgid "You are not authorized to interact with this."
+msgstr "आप इसके साथ बातचीत करने के लिए अधिकृत नहीं हैं।"
+
+#: plmanagednode/view.py:124
+msgid "IP Rotation Configurator."
+msgstr "आईपी रोटेशन कॉन्फ़िगरर।"
+
+#: plmanagednode/view.py:127
+msgid "IP Blocks."
+msgstr "आईपी ब्लॉक।"
+
+#: plmanagednode/view.py:131
+msgid "1.0.0.0/8,...,... - Comma separated list of IP blocks"
+msgstr "1.0.0.0/8,...,... - कॉमा आईपी ब्लॉकों की अलग सूची"
+
+#: plmanagednode/view.py:136
+msgid "Rotation strategy."
+msgstr "रोटेशन रणनीति।"
+
+#: plmanagednode/view.py:145
+msgid "Retry limit."
+msgstr "पुन: प्रयास सीमा."
+
+#: plmanagednode/view.py:148
+msgid "-1 = default, 0 = infinity, >0 = number of retries"
+msgstr "-1 = डिफ़ॉल्ट, 0 = अनंत, >0 = पुनरावृत्ति की संख्या"
+
+#: plmanagednode/view.py:153
+msgid "IPs to exclude."
+msgstr "आईपी को बाहर करना होगा।"
+
+#: plmanagednode/view.py:156
+msgid "Comma separated list of IP to exclude from rotation"
+msgstr "अल्पविराम ने रोटेशन से बाहर करने के लिए आईपी की अलग सूची को अलग किया"
+
+#: plmanagednode/view.py:160
+msgid "Search trigger rotation."
+msgstr "खोज ट्रिगर रोटेशन."
+
+#: plmanagednode/view.py:163
+msgid "0 or 1 (0 = disabled, 1 = enabled)"
+msgstr "0 या 1 (0 = अक्षम, 1 = सक्षम)"
+
+#: plmanagednode/view.py:189
+msgid "The IP block you have provided is not valid; {error_variable_do_not_translate}."
+msgstr "आपके द्वारा प्रदान किया गया आईपी ब्लॉक मान्य नहीं है; {error_variable_do_not_translate}."
+
+#: plmanagednode/view.py:203
+msgid "No IP blocks were provided."
+msgstr "कोई आईपी ब्लॉक प्रदान नहीं किए गए थे।"
+
+#: plmanagednode/view.py:215
+msgid "The IP address you have provided is not valid; {error_variable_do_not_translate}"
+msgstr "आपके द्वारा प्रदान किया गया IP पता मान्य नहीं है; {error_variable_do_not_translate}"
+
+#: plmanagednode/view.py:236
+msgid "The strategy you provided is invalid. You must be one of: {options_variable_do_not_translate}."
+msgstr "आपके द्वारा प्रदान की गई रणनीति अमान्य है. आपको उनमें से एक होना चाहिए: {options_variable_do_not_translate}."
+
+#: plmanagednode/view.py:252
+msgid "The retry limit must be a number greater than or equal to -1."
+msgstr "पुन: प्रयास सीमा -1 से अधिक या उसके बराबर संख्या होनी चाहिए।"
+
+#: plmanagednode/view.py:267
+msgid "The search trigger must be 0 or 1."
+msgstr "खोज ट्रिगर 0 या 1 होना चाहिए."
+
+#: plmanagednode/view.py:286
+msgid "IP rotation settings saved."
+msgstr "IP रोटेशन सेटिंग्स सहेजी गईं."
+
+#: plmanagednode/view.py:307
+msgid "Google Account Configurator"
+msgstr "Google खाता कॉन्फ़िगरकर्ता"
+
+#: plmanagednode/view.py:310
+msgid "Email address"
+msgstr "ईमेल पता"
+
+#: plmanagednode/view.py:313
+msgid "Your Google account email"
+msgstr "आपका Google खाता ईमेल"
+
+#: plmanagednode/view.py:318
+msgid "password"
+msgstr "पासवर्ड"
+
+#: plmanagednode/view.py:322
+msgid "If you have 2FA you will need an application password"
+msgstr "यदि आपके पास 2एफए है तो आपको एक एप्लिकेशन पासवर्ड की आवश्यकता होगी"
+
+#: plmanagednode/view.py:336 plmanagednode/view.py:425
+msgid "You are not authorized to interact with this"
+msgstr "आप इसके साथ सहभागिता करने के लिए अधिकृत नहीं हैं"
+
+#: plmanagednode/view.py:344
+msgid "Invalid email address"
+msgstr "अमान्य ईमेल पता"
+
+#: plmanagednode/view.py:354
+msgid "Google account linked."
+msgstr "Google खाता लिंक किया गया."
+
+#: plmanagednode/view.py:375
+msgid "HTTP Proxy Configurator"
+msgstr "HTTP प्रॉक्सी कॉन्फ़िगरर"
+
+#: plmanagednode/view.py:378
+msgid "Hostname"
+msgstr "Hostname"
+
+#: plmanagednode/view.py:381
+msgid "Hostname of the proxy, (IP or domain or localhost)"
+msgstr "प्रॉक्सी का होस्टनाम, (IP या डोमेन या localhost)"
+
+#: plmanagednode/view.py:385
+msgid "Proxy port"
+msgstr "प्रॉक्सी पोर्ट"
+
+#: plmanagednode/view.py:388
+msgid "Proxy port, 3128 is the default for squidProxy"
+msgstr "प्रॉक्सी पोर्ट, 3128 स्क्विडप्रोक्सी के लिए डिफ़ॉल्ट है"
+
+#: plmanagednode/view.py:394
+msgid "User"
+msgstr "उपभोक्ता"
+
+#: plmanagednode/view.py:399
+msgid "Optional user for basic authentication fields. Leave blank if you do not use basic authentication"
+msgstr "मूल प्रमाणीकरण फ़ील्ड के लिए वैकल्पिक उपयोगकर्ता. यदि आप मूल प्रमाणीकरण का उपयोग नहीं करते हैं तो रिक्त छोड़ दें"
+
+#: plmanagednode/view.py:405
+msgid "Password"
+msgstr "पासवर्ड"
+
+#: plmanagednode/view.py:410
+msgid "Optional password for basic authentication fields. Leave blank if you do not use basic authentication."
+msgstr "मूल प्रमाणीकरण फ़ील्ड के लिए वैकल्पिक पासवर्ड. यदि आप मूल प्रमाणीकरण का उपयोग नहीं करते हैं तो रिक्त छोड़ दें।"
+
+#: plmanagednode/view.py:436
+msgid "The port provided is not valid. It must be between 0 and 65536."
+msgstr "प्रदान किया गया पोर्ट मान्य नहीं है. यह 0 और 65536 के बीच होना चाहिए।"
+
+#: plmanagednode/view.py:453
+msgid "HTTP proxy settings saved."
+msgstr "HTTP प्रॉक्सी सेटिंग्स सहेजी गईं."
+

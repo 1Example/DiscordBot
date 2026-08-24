@@ -1,0 +1,541 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 10:26\n"
+"Last-Translator: \n"
+"Language-Team: Greek\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: el\n"
+"X-Crowdin-File: /cogs/plmanagednode/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3323\n"
+"Language: el_GR\n"
+
+#: plmanagednode/cog.py:34 plmanagednode/cog.py:46
+#, docstring
+msgid "Configure the managed Lavalink node used by PyLav"
+msgstr "Ρύθμιση του κόμβου Lavalink που χρησιμοποιείται από την PyLav"
+
+#: plmanagednode/cog.py:50
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Δείξτε την έκδοση του Γραναζιού και του PyLav"
+
+#: plmanagednode/cog.py:66
+msgid "Library / Cog"
+msgstr "Βιβλιοθήκη / Γρανάζι"
+
+#: plmanagednode/cog.py:67
+msgid "Version"
+msgstr "Εκδοχή"
+
+#: plmanagednode/cog.py:80
+#, docstring
+msgid "Update the managed Lavalink node"
+msgstr "Ενημέρωση του διαχειριζόμενου κόμβου Lavalink"
+
+#: plmanagednode/cog.py:92
+msgid "The managed Lavalink node is already up to date."
+msgstr "Ο κόμβος που διαχειρίζεται το Lavalink είναι ήδη ενημερωμένος."
+
+#: plmanagednode/cog.py:101
+msgid "Your node is out of date, to update please run `{command_name_variable_do_not_translate}`."
+msgstr "Ο κόμβος σας είναι ξεπερασμένος, για ενημέρωση παρακαλώ εκτελέστε '{command_name_variable_do_not_translate}`."
+
+#: plmanagednode/cog.py:118
+msgid "The managed Lavalink node has been updated to version {version_variable_do_not_translate}."
+msgstr "Ο διαχειριζόμενος κόμβος Lavalink έχει ενημερωθεί στην έκδοση {version_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:130
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Ενεργοποιήστε /απενεργοποιήστε τον διαχειριζόμενο κόμβο.\n\n"
+"        Οι αλλαγές θα εφαρμοστούν μετά την επανεκκίνηση.\n"
+"        "
+
+#: plmanagednode/cog.py:145
+msgid "The PyLav managed node has been enabled."
+msgstr "Ο διαχειριζόμενος κόμβος PyLav έχει ενεργοποιηθεί."
+
+#: plmanagednode/cog.py:153
+msgid "The PyLav managed node has been disabled."
+msgstr "Ο διαχειριζόμενος κόμβος PyLav έχει απενεργοποιηθεί."
+
+#: plmanagednode/cog.py:161
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Ενεργοποιήστε / απενεργοποιήστε τις αυτόματες ενημερώσεις του διαχειριζόμενου κόμβου.\n\n"
+"        Οι αλλαγές θα εφαρμοστούν μετά την επανεκκίνηση.\n"
+"        "
+
+#: plmanagednode/cog.py:177
+msgid "The PyLav managed node auto updates have been enabled."
+msgstr "Οι αυτόματες ενημερώσεις διαχειριζόμενων κόμβων PyLav έχουν ενεργοποιηθεί."
+
+#: plmanagednode/cog.py:185
+msgid "The  PyLav managed node auto updates have been disabled."
+msgstr "Οι αυτόματες ενημερώσεις διαχειριζόμενων κόμβων PyLav έχουν απενεργοποιηθεί."
+
+#: plmanagednode/cog.py:193
+#, docstring
+msgid "Set the managed Lavalink node maximum heap-size.\n\n"
+"        By default, this value is 2G of available RAM in the host machine represented by (65-1023M|1+G) (256M,\n"
+"        256G for example)\n\n"
+"        This value only represents the maximum amount of RAM allowed to be used at any given point, and does not mean\n"
+"        that the managed Lavalink node will always use this amount of RAM.\n"
+"        "
+msgstr "Ορίστε το μέγιστο μέγεθος σωρού κόμβου Lavalink. (Automatic Translation)\n\n"
+"        από προεπιλογή, αυτή η τιμή είναι 2G της διαθέσιμης μνήμης RAM στο κεντρικό μηχάνημα που αντιπροσωπεύεται από (65-1023Mount 1+G) (256M,\n"
+"        256G για παράδειγμα)\n\n"
+"        Αυτή η τιμή αντιπροσωπεύει μόνο το μέγιστο ποσό RAM που επιτρέπεται να χρησιμοποιηθεί σε οποιοδήποτε σημείο, και δεν σημαίνει\n"
+"        ότι ο κόμβος Lavalink που διαχειρίζεται θα χρησιμοποιεί πάντα αυτό το ποσό RAM.\n"
+"        "
+
+#: plmanagednode/cog.py:217
+msgid "Heap-size must be a valid measure of size, e.g. 256M, 256G"
+msgstr "Το μέγεθος του σωρού πρέπει να είναι έγκυρο μέτρο μεγέθους, π.χ. 256M, 256G"
+
+#: plmanagednode/cog.py:227
+msgid "Heap-size must be at least 64M, however it is recommended to have it set to at least 1G"
+msgstr "Το μέγεθος του σωρού πρέπει να είναι τουλάχιστον 64M, ωστόσο συνιστάται να έχει ρυθμιστεί σε τουλάχιστον 1G"
+
+#: plmanagednode/cog.py:239
+msgid "Heap-size must be less than your system RAM, You currently have {ram_in_bytes_variable_do_not_translate} of RAM available"
+msgstr "Το μέγεθος του σωρού πρέπει να είναι μικρότερο από τη μνήμη RAM του συστήματός σας, αυτήν τη στιγμή έχετε {ram_in_bytes_variable_do_not_translate} διαθέσιμη μνήμη RAM"
+
+#: plmanagednode/cog.py:251
+msgid "Heap-size must be less than {limit_variable_do_not_translate} due to your system limitations"
+msgstr "Το μέγεθος του σωρού πρέπει να είναι μικρότερο από {limit_variable_do_not_translate} λόγω των περιορισμών του συστήματός σας"
+
+#: plmanagednode/cog.py:271
+msgid "The Managed node heap-size set to {bytes_variable_do_not_translate}."
+msgstr "Το μέγεθος σωρού διαχειριζόμενου κόμβου έχει οριστεί σε {bytes_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:281
+#, docstring
+msgid "Change the managed node start up configs"
+msgstr "Αλλαγή των ρυθμών εκκίνησης του διαχειριζόμενου κόμβου"
+
+#: plmanagednode/cog.py:285
+#, docstring
+msgid "Set the managed node host"
+msgstr "Ορίστε το διακομιστή του διαχειριζόμενου κόμβου"
+
+#: plmanagednode/cog.py:297
+msgid "The Managed node host set to {host_variable_do_not_translate}."
+msgstr "Ο κεντρικός υπολογιστής διαχειριζόμενου κόμβου έχει οριστεί σε {host_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:307
+#, docstring
+msgid "`Dangerous command` Set the managed Lavalink node connection port.\n\n"
+"        This port is the port the managed Lavalink node binds to, you should only change this if there is a\n"
+"        conflict with the default port because you already have an application using port 2154 on this device.\n\n"
+"        The value by default is `2154`.\n"
+"        "
+msgstr "«Επικίνδυνη εντολή» Ορίστε τη διαχειριζόμενη θύρα σύνδεσης κόμβου Lavalink.\n\n"
+"        Αυτή η θύρα είναι η θύρα στην οποία συνδέεται ο διαχειριζόμενος κόμβος Lavalink, θα πρέπει να το αλλάξετε μόνο εάν υπάρχει\n"
+"        Διένεξη με την προεπιλεγμένη θύρα, επειδή έχετε ήδη μια εφαρμογή που χρησιμοποιεί τη θύρα 2154 σε αυτήν τη συσκευή.\n\n"
+"        Η τιμή από προεπιλογή είναι '2154'.\n"
+"        "
+
+#: plmanagednode/cog.py:317
+msgid "The port must be between 1024 and 49151"
+msgstr "Ο λιμένας πρέπει να είναι μεταξύ 1024 και 49151"
+
+#: plmanagednode/cog.py:329
+msgid "The managed node port set to {port_variable_do_not_translate}."
+msgstr "Η διαχειριζόμενη θύρα κόμβου έχει οριστεί σε {port_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:339
+#, docstring
+msgid "Change the managed node plugins"
+msgstr "Αλλαγή των πρόσθετων διαχειριζόμενων κόμβων"
+
+#: plmanagednode/cog.py:345
+#, docstring
+msgid "Disabled one of the available plugins"
+msgstr "Απενεργοποιήθηκε ένα από τα διαθέσιμα πρόσθετα"
+
+#: plmanagednode/cog.py:361 plmanagednode/cog.py:472
+msgid "The plugin must be one of the following: {plugins_variable_do_not_translate}"
+msgstr "Το πρόσθετο πρέπει να είναι ένα από τα ακόλουθα: {plugins_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:446
+msgid "Managed node plugin {plugin_variable_do_not_translate} disabled."
+msgstr "Διαχειριζόμενο πρόσθετο κόμβου {plugin_variable_do_not_translate} ανάπηρος."
+
+#: plmanagednode/cog.py:456
+#, docstring
+msgid "Enable one of the available plugins"
+msgstr "Ενεργοποιήστε ένα από τα διαθέσιμα πρόσθετα"
+
+#: plmanagednode/cog.py:505
+msgid "Managed node plugin {plugin_variable_do_not_translate} enabled."
+msgstr "Διαχειριζόμενο πρόσθετο κόμβου {plugin_variable_do_not_translate} Ενεργοποιημένη."
+
+#: plmanagednode/cog.py:515
+#, docstring
+msgid "Update the managed node plugins"
+msgstr "Ενημέρωση των πρόσθετων διαχειριζόμενων κόμβων"
+
+#: plmanagednode/cog.py:589
+msgid "{name_variable_do_not_translate} was updated from {old_variable_do_not_translate} to {new_variable_do_not_translate}\n"
+msgstr "{name_variable_do_not_translate} ενημερώθηκε από {old_variable_do_not_translate} προς {new_variable_do_not_translate}\n"
+
+#: plmanagednode/cog.py:599
+msgid "Managed node plugins updated.\n\n"
+"{update_variable_do_not_translate}"
+msgstr "Τα διαχειριζόμενα πρόσθετα κόμβων ενημερώθηκαν.\n\n"
+"{update_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:609
+msgid "The managed node plugins are already up to date."
+msgstr "Τα διαχειριζόμενα πρόσθετα κόμβων είναι ήδη ενημερωμένα."
+
+#: plmanagednode/cog.py:617
+#, docstring
+msgid "Toggle the managed node sources"
+msgstr "Εναλλαγή πηγών του διαχειριζόμενου κόμβου"
+
+#: plmanagednode/cog.py:632
+msgid "Invalid source, {valid_list_variable_do_not_translate} are valid sources"
+msgstr "Μη έγκυρη πηγή, {valid_list_variable_do_not_translate} είναι έγκυρες πηγές"
+
+#: plmanagednode/cog.py:648 plmanagednode/cog.py:687
+msgid "enabled"
+msgstr "Ενεργοποιημένη"
+
+#: plmanagednode/cog.py:648 plmanagednode/cog.py:687
+msgid "disabled"
+msgstr "ανάπηρος"
+
+#: plmanagednode/cog.py:651
+msgid "Managed node {source_variable_do_not_translate} source set to {state_variable_do_not_translate}."
+msgstr "Διαχειριζόμενος κόμβος {source_variable_do_not_translate} Η προέλευση έχει οριστεί σε {state_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:664
+#, docstring
+msgid "Toggle the managed node filters"
+msgstr "Εναλλαγή φίλτρων διαχειριζόμενων κόμβων"
+
+#: plmanagednode/cog.py:676
+msgid "Invalid source, {valid_list_variable_do_not_translate} are valid filters"
+msgstr "Μη έγκυρη πηγή, {valid_list_variable_do_not_translate} είναι έγκυρα φίλτρα"
+
+#: plmanagednode/cog.py:690
+msgid "Managed node {source_variable_do_not_translate} filter set to {state_variable_do_not_translate}."
+msgstr "Διαχειριζόμενος κόμβος {source_variable_do_not_translate} φίλτρο που έχει οριστεί σε {state_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:703
+#, docstring
+msgid "Configure multiple settings for the managed node.\n\n"
+"        Run `[p]plmanaged settings server <setting> info` to show info about the settings and what they do.\n\n"
+"        **Setting names**:\n"
+"        `bufferDurationMs` : Integer i.e 400 (Default 400) - Set to 0 to disable JDA-NAS\n"
+"        `frameBufferDurationMs` : Integer i.e 1000 (Default 1000)\n"
+"        `trackStuckThresholdMs` : Integer i.e 1000 (Default 1000)\n"
+"        `youtubePlaylistLoadLimit` : Integer i.e 1000 (Default 1000)\n"
+"        `opusEncodingQuality` : Integer i.e 10 (Default 10)\n"
+"        `resamplingQuality` : String i.e LOW (Default HIGH)\n"
+"        `useSeekGhosting` : Boolean i.e True (Default True)\n"
+"        `playerUpdateInterval` : Integer i.e 30 (Default 30)\n"
+"        `youtubeSearchEnabled` : Boolean i.e True (Default True)\n"
+"        `soundcloudSearchEnabled` : Boolean i.e True (Default True)\n"
+"        "
+msgstr "Διαμορφώστε πολλές ρυθμίσεις για τον διαχειριζόμενο κόμβο.\n\n"
+"        Εκτέλεση '[p]διακομιστής ρυθμίσεων plmanaged <setting> πληροφορίες» για την εμφάνιση πληροφοριών σχετικά με τις ρυθμίσεις και τι κάνουν.\n\n"
+"        **Ονόματα ρυθμίσεων**:\n"
+"        'BufferDurationMs' : Ακέραιος δηλαδή 400 (Προεπιλογή 400) - Ορίστε το σε 0 για να απενεργοποιήσετε το JDA-NAS\n"
+"        'frameBufferDurationMs' : Ακέραιος δηλαδή 1000 (Προεπιλογή 1000)\n"
+"        'trackStuckThresholdMs' : Ακέραιος δηλαδή 1000 (Προεπιλογή 1000)\n"
+"        'youtubePlaylistLoadLimit' : Ακέραιος δηλαδή 1000 (Προεπιλογή 1000)\n"
+"        'opusEncodingQuality' : Ακέραιος δηλαδή 10 (Προεπιλογή 10)\n"
+"        'αναδειγματοληψίαΠοιότητα' : Συμβολοσειρά δηλαδή ΧΑΜΗΛΗ (Προεπιλεγμένη ΥΨΗΛΗ)\n"
+"        'useSeekGhosting' : Δυαδικό, δηλαδή Αληθινό (Προεπιλεγμένο Αληθές)\n"
+"        'playerUpdateInterval' : Ακέραιος δηλαδή 30 (Προεπιλογή 30)\n"
+"        'youtubeΑναζήτησηΕνίσχυση' : Δυαδικό, δηλαδή Αληθινό (Προεπιλεγμένο Αληθές)\n"
+"        'soundcloudΑναζήτησηΕνεργοποιημένο' : Δυαδικό, δηλαδή Αληθινό (Προεπιλεγμένο Αληθές)\n"
+"        "
+
+#: plmanagednode/cog.py:743
+msgid "{Setting_variable_do_not_translate} is not a valid Setting; Options are:\n\n"
+"{setting_list_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} δεν είναι έγκυρη ρύθμιση, Οι επιλογές είναι:\n\n"
+"{setting_list_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:757
+msgid "The duration of the NAS buffer in milliseconds. Higher values fare better against longer GC pauses but will increase RAM usage. Minimum of 40ms, lower values may introduce pauses and stutters. Set to 0 to disable JDA-NAS. Accepted values: Range: 0 - 2,000"
+msgstr "Η διάρκεια του buffer της NAS σε χιλιοστά του δευτερολέπτου. Οι υψηλότερες τιμές είναι καλύτερες έναντι της μεγαλύτερης παύσης GC αλλά θα αυξήσουν τη χρήση της RAM. Ελάχιστο 40ms, χαμηλότερες τιμές μπορεί να εισαγάγει παύσεις και καβούρια. Ορίστε στο 0 για να απενεργοποιήσετε JDA-NAS. Αποδεκτές τιμές: Εύρος: 0 - 2.000"
+
+#: plmanagednode/cog.py:763
+msgid "How many milliseconds of audio to keep buffered, Higher values increase RAM usage. Accepted values: Range: 1,000 - 10,000"
+msgstr "Πόσα χιλιοστά του δευτερολέπτου του ήχου για να κρατήσει buffered, Υψηλότερες τιμές αυξάνουν τη χρήση RAM. Αποδεκτές τιμές: Εύρος: 1.000 - 10.000"
+
+#: plmanagednode/cog.py:767
+msgid "The threshold in milliseconds for how long a track can be stuck. A track is stuck if does not return any audio data. Accepted values: Range: 5,000 - 20,000"
+msgstr "Το όριο σε χιλιοστά του δευτερολέπτου για πόσο καιρό μπορεί να κολλήσει ένα κομμάτι. Ένα κομμάτι είναι κολλημένο αν δεν επιστρέψει οποιαδήποτε δεδομένα ήχου. Αποδεκτές τιμές: Εύρος: 5,000 - 20,000"
+
+#: plmanagednode/cog.py:771
+msgid "Number of pages to return for a YouTube Playlist - Each page contains 100 songs. Accepted values: Range: 5 - 100"
+msgstr "Αριθμός σελίδων προς επιστροφή για μια λίστα αναπαραγωγής YouTube - Κάθε σελίδα περιέχει 100 τραγούδια. Αποδεκτές τιμές: Εύρος: 5 - 100"
+
+#: plmanagednode/cog.py:775
+msgid "Opus encoder quality. Valid values range from 0 to 10, where 10 is the best quality but is the most expensive on the CPU."
+msgstr "Ποιότητα κωδικοποιητή Opus. Οι έγκυρες τιμές κυμαίνονται από 0 έως 10, όπου το 10 είναι η καλύτερη ποιότητα αλλά είναι το πιο ακριβό στην CPU."
+
+#: plmanagednode/cog.py:779
+msgid "Quality of resampling operations. Valid values are LOW, MEDIUM and HIGH, where HIGH uses the most CPU."
+msgstr "Ποιότητα των εργασιών αναδειγματοληψίας. Οι έγκυρες τιμές είναι LOW, MEDIUM και HIGH, όπου το HIGH χρησιμοποιεί την περισσότερη CPU."
+
+#: plmanagednode/cog.py:783
+msgid "Seek ghosting is the effect where whilst a seek is in progress, the audio buffer is read from until empty, or until seek is ready. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "Αναζήτηση ghosting είναι το αποτέλεσμα όπου ενώ μια αναζήτηση είναι σε εξέλιξη, το buffer ήχου διαβάζεται από το κενό ή έως ότου η αναζήτηση είναι έτοιμη. Αποδεκτές τιμές για το True: `True`, `t`, `1`, Αποδεκτές τιμές για False: `False`, `f`, `0`"
+
+#: plmanagednode/cog.py:788
+msgid "How frequently in seconds to send player updates to clients, affects the current position accuracy. Accepted values: Range: 1 - 86400"
+msgstr "Πόσο συχνά σε δευτερόλεπτα για να στείλετε ενημερώσεις παίκτη σε πελάτες, επηρεάζει την τρέχουσα ακρίβεια θέσης. Αποδεκτές τιμές: Εύρος: 1 - 86400"
+
+#: plmanagednode/cog.py:792
+msgid "Enable or disable YouTube searches within the node, this will affect AppleMusic, Spotify and any functionality dependent on YouTube. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "Ενεργοποιήστε ή απενεργοποιήστε τις αναζητήσεις YouTube εντός του κόμβου, αυτό θα επηρεάσει το AppleMusic, το Spotify και οποιαδήποτε λειτουργικότητα εξαρτάται από το YouTube. Αποδεκτές τιμές για true: 'True', 't', '1', Αποδεκτές τιμές για False: 'False', 'f', '0'"
+
+#: plmanagednode/cog.py:797
+msgid "Enable or disable SoundCloud searches within the node, this will affect any functionality dependent on SoundCloud. Accepted values for True: `True`, `t`, `1`, Accepted values for False: `False`, `f`, `0`"
+msgstr "Ενεργοποιήστε ή απενεργοποιήστε τις αναζητήσεις SoundCloud εντός του κόμβου, αυτό θα επηρεάσει οποιαδήποτε λειτουργικότητα εξαρτάται από το SoundCloud. Αποδεκτές τιμές για true: 'True', 't', '1', Αποδεκτές τιμές για False: 'False', 'f', '0'"
+
+#: plmanagednode/cog.py:806
+msgid "{Setting_variable_do_not_translate} info.\n\n"
+"{info_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} Πληροφορίες.\n\n"
+"{info_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:837
+msgid "{Setting_variable_do_not_translate} valid inputs are:\n\n"
+"Range between: {start_variable_do_not_translate} - {end_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} Οι έγκυρες είσοδοι είναι:\n\n"
+"Εύρος μεταξύ: {start_variable_do_not_translate} - {end_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:852
+msgid "{Setting_variable_do_not_translate} valid inputs are:\n\n"
+"{setting_list_variable_do_not_translate}"
+msgstr "{Setting_variable_do_not_translate} Οι έγκυρες είσοδοι είναι:\n\n"
+"{setting_list_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:874
+msgid "{Setting_variable_do_not_translate} set to {value_variable_do_not_translate}."
+msgstr "{Setting_variable_do_not_translate} ρυθμισμένο σε {value_variable_do_not_translate}."
+
+#: plmanagednode/cog.py:885
+#, docstring
+msgid "Configure Lavalink IP Rotation for rate limits.\n\n"
+"        Run `[p]plmanaged settings iprotation 1` to remove the ip rotation\n"
+"        "
+msgstr "Διαμορφώστε την περιστροφή IP Lavalink για όρια ρυθμού.\n\n"
+"        Εκτέλεση '[p]plmanaged ρυθμίσεις iprotation 1 'για να καταργήσετε την περιστροφή IP\n"
+"        "
+
+#: plmanagednode/cog.py:896
+msgid "Click the button below to configure the IP rotation for your node.\n"
+"More info at: {url_value_1_variable_do_not_translate} and {url_value_2_variable_do_not_translate}"
+msgstr "Κάντε κλικ στο παρακάτω κουμπί για να διαμορφώσετε την περιστροφή IP για τον κόμβο σας.\n"
+"Περισσότερες πληροφορίες στο: {url_value_1_variable_do_not_translate} και {url_value_2_variable_do_not_translate}"
+
+#: plmanagednode/cog.py:917
+msgid "Removing the IP rotation from your node."
+msgstr "Αφαίρεση της περιστροφής IP από τον κόμβο."
+
+#: plmanagednode/cog.py:925
+#, docstring
+msgid "Link a Google account to Lavalink to bypass the YouTube age restriction.\n\n"
+"        Run `[p]plmanaged settings googleaccount 1` to remove the linked account.\n"
+"        "
+msgstr "Συνδέστε έναν λογαριασμό Google με το Lavalink για να παρακάμψετε τον περιορισμό ηλικίας του YouTube.\n\n"
+"        Εκτέλεση '[p]plmanaged ρυθμίσεις googleaccount 1 'για την κατάργηση του συνδεδεμένου λογαριασμού.\n"
+"        "
+
+#: plmanagednode/cog.py:936
+msgid "Click the button below to link a Google account to your node, if you have 2FA setup on this account you will need an application password instead\n"
+"More info at: <https://support.google.com/accounts/answer/185833>"
+msgstr "Κάντε κλικ στο παρακάτω κουμπί για να συνδέσετε έναν λογαριασμό Google με τον κόμβο σας, εάν έχετε ρυθμίσει 2FA σε αυτόν τον λογαριασμό, θα χρειαστείτε έναν κωδικό πρόσβασης εφαρμογής\n"
+"Περισσότερες πληροφορίες στο: <https://support.google.com/accounts/answer/185833>"
+
+#: plmanagednode/cog.py:955
+msgid "Unlinking Google account from your node."
+msgstr "Αποσύνδεση του λογαριασμού Google από τον κόμβο σας."
+
+#: plmanagednode/cog.py:963
+#, docstring
+msgid "Configure a HTTP proxy for Lavalink\n\n"
+"        Run `[p]plmanaged settings httpproxy 1` to remove the proxy.\n"
+"        "
+msgstr "Ρύθμιση παραμέτρων διακομιστή μεσολάβησης HTTP για το Lavalink\n\n"
+"        Εκτέλεση '[p]plmanaged ρυθμίσεις httpproxy 1 'για να αφαιρέσετε το διακομιστή μεσολάβησης.\n"
+"        "
+
+#: plmanagednode/cog.py:974
+msgid "Click the button below to configure a HTTP proxy for your node"
+msgstr "Κάντε κλικ στο παρακάτω κουμπί για να ρυθμίσετε έναν διαμεσολαβητή HTTP για τον κόμβο σας"
+
+#: plmanagednode/cog.py:988
+msgid "Unlinking HTTP proxy from your node."
+msgstr "Αποσύνδεση διακομιστή μεσολάβησης HTTP από τον κόμβο σας."
+
+#: plmanagednode/view.py:37 plmanagednode/view.py:64 plmanagednode/view.py:97
+#: plmanagednode/view.py:178
+msgid "You are not authorized to interact with this."
+msgstr "Δεν είστε εξουσιοδοτημένοι να αλληλεπιδράσετε με αυτό."
+
+#: plmanagednode/view.py:124
+msgid "IP Rotation Configurator."
+msgstr "Διαμορφωτής περιστροφής IP."
+
+#: plmanagednode/view.py:127
+msgid "IP Blocks."
+msgstr "Μπλοκ IP."
+
+#: plmanagednode/view.py:131
+msgid "1.0.0.0/8,...,... - Comma separated list of IP blocks"
+msgstr "1.0.0.0/8,...... - Λίστα χωρισμένη με κόμμα των μπλοκ IP"
+
+#: plmanagednode/view.py:136
+msgid "Rotation strategy."
+msgstr "Στρατηγική περιστροφής."
+
+#: plmanagednode/view.py:145
+msgid "Retry limit."
+msgstr "Όριο επανάληψης."
+
+#: plmanagednode/view.py:148
+msgid "-1 = default, 0 = infinity, >0 = number of retries"
+msgstr "-1 = προεπιλογή, 0 = άπειρο, >0 = αριθμός επαναλήψεων"
+
+#: plmanagednode/view.py:153
+msgid "IPs to exclude."
+msgstr "IP για εξαίρεση."
+
+#: plmanagednode/view.py:156
+msgid "Comma separated list of IP to exclude from rotation"
+msgstr "Λίστα IP χωρισμένη με κόμμα για εξαίρεση από την περιστροφή"
+
+#: plmanagednode/view.py:160
+msgid "Search trigger rotation."
+msgstr "Εναλλαγή σκανδάλης αναζήτησης."
+
+#: plmanagednode/view.py:163
+msgid "0 or 1 (0 = disabled, 1 = enabled)"
+msgstr "0 ή 1 (0 = απενεργοποιημένο, 1 = ενεργοποιημένο)"
+
+#: plmanagednode/view.py:189
+msgid "The IP block you have provided is not valid; {error_variable_do_not_translate}."
+msgstr "Το μπλοκ IP που δώσατε δεν είναι έγκυρο. {error_variable_do_not_translate}."
+
+#: plmanagednode/view.py:203
+msgid "No IP blocks were provided."
+msgstr "Δεν παρασχέθηκαν μπλοκ IP."
+
+#: plmanagednode/view.py:215
+msgid "The IP address you have provided is not valid; {error_variable_do_not_translate}"
+msgstr "Η διεύθυνση IP που δώσατε δεν είναι έγκυρη. {error_variable_do_not_translate}"
+
+#: plmanagednode/view.py:236
+msgid "The strategy you provided is invalid. You must be one of: {options_variable_do_not_translate}."
+msgstr "Η στρατηγική που δώσατε δεν είναι έγκυρη. Πρέπει να είστε ένας από: {options_variable_do_not_translate}."
+
+#: plmanagednode/view.py:252
+msgid "The retry limit must be a number greater than or equal to -1."
+msgstr "Το όριο επανάληψης πρέπει να είναι ένας αριθμός μεγαλύτερος ή ίσος με -1."
+
+#: plmanagednode/view.py:267
+msgid "The search trigger must be 0 or 1."
+msgstr "Το έναυσμα αναζήτησης πρέπει να είναι 0 ή 1."
+
+#: plmanagednode/view.py:286
+msgid "IP rotation settings saved."
+msgstr "Οι ρυθμίσεις περιστροφής IP αποθηκεύτηκαν."
+
+#: plmanagednode/view.py:307
+msgid "Google Account Configurator"
+msgstr "Ρύθμιση Λογαριασμού Google"
+
+#: plmanagednode/view.py:310
+msgid "Email address"
+msgstr "Διεύθυνση ηλεκτρονικού ταχυδρομείου"
+
+#: plmanagednode/view.py:313
+msgid "Your Google account email"
+msgstr "Το email του λογαριασμού σας Google"
+
+#: plmanagednode/view.py:318
+msgid "password"
+msgstr "κωδικός"
+
+#: plmanagednode/view.py:322
+msgid "If you have 2FA you will need an application password"
+msgstr "Εάν έχετε 2FA, θα χρειαστείτε έναν κωδικό πρόσβασης εφαρμογής"
+
+#: plmanagednode/view.py:336 plmanagednode/view.py:425
+msgid "You are not authorized to interact with this"
+msgstr "Δεν είστε εξουσιοδοτημένοι να αλληλεπιδράσετε με αυτό"
+
+#: plmanagednode/view.py:344
+msgid "Invalid email address"
+msgstr "Μη έγκυρη διεύθυνση email"
+
+#: plmanagednode/view.py:354
+msgid "Google account linked."
+msgstr "Ο λογαριασμός Google συνδέθηκε."
+
+#: plmanagednode/view.py:375
+msgid "HTTP Proxy Configurator"
+msgstr "Διακομιστής Μεσολάβησης HTTP"
+
+#: plmanagednode/view.py:378
+msgid "Hostname"
+msgstr "Όνομα κεντρικού υπολογιστή"
+
+#: plmanagednode/view.py:381
+msgid "Hostname of the proxy, (IP or domain or localhost)"
+msgstr "Όνομα κεντρικού υπολογιστή του διακομιστή μεσολάβησης (IP ή τομέας ή τοπικός οργανισμός)"
+
+#: plmanagednode/view.py:385
+msgid "Proxy port"
+msgstr "Θύρα διακομιστή μεσολάβησης"
+
+#: plmanagednode/view.py:388
+msgid "Proxy port, 3128 is the default for squidProxy"
+msgstr "Η θύρα μεσολάβησης, 3128 είναι η προεπιλογή για τον squidProxy"
+
+#: plmanagednode/view.py:394
+msgid "User"
+msgstr "Χρήστης"
+
+#: plmanagednode/view.py:399
+msgid "Optional user for basic authentication fields. Leave blank if you do not use basic authentication"
+msgstr "Προαιρετικός χρήστης για βασικά πεδία ελέγχου ταυτότητας. Αφήστε κενό εάν δεν χρησιμοποιείτε βασικό έλεγχο ταυτότητας"
+
+#: plmanagednode/view.py:405
+msgid "Password"
+msgstr "Κωδικός"
+
+#: plmanagednode/view.py:410
+msgid "Optional password for basic authentication fields. Leave blank if you do not use basic authentication."
+msgstr "Προαιρετικός κωδικός πρόσβασης για βασικά πεδία ελέγχου ταυτότητας. Αφήστε κενό εάν δεν χρησιμοποιείτε βασικό έλεγχο ταυτότητας."
+
+#: plmanagednode/view.py:436
+msgid "The port provided is not valid. It must be between 0 and 65536."
+msgstr "Η θύρα που παρέχεται δεν είναι έγκυρη. Πρέπει να είναι μεταξύ 0 και 65536."
+
+#: plmanagednode/view.py:453
+msgid "HTTP proxy settings saved."
+msgstr "Οι ρυθμίσεις διακομιστή μεσολάβησης HTTP αποθηκεύονται."
+

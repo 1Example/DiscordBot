@@ -1,0 +1,188 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 10:26\n"
+"Last-Translator: \n"
+"Language-Team: German\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: de\n"
+"X-Crowdin-File: /cogs/plnodes/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3321\n"
+"Language: de_DE\n"
+
+#: plnodes/cog.py:32
+#, docstring
+msgid "Manage the nodes used by PyLav"
+msgstr "Knoten von PyLav verwalten"
+
+#: plnodes/cog.py:43
+#, docstring
+msgid "Configure PyLav Nodes"
+msgstr "PyLav Knoten konfigurieren"
+
+#: plnodes/cog.py:47
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Zeigen Sie die Version von Cog und PyLav"
+
+#: plnodes/cog.py:63
+msgid "Library / Cog"
+msgstr "Bibliothek / Zahnrad"
+
+#: plnodes/cog.py:64
+msgid "Version"
+msgstr "Version"
+
+#: plnodes/cog.py:77
+#, docstring
+msgid "Add a node to PyLav"
+msgstr "Knoten zu PyLav hinzufügen"
+
+#: plnodes/cog.py:87
+msgid "Let us add a node to PyLav!"
+msgstr "Lassen Sie uns einen Knoten zu PyLav hinzufügen!"
+
+#: plnodes/cog.py:88
+msgid "(**1**){space_variable_do_not_translate} - Apply changes and add the node to PyLav.\n"
+"(**2**){space_variable_do_not_translate} - Cancel any changes made and close the menu.\n"
+"(**3**){space_variable_do_not_translate} - Toggle between search-only and search and playback modes.\n"
+"(**4**){space_variable_do_not_translate} - Toggle between SSL on and off.\n"
+"(**5**){space_variable_do_not_translate} - Add a name to the node.\n"
+"(**6**){space_variable_do_not_translate} - Add the host address of the node.\n"
+"(**7**){space_variable_do_not_translate} - Add the port the node uses.\n"
+"(**8**){space_variable_do_not_translate} - Set the password for the node.\n"
+"(**9**){space_variable_do_not_translate} - Set the connection timeout.\n"
+"(**10**) - Select which sources to disable for this node (Multiple can be selected).\n"
+"If you interact with a button multiple times, only the last interaction will take effect.\n\n\n"
+msgstr "(**1**){space_variable_do_not_translate} - Übernehmen Sie Änderungen und fügen Sie den Knoten zu PyLav hinzu.\n"
+"(**2**){space_variable_do_not_translate} - Stornieren Sie alle vorgenommenen Änderungen und schließen Sie das Menü.\n"
+"(**3**){space_variable_do_not_translate} - Umschalten zwischen Nur-Suche-, Such- und Wiedergabemodus.\n"
+"(**4**){space_variable_do_not_translate} - Umschalten zwischen SSL ein und aus.\n"
+"(**5**){space_variable_do_not_translate} - Fügen Sie dem Knoten einen Namen hinzu.\n"
+"(**6**){space_variable_do_not_translate} - Fügen Sie die Hostadresse des Knotens hinzu.\n"
+"(**7**){space_variable_do_not_translate} - Fügen Sie den Port hinzu, den der Knoten verwendet.\n"
+"(**8**){space_variable_do_not_translate} - Legen Sie das Passwort für den Knoten fest.\n"
+"(**9**){space_variable_do_not_translate} - Stellen Sie das Verbindungstimeout ein.\n"
+"(**10**) - Wählen Sie aus, welche Quellen für diesen Knoten deaktiviert werden sollen (Mehrere können ausgewählt werden).\n"
+"Wenn Sie mehrmals mit einer Schaltfläche interagieren, wird nur die letzte Interaktion wirksam.\n\n\n"
+
+#: plnodes/cog.py:134
+msgid "I have added the {name_variable_do_not_translate} node with the following settings:\n"
+"Host: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Password: {password_variable_do_not_translate}\n"
+"Resume Timeout: {resume_timeout_variable_do_not_translate}\n"
+"Search Only: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Disabled Sources: {disabled_sources_variable_do_not_translate}\n"
+msgstr "Ich habe die {name_variable_do_not_translate} Knoten mit den folgenden Einstellungen:\n"
+"Gastgeber: {host_variable_do_not_translate}\n"
+"Hafen: {port_variable_do_not_translate}\n"
+"Passwort: {password_variable_do_not_translate}\n"
+"Zeitüberschreitung für den Lebenslauf: {resume_timeout_variable_do_not_translate}\n"
+"Nur Suche: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Deaktivierte Quellen: {disabled_sources_variable_do_not_translate}\n"
+
+#: plnodes/cog.py:165 plnodes/cog.py:172
+msgid "I am unable to add this node"
+msgstr "Ich kann diesen Knoten nicht hinzufügen"
+
+#: plnodes/cog.py:178
+#, docstring
+msgid "Remove a node from a PyLav instance"
+msgstr "Entferne einen Knoten aus einer PyLav Instanz"
+
+#: plnodes/cog.py:190
+msgid "{name_variable_do_not_translate} is managed by PyLav and cannot be removed."
+msgstr "{name_variable_do_not_translate} wird von PyLav verwaltet und kann nicht entfernt werden."
+
+#: plnodes/cog.py:207
+msgid "I have removed the {name_variable_do_not_translate} node.\n\n"
+"{data_variable_do_not_translate}"
+msgstr "Ich habe die {name_variable_do_not_translate} Knoten.\n\n"
+"{data_variable_do_not_translate}"
+
+#: plnodes/cog.py:220
+msgid "I have removed the {name_variable_do_not_translate} node. A direct message was sent to you with the node details in case you wish to re-add it."
+msgstr "Ich habe die {name_variable_do_not_translate} Knoten. Ihnen wurde eine direkte Nachricht mit den Knotendetails gesendet, falls Sie sie erneut hinzufügen möchten."
+
+#: plnodes/cog.py:230
+#, docstring
+msgid "Manage all nodes in a PyLav instance"
+msgstr "Alle Knoten in einer PyLav Instanz verwalten"
+
+#: plnodes/cog.py:242
+msgid "Let us manage some nodes!"
+msgstr "Lassen Sie uns einige Knoten verwalten!"
+
+#: plnodes/cog.py:243
+msgid "(**1**){space_variable_do_not_translate} - Cancel any changes made and close the menu.\n"
+"(**6**){space_variable_do_not_translate} - Show sources enabled for this node.\n"
+"(**7**){space_variable_do_not_translate} - Apply changes and add the node to PyLav.\n"
+"(**8**){space_variable_do_not_translate} - Toggle between search-only and search and playback modes.\n"
+"(**9**){space_variable_do_not_translate} - Toggle between SSL on and off.\n"
+"(**10**) - Add a name to the node.\n"
+"(**11**) - Add the host address of the node.\n"
+"(**12**) - Add the port the node uses.\n"
+"(**13**) - Set the password for the node.\n"
+"(**14**) - Set the connection timeout.\n"
+"(**15**) - Remove this node.\n"
+"(**16**) - Select which sources to disable for this node (Multiple can be selected).\n"
+"If you interact with a button multiple times, only the last interaction will take effect.\n\n\n"
+msgstr "(**1**){space_variable_do_not_translate} - Stornieren Sie alle vorgenommenen Änderungen und schließen Sie das Menü.\n"
+"(**6**){space_variable_do_not_translate} - Quellen anzeigen, die für diesen Knoten aktiviert sind.\n"
+"(**7**){space_variable_do_not_translate} - Übernehmen Sie Änderungen und fügen Sie den Knoten zu PyLav hinzu.\n"
+"(**8**){space_variable_do_not_translate} - Umschalten zwischen Nur-Suche-, Such- und Wiedergabemodus.\n"
+"(**9**){space_variable_do_not_translate} - Umschalten zwischen SSL ein und aus.\n"
+"(**10**) - Fügen Sie dem Knoten einen Namen hinzu.\n"
+"(**11**) - Fügen Sie die Hostadresse des Knotens hinzu.\n"
+"(**12**) - Fügen Sie den Port hinzu, den der Knoten verwendet.\n"
+"(**13**) - Legen Sie das Passwort für den Knoten fest.\n"
+"(**14**) - Stellen Sie das Verbindungstimeout ein.\n"
+"(**15**) - Entfernen Sie diesen Knoten.\n"
+"(**16**) - Wählen Sie aus, welche Quellen für diesen Knoten deaktiviert werden sollen (Mehrere können ausgewählt werden).\n"
+"Wenn Sie mehrmals mit einer Schaltfläche interagieren, wird nur die letzte Interaktion wirksam.\n\n\n"
+
+#: plnodes/cog.py:272
+msgid "{name_variable_do_not_translate} is managed by PyLav, and I can not modify it."
+msgstr "{name_variable_do_not_translate} wird von PyLav verwaltet, und ich kann es nicht ändern."
+
+#: plnodes/cog.py:284
+msgid "I have removed the {name_variable_do_not_translate} node."
+msgstr "Ich habe die {name_variable_do_not_translate} Knoten."
+
+#: plnodes/cog.py:322
+msgid "I have changed the {name_variable_do_not_translate} node to the following settings:\n"
+"Host: {host_variable_do_not_translate}\n"
+"Port: {port_variable_do_not_translate}\n"
+"Password: {password_variable_do_not_translate}\n"
+"Resume Timeout: {resume_timeout_variable_do_not_translate}\n"
+"Search Only: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Disabled Sources: {disabled_sources_variable_do_not_translate}\n"
+msgstr "Ich habe die {name_variable_do_not_translate} Knoten zu den folgenden Einstellungen:\n"
+"Gastgeber: {host_variable_do_not_translate}\n"
+"Hafen: {port_variable_do_not_translate}\n"
+"Passwort: {password_variable_do_not_translate}\n"
+"Zeitüberschreitung für den Lebenslauf: {resume_timeout_variable_do_not_translate}\n"
+"Nur Suche: {search_only_variable_do_not_translate}\n"
+"SSL: {ssl_variable_do_not_translate}\n"
+"Deaktivierte Quellen: {disabled_sources_variable_do_not_translate}\n"
+
+#: plnodes/cog.py:349
+#, docstring
+msgid "List all nodes used by PyLav"
+msgstr "Alle von PyLav verwendeten Knoten auflisten"
+
+#: plnodes/cog.py:359
+msgid "No nodes were added to PyLav."
+msgstr "Es wurden keine Knoten zu PyLav hinzugefügt."
+

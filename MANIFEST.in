@@ -14,6 +14,15 @@ recursive-include redbot locales/*.po
 # include data folders for cogs
 recursive-include redbot/**/data *
 
+# include assets for the third-party cogs bundled into redbot/cogs.
+# many of them read info.json at import time via get_end_user_data_statement(),
+# so a missing info.json is an ImportError, not a cosmetic problem.
+recursive-include redbot/cogs info.json
+recursive-include redbot/cogs *.yaml *.yml *.json *.txt
+recursive-include redbot/cogs *.html *.css *.js
+recursive-include redbot/cogs *.png *.jpg *.webp *.ttf
+recursive-include redbot/cogs *.pot
+
 # include *.export files from the test fixtures
 recursive-include redbot *.export
 

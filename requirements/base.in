@@ -13,7 +13,6 @@ python-discovery
 PyYAML
 rapidfuzz
 Red-Commons
-Red-Lavalink
 redbot-update
 rich
 schema
@@ -28,3 +27,43 @@ uvloop; sys_platform != "win32" and platform_python_implementation == "CPython"
 Brotli
 orjson
 zstandard
+
+# --- bundled cog dependencies (fork) ---
+# PyLav music stack (audio, pl*) - replaces Red-Lavalink
+Py-Lav[all] @ git+https://github.com/1Example/PyLav@develop
+# dashboard, embedutils, splitorstealgame, tickets
+AAA3A-utils @ git+https://github.com/AAA3A-AAA3A/AAA3A_utils.git
+fernet
+markdown2
+wtforms
+werkzeug
+markupsafe
+itsdangerous
+# levelup
+aiocache
+colorgram.py
+emoji
+fastapi
+msgpack
+plotly
+pydantic>=2.11,<2.12
+python-multipart
+python-decouple
+python-dotenv
+requests
+tenacity
+ujson
+uvicorn
+jinja2
+# rss
+bs4
+feedparser>=6.0.0
+webcolors==1.3  # pinned: css3_hex_to_names removed upstream, rss/color.py needs it
+filetype
+# simplecasino
+aiofiles
+dataclasses-json
+# tickets, vrtutils
+chat-exporter
+py-cpuinfo
+speedtest-cli>=2.1.3

@@ -1,7 +1,8 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: red-discordbot\n"
-"POT-Creation-Date: 2023-06-14 02:57+0000\n"
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-05-07 19:17+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
 "Last-Translator: \n"
 "Language-Team: Vietnamese\n"
 "MIME-Version: 1.0\n"
@@ -9,79 +10,825 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: redgettext 3.4.2\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Crowdin-Project: red-discordbot\n"
-"X-Crowdin-Project-ID: 289505\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
 "X-Crowdin-Language: vi\n"
-"X-Crowdin-File-ID: 51\n"
+"X-Crowdin-File: /cogs/audio/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3301\n"
 "Language: vi_VN\n"
 
-#: redbot/cogs/audio/converters.py:35
+#: audio/cog.py:35
+#, docstring
+msgid "A Media player using the PyLav library"
+msgstr "Trình phát đa phương tiện sử dụng thư viện PyLav"
+
+#: audio/cog.py:49
+msgid "Play from activity"
+msgstr "Phát từ hoạt động"
+
+#: audio/cog.py:52
+msgid "Play from message"
+msgstr "Phát từ tin nhắn"
+
+#: audio/config_commands.py:40
+#, docstring
+msgid "Notifies PyLav that a Player is having issues.\n\n"
+"        If enough (50% or more of currently playing players) report issues, PyLav will automatically\n"
+"        switch to a different node or restart the current node where possible.\n"
+"        "
+msgstr "Thông báo cho PyLav rằng Người chơi đang gặp sự cố.\n\n"
+"        Nếu đủ (50% người chơi hiện đang chơi trở lên) báo cáo sự cố, PyLav sẽ tự động\n"
+"        Chuyển sang một nút khác hoặc khởi động lại nút hiện tại nếu có thể.\n"
+"        "
+
+#: audio/config_commands.py:48
+msgid "This server already voted recently. Please, try again in 10 minutes."
+msgstr "Máy chủ này đã được bỏ phiếu gần đây. Vui lòng thử lại sau 10 phút."
+
+#: audio/config_commands.py:59
+msgid "Thank you for your report."
+msgstr "Cảm ơn bạn đã báo cáo của bạn."
+
+#: audio/config_commands.py:69
+#, docstring
+msgid "Removes a vote for a Player being down.\n\n"
+"        If enough (50% or more of currently active players) report issues, PyLav will automatically\n"
+"        switch to a different node or restart the current node where possible.\n\n"
+"        This command is only valid if your server previously voted for a node to be down and is now back up.\n"
+"        "
+msgstr "Xóa một phiếu bầu cho một Người chơi bị từ chối.\n\n"
+"        Nếu đủ (50% người chơi hiện đang hoạt động trở lên) báo cáo sự cố, PyLav sẽ tự động\n"
+"        Chuyển sang một nút khác hoặc khởi động lại nút hiện tại nếu có thể.\n\n"
+"        Lệnh này chỉ hợp lệ nếu trước đó máy chủ của bạn đã bỏ phiếu cho một nút bị sập và hiện đang sao lưu.\n"
+"        "
+
+#: audio/config_commands.py:79
+msgid "There are no active votes for the current audio node."
+msgstr "Không có phiếu bầu tích cực cho nút âm thanh hiện tại."
+
+#: audio/config_commands.py:89
+msgid "I have removed your report."
+msgstr "Tôi đã xóa báo cáo của bạn."
+
+#: audio/config_commands.py:97
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Hiển thị phiên bản của Cog và PyLav"
+
+#: audio/config_commands.py:113
+msgid "Library / Cog"
+msgstr "Thư viện / Cog"
+
+#: audio/config_commands.py:114
+msgid "Version"
+msgstr "Phiên bản"
+
+#: audio/config_commands.py:128
+#, docstring
+msgid "Bot-wide settings."
+msgstr "Cài đặt toàn bot."
+
+#: audio/config_commands.py:132
+#, docstring
+msgid "Set the maximum volume a server can set"
+msgstr "Đặt âm lượng tối đa mà máy chủ có thể đặt"
+
+#: audio/config_commands.py:140
+msgid "You have to specify a volume less than or equal to 1,000%."
+msgstr "Bạn phải chỉ định âm lượng nhỏ hơn hoặc bằng 1,000%."
+
+#: audio/config_commands.py:148 audio/config_commands.py:626
+msgid "The maximum volume must be greater than 0%."
+msgstr "Âm lượng tối đa phải lớn hơn 0%."
+
+#: audio/config_commands.py:156
+msgid "The maximum volume I will allow anyone in any server is now set to {volume_variable_do_not_translate}%"
+msgstr "Âm lượng tối đa tôi sẽ cho phép bất kỳ ai trong bất kỳ máy chủ nào hiện được đặt thành {volume_variable_do_not_translate}%"
+
+#: audio/config_commands.py:166 audio/config_commands.py:679
+#, docstring
+msgid "Set whether I should deafen myself when playing."
+msgstr "Đặt xem tôi có nên điếc tai khi chơi hay không."
+
+#: audio/config_commands.py:175
+msgid "From now on, I will deafen myself when joining a voice channel."
+msgstr "Kể từ bây giờ, tôi sẽ tự điếc tai khi tham gia một kênh thoại."
+
+#: audio/config_commands.py:177
+msgid "From now on, I will no longer deafen myself when joining a voice channel."
+msgstr "Kể từ bây giờ, tôi sẽ không còn bị điếc khi tham gia một kênh lồng tiếng."
+
+#: audio/config_commands.py:185
+#, docstring
+msgid "Set whether the server is allowed to enable auto shuffle."
+msgstr "Đặt xem máy chủ có được phép bật tự động xáo trộn hay không."
+
+#: audio/config_commands.py:195
+msgid "From now on, I will auto shuffle my track queue when new songs are added."
+msgstr "Từ bây giờ, tôi sẽ tự động xáo trộn hàng đợi bản nhạc của mình khi các bài hát mới được thêm vào."
+
+#: audio/config_commands.py:197
+msgid "From now on, I will no longer auto shuffle my track queue when new songs are added."
+msgstr "Kể từ bây giờ, tôi sẽ không còn tự động xáo trộn hàng đợi bản nhạc của mình khi các bài hát mới được thêm vào."
+
+#: audio/config_commands.py:205 audio/config_commands.py:747
+#, docstring
+msgid "Set whether I should allow users to shuffle the queue"
+msgstr "Đặt xem tôi có nên cho phép người dùng xáo trộn hàng đợi hay không"
+
+#: audio/config_commands.py:215
+msgid "From now on, I will allow users to shuffle the queue."
+msgstr "Từ bây giờ, tôi sẽ cho phép người dùng xáo trộn hàng đợi."
+
+#: audio/config_commands.py:217
+msgid "From now on, I will no longer allow users to shuffle the queue."
+msgstr "Kể từ bây giờ, tôi sẽ không còn cho phép người dùng xáo trộn hàng đợi."
+
+#: audio/config_commands.py:225
+#, docstring
+msgid "Set whether I should automatically play songs when the queue is empty."
+msgstr "Đặt xem tôi có nên tự động phát bài hát khi hàng đợi trống hay không."
+
+#: audio/config_commands.py:234
+msgid "From now on, I will automatically play songs from the specified playlist when the queue is empty."
+msgstr "Từ bây giờ, tôi sẽ tự động phát các bài hát từ danh sách phát được chỉ định khi hàng đợi trống."
+
+#: audio/config_commands.py:238
+msgid "From now on, I will no longer automatically play songs from the specified playlist when the queue is empty."
+msgstr "Kể từ bây giờ, tôi sẽ không còn tự động phát các bài hát từ danh sách phát được chỉ định khi hàng đợi trống."
+
+#: audio/config_commands.py:248
+#, docstring
+msgid "Set whether I should disconnect from the voice channel."
+msgstr "Đặt xem tôi có nên ngắt kết nối khỏi kênh thoại hay không."
+
+#: audio/config_commands.py:258
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when the queue is empty.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: Whether I should disconnect from the voice channel when the queue is empty.\n"
+"            - `<duration>`: How long after the queue is empty should the player be disconnected? The default is 60 seconds.\n"
+"            Accepts second, minutes, hours, days and weeks (if no unit is specified, the duration is assumed to be given in seconds)\n"
+"        "
+msgstr "Đặt xem tôi có nên ngắt kết nối khỏi kênh thoại khi hàng đợi trống hay không.\n\n"
+"        Lập luận:\n"
+"            - `<toggle>': Liệu tôi có nên ngắt kết nối khỏi kênh thoại khi hàng đợi trống không.\n"
+"            - `<duration>': Bao lâu sau khi hàng đợi trống, người chơi có nên bị ngắt kết nối không? Mặc định là 60 giây.\n"
+"            Chấp nhận thứ hai, phút, giờ, ngày và tuần (nếu không có đơn vị nào được chỉ định, thời lượng được giả định là được đưa ra tính bằng giây)\n"
+"        "
+
+#: audio/config_commands.py:278 audio/config_commands.py:869
+msgid "I will disconnect from the voice channel when the queue is empty after {time_to_dc_variable_do_not_translate}."
+msgstr "Tôi sẽ ngắt kết nối khỏi kênh thoại khi hàng đợi trống sau {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:282 audio/config_commands.py:873
+msgid "I will disconnect from the voice channel when the queue is empty after 60 seconds."
+msgstr "Tôi sẽ ngắt kết nối khỏi kênh thoại khi hàng đợi trống sau 60 giây."
+
+#: audio/config_commands.py:284 audio/config_commands.py:875
+msgid "I will no longer disconnect from the voice channel when the queue is empty."
+msgstr "Tôi sẽ không ngắt kết nối khỏi kênh thoại khi hàng đợi trống."
+
+#: audio/config_commands.py:301
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when alone.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: Whether I should disconnect from the voice channel when I detect that I am alone in a voice channel.\n"
+"            - `<duration>`: How longer after detecting should the player be disconnected? The default is 60 seconds.\n"
+"            Accepts second, minutes, hours, days and weeks.\n"
+"            If no unit is specified, the duration is assumed to be given in seconds.\n"
+"        "
+msgstr "Đặt xem tôi có nên ngắt kết nối khỏi kênh thoại khi ở một mình hay không.\n\n"
+"        Lập luận:\n"
+"            - `<toggle>': Liệu tôi có nên ngắt kết nối khỏi kênh thoại khi tôi phát hiện ra rằng tôi đang ở một mình trong một kênh thoại.\n"
+"            - `<duration>': Bao lâu sau khi phát hiện người chơi nên bị ngắt kết nối? Mặc định là 60 giây.\n"
+"            Chấp nhận thứ hai, phút, giờ, ngày và tuần.\n"
+"            Nếu không có đơn vị nào được chỉ định, thời lượng được giả định là được tính bằng giây.\n"
+"        "
+
+#: audio/config_commands.py:322 audio/config_commands.py:939
+msgid "I will disconnect from the voice channel when alone after {time_to_dc_variable_do_not_translate}."
+msgstr "Tôi sẽ ngắt kết nối khỏi kênh thoại khi một mình sau {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:326 audio/config_commands.py:943
+msgid "I will disconnect from the voice channel when alone after 60 seconds."
+msgstr "Tôi sẽ ngắt kết nối khỏi kênh thoại khi một mình sau 60 giây."
+
+#: audio/config_commands.py:328 audio/config_commands.py:945
+msgid "I will no longer disconnect from the voice channel when alone."
+msgstr "Tôi sẽ không còn ngắt kết nối khỏi kênh thoại khi ở một mình."
+
+#: audio/config_commands.py:342
+#, docstring
+msgid "Server-specific settings."
+msgstr "Cài đặt dành riêng cho máy chủ."
+
+#: audio/config_commands.py:346
+#, docstring
+msgid "Add, remove or show the disc jockey roles and users for this server."
+msgstr "Thêm, loại bỏ hoặc hiển thị vai trò và người dùng trình chạy đĩa cho máy chủ này."
+
+#: audio/config_commands.py:352
+#, docstring
+msgid "Add disc jockey roles or users to this server."
+msgstr "Thêm vai trò hoặc người dùng đĩa jockey vào máy chủ này."
+
+#: audio/config_commands.py:365 audio/config_commands.py:388
+msgid "I have added {role_list_variable_do_not_translate} to the disc jockey roles."
+msgstr "Tôi đã thêm {role_list_variable_do_not_translate} cho các vai trò jockey đĩa."
+
+#: audio/config_commands.py:370 audio/config_commands.py:394
+msgid "I have added {user_list_variable_do_not_translate} to the disc jockey users."
+msgstr "Tôi đã thêm {user_list_variable_do_not_translate} cho người dùng disc jockey."
+
+#: audio/config_commands.py:379
+msgid "I have added {role_list_variable_do_not_translate} to the disc jockey roles and {user_list_variable_do_not_translate} to the disc jockey users."
+msgstr "Tôi đã thêm {role_list_variable_do_not_translate} cho các vai trò của disc jockey và {user_list_variable_do_not_translate} cho người dùng disc jockey."
+
+#: audio/config_commands.py:411
+#, docstring
+msgid "Remove disc jockey roles or users in this server."
+msgstr "Loại bỏ vai trò hoặc người dùng đĩa jockey trong máy chủ này."
+
+#: audio/config_commands.py:443
+msgid "I have removed {role_list_variable_do_not_translate} from the disc jockey roles and {user_list_variable_do_not_translate} from the disc jockey users, as well as {number_list_variable_do_not_translate} from the disc jockey roles and users."
+msgstr "Tôi đã xóa {role_list_variable_do_not_translate} từ vai trò của disc jockey và {user_list_variable_do_not_translate} từ những người dùng disc jockey, cũng như {number_list_variable_do_not_translate} từ vai trò và người dùng của disc jockey."
+
+#: audio/config_commands.py:451
+msgid "I have removed {role_list_variable_do_not_translate} from the disc jockey roles and {user_list_variable_do_not_translate} from the disc jockey users."
+msgstr "Tôi đã xóa {role_list_variable_do_not_translate} từ vai trò của disc jockey và {user_list_variable_do_not_translate} từ những người dùng disc jockey."
+
+#: audio/config_commands.py:459
+msgid "I have removed {role_list_variable_do_not_translate} from the disc jockey roles."
+msgstr "Tôi đã xóa {role_list_variable_do_not_translate} từ các vai trò của disc jockey."
+
+#: audio/config_commands.py:465
+msgid "I have removed {user_list_variable_do_not_translate} from the disc jockey users."
+msgstr "Tôi đã xóa {user_list_variable_do_not_translate} từ những người dùng disc jockey."
+
+#: audio/config_commands.py:471
+msgid "I have removed {user_or_role_id_list_variable_do_not_translate} from the disc jockey roles and users."
+msgstr "Tôi đã xóa {user_or_role_id_list_variable_do_not_translate} từ vai trò và người dùng của disc jockey."
+
+#: audio/config_commands.py:486
+msgid "I have Removed `{user_or_role_id_variable_do_not_translate}` from the disc jockey roles and users."
+msgstr "Tôi đã xóa '{user_or_role_id_variable_do_not_translate}'từ vai trò và người dùng của disc jockey."
+
+#: audio/config_commands.py:490
+msgid "I have removed {role_name_variable_do_not_translate} from the disc jockey roles."
+msgstr "Tôi đã xóa {role_name_variable_do_not_translate} từ các vai trò của disc jockey."
+
+#: audio/config_commands.py:495
+msgid "I have removed {user_name_variable_do_not_translate} from the disc jockey users."
+msgstr "Tôi đã xóa {user_name_variable_do_not_translate} từ những người dùng disc jockey."
+
+#: audio/config_commands.py:503
+#, docstring
+msgid "List the disc jockey roles and users for this server."
+msgstr "Liệt kê các vai trò và người dùng đĩa jockey cho máy chủ này."
+
+#: audio/config_commands.py:554
+msgid "There are no disc jockey roles or disc jockey users set in this server."
+msgstr "Không có vai trò jockey đĩa hoặc người dùng jockey đĩa được đặt trong máy chủ này."
+
+#: audio/config_commands.py:565 audio/config_commands.py:570
+msgid "Disc Jockey Roles"
+msgstr "Vai trò của Disc Jockey"
+
+#: audio/config_commands.py:576 audio/config_commands.py:581
+msgid "Disc Jockey Users"
+msgstr "Người dùng Disc Jockey"
+
+#: audio/config_commands.py:589
+#, docstring
+msgid "Clear the disc jockey roles and users for this server."
+msgstr "Xóa vai trò và người dùng đĩa jockey cho máy chủ này."
+
+#: audio/config_commands.py:601
+msgid "I have removed all disc jockey roles and users from this server."
+msgstr "Tôi đã xóa tất cả các vai trò và người dùng của disc jockey khỏi máy chủ này."
+
+#: audio/config_commands.py:609
+#, docstring
+msgid "Set the maximum volume a user can set."
+msgstr "Đặt âm lượng tối đa mà người dùng có thể đặt."
+
+#: audio/config_commands.py:618
+msgid "The maximum volume must be less than 1,000%."
+msgstr "Âm lượng tối đa phải nhỏ hơn 1.000%."
+
+#: audio/config_commands.py:635
+msgid "My owner has told me that server-specific volume must be between 0% and {volume_variable_do_not_translate}%."
+msgstr "Chủ sở hữu của tôi đã nói với tôi rằng khối lượng dành riêng cho máy chủ phải nằm trong khoảng từ 0% đến {volume_variable_do_not_translate}%."
+
+#: audio/config_commands.py:655
+msgid "The maximum volume must be between 0% and {volume_variable_do_not_translate}%."
+msgstr "Âm lượng tối đa phải nằm trong khoảng từ 0% đến {volume_variable_do_not_translate}%."
+
+#: audio/config_commands.py:669
+msgid "The maximum volume users can set in this server is now {volume_variable_do_not_translate}%."
+msgstr "Âm lượng tối đa mà người dùng có thể đặt trong máy chủ này hiện đã {volume_variable_do_not_translate}%."
+
+#: audio/config_commands.py:688
+msgid "My owner has requested that I always deafen myself when joining a voice channel."
+msgstr "Chủ sở hữu của tôi đã yêu cầu tôi luôn điếc tai khi tham gia một kênh thoại."
+
+#: audio/config_commands.py:705
+msgid "I will deafen myself when joining voice channels on this server."
+msgstr "Tôi sẽ tự điếc tai khi tham gia các kênh thoại trên máy chủ này."
+
+#: audio/config_commands.py:707
+msgid "I will no longer deafen myself when joining voice channels on this server."
+msgstr "Tôi sẽ không còn điếc tai khi tham gia các kênh thoại trên máy chủ này."
+
+#: audio/config_commands.py:715
+#, docstring
+msgid "Set whether I should shuffle the queue after adding every new song."
+msgstr "Đặt xem tôi có nên xáo trộn hàng đợi sau khi thêm mọi bài hát mới hay không."
+
+#: audio/config_commands.py:723
+msgid "My owner has turned off the auto shuffle capability for all servers."
+msgstr "Chủ sở hữu của tôi đã tắt tính năng tự động xáo trộn cho tất cả các máy chủ."
+
+#: audio/config_commands.py:737
+msgid "Auto shuffle turned on for this server."
+msgstr "Tự động xáo trộn được bật cho máy chủ này."
+
+#: audio/config_commands.py:739
+msgid "Auto shuffle turned off for this server."
+msgstr "Tự động xáo trộn đã tắt cho máy chủ này."
+
+#: audio/config_commands.py:757
+msgid "My owner has turned off the shuffle capability for all servers."
+msgstr "Chủ sở hữu của tôi đã tắt khả năng xáo trộn cho tất cả các máy chủ."
+
+#: audio/config_commands.py:770
+msgid "Shuffling turned on for this server."
+msgstr "Shuffling đã bật cho máy chủ này."
+
+#: audio/config_commands.py:772
+msgid "Shuffling turned off for this server."
+msgstr "Shuffling đã tắt cho máy chủ này."
+
+#: audio/config_commands.py:780
+#, docstring
+msgid "Set whether the bot should automatically play songs when the queue is empty."
+msgstr "Đặt xem bot có tự động phát các bài hát khi hàng đợi trống hay không."
+
+#: audio/config_commands.py:789
+msgid "My owner has turned off the autoplay capability for all servers."
+msgstr "Chủ sở hữu của tôi đã tắt khả năng tự động phát cho tất cả các máy chủ."
+
+#: audio/config_commands.py:806
+msgid "From now on, I will automatically play songs when the queue is empty."
+msgstr "Từ bây giờ, tôi sẽ tự động phát các bài hát khi hàng đợi trống."
+
+#: audio/config_commands.py:808
+msgid "From now on, I will no longer automatically play songs when the queue is empty."
+msgstr "Kể từ bây giờ, tôi sẽ không còn tự động phát các bài hát khi hàng đợi trống."
+
+#: audio/config_commands.py:816
+#, docstring
+msgid "Set whether the bot should disconnect from the voice channel"
+msgstr "Đặt xem bot có nên ngắt kết nối khỏi kênh thoại hay không"
+
+#: audio/config_commands.py:826
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when the queue is empty.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: I should disconnect from the voice channel when the queue is empty.\n"
+"            - `<duration>`: How long after the queue is empty should I disconnect?\n"
+"            The Default is 60 seconds.\n"
+"            Accept seconds, minutes, hours, days, and weeks.\n"
+"            If no unit is specified, the duration is assumed to be seconds.\n"
+"        "
+msgstr "Đặt xem tôi có nên ngắt kết nối khỏi kênh thoại khi hàng đợi trống hay không.\n\n"
+"        Lập luận:\n"
+"            - `<toggle>': Tôi nên ngắt kết nối khỏi kênh thoại khi hàng đợi trống.\n"
+"            - `<duration>': Tôi nên ngắt kết nối sau bao lâu sau khi hàng đợi trống?\n"
+"            Mặc định là 60 giây.\n"
+"            Chấp nhận giây, phút, giờ, ngày và tuần.\n"
+"            Nếu không có đơn vị nào được chỉ định, thời lượng được giả định là giây.\n"
+"        "
+
+#: audio/config_commands.py:844
+msgid "My owner has told me to disconnect from the voice channel when the queue is empty after {time_to_dc_variable_do_not_translate}."
+msgstr "Chủ sở hữu của tôi đã yêu cầu tôi ngắt kết nối khỏi kênh thoại khi hàng đợi trống sau {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:893
+#, docstring
+msgid "Set whether I should disconnect from the voice channel when alone.\n\n"
+"        Arguments:\n"
+"            - `<toggle>`: I should disconnect from the voice channel when it detects that it is\n"
+"            alone.\n"
+"            - `<duration>`: How longer after detecting should I disconnect?\n"
+"            The Default is 60 seconds.\n"
+"            Accept seconds, minutes, hours, days, and weeks.\n"
+"            If no unit is specified, the duration is assumed to be seconds.\n"
+"        "
+msgstr "Đặt xem tôi có nên ngắt kết nối khỏi kênh thoại khi ở một mình hay không.\n\n"
+"        Lập luận:\n"
+"            - `<toggle>': Tôi nên ngắt kết nối khỏi kênh thoại khi phát hiện ra rằng đó là\n"
+"            một mình.\n"
+"            - `<duration>': Bao lâu sau khi phát hiện tôi nên ngắt kết nối?\n"
+"            Mặc định là 60 giây.\n"
+"            Chấp nhận giây, phút, giờ, ngày và tuần.\n"
+"            Nếu không có đơn vị nào được chỉ định, thời lượng được giả định là giây.\n"
+"        "
+
+#: audio/config_commands.py:913
+msgid "My owner has told me to disconnect from the voice channel when alone after {time_to_dc_variable_do_not_translate}."
+msgstr "Chủ sở hữu của tôi đã yêu cầu tôi ngắt kết nối khỏi kênh thoại khi ở một mình sau {time_to_dc_variable_do_not_translate}."
+
+#: audio/config_commands.py:957
+#, docstring
+msgid "Specify a playlist to be used for autoplay."
+msgstr "Chỉ định playlist sẽ được sử dụng để tự động phát."
+
+#: audio/config_commands.py:974
+msgid "From now on, I will use {playlist_name_variable_do_not_translate} to select songs for autoplay."
+msgstr "Từ bây giờ, tôi sẽ sử dụng {playlist_name_variable_do_not_translate} để chọn bài hát cho tính năng tự động phát."
+
+#: audio/config_commands.py:984
+#, docstring
+msgid "Restrict which channels where I can be used."
+msgstr "Hạn chế những kênh mà tôi có thể được sử dụng."
+
+#: audio/config_commands.py:990
+#, docstring
+msgid "Restrict me only to accept PyLav commands executed from the specified channel."
+msgstr "Hạn chế tôi chỉ chấp nhận các lệnh PyLav được thực thi từ kênh được chỉ định."
+
+#: audio/config_commands.py:1005
+msgid "I do not have permission to send messages or send embed links or read messages in {channel_name_variable_do_not_translate}."
+msgstr "Tôi không có quyền gửi tin nhắn hoặc gửi liên kết nhúng hoặc đọc tin nhắn trong {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1022
+msgid "I will only accept PyLav commands executed from {channel_name_variable_do_not_translate}."
+msgstr "Tôi sẽ chỉ chấp nhận các lệnh PyLav được thực thi từ {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1032
+msgid "I will accept PyLav commands executed in all channels I can see in the server."
+msgstr "Tôi sẽ chấp nhận các lệnh PyLav được thực thi trong tất cả các kênh mà tôi có thể thấy trong máy chủ."
+
+#: audio/config_commands.py:1040
+#, docstring
+msgid "Restrict me only to join the specified voice channel."
+msgstr "Hạn chế tôi chỉ tham gia kênh thoại được chỉ định."
+
+#: audio/config_commands.py:1052 audio/hybrid_commands.py:107
+#: audio/player_commands.py:158
+msgid "I do not have permission to connect or speak in {channel_name_variable_do_not_translate}."
+msgstr "Tôi không có quyền kết nối hoặc nói chuyện {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1070
+msgid "I will only be allowed to join {channel_name_variable_do_not_translate}."
+msgstr "Tôi sẽ chỉ được phép tham gia {channel_name_variable_do_not_translate}."
+
+#: audio/config_commands.py:1080
+msgid "I am allowed to join any voice channel in the server."
+msgstr "Tôi được phép tham gia bất kỳ kênh thoại nào trong máy chủ."
+
+#: audio/context_menus.py:27 audio/context_menus.py:138
+msgid "I can not play songs in direct messages. Sorry, try again on a server."
+msgstr "Tôi không thể phát các bài hát trong tin nhắn trực tiếp. Rất tiếc, hãy thử lại trên máy chủ."
+
+#: audio/context_menus.py:38
+msgid "You need to be a disc jockey in this server to play tracks in this server."
+msgstr "Bạn cần phải là một tay đua đĩa trong máy chủ này để phát các bản nhạc trong máy chủ này."
+
+#: audio/context_menus.py:55 audio/context_menus.py:164
+msgid "This command is unavailable in this channel. Please use {channel_name_variable_do_not_translate} instead."
+msgstr "Lệnh này không khả dụng trong kênh này. Vui lòng sử dụng {channel_name_variable_do_not_translate} thay vì."
+
+#: audio/context_menus.py:84
+msgid "I could not find any suitable matches in this message."
+msgstr "Tôi không thể tìm thấy bất kỳ kết quả phù hợp nào trong tin nhắn này."
+
+#: audio/context_menus.py:86
+msgid "I found many suitable matches in this message."
+msgstr "Tôi đã tìm thấy nhiều kết quả phù hợp trong tin nhắn này."
+
+#: audio/context_menus.py:88
+msgid "I found a single suitable match in this message."
+msgstr "Tôi đã tìm thấy một kết quả phù hợp duy nhất trong tin nhắn này."
+
+#: audio/context_menus.py:149
+msgid "You need to be a disc jockey to play tracks in this server."
+msgstr "Bạn cần phải là một tay đua đĩa để chơi các bản nhạc trong máy chủ này."
+
+#: audio/context_menus.py:183
+msgid "I could not find any supported activity in the activities {user_name_variable_do_not_translate} is partaking."
+msgstr "Tôi không thể tìm thấy bất kỳ hoạt động được hỗ trợ nào trong các hoạt động {user_name_variable_do_not_translate} đang tham gia."
+
+#: audio/context_menus.py:215
+msgid "I could not find a valid Apple Music track in the activity {user_name_variable_do_not_translate} is partaking in."
+msgstr "Tôi không thể tìm thấy bản nhạc Apple Music hợp lệ trong hoạt động {user_name_variable_do_not_translate} đang tham gia."
+
+#: audio/context_menus.py:231
+msgid "I could not find any tracks matching {query_variable_do_not_translate}."
+msgstr "Tôi không thể tìm thấy bất kỳ bản nhạc nào phù hợp {query_variable_do_not_translate}."
+
+#: audio/context_menus.py:248
+msgid "I could not figure out what {user_name_variable_do_not_translate} is listening to."
+msgstr "Tôi không thể tìm ra những gì {user_name_variable_do_not_translate} đang lắng nghe."
+
+#: audio/hybrid_commands.py:82
+msgid "You need to give me a query to enqueue."
+msgstr "Bạn cần cung cấp cho tôi một truy vấn để enqueue."
+
+#: audio/hybrid_commands.py:96
+msgid "You must be in a voice channel, so I can connect to it."
+msgstr "Bạn phải ở trong một kênh thoại, vì vậy tôi có thể kết nối với nó."
+
+#: audio/hybrid_commands.py:147
+msgid "{track_name_variable_do_not_translate} enqueued."
+msgstr "{track_name_variable_do_not_translate} enqueued."
+
+#: audio/hybrid_commands.py:152 audio/player_commands.py:228
+msgid "No tracks were found for your query."
+msgstr "Không có bản nhạc nào được tìm thấy cho truy vấn của bạn."
+
+#: audio/hybrid_commands.py:154
+msgid "{number_of_tracks_variable_do_not_translate} tracks enqueued."
+msgstr "{number_of_tracks_variable_do_not_translate} các bản nhạc được xếp hàng."
+
+#: audio/hybrid_commands.py:218
+msgid "You need to be in a voice channel if you do not specify which channel I should connect to."
+msgstr "Bạn cần phải ở trong một kênh thoại nếu bạn không chỉ định kênh nào tôi nên kết nối."
+
+#: audio/hybrid_commands.py:230
+msgid "I do not have permission to connect to {channel_name_variable_do_not_translate}."
+msgstr "Tôi không có quyền kết nối với {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:234
+msgid "I do not have permission to speak in {channel_name_variable_do_not_translate}."
+msgstr "Tôi không được phép nói chuyện {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:252
+msgid "You do not have permission to connect to {channel_name_variable_do_not_translate}."
+msgstr "Bạn không có quyền kết nối với {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:269
+msgid "I have been told only to join {channel_name_variable_do_not_translate} on this server."
+msgstr "Tôi đã được yêu cầu chỉ tham gia {channel_name_variable_do_not_translate} trên máy chủ này."
+
+#: audio/hybrid_commands.py:279
+msgid "I have successfully connected to {channel_name_variable_do_not_translate}."
+msgstr "Tôi đã kết nối thành công với {channel_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:305 audio/hybrid_commands.py:330
+#: audio/hybrid_commands.py:366 audio/hybrid_commands.py:397
+#: audio/hybrid_commands.py:430 audio/hybrid_commands.py:457
+#: audio/hybrid_commands.py:509 audio/hybrid_commands.py:548
+#: audio/hybrid_commands.py:586 audio/hybrid_commands.py:644
+#: audio/hybrid_commands.py:696 audio/hybrid_commands.py:705
+#: audio/hybrid_commands.py:847
+msgid "I am not currently playing anything on this server."
+msgstr "Tôi hiện không chơi bất cứ thứ gì trên máy chủ này."
+
+#: audio/hybrid_commands.py:338
+msgid "I have skipped {track_name_variable_do_not_translate} as requested."
+msgstr "Tôi đã bỏ qua {track_name_variable_do_not_translate} theo yêu cầu."
+
+#: audio/hybrid_commands.py:374
+msgid "I have stopped the playback and cleared the queue as requested."
+msgstr "Tôi đã dừng phát lại và xóa hàng đợi theo yêu cầu."
+
+#: audio/hybrid_commands.py:406
+msgid "I have disconnected from {channel_name_variable_do_not_translate} as requested."
+msgstr "Tôi đã ngắt kết nối khỏi {channel_name_variable_do_not_translate} theo yêu cầu."
+
+#: audio/hybrid_commands.py:465
+msgid "The server queue is currently empty."
+msgstr "Hàng đợi máy chủ hiện đang trống."
+
+#: audio/hybrid_commands.py:473
+msgid "You are not allowed to shuffle the queue."
+msgstr "Bạn không được phép xáo trộn hàng đợi."
+
+#: audio/hybrid_commands.py:481
+msgid "{queue_size_variable_do_not_translate} tracks shuffled."
+msgstr "{queue_size_variable_do_not_translate} bản nhạc xáo trộn."
+
+#: audio/hybrid_commands.py:517
+msgid "From now on, I will now repeat the entire queue."
+msgstr "Từ bây giờ, bây giờ tôi sẽ lặp lại toàn bộ hàng đợi."
+
+#: audio/hybrid_commands.py:520
+msgid "From now on, I will no longer repeat any tracks."
+msgstr "Kể từ bây giờ, tôi sẽ không lặp lại bất kỳ bản nhạc nào nữa."
+
+#: audio/hybrid_commands.py:524
+msgid "From now on, I will now repeat {track_name_variable_do_not_translate}."
+msgstr "Từ bây giờ, bây giờ tôi sẽ lặp lại {track_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:530
+msgid "From now on, I will now repeat the current track."
+msgstr "Từ bây giờ, bây giờ tôi sẽ lặp lại bản nhạc hiện tại."
+
+#: audio/hybrid_commands.py:554
+msgid "The player is already paused, did you mean to run {command_name_variable_do_not_translate}."
+msgstr "Trình phát đã tạm dừng, bạn có ý định chạy không {command_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:568
+msgid "I have now paused the player as requested."
+msgstr "Bây giờ tôi đã tạm dừng cầu thủ theo yêu cầu."
+
+#: audio/hybrid_commands.py:592
+msgid "The player already resumed, did you mean to run {command_name_variable_do_not_translate}."
+msgstr "Người chơi đã tiếp tục, bạn có ý định chạy {command_name_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:606
+msgid "I have now resumed the player as requested."
+msgstr "Bây giờ tôi đã tiếp tục cầu thủ theo yêu cầu."
+
+#: audio/hybrid_commands.py:628
+msgid "I can not set the volume above 1,000%."
+msgstr "Tôi không thể đặt âm lượng trên 1.000%."
+
+#: audio/hybrid_commands.py:636
+msgid "I can not set the volume lower than 0%"
+msgstr "Tôi không thể đặt âm lượng thấp hơn 0%"
+
+#: audio/hybrid_commands.py:653
+msgid "I have been told to restrict the maximum volume to {max_volume_variable_do_not_translate}%."
+msgstr "Tôi đã được yêu cầu hạn chế âm lượng tối đa ở mức {max_volume_variable_do_not_translate}%."
+
+#: audio/hybrid_commands.py:664
+msgid "I have set the player volume to {volume_variable_do_not_translate}%."
+msgstr "Tôi đã đặt âm lượng trình phát thành {volume_variable_do_not_translate}%."
+
+#: audio/hybrid_commands.py:715 audio/hybrid_commands.py:724
+#: audio/hybrid_commands.py:737 audio/hybrid_commands.py:758
+#: audio/hybrid_commands.py:768 audio/hybrid_commands.py:778
+msgid "Unable to seek track"
+msgstr "Không thể tìm kiếm theo dõi"
+
+#: audio/hybrid_commands.py:716
+msgid "I can not seek this track as the server reports it is a live stream."
+msgstr "Tôi không thể tìm kiếm bản nhạc này vì máy chủ báo cáo đó là luồng trực tiếp."
+
+#: audio/hybrid_commands.py:725
+msgid "I can not seek this track as the server report that this track does not support seeking."
+msgstr "Tôi không thể tìm kiếm bản nhạc này vì máy chủ báo cáo rằng bản nhạc này không hỗ trợ tìm kiếm."
+
+#: audio/hybrid_commands.py:738
+msgid "I can not seek the current track while the player is paused."
+msgstr "Tôi không thể tìm kiếm bản nhạc hiện tại trong khi trình phát bị tạm dừng."
+
+#: audio/hybrid_commands.py:759
+msgid "I can not seek the current track to an invalid percentage."
+msgstr ""
+
+#: audio/hybrid_commands.py:769
+msgid "I can not seek the current track past 100%."
+msgstr ""
+
+#: audio/hybrid_commands.py:779
+msgid "I can not seek the current track before 0%."
+msgstr ""
+
+#: audio/hybrid_commands.py:799
+msgid "I have moved the current track forward {number_of_seconds_variable_do_not_translate} seconds to the end of the track."
+msgstr "Tôi đã di chuyển theo dõi hiện tại về phía trước {number_of_seconds_variable_do_not_translate} vài giây để kết thúc bản nhạc."
+
+#: audio/hybrid_commands.py:803
+msgid "I have moved the current track forward {number_of_seconds} seconds to position {timestamp_variable_do_not_translate}."
+msgstr "Tôi đã di chuyển theo dõi hiện tại về phía trước {number_of_seconds} giây để định vị {timestamp_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:808
+msgid "I have moved the current track back {number_of_seconds_variable_do_not_translate} seconds to the beginning."
+msgstr "Tôi đã chuyển bản nhạc hiện tại trở lại {number_of_seconds_variable_do_not_translate} vài giây để bắt đầu."
+
+#: audio/hybrid_commands.py:812
+msgid "I have moved the current track back {number_of_seconds} seconds to position {timestamp_variable_do_not_translate}."
+msgstr "Tôi đã chuyển bản nhạc hiện tại trở lại {number_of_seconds} giây để định vị {timestamp_variable_do_not_translate}."
+
+#: audio/hybrid_commands.py:818
+msgid "I have moved the current track to the beginning."
+msgstr "Tôi đã chuyển đường đua hiện tại sang đầu."
+
+#: audio/hybrid_commands.py:856
+msgid "The history of tracks is currently empty."
+msgstr "Lịch sử của các bản nhạc hiện đang trống rỗng."
+
+#: audio/hybrid_commands.py:864
+msgid "Playing previous track: {track_name_variable_do_not_translate}."
+msgstr "Phát bản nhạc trước đó: {track_name_variable_do_not_translate}."
+
+#: audio/player_commands.py:31
+msgid "Plays the specified track from the queue."
+msgstr "Phát bản nhạc được chỉ định từ hàng đợi."
+
+#: audio/player_commands.py:51
+msgid "There are no songs in the queue."
+msgstr "Không có bài hát nào trong hàng đợi."
+
+#: audio/player_commands.py:60
+msgid "Track index must be between 1 and {size_of_queue_variable_do_not_translate}"
+msgstr "Chỉ số theo dõi phải nằm trong khoảng từ 1 đến {size_of_queue_variable_do_not_translate}"
+
+#: audio/player_commands.py:78
+msgid "There are no tracks in position {queue_position_variable_do_not_translate}."
+msgstr "Không có bản nhạc ở vị trí {queue_position_variable_do_not_translate}."
+
+#: audio/player_commands.py:90
+msgid "{track_name_variable_do_not_translate} will play after {current_track_name_variable_do_not_translate} finishes ({estimated_time_variable_do_not_translate})."
+msgstr "{track_name_variable_do_not_translate} sẽ chơi sau {current_track_name_variable_do_not_translate} Kết thúc ({estimated_time_variable_do_not_translate})."
+
+#: audio/player_commands.py:113
+msgid "{track_name_variable_do_not_translate} will start now\n"
+"{current_track_name_variable_do_not_translate} has been skipped."
+msgstr "{track_name_variable_do_not_translate} sẽ bắt đầu ngay bây giờ\n"
+"{current_track_name_variable_do_not_translate} đã bị bỏ qua."
+
+#: audio/player_commands.py:135
+#, docstring
+msgid "Enqueue a track at the top of the queue."
+msgstr "Thêm một bản nhạc vào hàng đợi ở đầu hàng đợi."
+
+#: audio/player_commands.py:148
+msgid "You must be in a voice channel to allow me to connect"
+msgstr "Bạn phải ở trong một kênh thoại để cho phép tôi kết nối"
+
+#: audio/player_commands.py:207
+msgid "{number_of_tracks_variable_do_not_translate} tracks have been enqueued."
+msgstr "{number_of_tracks_variable_do_not_translate} các bản nhạc đã được xếp vào."
+
+#: audio/player_commands.py:217
+msgid "{track_name_variable_do_not_translate} has been enqueued."
+msgstr "{track_name_variable_do_not_translate} đã được enqueued."
+
+#: audio/player_commands.py:238
+#, docstring
 msgid "\n"
-"Scope must be a valid version of one of the following:\n"
-"​ ​ ​ ​ Global\n"
-"​ ​ ​ ​ Guild\n"
-"​ ​ ​ ​ User\n"
+"        Remove the specified track from the queue.\n\n"
+"        If you specify the `remove_duplicates` argument, all tracks that are the same as your URL or the index track will be removed.\n"
+"        "
 msgstr "\n"
-"Phạm vi phải là phiên bản hợp lệ của một trong những điều sau:\n"
-"​ ​ ​ ​ Toàn cầu\n"
-"​ ​ ​ ​ Guild\n"
-"​ ​ ​ ​ Người dùng\n"
+"        Xóa theo dõi được chỉ định khỏi hàng đợi.\n\n"
+"        Nếu bạn chỉ định đối số \"remove_duplicates\", tất cả các kênh giống với URL của bạn hoặc phiên bản chỉ mục sẽ bị xóa.\n"
+"        "
 
-#: redbot/cogs/audio/converters.py:43
-msgid "\n"
-"Author must be a valid version of one of the following:\n"
-"​ ​ ​ ​ User ID\n"
-"​ ​ ​ ​ User Mention\n"
-"​ ​ ​ ​ User Name#123\n"
-msgstr "\n"
-"Tác giả phải là phiên bản hợp lệ của một trong những điều sau:\n"
-"​ ​ ​ ​ ID người dùng\n"
-"​ ​ ​ ​ Đề cập của Người dùng\n"
-"​ ​ ​ ​ Tên người dùng#123\n"
+#: audio/player_commands.py:253
+msgid "Queue is empty."
+msgstr "Hàng đợi trống."
 
-#: redbot/cogs/audio/converters.py:51
-msgid "\n"
-"Guild must be a valid version of one of the following:\n"
-"​ ​ ​ ​ Guild ID\n"
-"​ ​ ​ ​ Exact guild name\n"
-msgstr "\n"
-"Hội phải là phiên bản hợp lệ của một trong những điều sau:\n"
-"​ ​ ​ ​ ID Hội\n"
-"​ ​ ​ ​ Tên hội chính xác\n"
+#: audio/player_commands.py:266
+msgid "Track index must be between 1 and {queue_size_variable_do_not_translate}."
+msgstr "Chỉ số theo dõi phải nằm trong khoảng từ 1 đến {queue_size_variable_do_not_translate}."
 
-#: redbot/cogs/audio/converters.py:87
-msgid "\"{arg}\" was not found. It must be the ID or complete name of a server which the bot can see."
-msgstr "\"{arg}\" không được tìm thấy. Nó phải là ID hoặc tên đầy đủ của máy chủ mà bot có thể nhìn thấy."
+#: audio/player_commands.py:281
+msgid "There is no track in position {position_variable_do_not_translate}."
+msgstr "Không có đường đua ở vị trí {position_variable_do_not_translate}."
 
-#: redbot/cogs/audio/converters.py:96 redbot/cogs/audio/converters.py:138
-msgid "\"{arg}\" does not refer to a unique server. Please use the ID for the server you're trying to specify."
-msgstr "\"{arg}\" không tham chiếu đến một máy chủ duy nhất. Vui lòng sử dụng ID cho máy chủ mà bạn đang cố gắng chỉ định."
+#: audio/player_commands.py:311
+msgid "{track_name_variable_do_not_translate} not found in queue."
+msgstr "{track_name_variable_do_not_translate} không tìm thấy trong hàng đợi."
 
-#: redbot/cogs/audio/converters.py:129
-msgid "\"{arg}\" was not found. It must be the ID or name or mention a user which the bot can see."
-msgstr "\"{arg}\" không tìm thấy. Nó phải là ID hoặc tên hoặc đề cập đến người dùng mà bot có thể nhìn thấy."
+#: audio/player_commands.py:323
+msgid "No tracks were removed from the queue."
+msgstr "Không có bản nhạc nào bị xóa khỏi hàng đợi."
 
-#: redbot/cogs/audio/converters.py:178
-msgid "Could not match '{}' to a playlist."
-msgstr "Không thể ghép '{}' với một danh sách phát."
+#: audio/player_commands.py:331
+msgid "I have removed a single entry of {track_name_variable_do_not_translate} from the queue."
+msgstr "Tôi đã xóa một mục nhập duy nhất của {track_name_variable_do_not_translate} từ hàng đợi."
 
-#: redbot/cogs/audio/converters.py:242 redbot/cogs/audio/converters.py:264
-#: redbot/cogs/audio/converters.py:284 redbot/cogs/audio/converters.py:368
-#: redbot/cogs/audio/converters.py:380 redbot/cogs/audio/converters.py:405
-#: redbot/cogs/audio/converters.py:431 redbot/cogs/audio/converters.py:453
-#: redbot/cogs/audio/converters.py:480
-msgid "Nothing"
-msgstr "Không có gì"
+#: audio/player_commands.py:341
+msgid "I have removed {number_of_entries_variable_do_not_translate} entries of {track_name_variable_do_not_translate} from the queue."
+msgstr "Tôi đã xóa {number_of_entries_variable_do_not_translate} mục nhập của {track_name_variable_do_not_translate} từ hàng đợi."
 
-#: redbot/cogs/audio/converters.py:262
-msgid "You cannot use `--guild`"
-msgstr "Bạn không thể dùng `--guild`"
+#: audio/slash_commands.py:48
+#, docstring
+msgid "Search for a track then play the selected response."
+msgstr "Tìm kiếm bản nhạc sau đó phát phản hồi đã chọn."
 
-#: redbot/cogs/audio/converters.py:402
-msgid "You cannot use `--to-server`"
-msgstr "Bạn không thể dùng `--to-server`"
+#: audio/slash_commands.py:54
+msgid "You have not selected something to play."
+msgstr "Bạn chưa chọn một cái gì đó để chơi."
 
-#: redbot/cogs/audio/converters.py:428
-msgid "You cannot use `--from-server`"
-msgstr "Bạn không thể dùng `--from-server`"
+#: audio/slash_commands.py:111
+msgid "Searching {service_name_variable_do_not_translate}"
+msgstr "Tìm kiếm {service_name_variable_do_not_translate}"
+
+#: audio/slash_commands.py:129 audio/slash_commands.py:142
+msgid "No results found on {service_name_variable_do_not_translate}"
+msgstr "Không tìm thấy kết quả trên {service_name_variable_do_not_translate}"
+
+#: audio/utility_commands.py:32
+msgid "I am not connected to a voice channel."
+msgstr "Tôi không được kết nối với kênh thoại."
+
+#: audio/utility_commands.py:43
+msgid "Volume limit reached, player volume set to {volume_variable_do_not_translate}%"
+msgstr "Đã đạt đến giới hạn âm lượng, âm lượng người chơi được đặt thành {volume_variable_do_not_translate}%"
+
+#: audio/utility_commands.py:54
+msgid "Minimum volume reached, player volume set to 0%"
+msgstr "Âm lượng tối thiểu đạt được, âm lượng trình phát được đặt thành 0%"
+
+#: audio/utility_commands.py:62
+msgid "Player volume set to {volume_variable_do_not_translate}%"
+msgstr "Âm lượng người chơi được đặt thành {volume_variable_do_not_translate}%"
 

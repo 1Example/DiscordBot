@@ -1,0 +1,532 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pylav\n"
+"POT-Creation-Date: 2023-02-03 20:16+0000\n"
+"PO-Revision-Date: 2023-05-19 11:08\n"
+"Last-Translator: \n"
+"Language-Team: Italian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: pylav\n"
+"X-Crowdin-Project-ID: 535244\n"
+"X-Crowdin-Language: it\n"
+"X-Crowdin-File: /cogs/plconfig/locales/messages.pot\n"
+"X-Crowdin-File-ID: 3353\n"
+"Language: it_IT\n"
+
+#: plconfig/cog.py:32
+#, docstring
+msgid "Configure PyLav library settings"
+msgstr "Configura le impostazioni della libreria PyLav"
+
+#: plconfig/cog.py:44
+#, docstring
+msgid "Change global settings for PyLav"
+msgstr "Modifica le impostazioni globali per PyLav"
+
+#: plconfig/cog.py:48
+#, docstring
+msgid "Show the version of the Cog and PyLav"
+msgstr "Mostra la versione di Cog e PyLav"
+
+#: plconfig/cog.py:64
+msgid "Library / Cog"
+msgstr "Biblioteca / Ingranaggio"
+
+#: plconfig/cog.py:65
+msgid "Version"
+msgstr "Versione"
+
+#: plconfig/cog.py:78
+#, docstring
+msgid "Show the setting values"
+msgstr "Mostra i valori di impostazione"
+
+#: plconfig/cog.py:85 plconfig/view.py:57
+msgid "PyLav Settings"
+msgstr "Impostazioni di PyLav"
+
+#: plconfig/cog.py:88
+msgid "Get information about the PyLav library settings."
+msgstr "Ottieni informazioni sulle impostazioni della libreria PyLav."
+
+#: plconfig/cog.py:92 plconfig/view.py:162
+msgid "Global Settings"
+msgstr "Impostazioni globali"
+
+#: plconfig/cog.py:95
+msgid "Get information about bot owner configured settings for the players."
+msgstr "Ottieni informazioni sulle impostazioni configurate dal proprietario del bot per i giocatori."
+
+#: plconfig/cog.py:103
+msgid "Contextual Settings"
+msgstr "Impostazioni contestuali"
+
+#: plconfig/cog.py:107
+msgid "Get information about contextual settings for the player, accounting for the global settings."
+msgstr "Ottieni informazioni sulle impostazioni contestuali per il lettore, tenendo conto delle impostazioni globali."
+
+#: plconfig/cog.py:114
+msgid "Server Settings"
+msgstr "Impostazioni server"
+
+#: plconfig/cog.py:118
+msgid "Get information about the server configured settings for the player."
+msgstr "Ottenere informazioni sulle impostazioni configurate dal server per il lettore."
+
+#: plconfig/cog.py:126 plconfig/view.py:499
+msgid "Playlist Tasks"
+msgstr "Compiti Playlist"
+
+#: plconfig/cog.py:129
+msgid "Get information about the playlist auto update schedule."
+msgstr "Ottieni informazioni sulla pianificazione dell'aggiornamento automatico della playlist."
+
+#: plconfig/cog.py:138
+msgid "PyLav Paths"
+msgstr "Percorsi PyLav"
+
+#: plconfig/cog.py:140
+msgid "Get information about PyLav paths"
+msgstr "Ottieni informazioni sui percorsi PyLav"
+
+#: plconfig/cog.py:147 plconfig/view.py:595
+msgid "Managed Node Settings"
+msgstr "Impostazioni dei nodi gestiti"
+
+#: plconfig/cog.py:150
+msgid "Get information about the Managed PyLav Lavalink node"
+msgstr "Ottieni informazioni sul nodo PyLav Lavalink gestito"
+
+#: plconfig/cog.py:160
+#, docstring
+msgid "Checks if a user or role is considered a disc jockey"
+msgstr "Controlla se un utente o un ruolo è considerato un disc jockey"
+
+#: plconfig/cog.py:171
+msgid "{role_name_variable_do_not_translate} is a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} è un ruolo di disc jockey."
+
+#: plconfig/cog.py:175
+msgid "{role_name_variable_do_not_translate} is not a disc jockey role."
+msgstr "{role_name_variable_do_not_translate} non è un ruolo di disc jockey."
+
+#: plconfig/cog.py:182
+msgid "{user_name_variable_do_not_translate} is a disc jockey."
+msgstr "{user_name_variable_do_not_translate} è un disc jockey."
+
+#: plconfig/cog.py:186
+msgid "{user_name_variable_do_not_translate} is not a disc jockey."
+msgstr "{user_name_variable_do_not_translate} non è un disc jockey."
+
+#: plconfig/cog.py:201
+#, docstring
+msgid "Set the local tracks folder for PyLav.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Imposta la cartella delle tracce locali per PyLav.\n\n"
+"        Le modifiche verranno applicate dopo il riavvio.\n"
+"        "
+
+#: plconfig/cog.py:213
+msgid "{folder_path_variable_do_not_translate} is not a folder."
+msgstr "{folder_path_variable_do_not_translate} non è una cartella."
+
+#: plconfig/cog.py:229
+msgid "{folder_path_variable_do_not_translate} does not exist, rerun the command with the create argument set to {command_variable_do_not_translate} to create this folder automatically."
+msgstr "{folder_path_variable_do_not_translate} non esiste, eseguire nuovamente il comando con l'argomento create impostato su {command_variable_do_not_translate} per creare automaticamente questa cartella."
+
+#: plconfig/cog.py:246
+msgid "PyLav local tracks folder has been set to {folder_path_variable_do_not_translate}."
+msgstr "La cartella delle tracce locali di PyLav è stata impostata su {folder_path_variable_do_not_translate}."
+
+#: plconfig/cog.py:261
+#, docstring
+msgid "Change the managed node configuration"
+msgstr "Cambia la configurazione del nodo gestito"
+
+#: plconfig/cog.py:265
+#, docstring
+msgid "Toggle the managed node on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Attiva/disattiva il nodo gestito.\n\n"
+"        Le modifiche verranno applicate dopo il riavvio.\n"
+"        "
+
+#: plconfig/cog.py:281
+msgid "I have turned on my managed Lavalink node."
+msgstr "Ho attivato il mio nodo Lavalink gestito."
+
+#: plconfig/cog.py:289
+msgid "I have turned off my managed Lavalink node."
+msgstr "Ho disattivato il mio nodo Lavalink gestito."
+
+#: plconfig/cog.py:297
+#, docstring
+msgid "Toggle the managed node auto updates on/off.\n\n"
+"        Changes will be applied after I restart.\n"
+"        "
+msgstr "Attiva/disattiva gli aggiornamenti automatici del nodo gestito.\n\n"
+"        Le modifiche verranno applicate dopo il riavvio.\n"
+"        "
+
+#: plconfig/cog.py:313
+msgid "I have turned on the self-update functionality of my managed node."
+msgstr "Ho attivato la funzionalità di aggiornamento automatico del mio nodo gestito."
+
+#: plconfig/cog.py:321
+msgid "I have turned off the self-update functionality of my managed node."
+msgstr "Ho disattivato la funzionalità di aggiornamento automatico del mio nodo gestito."
+
+#: plconfig/cog.py:329
+#, docstring
+msgid "Change the bundled external nodes state"
+msgstr "Cambia lo stato dei nodi esterni bundled"
+
+#: plconfig/cog.py:333
+#, docstring
+msgid "Toggle the managed external draper.wtf nodes on/off"
+msgstr "Attiva/disattiva i nodi esterni draper.wtf gestiti"
+
+#: plconfig/cog.py:353
+msgid "I have turned on the PyLav external Lavalink nodes."
+msgstr "Ho attivato i nodi Lavalink esterni PyLav."
+
+#: plconfig/cog.py:363
+msgid "I have turned off the PyLav external Lavalink nodes."
+msgstr "Ho disattivato i nodi Lavalink esterni PyLav."
+
+#: plconfig/cog.py:371
+#, docstring
+msgid "Toggle the managed external lava.link node on/off"
+msgstr "Attiva/disattiva il nodo lava.link esterno gestito"
+
+#: plconfig/cog.py:383
+msgid "I have turned on the lava.link external Lavalink node."
+msgstr "Ho attivato il nodo Lavalink esterno lava.link."
+
+#: plconfig/cog.py:391
+msgid "The PyLav managed lava.link external Lavalink node has been permanently removed."
+msgstr "Il nodo Lavalink esterno gestito da PyLav gestito lava.link è stato rimosso in modo permanente."
+
+#: plconfig/cog.py:400
+#, docstring
+msgid "Instructions on how to set the Spotify API Tokens"
+msgstr "Istruzioni su come impostare i token API di Spotify"
+
+#: plconfig/cog.py:401
+msgid "1. Go to Spotify developers and log in with your Spotify account.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. Click on \"Create An App\".\n"
+"3. Fill out the form provided with your application name, etc.\n"
+"4. When asked if you're developing commercial integration select \"No\".\n"
+"5. Accept the terms and conditions.\n"
+"6. Execute the following command replacing {argument_1_variable_do_not_translate} with your client identifier and {argument_2_variable_do_not_translate} with your client secret:\n"
+"  `{command_name_variable_do_not_translate}`"
+msgstr "1. Vai agli sviluppatori di Spotify e accedi con il tuo account Spotify.\n"
+"{spotify_url_variable_do_not_translate}\n"
+"2. Clicca su \"Crea un'app\".\n"
+"3. Compila il modulo fornito con il nome della tua domanda, ecc.\n"
+"4. Quando ti viene chiesto se stai sviluppando un'integrazione commerciale, seleziona \"No\".\n"
+"5. Accetta i termini e le condizioni.\n"
+"6. Eseguire il seguente comando sostituendo {argument_1_variable_do_not_translate} con l'identificatore client e {argument_2_variable_do_not_translate} con il segreto cliente:\n"
+"  `{command_name_variable_do_not_translate}`"
+
+#: plconfig/cog.py:428
+#, docstring
+msgid "Manage active players"
+msgstr "Gestisci giocatori attivi"
+
+#: plconfig/cog.py:437
+msgid "I am not currently playing anything in {server_name_variable_do_not_translate}."
+msgstr "Al momento non sto giocando nulla in {server_name_variable_do_not_translate}."
+
+#: plconfig/cog.py:448
+msgid "I am not connected to any voice channel at the moment."
+msgstr "Al momento non sono connesso a nessun canale vocale."
+
+#: plconfig/cog.py:465
+#, docstring
+msgid "Toggle whether or not I should update my Discord activity when playing tracks."
+msgstr "Attiva o disattiva se devo aggiornare o meno la mia attività Discord durante la riproduzione di brani."
+
+#: plconfig/cog.py:476
+msgid "From now on, I will update my activity to reflect the tracks I am playing."
+msgstr "D'ora in poi, aggiornerò la mia attività per riflettere le tracce che sto suonando."
+
+#: plconfig/cog.py:485
+msgid "From now on, I will no longer update my activity to reflect the tracks I am playing."
+msgstr "D'ora in poi, non aggiornerò più la mia attività per riflettere i brani che sto suonando."
+
+#: plconfig/view.py:27 plconfig/view.py:68 plconfig/view.py:179
+#: plconfig/view.py:289 plconfig/view.py:551
+msgid "Enabled"
+msgstr "Abilitato"
+
+#: plconfig/view.py:28 plconfig/view.py:69 plconfig/view.py:180
+#: plconfig/view.py:290 plconfig/view.py:552
+msgid "Disabled"
+msgstr "Disabile"
+
+#: plconfig/view.py:32
+msgid "Use Managed Node"
+msgstr "Usa Nodo Gestito"
+
+#: plconfig/view.py:36
+msgid "Auto Update\n"
+"Managed Node"
+msgstr "Aggiornamento automatico\n"
+"nodo gestito"
+
+#: plconfig/view.py:40
+msgid "Change Bot activity"
+msgstr "Cambia attività Bot"
+
+#: plconfig/view.py:44
+msgid "Use Bundled\n"
+"PyLav Nodes"
+msgstr "Usa i nodi PyLav\n"
+"raggruppati"
+
+#: plconfig/view.py:48
+msgid "Use Bundled\n"
+"lava.link Nodes"
+msgstr "Usa i nodi Bundled\n"
+"lava.link"
+
+#: plconfig/view.py:58 plconfig/view.py:163 plconfig/view.py:273
+#: plconfig/view.py:461 plconfig/view.py:596
+msgid "Value"
+msgstr "Valore"
+
+#: plconfig/view.py:72 plconfig/view.py:253 plconfig/view.py:400
+msgid "Volume"
+msgstr "Volume"
+
+#: plconfig/view.py:78 plconfig/view.py:98 plconfig/view.py:118
+#: plconfig/view.py:196 plconfig/view.py:216 plconfig/view.py:236
+#: plconfig/view.py:343 plconfig/view.py:363 plconfig/view.py:383
+msgid "{enabled_variable_do_not_translate}\n"
+"0 seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"0 secondi"
+
+#: plconfig/view.py:82 plconfig/view.py:102 plconfig/view.py:122
+#: plconfig/view.py:200 plconfig/view.py:220 plconfig/view.py:240
+#: plconfig/view.py:347 plconfig/view.py:367 plconfig/view.py:387
+msgid "{enabled_variable_do_not_translate}\n"
+"1 second"
+msgstr "{enabled_variable_do_not_translate}\n"
+"1 secondo"
+
+#: plconfig/view.py:86 plconfig/view.py:106 plconfig/view.py:126
+#: plconfig/view.py:204 plconfig/view.py:224 plconfig/view.py:244
+#: plconfig/view.py:351 plconfig/view.py:371 plconfig/view.py:391
+msgid "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} seconds"
+msgstr "{enabled_variable_do_not_translate}\n"
+"{setting_timer_variable_do_not_translate} Secondi"
+
+#: plconfig/view.py:135 plconfig/view.py:254 plconfig/view.py:401
+msgid "Maximum Volume"
+msgstr "Volume Massimo"
+
+#: plconfig/view.py:137 plconfig/view.py:256 plconfig/view.py:403
+msgid "AutoPlay"
+msgstr "AutoPlay"
+
+#: plconfig/view.py:141 plconfig/view.py:259 plconfig/view.py:419
+msgid "Shuffling"
+msgstr "Scalpiccio"
+
+#: plconfig/view.py:145 plconfig/view.py:260 plconfig/view.py:423
+msgid "Auto Shuffle"
+msgstr "Riproduzione automatica"
+
+#: plconfig/view.py:149 plconfig/view.py:261 plconfig/view.py:427
+msgid "Auto Deafen"
+msgstr "Autosordo"
+
+#: plconfig/view.py:152
+msgid "Auto Disconnect"
+msgstr "Disconnessione Automatica"
+
+#: plconfig/view.py:153 plconfig/view.py:263 plconfig/view.py:431
+msgid "Auto Alone Pause"
+msgstr "Pausa Automatica"
+
+#: plconfig/view.py:154 plconfig/view.py:264 plconfig/view.py:432
+msgid "Auto Alone Disconnect"
+msgstr "Disconnessione Automatica Da Sola"
+
+#: plconfig/view.py:176
+msgid "You need to be on a server to show this page."
+msgstr "Devi essere su un server per mostrare questa pagina."
+
+#: plconfig/view.py:262 plconfig/view.py:430
+msgid "Auto Empty Disconnect"
+msgstr "Disconnessione automatica vuota"
+
+#: plconfig/view.py:272
+msgid "Context Player Settings"
+msgstr "Impostazioni del lettore contestuale"
+
+#: plconfig/view.py:286
+msgid "You need to be in a server to be able to show this page."
+msgstr "Devi essere in un server per essere in grado di mostrare questa pagina."
+
+#: plconfig/view.py:307
+msgid "Too many entries to show ({number_of_users_variable_do_not_translate})"
+msgstr "Troppe voci da mostrare ({number_of_users_variable_do_not_translate})"
+
+#: plconfig/view.py:325
+msgid "Too many entries to show ({number_of_roles_variable_do_not_translate})"
+msgstr "Troppe voci da mostrare ({number_of_roles_variable_do_not_translate})"
+
+#: plconfig/view.py:330 plconfig/view.py:335 plconfig/view.py:437
+#: plconfig/view.py:443 plconfig/view.py:449
+msgid "None"
+msgstr "Nessuno"
+
+#: plconfig/view.py:407
+msgid "AutoPlay Playlist"
+msgstr "Playlist AutoPlay"
+
+#: plconfig/view.py:411
+msgid "Loop track"
+msgstr "Traccia loop"
+
+#: plconfig/view.py:415
+msgid "Loop Queue"
+msgstr "Coda Di Ciclo"
+
+#: plconfig/view.py:434
+msgid "Forced Voice Channel"
+msgstr "Canale Vocale Forzato"
+
+#: plconfig/view.py:440
+msgid "Forced Command Channel"
+msgstr "Canale Di Comando Forzato"
+
+#: plconfig/view.py:446
+msgid "Forced Notification Channel"
+msgstr "Canale Di Notifica Forzato"
+
+#: plconfig/view.py:451
+msgid "Disc Jockey Users"
+msgstr "Utenti di Disc Jockey"
+
+#: plconfig/view.py:452
+msgid "Disc Jockey Roles"
+msgstr "Ruoli di disc jockey"
+
+#: plconfig/view.py:460
+msgid "Server Player Settings"
+msgstr "Impostazioni di Server Player"
+
+#: plconfig/view.py:475
+msgid "Next Bundled\n"
+"Playlist Update"
+msgstr "Successivo in bundle\n"
+"Aggiornamento playlist"
+
+#: plconfig/view.py:481
+msgid "Next Bundled External\n"
+"Playlist Update"
+msgstr "Successivo Bundled esterno\n"
+"Aggiornamento playlist"
+
+#: plconfig/view.py:487
+msgid "Next External\n"
+"Playlist Update"
+msgstr "Prossimo aggiornamento esterno\n"
+"Playlist"
+
+#: plconfig/view.py:500
+msgid "Date and Time (UTC)"
+msgstr "Data e ora (UTC)"
+
+#: plconfig/view.py:513
+msgid "Due to sensitive information, I can only show the contents of this page to my owner."
+msgstr "A causa di informazioni sensibili, posso mostrare il contenuto di questa pagina solo al mio proprietario."
+
+#: plconfig/view.py:519
+msgid "Settings Folder"
+msgstr "Cartella Impostazioni"
+
+#: plconfig/view.py:521
+msgid "Local Tracks"
+msgstr "Tracce Locali"
+
+#: plconfig/view.py:524
+msgid "Lavalink Folder"
+msgstr "Cartella Lavalink"
+
+#: plconfig/view.py:526
+msgid "Java Executable"
+msgstr "Eseguibile Java"
+
+#: plconfig/view.py:530
+msgid "Not Found"
+msgstr "Non Trovato"
+
+#: plconfig/view.py:540
+msgid "Paths"
+msgstr "Percorsi"
+
+#: plconfig/view.py:541
+msgid "Path"
+msgstr "Percorso"
+
+#: plconfig/view.py:560
+msgid "Java"
+msgstr "Giava"
+
+#: plconfig/view.py:564
+msgid "Lavaplayer"
+msgstr "Lavaplayer"
+
+#: plconfig/view.py:568
+msgid "Lavalink Branch"
+msgstr "Succursale Di Lavalink"
+
+#: plconfig/view.py:572
+msgid "Lavalink Version"
+msgstr "Versione Lavalink"
+
+#: plconfig/view.py:576
+msgid "Lavalink Build"
+msgstr "Costruisci Lavalink"
+
+#: plconfig/view.py:579
+msgid "Build Time"
+msgstr "Tempo Di Costruzione"
+
+#: plconfig/view.py:581
+msgid "Commit"
+msgstr "Commettere"
+
+#: plconfig/view.py:585
+msgid "Auto Update"
+msgstr "Aggiornamento Automatico"
+
+#: plconfig/view.py:623
+msgid "Select an option from the dropdown menu below."
+msgstr "Seleziona un'opzione dal menu a discesa qui sotto."
+
+#: plconfig/view.py:638
+msgid "Pick an option to view"
+msgstr "Scegli un'opzione da visualizzare"
+
+#: plconfig/view.py:648
+msgid "You are not authorized to interact with this option."
+msgstr "Non sei autorizzato a interagire con questa opzione."
+
+#: plconfig/view.py:678
+msgid "You are not authorized to interact with this."
+msgstr "Non sei autorizzato a interagire con questo."
+
