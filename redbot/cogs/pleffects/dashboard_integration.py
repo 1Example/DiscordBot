@@ -84,6 +84,8 @@ class DashboardIntegration:
                 "connected": player is not None,
                 "filters": self._fx_state(player),
                 "volume": int(getattr(player, "volume", 0) or 0) if player else None,
+                "active_filters": sum(1 for f in self._fx_state(player) if f["active"]),
+                "current_eq": getattr(getattr(player, "equalizer", None), "name", "Flat") if player else "Flat",
             },
         }
 
@@ -164,6 +166,27 @@ EFFECTS_TEMPLATE = (
       </div>
     </form>
   {% endif %}
+
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-chart-line"></i> Player Status</h5>
+    <div class="dz-grid two">
+      <div><strong>Volume</strong><br>{{ volume if volume is not none else 0 }}%</div>
+      <div><strong>Equalizer</strong><br>{{ current_eq }}</div>
+      <div><strong>Active Filters</strong><br>{{ active_filters }}</div>
+      <div><strong>Connection</strong><br>{% if connected %}Connected{% else %}Offline{% endif %}</div>
+    </div>
+  </div>
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-sliders-h"></i> Equalizer</h5>
+    <p class="dz-hint">Preview panel for current EQ profile.</p>
+    <div class="dz-grid two">
+      {% for i in range(15) %}
+      <div style="padding:4px 0;">Band {{ i }}</div>
+      {% endfor %}
+    </div>
+  </div>
 
   <div class="dz-panel">
     <h5><i class="fa fa-magic"></i> Current filters</h5>
