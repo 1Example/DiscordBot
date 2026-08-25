@@ -1,29 +1,100 @@
+import re
+
 import discord
 from redbot.core import commands, Config, checks
 from redbot.core.bot import Red
 from typing import Optional
+from .dashboard_integration import DashboardIntegration
 
 
-def room_embed(guild: discord.Guild) -> discord.Embed:
+# Action keys, their default (unicode) emoji, and the panel description line.
+# Guilds can override any emoji with one of their own; nothing here is tied to
+# a specific server.
+ACTIONS = (
+    ("lock", "\N{LOCK}", "Lock", "stop new people from joining"),
+    ("unlock", "\N{OPEN LOCK}", "Unlock", "let anyone join again"),
+    ("hide", "\N{GHOST}", "Hide", "hide the room from the channel list"),
+    ("unhide", "\N{EYE}", "Unhide", "make the room visible again"),
+    ("rename", "\N{PENCIL}", "Rename", "change your room's name"),
+    ("limit", "\N{BUST IN SILHOUETTE}", "Limit", "set a max number of people (0 = unlimited)"),
+    ("kick", "\N{WOMANS BOOTS}", "Kick", "remove someone from your room"),
+    ("claim", "\N{CROWN}", "Claim", "take ownership of an empty-of-owner room"),
+)
+
+DEFAULT_EMOJIS = {key: default for key, default, _label, _blurb in ACTIONS}
+DEFAULT_EMOJIS["hub"] = "\N{SPEAKER WITH THREE SOUND WAVES}"
+DEFAULT_EMOJIS["public"] = "\N{SPEAKER WITH THREE SOUND WAVES}"
+DEFAULT_EMOJIS["private"] = "\N{LOCK}"
+
+CUSTOM_EMOJI_RE = re.compile(r"^<(a?):([A-Za-z0-9_]{2,32}):(\d{15,25})>$")
+
+
+def parse_emoji(raw: Optional[str]):
+    """Turn a stored emoji string into something discord.py accepts.
+
+    Accepts a unicode emoji or a full `<:name:id>` / `<a:name:id>` token.
+    Returns None when the value is unusable so a bad override degrades to no
+    emoji rather than breaking the whole panel.
+    """
+    if not raw:
+        return None
+    raw = raw.strip()
+    match = CUSTOM_EMOJI_RE.match(raw)
+    if match:
+        animated, name, emoji_id = match.groups()
+        return discord.PartialEmoji(name=name, id=int(emoji_id), animated=bool(animated))
+    # Anything short and non-ASCII is treated as a unicode emoji.
+    if len(raw) <= 8 and not raw.isascii():
+        return raw
+    return None
+
+
+def resolve_emojis(overrides: Optional[dict]) -> dict:
+    merged = dict(DEFAULT_EMOJIS)
+    for key, value in (overrides or {}).items():
+        if value:
+            merged[key] = value
+    return merged
+
+
+def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord.Embed:
+    """Build the hub panel embed for this guild.
+
+    Title, colour and every emoji come from config, defaulting to the guild's
+    own name so a fresh install reads correctly with no setup.
+    """
+    settings = settings or {}
+    emojis = resolve_emojis(settings.get("emojis"))
+    title = settings.get("panel_title") or f"{guild.name} | Voice Hub"
+    public_name = settings.get("hub_public_name") or "CREATE PUBLIC"
+    private_name = settings.get("hub_private_name") or "CREATE PRIVATE"
+
+    lines = [
+        f"Join **{emojis['public']} {public_name}** for a room anyone can join, or "
+        f"**{emojis['private']} {private_name}** for a room that's locked to just you "
+        f"until you let others in.\n",
+        "Use the buttons below to manage **your own** room from anywhere \u2014 "
+        "you don't need to be in the room's own chat to use these.\n",
+    ]
+    for key, _default, label, blurb in ACTIONS:
+        lines.append(f"{emojis[key]} **{label}** \u2014 {blurb}")
+
+    colour_value = settings.get("panel_colour")
+    try:
+        colour = discord.Colour(int(colour_value)) if colour_value else discord.Colour.blurple()
+    except (TypeError, ValueError):
+        colour = discord.Colour.blurple()
+
     embed = discord.Embed(
-        title="<:frg_joinvc:1535209033420505138> Fried Gang | VOICE HUB",
-        description=(
-            "Join  **🔊 CREATE PUBLIC**  for a room anyone can join, or  **🔒 CREATE PRIVATE**  "
-            "for a room that's locked to just you until you let others in.\n\n"
-            "Use the buttons below to manage **your own** room from anywhere — "
-            "you don't need to be in the room's own chat to use these.\n\n"
-            "<:frg_lock:1535326926670008411> **Lock** — stop new people from joining\n"
-            "<:frg_unlock:1535326925516709928> **Unlock** — let anyone join again\n"
-            "<:frg_hide:1535326883216883752> **Hide** — hide the room from the channel list\n"
-            "<:frg_unhide:1535326713880514602> **Unhide** — make the room visible again\n"
-            "<:frg_rename:1535326922387488959> **Rename** — change your room's name\n"
-            "<:frg_limit:1535326921271812236> **Limit** — set a max number of people (0 = unlimited)\n"
-            "<:frg_kick:1535326920420630660> **Kick** — remove someone from your room\n"
-            "<:frg_claim:1541154764660678727> **Claim** — take ownership of an empty-of-owner room"
-        ),
-        colour=discord.Colour.blurple(),
+        title=f"{emojis['hub']} {title}",
+        description="\n".join(lines),
+        colour=colour,
     )
-    embed.set_footer(text="Rooms are always created at your server's maximum voice quality. You must own a room to manage it (except Claim).")
+    footer = settings.get("panel_footer") or (
+        "Rooms are created at your server's maximum voice quality. "
+        "You must own a room to manage it (except Claim)."
+    )
+    embed.set_footer(text=footer)
     return embed
 
 
@@ -102,9 +173,20 @@ class ControlPanelView(discord.ui.View):
     cog_load and works for every guild/message it's attached to, since every
     callback resolves the acting member's room dynamically."""
 
-    def __init__(self, cog: "PrivateRooms"):
+    def __init__(self, cog: "PrivateRooms", emojis: Optional[dict] = None):
         super().__init__(timeout=None)
         self.cog = cog
+        # discord.py matches persistent views by custom_id, so the globally
+        # registered instance needs no emoji. The copy used when *posting* a
+        # panel carries the guild's own, and those are what the message keeps.
+        if emojis:
+            for child in self.children:
+                if not isinstance(child, discord.ui.Button) or not child.custom_id:
+                    continue
+                key = child.custom_id.split(":", 1)[-1]
+                parsed = parse_emoji(emojis.get(key))
+                if parsed is not None:
+                    child.emoji = parsed
 
     async def _get_channel_or_warn(self, interaction: discord.Interaction) -> Optional[discord.VoiceChannel]:
         channel = await self.cog.get_owned_channel(interaction)
@@ -115,7 +197,7 @@ class ControlPanelView(discord.ui.View):
             )
         return channel
 
-    @discord.ui.button(label="Lock", emoji=discord.PartialEmoji(name="frg_lock", id=1535326926670008411), style=discord.ButtonStyle.secondary, custom_id="prooms:lock", row=0)
+    @discord.ui.button(label="Lock", style=discord.ButtonStyle.secondary, custom_id="prooms:lock", row=0)
     async def lock(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = await self._get_channel_or_warn(interaction)
         if channel is None:
@@ -123,9 +205,9 @@ class ControlPanelView(discord.ui.View):
         overwrite = channel.overwrites_for(channel.guild.default_role)
         overwrite.connect = False
         await channel.set_permissions(channel.guild.default_role, overwrite=overwrite, reason=f"Locked by {interaction.user}")
-        await interaction.response.send_message("<:frg_lock:1535326926670008411> Room locked. Only existing members and anyone you allow can join.", ephemeral=True)
+        await interaction.response.send_message("Room locked. Only existing members and anyone you allow can join.", ephemeral=True)
 
-    @discord.ui.button(label="Unlock", emoji=discord.PartialEmoji(name="frg_unlock", id=1535326925516709928), style=discord.ButtonStyle.secondary, custom_id="prooms:unlock", row=0)
+    @discord.ui.button(label="Unlock", style=discord.ButtonStyle.secondary, custom_id="prooms:unlock", row=0)
     async def unlock(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = await self._get_channel_or_warn(interaction)
         if channel is None:
@@ -133,9 +215,9 @@ class ControlPanelView(discord.ui.View):
         overwrite = channel.overwrites_for(channel.guild.default_role)
         overwrite.connect = None
         await channel.set_permissions(channel.guild.default_role, overwrite=overwrite, reason=f"Unlocked by {interaction.user}")
-        await interaction.response.send_message("<:frg_unlock:1535326925516709928> Room unlocked. Anyone can join now.", ephemeral=True)
+        await interaction.response.send_message("Room unlocked. Anyone can join now.", ephemeral=True)
 
-    @discord.ui.button(label="Hide", emoji=discord.PartialEmoji(name="frg_hide", id=1535326883216883752), style=discord.ButtonStyle.secondary, custom_id="prooms:hide", row=0)
+    @discord.ui.button(label="Hide", style=discord.ButtonStyle.secondary, custom_id="prooms:hide", row=0)
     async def hide(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = await self._get_channel_or_warn(interaction)
         if channel is None:
@@ -143,9 +225,9 @@ class ControlPanelView(discord.ui.View):
         overwrite = channel.overwrites_for(channel.guild.default_role)
         overwrite.view_channel = False
         await channel.set_permissions(channel.guild.default_role, overwrite=overwrite, reason=f"Hidden by {interaction.user}")
-        await interaction.response.send_message("<:frg_hide:1535326883216883752> Room hidden from the channel list.", ephemeral=True)
+        await interaction.response.send_message("Room hidden from the channel list.", ephemeral=True)
 
-    @discord.ui.button(label="Unhide", emoji=discord.PartialEmoji(name="frg_unhide", id=1535326713880514602), style=discord.ButtonStyle.secondary, custom_id="prooms:unhide", row=0)
+    @discord.ui.button(label="Unhide", style=discord.ButtonStyle.secondary, custom_id="prooms:unhide", row=0)
     async def unhide(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = await self._get_channel_or_warn(interaction)
         if channel is None:
@@ -153,9 +235,9 @@ class ControlPanelView(discord.ui.View):
         overwrite = channel.overwrites_for(channel.guild.default_role)
         overwrite.view_channel = None
         await channel.set_permissions(channel.guild.default_role, overwrite=overwrite, reason=f"Unhidden by {interaction.user}")
-        await interaction.response.send_message("<:frg_unhide:1535326713880514602> Room visible again.", ephemeral=True)
+        await interaction.response.send_message("Room visible again.", ephemeral=True)
 
-    @discord.ui.button(label="Rename", emoji=discord.PartialEmoji(name="frg_rename", id=1535326922387488959), style=discord.ButtonStyle.secondary, custom_id="prooms:rename", row=1)
+    @discord.ui.button(label="Rename", style=discord.ButtonStyle.secondary, custom_id="prooms:rename", row=1)
     async def rename(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = await self.cog.get_owned_channel(interaction)
         if channel is None:
@@ -163,7 +245,7 @@ class ControlPanelView(discord.ui.View):
             return
         await interaction.response.send_modal(RenameModal(self.cog, channel))
 
-    @discord.ui.button(label="Limit", emoji=discord.PartialEmoji(name="frg_limit", id=1535326921271812236), style=discord.ButtonStyle.secondary, custom_id="prooms:limit", row=1)
+    @discord.ui.button(label="Limit", style=discord.ButtonStyle.secondary, custom_id="prooms:limit", row=1)
     async def limit(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = await self.cog.get_owned_channel(interaction)
         if channel is None:
@@ -171,7 +253,7 @@ class ControlPanelView(discord.ui.View):
             return
         await interaction.response.send_modal(LimitModal(self.cog, channel))
 
-    @discord.ui.button(label="Kick", emoji=discord.PartialEmoji(name="frg_kick", id=1535326920420630660), style=discord.ButtonStyle.secondary, custom_id="prooms:kick", row=1)
+    @discord.ui.button(label="Kick", style=discord.ButtonStyle.secondary, custom_id="prooms:kick", row=1)
     async def kick(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = await self._get_channel_or_warn(interaction)
         if channel is None:
@@ -183,7 +265,7 @@ class ControlPanelView(discord.ui.View):
             "Choose who to remove:", view=KickSelectView(self.cog, channel), ephemeral=True
         )
 
-    @discord.ui.button(label="Claim", emoji=discord.PartialEmoji(name="frg_claim", id=1541154764660678727), style=discord.ButtonStyle.secondary, custom_id="prooms:claim", row=1)
+    @discord.ui.button(label="Claim", style=discord.ButtonStyle.secondary, custom_id="prooms:claim", row=1)
     async def claim(self, interaction: discord.Interaction, button: discord.ui.Button):
         member = interaction.user
         if member.voice is None or member.voice.channel is None:
@@ -201,10 +283,10 @@ class ControlPanelView(discord.ui.View):
             await interaction.response.send_message("The current owner is still in the room.", ephemeral=True)
             return
         await self.cog.set_owner(interaction.guild, channel, member)
-        await interaction.response.send_message("<:frg_claim:1535326919472586837> You are now the owner of this room.", ephemeral=True)
+        await interaction.response.send_message("You are now the owner of this room.", ephemeral=True)
 
 
-class PrivateRooms(commands.Cog):
+class PrivateRooms(DashboardIntegration, commands.Cog):
     """Join-to-create voice rooms (public or private) with a shared control panel."""
 
     def __init__(self, bot: Red):
@@ -217,8 +299,16 @@ class PrivateRooms(commands.Cog):
             "panel_channel": None,
             "panel_message": None,
             "default_limit": 0,
-            "name_format_private": "🔒 {user}'s Room",
-            "name_format_public": "🌐 {user}'s Room",
+            "name_format_private": "{user}'s Room",
+            "name_format_public": "{user}'s Room",
+            # Presentation, all overridable per guild - nothing server-specific
+            # is baked into the code.
+            "panel_title": None,
+            "panel_footer": None,
+            "panel_colour": None,
+            "hub_public_name": "CREATE PUBLIC",
+            "hub_private_name": "CREATE PRIVATE",
+            "emojis": {},
             "rooms": {},  # str(voice_channel_id) -> {"owner": user_id, "public": bool}
         }
         self.config.register_guild(**default_guild)
@@ -418,8 +508,9 @@ class PrivateRooms(commands.Cog):
         This is the single shared interface everyone uses to manage their
         own room — it's independent of any voice channel's built-in chat.
         """
-        view = ControlPanelView(self)
-        message = await channel.send(embed=room_embed(ctx.guild), view=view)
+        settings = await self.config.guild(ctx.guild).all()
+        view = ControlPanelView(self, emojis=resolve_emojis(settings.get("emojis")))
+        message = await channel.send(embed=room_embed(ctx.guild, settings), view=view)
         await self.config.guild(ctx.guild).panel_channel.set(channel.id)
         await self.config.guild(ctx.guild).panel_message.set(message.id)
         await ctx.send(f"✅ Control panel posted in {channel.mention}.")

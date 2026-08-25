@@ -16,6 +16,10 @@ __all__ = (
     "guild_member",
     "channel_options",
     "role_options",
+    "member_options",
+    "emoji_options",
+    "message_preview",
+    "MACROS",
     "notify",
     "BASE_CSS",
 )
@@ -52,6 +56,14 @@ def form_reader(kwargs: dict) -> t.Callable[[str, t.Any], t.Any]:
     field.raw = form  # type: ignore[attr-defined]
     field.many = lambda key: [x for x in (form.get(key) or []) if x not in ("", None)]  # type: ignore[attr-defined]
     field.checked = lambda key: key in form  # type: ignore[attr-defined]
+
+    def integer(key: str, default=None):
+        try:
+            return int(str(field(key)).strip())
+        except (TypeError, ValueError):
+            return default
+
+    field.integer = integer  # type: ignore[attr-defined]
     return field
 
 
@@ -76,27 +88,168 @@ def guild_member(user: discord.User, guild: discord.Guild):
     return member, None
 
 
-def channel_options(guild: discord.Guild, *, selected: int | None = None, kinds=("text",)):
-    """Serialisable channel list for a <select>."""
+def _kind_of(channel) -> str:
+    if isinstance(channel, discord.CategoryChannel):
+        return "category"
+    if isinstance(channel, discord.VoiceChannel):
+        return "voice"
+    if isinstance(channel, discord.StageChannel):
+        return "stage"
+    return "text"
+
+
+def channel_options(
+    guild: discord.Guild,
+    *,
+    selected: int | None = None,
+    selected_many=None,
+    kinds=("text",),
+    require_send: bool = False,
+):
+    """Channel list for a picker, grouped by category.
+
+    `require_send` marks channels the bot cannot post in, so a page can warn
+    rather than letting the action fail silently later.
+    """
+    chosen = {str(i) for i in (selected_many or [])}
     wanted = []
     if "text" in kinds:
         wanted.extend(guild.text_channels)
     if "voice" in kinds:
         wanted.extend(guild.voice_channels)
+    if "stage" in kinds:
+        wanted.extend(getattr(guild, "stage_channels", []))
     if "category" in kinds:
         wanted.extend(guild.categories)
+    if "forum" in kinds:
+        wanted.extend(getattr(guild, "forums", []))
+
+    me = guild.me
+    prefixes = {"text": "#", "voice": "\N{SPEAKER WITH THREE SOUND WAVES}",
+                "stage": "\N{STUDIO MICROPHONE}", "category": "\N{BLACK RIGHT-POINTING SMALL TRIANGLE}",
+                "forum": "\N{SPEECH BALLOON}"}
+    out = []
+    for channel in sorted(wanted, key=lambda c: (getattr(c, "position", 0), c.name)):
+        can_send = True
+        if require_send and me is not None and hasattr(channel, "permissions_for"):
+            can_send = bool(getattr(channel.permissions_for(me), "send_messages", False))
+        out.append(
+            {
+                "id": str(channel.id),
+                "name": f"{prefixes.get(_kind_of(channel), '#')} {channel.name}",
+                "group": getattr(getattr(channel, "category", None), "name", "") or "No category",
+                "selected": (selected is not None and channel.id == selected)
+                or str(channel.id) in chosen,
+                "warn": not can_send,
+            }
+        )
+    return out
+
+
+def role_options(
+    guild: discord.Guild,
+    *,
+    selected: int | None = None,
+    selected_many=None,
+    skip_default: bool = True,
+    skip_managed: bool = False,
+):
+    chosen = {str(i) for i in (selected_many or [])}
+    me_top = guild.me.top_role.position if guild.me else 0
+    out = []
+    for role in sorted(guild.roles, key=lambda r: -r.position):
+        if skip_default and role.is_default():
+            continue
+        if skip_managed and role.managed:
+            continue
+        out.append(
+            {
+                "id": str(role.id),
+                "name": role.name,
+                # Roles at or above the bot's top role can never be assigned.
+                "group": "Above me" if role.position >= me_top else "Assignable",
+                "colour": f"#{role.colour.value:06x}" if role.colour.value else "#99aab5",
+                "members": len(role.members),
+                "selected": (selected is not None and role.id == selected)
+                or str(role.id) in chosen,
+                "warn": role.position >= me_top,
+            }
+        )
+    return out
+
+
+def member_options(guild: discord.Guild, *, selected: int | None = None,
+                   limit: int = 500, humans_only: bool = False):
+    members = [m for m in guild.members if not (humans_only and m.bot)]
+    members.sort(key=lambda m: m.display_name.lower())
     return [
-        {"id": str(c.id), "name": f"#{c.name}", "selected": selected is not None and c.id == selected}
-        for c in sorted(wanted, key=lambda c: (getattr(c, "position", 0), c.name))
+        {
+            "id": str(m.id),
+            "name": m.display_name,
+            "group": "Bots" if m.bot else "Members",
+            "selected": selected is not None and m.id == selected,
+            "warn": False,
+        }
+        for m in members[:limit]
     ]
 
 
-def role_options(guild: discord.Guild, *, selected: int | None = None, skip_default: bool = True):
-    roles = [r for r in guild.roles if not (skip_default and r.is_default())]
-    return [
-        {"id": str(r.id), "name": r.name, "selected": selected is not None and r.id == selected}
-        for r in sorted(roles, key=lambda r: -r.position)
-    ]
+def emoji_options(guild: discord.Guild, *, selected: str | None = None):
+    """Custom emoji available here, as `<:name:id>` tokens."""
+    out = []
+    for emoji in sorted(guild.emojis, key=lambda e: e.name.lower()):
+        token = f"<{'a' if emoji.animated else ''}:{emoji.name}:{emoji.id}>"
+        out.append(
+            {
+                "id": token,
+                "name": f":{emoji.name}:",
+                "group": "Animated" if emoji.animated else "Static",
+                "url": str(emoji.url),
+                "selected": selected == token,
+                "warn": False,
+            }
+        )
+    return out
+
+
+def message_preview(message, *, max_chars: int = 400) -> dict:
+    """Flatten a discord.Message into something the `msg` macro can render."""
+    from datetime import datetime, timezone
+
+    content = message.content or ""
+    if len(content) > max_chars:
+        content = content[:max_chars] + "\N{HORIZONTAL ELLIPSIS}"
+
+    embeds = []
+    for embed in message.embeds[:2]:
+        embeds.append(
+            {
+                "title": embed.title or "",
+                "description": (embed.description or "")[:300],
+                "colour": f"#{embed.colour.value:06x}" if embed.colour else "#4f545c",
+                "footer": (embed.footer.text if embed.footer else "") or "",
+                "fields": [
+                    {"name": f.name, "value": (f.value or "")[:120]}
+                    for f in embed.fields[:6]
+                ],
+            }
+        )
+
+    created = message.created_at or datetime.now(timezone.utc)
+    author = message.author
+    return {
+        "id": str(message.id),
+        "author": getattr(author, "display_name", str(author)),
+        "avatar": str(getattr(author, "display_avatar", "") or ""),
+        "bot": bool(getattr(author, "bot", False)),
+        "content": content,
+        "timestamp": created.strftime("%d %b %Y, %H:%M"),
+        "attachments": [a.filename for a in message.attachments[:4]],
+        "embeds": embeds,
+        "pinned": bool(message.pinned),
+        # Discord refuses to bulk-delete anything older than 14 days.
+        "old": (datetime.now(timezone.utc) - created).days >= 14,
+    }
 
 
 def notify(message: str, category: str = "success", *, redirect: str | None = None) -> dict:
@@ -151,4 +304,140 @@ BASE_CSS = """
             background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); }
   .dz-save { position:sticky; bottom:0; padding:12px 0; }
 </style>
+"""
+
+
+# Additional styling for the v2 components: searchable pickers, stat strips and
+# the Discord-style message preview.
+BASE_CSS += """
+<style>
+  .dz-grid.three { grid-template-columns:1fr; }
+  @media (min-width:1200px){ .dz-grid.three { grid-template-columns:repeat(3,1fr); } }
+  .dz-tag.warn { color:#f0aa3c; border-color:rgba(240,170,60,.4); }
+  .dz-tag.bad  { color:#ff8b8b; border-color:rgba(255,90,90,.4); }
+  .dz-tag.good { color:#3ba55d; border-color:rgba(59,165,93,.4); }
+
+  .dz-pick { position:relative; }
+  .dz-pick input.dz-search { margin-bottom:6px; }
+  .dz-pick .dz-count { font-size:.7rem; opacity:.45; margin-top:4px; }
+
+  .dz-stats { display:flex; gap:10px; flex-wrap:wrap; }
+  .dz-stat { flex:1 1 120px; padding:11px 14px; border-radius:12px;
+             background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.08); }
+  .dz-stat b { display:block; font-size:1.25rem; line-height:1.2; }
+  .dz-stat span { font-size:.72rem; opacity:.5; }
+
+  .dz-msgs { display:flex; flex-direction:column; gap:2px;
+             max-height:460px; overflow-y:auto; padding:4px 2px; }
+  .dz-msg { display:flex; gap:11px; padding:7px 9px; border-radius:8px; }
+  .dz-msg:hover { background:rgba(255,255,255,.03); }
+  .dz-msg.old { opacity:.5; }
+  .dz-av { width:34px; height:34px; border-radius:50%; flex:0 0 auto;
+           background:rgba(255,255,255,.09); object-fit:cover; }
+  .dz-body { min-width:0; flex:1; }
+  .dz-meta { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .dz-name { font-weight:600; font-size:.88rem; }
+  .dz-time { font-size:.68rem; opacity:.4; }
+  .dz-text { font-size:.86rem; line-height:1.4; white-space:pre-wrap;
+             word-break:break-word; opacity:.9; }
+  .dz-att { font-size:.72rem; opacity:.55; margin-top:3px; }
+  .dz-embed { margin-top:5px; padding:9px 12px; border-radius:5px;
+              border-left:4px solid #4f545c; background:rgba(0,0,0,.26); max-width:440px; }
+  .dz-embed .et { font-weight:600; font-size:.85rem; margin-bottom:3px; }
+  .dz-embed .ed { font-size:.8rem; opacity:.82; white-space:pre-wrap; }
+  .dz-embed .ef { font-size:.7rem; opacity:.5; margin-top:6px; }
+  .dz-embed .efield { margin-top:6px; font-size:.78rem; }
+  .dz-embed .efield b { display:block; opacity:.9; }
+  .dz-botpill { font-size:.6rem; padding:1px 5px; border-radius:3px;
+                background:#5865f2; color:#fff; font-weight:700; }
+  .dz-emoji { width:20px; height:20px; vertical-align:-4px; }
+</style>
+"""
+
+
+# Jinja macro library. Build templates as ``BASE_CSS + MACROS + markup`` so the
+# macros are defined in the same template that calls them.
+MACROS = """
+{% macro picker(name, options, multiple=false, size=8, placeholder='Search...', allow_none=false, none_label='none') -%}
+  <div class="dz-pick">
+    {% if options|length > 8 %}
+      <input class="dz-input dz-search" type="text" placeholder="{{ placeholder }}"
+             oninput="(function(i){
+               var s=i.parentNode.querySelector('select'); var q=i.value.toLowerCase(); var n=0;
+               Array.prototype.forEach.call(s.querySelectorAll('option'),function(o){
+                 var hit=o.text.toLowerCase().indexOf(q)>-1;
+                 o.hidden=!hit && o.value!=='';
+                 if(hit) n++;
+               });
+               Array.prototype.forEach.call(s.querySelectorAll('optgroup'),function(g){
+                 g.hidden=!g.querySelector('option:not([hidden])');
+               });
+               var c=i.parentNode.querySelector('.dz-count');
+               if(c) c.textContent=n+' of {{ options|length }} shown';
+             })(this)" />
+    {% endif %}
+    <select class="dz-select" name="{{ name }}"
+            {% if multiple %}multiple size="{{ size }}"{% endif %}>
+      {% if allow_none and not multiple %}
+        <option value="">&mdash; {{ none_label }} &mdash;</option>
+      {% endif %}
+      {% for group, items in options|groupby('group') %}
+        <optgroup label="{{ group }}">
+          {% for o in items %}
+            <option value="{{ o.id }}" {% if o.selected %}selected{% endif %}>{{ o.name }}{% if o.warn %} !{% endif %}</option>
+          {% endfor %}
+        </optgroup>
+      {% endfor %}
+    </select>
+    {% if options|length > 8 %}<div class="dz-count">{{ options|length }} available</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro stats(items) -%}
+  <div class="dz-stats">
+    {% for label, value in items %}
+      <div class="dz-stat"><b>{{ value }}</b><span>{{ label }}</span></div>
+    {% endfor %}
+  </div>
+{%- endmacro %}
+
+{% macro msg(m) -%}
+  <div class="dz-msg{% if m.old %} old{% endif %}">
+    {% if m.avatar %}<img class="dz-av" src="{{ m.avatar }}" alt="" />{% else %}<div class="dz-av"></div>{% endif %}
+    <div class="dz-body">
+      <div class="dz-meta">
+        <span class="dz-name">{{ m.author }}</span>
+        {% if m.bot %}<span class="dz-botpill">BOT</span>{% endif %}
+        <span class="dz-time">{{ m.timestamp }}</span>
+        {% if m.pinned %}<span class="dz-tag">pinned</span>{% endif %}
+        {% if m.old %}<span class="dz-tag warn">over 14 days</span>{% endif %}
+      </div>
+      {% if m.content %}<div class="dz-text">{{ m.content }}</div>{% endif %}
+      {% if m.attachments %}<div class="dz-att">{{ m.attachments|join(', ') }}</div>{% endif %}
+      {% for e in m.embeds %}
+        <div class="dz-embed" style="border-left-color:{{ e.colour }};">
+          {% if e.title %}<div class="et">{{ e.title }}</div>{% endif %}
+          {% if e.description %}<div class="ed">{{ e.description }}</div>{% endif %}
+          {% for f in e.fields %}<div class="efield"><b>{{ f.name }}</b>{{ f.value }}</div>{% endfor %}
+          {% if e.footer %}<div class="ef">{{ e.footer }}</div>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{%- endmacro %}
+
+{% macro msglist(messages, empty='Nothing matches.') -%}
+  {% if messages %}
+    <div class="dz-msgs">{% for m in messages %}{{ msg(m) }}{% endfor %}</div>
+  {% else %}
+    <p class="dz-empty">{{ empty }}</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro confirm(label, action, question, cls='danger', icon='fa-trash-o') -%}
+  <button class="dz-btn {{ cls }}" name="action" value="{{ action }}"
+          onclick="return confirm('{{ question }}');">
+    <i class="fa {{ icon }}"></i> {{ label }}
+  </button>
+{%- endmacro %}
 """
