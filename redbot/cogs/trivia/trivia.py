@@ -24,6 +24,7 @@ from .converters import finite_float
 from .log import LOG
 from .session import TriviaSession
 from .schema import TRIVIA_LIST_SCHEMA, format_schema_error
+from .dashboard_integration import DashboardIntegration
 
 __all__ = ("Trivia", "UNIQUE_ID", "InvalidListError", "get_core_lists", "get_list")
 
@@ -71,7 +72,7 @@ def format_settings(settings: Dict[str, Union[float, bool]]) -> str:
 
 
 @cog_i18n(_)
-class Trivia(commands.Cog):
+class Trivia(DashboardIntegration, commands.Cog):
     """Play trivia with friends!"""
 
     def __init__(self, bot: Red) -> None:

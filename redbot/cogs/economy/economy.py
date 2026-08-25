@@ -16,6 +16,7 @@ from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils import AsyncIter
 from redbot.core.utils.chat_formatting import box, humanize_number
 from redbot.core.utils.menus import menu
+from .dashboard_integration import DashboardIntegration
 
 T_ = Translator("Economy", __file__)
 
@@ -126,7 +127,7 @@ class SetParser:
 
 
 @cog_i18n(_)
-class Economy(commands.Cog):
+class Economy(DashboardIntegration, commands.Cog):
     """Get rich and have fun with imaginary currency!"""
 
     default_guild_settings = {

@@ -6,6 +6,7 @@ import discord
 from redbot.core import Config, commands
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import pagify
+from .dashboard_integration import DashboardIntegration
 
 log = logging.getLogger("red.vrt.commandlock")
 
@@ -23,7 +24,7 @@ class CogCommandConverter(t.NamedTuple):
         raise commands.BadArgument(f"Cog or command '{argument}' not found.")
 
 
-class CommandLock(commands.Cog):
+class CommandLock(DashboardIntegration, commands.Cog):
     """
     Lock command or cog usage to specific channels and redirect users to the correct ones.
     """

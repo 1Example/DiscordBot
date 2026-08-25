@@ -8,6 +8,7 @@ from redbot.core.utils.chat_formatting import humanize_list
 
 from .eventmixin import CommandPrivs, EventChooser, EventMixin, MemberUpdateEnum
 from .settings import inv_settings
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("ExtendedModLog", __file__)
 logger = getLogger("red.trusty-cogs.ExtendedModLog")
@@ -55,7 +56,7 @@ def wrapped_additional_help():
 
 
 @cog_i18n(_)
-class ExtendedModLog(EventMixin, commands.Cog):
+class ExtendedModLog(DashboardIntegration, EventMixin, commands.Cog):
     """
     Extended modlogs
     Works with core modlogset channel

@@ -26,6 +26,7 @@ from .requires import RoleToolsRequires
 from .select import RoleToolsSelect
 from .settings import RoleToolsSettings
 from .temprole import RoleToolsTemporary
+from .dashboard_integration import DashboardIntegration
 
 roletools = RoleToolsMixin.roletools
 
@@ -71,6 +72,7 @@ def custom_cooldown(ctx: commands.Context) -> Optional[discord.app_commands.Cool
 
 @cog_i18n(_)
 class RoleTools(
+    DashboardIntegration,
     RoleToolsEvents,
     RoleToolsButtons,
     RoleToolsExclusive,
