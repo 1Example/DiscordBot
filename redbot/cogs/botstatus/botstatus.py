@@ -4,12 +4,15 @@ import asyncio
 from typing import Optional
 from redbot.core import commands, checks, Config
 from redbot.core.i18n import Translator, cog_i18n
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("Botstatus", __file__)
 
 
 @cog_i18n(_)
-class Botstatus(commands.Cog):
+
+
+class Botstatus(DashboardIntegration, commands.Cog):
     """Botstatus"""
 
     __version__ = "2.0.0"

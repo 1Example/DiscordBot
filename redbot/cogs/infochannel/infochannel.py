@@ -7,6 +7,7 @@ import discord
 from redbot.core import Config, checks, commands
 from redbot.core.bot import Red
 from redbot.core.commands import Cog
+from .dashboard_integration import DashboardIntegration
 
 # 10 minutes. Rate limit is 2 per 10, so 1 per 6 is safe.
 RATE_LIMIT_DELAY = 60 * 6  # If you're willing to risk rate limiting, you can decrease the delay
@@ -42,7 +43,9 @@ async def get_channel_counts(category, guild):
     }
 
 
-class InfoChannel(Cog):
+
+
+class InfoChannel(DashboardIntegration, Cog):
     """
     Create a channel with updating server info
 

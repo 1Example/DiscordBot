@@ -3,12 +3,15 @@ import discord
 from redbot.core import commands, Config
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import pagify
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("RoleSyncer", __file__)
 
 
 @cog_i18n(_)
-class RoleSyncer(commands.Cog):
+
+
+class RoleSyncer(DashboardIntegration, commands.Cog):
     """Sync Roles"""
 
     __version__ = "2.1.1"

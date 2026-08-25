@@ -24,6 +24,7 @@ from .color import Color
 from .quiet_template import QuietTemplate
 from .rss_feed import RssFeed
 from .tag_type import INTERNAL_TAGS, VALID_IMAGES, TagType
+from .dashboard_integration import DashboardIntegration
 
 log = logging.getLogger("red.aikaterna.rss")
 
@@ -49,7 +50,9 @@ warnings.filterwarnings(
 warnings.filterwarnings("ignore", module="rss", category=MarkupResemblesLocatorWarning)
 
 
-class RSS(commands.Cog):
+
+
+class RSS(DashboardIntegration, commands.Cog):
     """RSS feeds for your server."""
 
     def __init__(self, bot):

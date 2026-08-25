@@ -10,6 +10,7 @@ from redbot.core.utils.chat_formatting import humanize_list
 
 from .events import Events
 from .menus import IMAGE_LINKS, BaseMenu, EventType, WelcomePages
+from .dashboard_integration import DashboardIntegration
 
 default_greeting = "Welcome {0.name} to {1.name}!"
 default_goodbye = "See you later {0.name}!"
@@ -59,7 +60,9 @@ log = getLogger("red.trusty-cogs.Welcome")
 
 
 @cog_i18n(_)
-class Welcome(Events, commands.Cog):
+
+
+class Welcome(DashboardIntegration, Events, commands.Cog):
     """Welcomes new members and goodbye those who leave to the guild
     in the default channel rewritten for V3 from
     https://github.com/irdumbs/Dumb-Cogs/blob/master/welcome/welcome.py"""
