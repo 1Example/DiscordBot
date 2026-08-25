@@ -13,7 +13,7 @@ import ast
 import pathlib
 import sys
 
-BASE = pathlib.Path("redbot/cogs")
+BASE = pathlib.Path(__file__).resolve().parent.parent / "redbot" / "cogs"
 
 
 def target_exists(cog: str, sub: tuple[str, ...]) -> bool:
