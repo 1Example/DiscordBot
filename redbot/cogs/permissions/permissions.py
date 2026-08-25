@@ -22,6 +22,7 @@ from .converters import (
     GuildUniqueObjectFinder,
     GlobalUniqueObjectFinder,
 )
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("Permissions", __file__)
 
@@ -80,7 +81,7 @@ __version__ = "1.0.0"
 
 
 @cog_i18n(_)
-class Permissions(commands.Cog):
+class Permissions(DashboardIntegration, commands.Cog):
     """Customise permissions for commands and cogs."""
 
     # The command groups in this cog should never directly take any configuration actions

@@ -21,13 +21,14 @@ from redbot.core.utils import AsyncIter
 from redbot.core.utils.chat_formatting import box, pagify, warning
 from redbot.core.utils.views import ConfirmView
 from redbot.core.utils.menus import menu
+from .dashboard_integration import DashboardIntegration
 
 
 _ = Translator("Warnings", __file__)
 
 
 @cog_i18n(_)
-class Warnings(commands.Cog):
+class Warnings(DashboardIntegration, commands.Cog):
     """Warn misbehaving users and take automated actions."""
 
     default_guild = {

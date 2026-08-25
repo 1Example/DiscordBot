@@ -6,12 +6,13 @@ import aiohttp
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core import Config, commands
 from redbot.core.commands import UserInputOptional
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("Image", __file__)
 
 
 @cog_i18n(_)
-class Image(commands.Cog):
+class Image(DashboardIntegration, commands.Cog):
     """Image related commands."""
 
     default_global = {"imgur_client_id": None}

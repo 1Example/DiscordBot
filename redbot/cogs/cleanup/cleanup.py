@@ -14,6 +14,7 @@ from redbot.core.utils.mod import slow_deletion, mass_purge
 from redbot.core.utils.predicates import MessagePredicate
 from .checks import check_self_permissions
 from .converters import RawMessageIds
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("Cleanup", __file__)
 
@@ -21,7 +22,7 @@ log = logging.getLogger("red.cleanup")
 
 
 @cog_i18n(_)
-class Cleanup(commands.Cog):
+class Cleanup(DashboardIntegration, commands.Cog):
     """This cog contains commands used for "cleaning up" (deleting) messages.
 
     This is designed as a moderator tool and offers many convenient use cases.

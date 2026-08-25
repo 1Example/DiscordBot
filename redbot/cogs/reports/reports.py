@@ -14,6 +14,7 @@ from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n, set_contextual_locales_from_guild
 from redbot.core.utils.predicates import MessagePredicate
 from redbot.core.utils.tunnel import Tunnel
+from .dashboard_integration import DashboardIntegration
 
 
 _ = Translator("Reports", __file__)
@@ -22,7 +23,7 @@ log = logging.getLogger("red.reports")
 
 
 @cog_i18n(_)
-class Reports(commands.Cog):
+class Reports(DashboardIntegration, commands.Cog):
     """Create user reports that server staff can respond to.
 
     Users can open reports using `[p]report`. These are then sent
