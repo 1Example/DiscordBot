@@ -6,6 +6,7 @@ import discord
 from typing import Optional, Union, List
 from itertools import zip_longest
 from redbot.core import commands, app_commands
+from .dashboard_integration import DashboardIntegration
 
 IMAGE_TYPES = (".png", ".jpg", ".jpeg", ".gif", ".webp")
 STICKER_KB = 512
@@ -36,7 +37,7 @@ This prevents Discord from replacing your animated PNG with a static PNG.
 \n**Important:** """ + STICKER_TOO_BIG
 
 
-class EmojiSteal(commands.Cog):
+class EmojiSteal(DashboardIntegration, commands.Cog):
     """Steals emojis and stickers sent by other people and optionally uploads them to your own server."""
 
     def __init__(self, bot):

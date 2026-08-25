@@ -8,6 +8,7 @@ from redbot.core import commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     channel_options,
     dashboard_page,
     form_reader,
@@ -121,13 +122,75 @@ class DashboardIntegration:
                 "guild_name": guild.name,
                 "groups": groups,
                 "active": active,
+                "stat_items": [
+                    ("Events on", active),
+                    ("Events off", sum(len(g["events"]) for g in groups) - active),
+                    ("Ignored channels", len(settings.get("ignored_channels") or [])),
+                ],
+                "all_channels": channel_options(guild, require_send=True),
+                "preview": self._eml_preview(guild),
                 "total": sum(len(g["events"]) for g in groups),
-                "ignored_channels": channel_options(guild),
-                "ignored_channel_ids": [str(i) for i in (settings.get("ignored_channels") or [])],
+                "ignored_channels": channel_options(
+                    guild, selected_many=settings.get("ignored_channels") or []
+                ),
                 "ignored_roles": role_options(guild),
                 "ignored_mods": bool(settings.get("ignored_mods")),
             },
         }
+
+    def _eml_preview(self, guild: discord.Guild) -> dict:
+        """A representative log entry, so the styling is visible before an event fires."""
+        me = guild.me
+        return {
+            "id": "preview",
+            "author": me.display_name if me else "Bot",
+            "avatar": str(me.display_avatar) if me else "",
+            "bot": True,
+            "content": "",
+            "timestamp": "now",
+            "attachments": [],
+            "pinned": False,
+            "old": False,
+            "embeds": [
+                {
+                    "title": "Message deleted",
+                    "description": "A message by @someone was deleted in #general.",
+                    "colour": "#ed4245",
+                    "footer": "Message ID: 000000000000000000",
+                    "fields": [
+                        {"name": "Channel", "value": "#general"},
+                        {"name": "Content", "value": "the deleted text"},
+                    ],
+                }
+            ],
+        }
+
+    async def _eml_set_all_channels(self, conf, guild, field) -> list[dict]:
+        """Point every currently enabled event at one channel."""
+        raw = field("bulk_channel") or ""
+        if not raw.isdigit():
+            return [{"message": "Pick a channel first.", "category": "warning"}]
+        channel = guild.get_channel(int(raw))
+        if channel is None:
+            return [{"message": "That channel no longer exists.", "category": "danger"}]
+        if not channel.permissions_for(guild.me).send_messages:
+            return [
+                {"message": f"I cannot send messages in #{channel.name}.", "category": "danger"}
+            ]
+
+        changed = 0
+        settings = await conf.all()
+        for key, data in settings.items():
+            if key in NON_EVENT_KEYS or not isinstance(data, dict) or "enabled" not in data:
+                continue
+            if not data.get("enabled"):
+                continue
+            await conf.get_attr(key).channel.set(channel.id)
+            changed += 1
+        return [
+            {"message": f"Pointed {changed} enabled event(s) at #{channel.name}.",
+             "category": "success"}
+        ]
 
     async def _eml_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
         field = form_reader(kwargs)
@@ -137,6 +200,8 @@ class DashboardIntegration:
         try:
             if action == "save_group":
                 return await self._eml_save_group(conf, guild, field)
+            if action == "set_all_channels":
+                return await self._eml_set_all_channels(conf, guild, field)
             if action == "save_ignores":
                 ids = [int(x) for x in field.many("ignored_channels") if str(x).isdigit()]
                 await conf.ignored_channels.set(ids)
@@ -204,6 +269,7 @@ class DashboardIntegration:
 
 MODLOG_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -211,7 +277,29 @@ MODLOG_TEMPLATE = (
     <p>{{ active }} of {{ total }} events are being logged.</p>
   </div>
 
+  {{ stats(stat_items) }}
+
+  {% if preview %}
+    <div class="dz-panel">
+      <h5><i class="fa fa-eye"></i> Sample log entry</h5>
+      <p class="dz-hint">How an event looks when it is posted.</p>
+      {{ msg(preview) }}
+    </div>
+  {% endif %}
+
   <div class="dz-panel">
+    <h5><i class="fa fa-bolt"></i> Bulk actions</h5>
+    <p class="dz-hint">Point every enabled event at one channel, or flip them all at once.</p>
+    <form method="POST" class="dz-row" style="margin-bottom:10px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div style="flex:1 1 260px;">
+        {{ picker('bulk_channel', all_channels, allow_none=true,
+                  none_label='pick a channel', placeholder='Search channels...') }}
+      </div>
+      <button class="dz-btn" name="action" value="set_all_channels">
+        <i class="fa fa-share"></i> Send everything here
+      </button>
+    </form>
     <div class="dz-row">
       <form method="POST" style="display:inline;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
@@ -255,12 +343,8 @@ MODLOG_TEMPLATE = (
             <div class="dz-grid two" style="margin-top:9px;">
               <div>
                 <div class="dz-label">Log channel</div>
-                <select class="dz-select" name="{{ e.key }}__channel">
-                  <option value="">&mdash; default modlog &mdash;</option>
-                  {% for c in e.channels %}
-                    <option value="{{ c.id }}" {% if c.selected %}selected{% endif %}>{{ c.name }}</option>
-                  {% endfor %}
-                </select>
+                {{ picker(e.key ~ '__channel', e.channels, allow_none=true,
+                          none_label='default modlog', placeholder='Search channels...') }}
               </div>
               <div>
                 <div class="dz-label">Emoji</div>
@@ -299,13 +383,8 @@ MODLOG_TEMPLATE = (
     <div class="dz-panel">
       <h5><i class="fa fa-ban"></i> Ignore list</h5>
       <p class="dz-hint">Nothing from these channels is logged. Ctrl-click to multi-select.</p>
-      <select class="dz-select" name="ignored_channels" multiple size="8">
-        {% for c in ignored_channels %}
-          <option value="{{ c.id }}" {% if c.id in ignored_channel_ids %}selected{% endif %}>
-            {{ c.name }}
-          </option>
-        {% endfor %}
-      </select>
+      {{ picker('ignored_channels', ignored_channels, multiple=true, size=9,
+                placeholder='Search channels...') }}
       <label class="dz-toggle" style="margin-top:9px;">
         <input type="checkbox" name="ignored_mods" {% if ignored_mods %}checked{% endif %} />
         <span>Don't log actions performed by moderators</span>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import typing as t
 
 import discord
@@ -8,6 +9,7 @@ from redbot.core import commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     channel_options,
     dashboard_page,
     form_reader,
@@ -18,50 +20,46 @@ from redbot.core.utils.dashboard_helpers import (
 
 log = logging.getLogger("red.welcome.dashboard")
 
-# Config keys that are plain on/off switches, with the label shown on the page.
 TOGGLES = (
-    ("ON", "Announce joins"),
-    ("LEAVE_ON", "Announce leaves"),
-    ("WHISPER", "Also DM the new member"),
-    ("GROUPED", "Group rapid joins into one message"),
-    ("EMBED", "Send as an embed"),
-    ("JOINED_TODAY", "Include today's join count"),
-    ("PENDING", "Wait until membership screening completes"),
-    ("DELETE_PREVIOUS_GREETING", "Delete the previous greeting"),
-    ("DELETE_PREVIOUS_GOODBYE", "Delete the previous goodbye"),
+    ("ON", "Announce joins", "Post a message when someone joins."),
+    ("LEAVE_ON", "Announce leaves", "Post a message when someone leaves."),
+    ("WHISPER", "Also DM the new member", "Send the greeting to their DMs too."),
+    ("GROUPED", "Group rapid joins", "Combine a burst of joins into one message."),
+    ("EMBED", "Send as an embed", "Otherwise the greeting is plain text."),
+    ("JOINED_TODAY", "Include today's join count", "Appends how many joined today."),
+    ("PENDING", "Wait for membership screening", "Hold the greeting until they pass the gate."),
+    ("DELETE_PREVIOUS_GREETING", "Delete the previous greeting", "Keeps the channel tidy."),
+    ("DELETE_PREVIOUS_GOODBYE", "Delete the previous goodbye", "Keeps the channel tidy."),
 )
 
 MENTION_KEYS = ("users", "roles", "everyone")
 
+PLACEHOLDERS = (
+    ("{0}", "the member"),
+    ("{0.name}", "their username"),
+    ("{0.display_name}", "their nickname"),
+    ("{0.mention}", "a ping"),
+    ("{1}", "the server"),
+    ("{1.name}", "the server name"),
+    ("{count}", "member count"),
+    ("{plural}", "an 's' unless count is 1"),
+)
+
 
 class DashboardIntegration:
-    """Greeting and farewell configuration, with message editing."""
+    """Greeting editor with a live preview of the rendered message."""
 
     bot: t.Any
     config: t.Any
-
-    @discord.utils.cached_property
-    def _welcome_placeholders(self) -> list[tuple[str, str]]:
-        return [
-            ("{0}", "the member who joined or left"),
-            ("{0.name}", "their username"),
-            ("{0.mention}", "a mention"),
-            ("{1}", "the server"),
-            ("{1.name}", "the server name"),
-            ("{count}", "member count"),
-            ("{plural}", "an 's' when count is not 1"),
-        ]
 
     @commands.Cog.listener()
     async def on_dashboard_cog_add(self, dashboard_cog) -> None:  # noqa: D401
         log.info("Dashboard cog found, registering Welcome as a third party.")
         dashboard_cog.rpc.third_parties_handler.add_third_party(self)
 
-    # ------------------------------------------------------------------ page
-
     @dashboard_page(
         name=None,
-        description="Configure join and leave announcements.",
+        description="Join and leave messages, with a live preview.",
         methods=("GET", "POST"),
         context_ids=["guild_id", "user_id"],
     )
@@ -80,10 +78,12 @@ class DashboardIntegration:
 
         notifications: list[dict] = []
         if kwargs.get("method") == "POST":
-            notifications = await self._welcome_handle_post(guild, kwargs)
+            notifications = await self._wc_handle_post(guild, member, kwargs)
 
         settings = await self.config.guild(guild).all()
         embed_data = settings.get("EMBED_DATA") or {}
+        greetings = settings.get("GREETING") or []
+        goodbyes = settings.get("GOODBYE") or []
 
         return {
             "status": 0,
@@ -92,14 +92,23 @@ class DashboardIntegration:
                 "source": WELCOME_TEMPLATE,
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
-                "toggles": [
-                    {"key": key, "label": label, "on": bool(settings.get(key))}
-                    for key, label in TOGGLES
+                "stat_items": [
+                    ("Join messages", len(greetings)),
+                    ("Leave messages", len(goodbyes)),
+                    ("Members", guild.member_count or 0),
                 ],
-                "greetings": settings.get("GREETING") or [],
-                "goodbyes": settings.get("GOODBYE") or [],
-                "channels": channel_options(guild, selected=settings.get("CHANNEL")),
-                "leave_channels": channel_options(guild, selected=settings.get("LEAVE_CHANNEL")),
+                "toggles": [
+                    {"key": k, "label": lbl, "help": h, "on": bool(settings.get(k))}
+                    for k, lbl, h in TOGGLES
+                ],
+                "greetings": greetings,
+                "goodbyes": goodbyes,
+                "channels": channel_options(
+                    guild, selected=settings.get("CHANNEL"), require_send=True
+                ),
+                "leave_channels": channel_options(
+                    guild, selected=settings.get("LEAVE_CHANNEL"), require_send=True
+                ),
                 "bot_roles": role_options(guild, selected=settings.get("BOTS_ROLE")),
                 "bots_msg": settings.get("BOTS_MSG") or "",
                 "bots_goodbye_msg": settings.get("BOTS_GOODBYE_MSG") or "",
@@ -116,114 +125,196 @@ class DashboardIntegration:
                     "thumbnail": embed_data.get("thumbnail") or "",
                     "image": embed_data.get("image") or "",
                     "image_goodbye": embed_data.get("image_goodbye") or "",
-                    "colour": embed_data.get("colour") or 0,
-                    "colour_goodbye": embed_data.get("colour_goodbye") or 0,
+                    "colour": self._wc_hex(embed_data.get("colour")),
+                    "colour_goodbye": self._wc_hex(embed_data.get("colour_goodbye")),
                     "author": bool(embed_data.get("author")),
                     "timestamp": bool(embed_data.get("timestamp")),
                     "mention": bool(embed_data.get("mention")),
                 },
-                "placeholders": self._welcome_placeholders,
+                "placeholders": PLACEHOLDERS,
+                # Rendered exactly as it will appear, using a real member.
+                "preview_join": self._wc_preview(guild, member, settings, greetings, join=True),
+                "preview_leave": self._wc_preview(guild, member, settings, goodbyes, join=False),
+                "preview_member": member.display_name,
             },
         }
 
+    # ---------------------------------------------------------------- preview
+
+    @staticmethod
+    def _wc_hex(value) -> str:
+        try:
+            return f"#{int(value):06x}"
+        except (TypeError, ValueError):
+            return "#5865f2"
+
+    def _wc_render(self, template: str, guild: discord.Guild, member: discord.Member) -> str:
+        """Apply the same substitutions the cog uses when it posts."""
+        try:
+            text = template.format(member, guild, count=guild.member_count or 0,
+                                   plural="" if (guild.member_count or 0) == 1 else "s")
+        except (IndexError, KeyError, AttributeError) as exc:
+            return f"[placeholder error: {exc}]"
+        return text
+
+    def _wc_preview(self, guild, member, settings: dict, messages: list, *, join: bool) -> dict:
+        if not messages:
+            return {}
+        template = random.choice(messages)
+        body = self._wc_render(template, guild, member)
+        embed_data = settings.get("EMBED_DATA") or {}
+        as_embed = bool(settings.get("EMBED"))
+
+        preview = {
+            "id": "preview",
+            "author": guild.me.display_name if guild.me else "Bot",
+            "avatar": str(guild.me.display_avatar) if guild.me else "",
+            "bot": True,
+            "timestamp": "now",
+            "attachments": [],
+            "pinned": False,
+            "old": False,
+            "content": "" if as_embed else body,
+            "embeds": [],
+        }
+        if not as_embed:
+            return preview
+
+        colour_key = "colour" if join else "colour_goodbye"
+        preview["embeds"] = [
+            {
+                "title": self._wc_render(embed_data.get("title") or "", guild, member),
+                "description": body,
+                "colour": self._wc_hex(embed_data.get(colour_key)),
+                "footer": self._wc_render(embed_data.get("footer") or "", guild, member),
+                "fields": [],
+            }
+        ]
+        if embed_data.get("mention"):
+            preview["content"] = member.mention
+        return preview
+
     # ------------------------------------------------------------- post logic
 
-    async def _welcome_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+    async def _wc_handle_post(self, guild, actor, kwargs: dict) -> list[dict]:
         field = form_reader(kwargs)
         action = field("action")
         conf = self.config.guild(guild)
 
         try:
-            if action == "add_greeting":
-                return await self._welcome_add_message(conf, "GREETING", field("new_message"))
-            if action == "add_goodbye":
-                return await self._welcome_add_message(conf, "GOODBYE", field("new_message"))
-            if action == "delete_greeting":
-                return await self._welcome_delete_message(conf, "GREETING", field("index"))
-            if action == "delete_goodbye":
-                return await self._welcome_delete_message(conf, "GOODBYE", field("index"))
+            if action in ("add_greeting", "add_goodbye"):
+                key = "GREETING" if action == "add_greeting" else "GOODBYE"
+                text = (field("new_message") or "").strip()
+                if not text:
+                    return [{"message": "Enter a message first.", "category": "warning"}]
+                bad = self._wc_validate(text, guild, actor)
+                if bad:
+                    return [{"message": bad, "category": "danger"}]
+                async with conf.get_attr(key)() as messages:
+                    messages.append(text)
+                return [{"message": "Message added.", "category": "success"}]
+
+            if action in ("delete_greeting", "delete_goodbye"):
+                key = "GREETING" if action == "delete_greeting" else "GOODBYE"
+                index = field.integer("index")
+                if index is None:
+                    return [{"message": "Bad index.", "category": "danger"}]
+                async with conf.get_attr(key)() as messages:
+                    if not 0 <= index < len(messages):
+                        return [{"message": "That message is gone.", "category": "warning"}]
+                    # The cog picks at random; an empty list raises on the next join.
+                    if len(messages) == 1:
+                        return [
+                            {"message": "Keep at least one message - edit it instead.",
+                             "category": "warning"}
+                        ]
+                    messages.pop(index)
+                return [{"message": "Message removed.", "category": "success"}]
+
             if action == "save_messages":
-                return await self._welcome_save_messages(conf, field)
+                errors = []
+                for key, form_key in (("GREETING", "greeting"), ("GOODBYE", "goodbye")):
+                    values = [m.strip() for m in field.many(form_key) if m.strip()]
+                    if key == "GREETING" and not values:
+                        errors.append("You need at least one join message.")
+                        continue
+                    for value in values:
+                        bad = self._wc_validate(value, guild, actor)
+                        if bad:
+                            errors.append(bad)
+                            break
+                    else:
+                        if values:
+                            await conf.get_attr(key).set(values)
+                if errors:
+                    return [{"message": e, "category": "danger"} for e in errors]
+                return [{"message": "Messages saved.", "category": "success"}]
+
             if action == "save_settings":
-                return await self._welcome_save_settings(conf, field)
-        except Exception as exc:  # noqa: BLE001 - surfaced, not swallowed
+                return await self._wc_save_settings(conf, guild, field)
+
+            if action == "test":
+                return await self._wc_test(guild, actor, field)
+        except Exception as exc:  # noqa: BLE001
             log.exception("Welcome dashboard action %r failed", action)
             return [{"message": f"Action failed: {exc}", "category": "danger"}]
 
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
 
-    @staticmethod
-    async def _welcome_add_message(conf, key: str, text: str | None) -> list[dict]:
-        text = (text or "").strip()
-        if not text:
-            return [{"message": "Enter a message first.", "category": "warning"}]
-        async with getattr(conf, key)() as messages:
-            messages.append(text)
-        return [{"message": "Message added.", "category": "success"}]
-
-    @staticmethod
-    async def _welcome_delete_message(conf, key: str, index: str | None) -> list[dict]:
+    def _wc_validate(self, template: str, guild, member) -> str | None:
+        """Reject a template that would raise when the cog formats it."""
         try:
-            position = int(index)
-        except (TypeError, ValueError):
-            return [{"message": "Bad message index.", "category": "danger"}]
-        async with getattr(conf, key)() as messages:
-            if not 0 <= position < len(messages):
-                return [{"message": "That message no longer exists.", "category": "warning"}]
-            # Keep at least one message: the cog picks randomly from this list
-            # and an empty list would raise on the next join.
-            if len(messages) == 1:
-                return [
-                    {
-                        "message": "You need at least one message. Edit this one instead.",
-                        "category": "warning",
-                    }
-                ]
-            messages.pop(position)
-        return [{"message": "Message removed.", "category": "success"}]
+            template.format(member, guild, count=0, plural="s")
+        except (IndexError, KeyError) as exc:
+            return f"Unknown placeholder {exc} - only {{0}}, {{1}}, {{count}} and {{plural}} exist."
+        except AttributeError as exc:
+            return f"Invalid attribute in the template: {exc}"
+        return None
 
-    @staticmethod
-    async def _welcome_save_messages(conf, field) -> list[dict]:
-        greetings = [m.strip() for m in field.many("greeting") if m.strip()]
-        goodbyes = [m.strip() for m in field.many("goodbye") if m.strip()]
-        if not greetings:
-            return [{"message": "You need at least one greeting.", "category": "warning"}]
-        await conf.GREETING.set(greetings)
-        if goodbyes:
-            await conf.GOODBYE.set(goodbyes)
-        return [{"message": "Messages saved.", "category": "success"}]
-
-    async def _welcome_save_settings(self, conf, field) -> list[dict]:
-        errors: list[str] = []
-
-        for key, _label in TOGGLES:
-            await getattr(conf, key).set(field.checked(f"t_{key}"))
+    async def _wc_save_settings(self, conf, guild, field) -> list[dict]:
+        errors: list[dict] = []
+        for key, _lbl, _h in TOGGLES:
+            await conf.get_attr(key).set(field.checked(f"t_{key}"))
 
         for key, form_key in (("CHANNEL", "channel"), ("LEAVE_CHANNEL", "leave_channel")):
             raw = field(form_key) or ""
-            await getattr(conf, key).set(int(raw) if raw.isdigit() else None)
+            channel_id = int(raw) if raw.isdigit() else None
+            if channel_id is not None:
+                channel = guild.get_channel(channel_id)
+                if channel and not channel.permissions_for(guild.me).send_messages:
+                    errors.append(
+                        {"message": f"I cannot post in #{channel.name}.", "category": "warning"}
+                    )
+            await conf.get_attr(key).set(channel_id)
 
         raw_role = field("bots_role") or ""
-        await conf.BOTS_ROLE.set(int(raw_role) if raw_role.isdigit() else None)
+        role_id = int(raw_role) if raw_role.isdigit() else None
+        if role_id:
+            role = guild.get_role(role_id)
+            if role and guild.me and role.position >= guild.me.top_role.position:
+                errors.append(
+                    {"message": f"'{role.name}' is above my top role; I cannot assign it.",
+                     "category": "warning"}
+                )
+        await conf.BOTS_ROLE.set(role_id)
 
         await conf.BOTS_MSG.set((field("bots_msg") or "").strip() or None)
         await conf.BOTS_GOODBYE_MSG.set((field("bots_goodbye_msg") or "").strip() or None)
 
-        for key, form_key in (
-            ("MINIMUM_DAYS", "minimum_days"),
-            ("DELETE_AFTER_GREETING", "delete_after_greeting"),
-            ("DELETE_AFTER_GOODBYE", "delete_after_goodbye"),
+        for key, form_key, floor in (
+            ("MINIMUM_DAYS", "minimum_days", 0),
+            ("DELETE_AFTER_GREETING", "delete_after_greeting", None),
+            ("DELETE_AFTER_GOODBYE", "delete_after_goodbye", None),
         ):
             raw = (field(form_key) or "").strip()
             if raw == "":
-                # MINIMUM_DAYS is a count and must stay numeric; the delete
-                # timers are "off" when unset.
-                await getattr(conf, key).set(0 if key == "MINIMUM_DAYS" else None)
+                await conf.get_attr(key).set(0 if floor == 0 else None)
                 continue
-            try:
-                await getattr(conf, key).set(int(raw))
-            except ValueError:
-                errors.append(f"{form_key.replace('_', ' ')}: '{raw}' is not a number")
+            value = field.integer(form_key)
+            if value is None:
+                errors.append({"message": f"'{raw}' is not a number.", "category": "danger"})
+                continue
+            await conf.get_attr(key).set(max(0, value))
 
         await conf.MENTIONS.set({k: field.checked(f"m_{k}") for k in MENTION_KEYS})
         await conf.GOODBYE_MENTIONS.set({k: field.checked(f"gm_{k}") for k in MENTION_KEYS})
@@ -237,80 +328,135 @@ class DashboardIntegration:
                     embed[key] = 0
                     continue
                 try:
-                    # Accept both #rrggbb and a plain integer.
-                    embed[key] = int(raw.lstrip("#"), 16) if raw.startswith("#") else int(raw)
+                    embed[key] = int(raw.lstrip("#"), 16)
                 except ValueError:
-                    errors.append(f"{key}: '{raw}' is not a colour")
+                    errors.append({"message": f"'{raw}' is not a colour.", "category": "danger"})
             for key in ("author", "timestamp", "mention"):
                 embed[key] = field.checked(f"e_{key}")
 
-        notifications = [{"message": e, "category": "danger"} for e in errors]
-        notifications.append(
-            {
-                "message": "Settings saved." if not errors else "Saved, with some fields skipped.",
-                "category": "success" if not errors else "warning",
-            }
+        return errors + [{"message": "Settings saved.", "category": "success"}]
+
+    async def _wc_test(self, guild, actor, field) -> list[dict]:
+        """Send the greeting to the configured channel, using the actor."""
+        settings = await self.config.guild(guild).all()
+        which = field("which") or "join"
+        messages = settings.get("GREETING" if which == "join" else "GOODBYE") or []
+        if not messages:
+            return [{"message": "No messages to test.", "category": "warning"}]
+
+        channel_id = settings.get("CHANNEL") if which == "join" else (
+            settings.get("LEAVE_CHANNEL") or settings.get("CHANNEL")
         )
-        return notifications
+        channel = guild.get_channel(channel_id or 0)
+        if channel is None:
+            return [{"message": "No channel configured.", "category": "warning"}]
+        if not channel.permissions_for(guild.me).send_messages:
+            return [{"message": f"I cannot post in #{channel.name}.", "category": "danger"}]
+
+        body = self._wc_render(random.choice(messages), guild, actor)
+        try:
+            if settings.get("EMBED"):
+                data = settings.get("EMBED_DATA") or {}
+                colour = data.get("colour" if which == "join" else "colour_goodbye") or 0
+                embed = discord.Embed(
+                    title=(data.get("title") or "") or None,
+                    description=body,
+                    colour=discord.Colour(colour) if colour else discord.Colour.blurple(),
+                )
+                if data.get("footer"):
+                    embed.set_footer(text=data["footer"])
+                await channel.send(embed=embed)
+            else:
+                await channel.send(body)
+        except discord.HTTPException as exc:
+            return [{"message": f"Discord rejected the test: {exc}", "category": "danger"}]
+        return [
+            {"message": f"Test {which} message sent to #{channel.name}.", "category": "success"}
+        ]
 
 
 WELCOME_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
-
   <div class="dz-head">
-    <h4><i class="fa fa-handshake-o"></i> Greetings for {{ guild_name }}</h4>
-    <p>Messages are picked at random each time someone joins or leaves.</p>
+    <h4><i class="fa fa-handshake-o"></i> Greetings in {{ guild_name }}</h4>
+    <p>One message is picked at random each time. Previews use <b>{{ preview_member }}</b>.</p>
+  </div>
+
+  {{ stats(stat_items) }}
+
+  <div class="dz-grid two">
+    <div class="dz-panel">
+      <h5><i class="fa fa-eye"></i> Join preview</h5>
+      {% if preview_join %}{{ msg(preview_join) }}
+      {% else %}<p class="dz-empty">No join messages yet.</p>{% endif %}
+      <form method="POST" style="margin-top:9px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+        <input type="hidden" name="which" value="join" />
+        <button class="dz-btn" name="action" value="test">
+          <i class="fa fa-paper-plane"></i> Send a real test
+        </button>
+      </form>
+    </div>
+    <div class="dz-panel">
+      <h5><i class="fa fa-eye"></i> Leave preview</h5>
+      {% if preview_leave %}{{ msg(preview_leave) }}
+      {% else %}<p class="dz-empty">No leave messages yet.</p>{% endif %}
+      <form method="POST" style="margin-top:9px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+        <input type="hidden" name="which" value="leave" />
+        <button class="dz-btn" name="action" value="test">
+          <i class="fa fa-paper-plane"></i> Send a real test
+        </button>
+      </form>
+    </div>
   </div>
 
   <div class="dz-panel">
     <h5><i class="fa fa-code"></i> Placeholders</h5>
-    <p class="dz-hint">Use these inside any message below.</p>
     <div class="dz-row">
       {% for token, meaning in placeholders %}
-        <span class="dz-tag" title="{{ meaning }}"><code>{{ token }}</code> &mdash; {{ meaning }}</span>
+        <span class="dz-tag"><code>{{ token }}</code> {{ meaning }}</span>
       {% endfor %}
     </div>
+    <p class="dz-hint" style="margin:9px 0 0;">
+      Anything else is rejected when you save, rather than failing on the next join.
+    </p>
   </div>
 
   <div class="dz-grid two">
-
     <div class="dz-panel">
       <h5><i class="fa fa-sign-in"></i> Join messages</h5>
-      <p class="dz-hint">{{ greetings|length }} in rotation.</p>
       <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
         {% for text in greetings %}
-          <div style="margin-bottom:9px;">
-            <textarea class="dz-area" name="greeting" rows="2">{{ text }}</textarea>
-          </div>
+          <textarea class="dz-area" name="greeting" rows="2"
+                    style="margin-bottom:8px;">{{ text }}</textarea>
         {% endfor %}
         <button class="dz-btn primary" name="action" value="save_messages">
-          <i class="fa fa-save"></i> Save join messages
+          <i class="fa fa-save"></i> Save
         </button>
       </form>
-
       {% if greetings|length > 1 %}
-        <div class="dz-row" style="margin-top:10px;">
+        <div class="dz-row" style="margin-top:9px;">
           {% for text in greetings %}
             <form method="POST" style="display:inline;">
               <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
               <input type="hidden" name="index" value="{{ loop.index0 }}" />
-              <button class="dz-btn danger" name="action" value="delete_greeting"
-                      title="{{ text[:60] }}">
+              <button class="dz-btn danger" name="action" value="delete_greeting">
                 <i class="fa fa-trash-o"></i> #{{ loop.index }}
               </button>
             </form>
           {% endfor %}
         </div>
       {% endif %}
-
-      <form method="POST" style="margin-top:12px;">
+      <form method="POST" style="margin-top:10px;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
         <textarea class="dz-area" name="new_message" rows="2"
                   placeholder="Add another join message..."></textarea>
-        <button class="dz-btn" name="action" value="add_greeting" style="margin-top:8px;">
+        <button class="dz-btn" name="action" value="add_greeting" style="margin-top:7px;">
           <i class="fa fa-plus"></i> Add
         </button>
       </form>
@@ -318,24 +464,21 @@ WELCOME_TEMPLATE = (
 
     <div class="dz-panel">
       <h5><i class="fa fa-sign-out"></i> Leave messages</h5>
-      <p class="dz-hint">{{ goodbyes|length }} in rotation.</p>
       <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
         {% for text in goodbyes %}
-          <div style="margin-bottom:9px;">
-            <textarea class="dz-area" name="goodbye" rows="2">{{ text }}</textarea>
-          </div>
+          <textarea class="dz-area" name="goodbye" rows="2"
+                    style="margin-bottom:8px;">{{ text }}</textarea>
         {% endfor %}
         <button class="dz-btn primary" name="action" value="save_messages">
-          <i class="fa fa-save"></i> Save leave messages
+          <i class="fa fa-save"></i> Save
         </button>
       </form>
-
-      <form method="POST" style="margin-top:12px;">
+      <form method="POST" style="margin-top:10px;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
         <textarea class="dz-area" name="new_message" rows="2"
                   placeholder="Add another leave message..."></textarea>
-        <button class="dz-btn" name="action" value="add_goodbye" style="margin-top:8px;">
+        <button class="dz-btn" name="action" value="add_goodbye" style="margin-top:7px;">
           <i class="fa fa-plus"></i> Add
         </button>
       </form>
@@ -349,76 +492,60 @@ WELCOME_TEMPLATE = (
       <div class="dz-panel">
         <h5><i class="fa fa-toggle-on"></i> Behaviour</h5>
         {% for t in toggles %}
-          <label class="dz-toggle">
-            <input type="checkbox" name="t_{{ t.key }}" {% if t.on %}checked{% endif %} />
-            <span>{{ t.label }}</span>
-          </label>
+          <div style="margin-bottom:8px;">
+            <label class="dz-toggle" style="padding:0;">
+              <input type="checkbox" name="t_{{ t.key }}" {% if t.on %}checked{% endif %} />
+              <span>{{ t.label }}</span>
+            </label>
+            <div style="font-size:.72rem; opacity:.45; margin-left:26px;">{{ t.help }}</div>
+          </div>
         {% endfor %}
       </div>
 
       <div class="dz-panel">
         <h5><i class="fa fa-hashtag"></i> Channels &amp; limits</h5>
-
         <div class="dz-label">Join channel</div>
-        <select class="dz-select" name="channel">
-          <option value="">&mdash; none &mdash;</option>
-          {% for c in channels %}
-            <option value="{{ c.id }}" {% if c.selected %}selected{% endif %}>{{ c.name }}</option>
-          {% endfor %}
-        </select>
-
-        <div class="dz-label" style="margin-top:11px;">Leave channel</div>
-        <select class="dz-select" name="leave_channel">
-          <option value="">&mdash; same as join &mdash;</option>
-          {% for c in leave_channels %}
-            <option value="{{ c.id }}" {% if c.selected %}selected{% endif %}>{{ c.name }}</option>
-          {% endfor %}
-        </select>
-
-        <div class="dz-label" style="margin-top:11px;">Minimum account age (days)</div>
+        {{ picker('channel', channels, allow_none=true, placeholder='Search channels...') }}
+        <div class="dz-label" style="margin-top:10px;">Leave channel</div>
+        {{ picker('leave_channel', leave_channels, allow_none=true,
+                  none_label='same as join', placeholder='Search channels...') }}
+        <div class="dz-label" style="margin-top:10px;">Minimum account age (days)</div>
         <input class="dz-input" type="number" min="0" name="minimum_days" value="{{ minimum_days }}" />
-
-        <div class="dz-label" style="margin-top:11px;">Delete greeting after (seconds)</div>
-        <input class="dz-input" type="number" min="0" name="delete_after_greeting"
-               value="{{ delete_after_greeting }}" placeholder="blank = keep" />
-
-        <div class="dz-label" style="margin-top:11px;">Delete goodbye after (seconds)</div>
-        <input class="dz-input" type="number" min="0" name="delete_after_goodbye"
-               value="{{ delete_after_goodbye }}" placeholder="blank = keep" />
+        <div class="dz-row" style="margin-top:10px;">
+          <div style="flex:1 1 130px;">
+            <div class="dz-label">Delete greeting after (s)</div>
+            <input class="dz-input" type="number" min="0" name="delete_after_greeting"
+                   value="{{ delete_after_greeting }}" placeholder="keep" />
+          </div>
+          <div style="flex:1 1 130px;">
+            <div class="dz-label">Delete goodbye after (s)</div>
+            <input class="dz-input" type="number" min="0" name="delete_after_goodbye"
+                   value="{{ delete_after_goodbye }}" placeholder="keep" />
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="dz-grid two" style="margin-top:14px;">
       <div class="dz-panel">
         <h5><i class="fa fa-android"></i> Bots</h5>
-        <p class="dz-hint">Used when the new member is a bot.</p>
-
         <div class="dz-label">Join message</div>
         <textarea class="dz-area" name="bots_msg" rows="2">{{ bots_msg }}</textarea>
-
-        <div class="dz-label" style="margin-top:11px;">Leave message</div>
+        <div class="dz-label" style="margin-top:10px;">Leave message</div>
         <textarea class="dz-area" name="bots_goodbye_msg" rows="2">{{ bots_goodbye_msg }}</textarea>
-
-        <div class="dz-label" style="margin-top:11px;">Auto-role for bots</div>
-        <select class="dz-select" name="bots_role">
-          <option value="">&mdash; none &mdash;</option>
-          {% for r in bot_roles %}
-            <option value="{{ r.id }}" {% if r.selected %}selected{% endif %}>{{ r.name }}</option>
-          {% endfor %}
-        </select>
+        <div class="dz-label" style="margin-top:10px;">Auto-role for bots</div>
+        {{ picker('bots_role', bot_roles, allow_none=true, placeholder='Search roles...') }}
       </div>
 
       <div class="dz-panel">
         <h5><i class="fa fa-at"></i> Allowed mentions</h5>
-        <p class="dz-hint">What the greeting is permitted to ping.</p>
         <div class="dz-grid two">
           <div>
             <div class="dz-label">On join</div>
             {% for key, on in mentions.items() %}
               <label class="dz-toggle">
                 <input type="checkbox" name="m_{{ key }}" {% if on %}checked{% endif %} />
-                <span>{{ key }}</span>
-              </label>
+                <span>{{ key }}</span></label>
             {% endfor %}
           </div>
           <div>
@@ -426,8 +553,7 @@ WELCOME_TEMPLATE = (
             {% for key, on in goodbye_mentions.items() %}
               <label class="dz-toggle">
                 <input type="checkbox" name="gm_{{ key }}" {% if on %}checked{% endif %} />
-                <span>{{ key }}</span>
-              </label>
+                <span>{{ key }}</span></label>
             {% endfor %}
           </div>
         </div>
@@ -436,46 +562,42 @@ WELCOME_TEMPLATE = (
 
     <div class="dz-panel" style="margin-top:14px;">
       <h5><i class="fa fa-window-maximize"></i> Embed appearance</h5>
-      <p class="dz-hint">Only used when &ldquo;Send as an embed&rdquo; is on.</p>
+      <p class="dz-hint">Used when "send as an embed" is on. The preview above updates on save.</p>
       <div class="dz-grid two">
         <div>
           <div class="dz-label">Title</div>
           <input class="dz-input" type="text" name="e_title" value="{{ embed.title }}" />
-          <div class="dz-label" style="margin-top:10px;">Footer</div>
+          <div class="dz-label" style="margin-top:9px;">Footer</div>
           <input class="dz-input" type="text" name="e_footer" value="{{ embed.footer }}" />
-          <div class="dz-label" style="margin-top:10px;">Thumbnail</div>
+          <div class="dz-label" style="margin-top:9px;">Thumbnail</div>
           <input class="dz-input" type="text" name="e_thumbnail" value="{{ embed.thumbnail }}"
                  placeholder="avatar, splash, icon, or a URL" />
         </div>
         <div>
           <div class="dz-label">Join image URL</div>
           <input class="dz-input" type="text" name="e_image" value="{{ embed.image }}" />
-          <div class="dz-label" style="margin-top:10px;">Leave image URL</div>
+          <div class="dz-label" style="margin-top:9px;">Leave image URL</div>
           <input class="dz-input" type="text" name="e_image_goodbye" value="{{ embed.image_goodbye }}" />
-          <div class="dz-row" style="margin-top:10px;">
+          <div class="dz-row" style="margin-top:9px;">
             <div style="flex:1 1 120px;">
               <div class="dz-label">Join colour</div>
-              <input class="dz-input" type="text" name="e_colour" value="{{ embed.colour }}"
-                     placeholder="#5aa9ff" />
+              <input class="dz-input" type="color" name="e_colour" value="{{ embed.colour }}" />
             </div>
             <div style="flex:1 1 120px;">
               <div class="dz-label">Leave colour</div>
-              <input class="dz-input" type="text" name="e_colour_goodbye"
-                     value="{{ embed.colour_goodbye }}" placeholder="#ed4245" />
+              <input class="dz-input" type="color" name="e_colour_goodbye"
+                     value="{{ embed.colour_goodbye }}" />
             </div>
           </div>
         </div>
       </div>
       <div class="dz-row" style="margin-top:10px;">
-        <label class="dz-toggle">
-          <input type="checkbox" name="e_author" {% if embed.author %}checked{% endif %} />
-          <span>Show author</span></label>
-        <label class="dz-toggle">
-          <input type="checkbox" name="e_timestamp" {% if embed.timestamp %}checked{% endif %} />
-          <span>Show timestamp</span></label>
-        <label class="dz-toggle">
-          <input type="checkbox" name="e_mention" {% if embed.mention %}checked{% endif %} />
-          <span>Mention above the embed</span></label>
+        <label class="dz-toggle"><input type="checkbox" name="e_author"
+          {% if embed.author %}checked{% endif %} /><span>Show author</span></label>
+        <label class="dz-toggle"><input type="checkbox" name="e_timestamp"
+          {% if embed.timestamp %}checked{% endif %} /><span>Show timestamp</span></label>
+        <label class="dz-toggle"><input type="checkbox" name="e_mention"
+          {% if embed.mention %}checked{% endif %} /><span>Ping above the embed</span></label>
       </div>
     </div>
 
