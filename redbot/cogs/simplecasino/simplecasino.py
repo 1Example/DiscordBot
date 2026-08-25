@@ -19,6 +19,7 @@ from .blackjack import Blackjack
 from .utils import DISCORD_RED, POKER_MINIMUM_BET, POKER_RULES
 from .views.again_view import AgainView
 from .views.replace_view import ReplaceView
+from .dashboard_integration import DashboardIntegration
 
 log = logging.getLogger("red.crab-cogs.simplecasino")
 
@@ -32,7 +33,7 @@ POKER_AFK_LIMIT = 10  # minutes
 STARTING = "Starting game..."
 
 
-class SimpleCasino(BaseCasinoCog):
+class SimpleCasino(DashboardIntegration, BaseCasinoCog):
     """Gamble virtual currency with Poker, Blackjack, and Slot Machines."""
 
     def __init__(self, bot: Red):

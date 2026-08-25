@@ -1,0 +1,297 @@
+from __future__ import annotations
+
+import logging
+import typing as t
+
+import discord
+from redbot.core import bank, commands
+
+from redbot.core.utils.dashboard_helpers import (
+    BASE_CSS,
+    dashboard_page,
+    form_reader,
+    guild_member,
+    is_staff,
+)
+
+log = logging.getLogger("red.simplecasino.dashboard")
+
+# (key, label, help, minimum, maximum)
+LIMITS = (
+    ("bjmin", "Blackjack minimum bet", "Smallest allowed blackjack bet.", 1, 10_000_000),
+    ("bjmax", "Blackjack maximum bet", "Largest allowed blackjack bet.", 1, 10_000_000),
+    ("bjtime", "Blackjack decision time (s)", "How long a player has to act.", 1, 300),
+    ("pokermin", "Poker minimum bet", "Smallest allowed poker starting bet.", 1, 10_000_000),
+    ("pokermax", "Poker maximum bet", "Largest allowed poker starting bet.", 1, 10_000_000),
+)
+
+TOGGLES = (
+    ("coinfreespin", "Free spin on matching coins", "Grants a free spin instead of a loss."),
+    ("sloteasy", "Easier slot odds", "Raises the chance of a winning combination."),
+)
+
+# Bet pairs that must not be inverted.
+PAIRS = (("bjmin", "bjmax", "Blackjack"), ("pokermin", "pokermax", "Poker"))
+
+
+class DashboardIntegration:
+    """Betting limits, slot odds and per-member game statistics."""
+
+    bot: t.Any
+    config: t.Any
+
+    @commands.Cog.listener()
+    async def on_dashboard_cog_add(self, dashboard_cog) -> None:  # noqa: D401
+        log.info("Dashboard cog found, registering SimpleCasino as a third party.")
+        dashboard_cog.rpc.third_parties_handler.add_third_party(self)
+
+    @dashboard_page(
+        name=None,
+        description="Casino limits, odds and statistics.",
+        methods=("GET", "POST"),
+        context_ids=["guild_id", "user_id"],
+    )
+    async def dashboard_casino_page(
+        self, user: discord.User, guild: discord.Guild, **kwargs: t.Any
+    ) -> dict[str, t.Any]:
+        member, error = guild_member(user, guild)
+        if error:
+            return error
+        staff = await is_staff(self.bot, user, member, guild)
+
+        notifications: list[dict] = []
+        if kwargs.get("method") == "POST":
+            if not staff:
+                return {
+                    "status": 1,
+                    "error_title": "Forbidden",
+                    "error_message": "Only server administrators can change casino settings.",
+                }
+            notifications = await self._sc_handle_post(guild, kwargs)
+
+        # A global bank means the guild-scoped limits are not what players hit.
+        global_bank = await self._sc_global_bank()
+        scope = self.config if global_bank else self.config.guild(guild)
+        settings = await scope.all()
+
+        return {
+            "status": 0,
+            "notifications": notifications,
+            "web_content": {
+                "source": CASINO_TEMPLATE,
+                "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
+                "guild_name": guild.name,
+                "is_staff": staff,
+                "global_bank": global_bank,
+                "currency": await self._sc_currency(guild),
+                "limits": [
+                    {
+                        "key": k,
+                        "label": lbl,
+                        "help": h,
+                        "min": lo,
+                        "max": hi,
+                        "value": settings.get(k, lo),
+                    }
+                    for k, lbl, h, lo, hi in LIMITS
+                ],
+                "toggles": [
+                    {"key": k, "label": lbl, "help": h, "on": bool(settings.get(k))}
+                    for k, lbl, h in TOGGLES
+                ],
+                "stats": await self._sc_stats(guild),
+                "you": await self._sc_member_stats(guild, member),
+            },
+        }
+
+    async def _sc_global_bank(self) -> bool:
+        try:
+            return await bank.is_global()
+        except Exception:  # noqa: BLE001
+            return False
+
+    async def _sc_currency(self, guild: discord.Guild) -> str:
+        try:
+            return await bank.get_currency_name(guild)
+        except Exception:  # noqa: BLE001
+            return "credits"
+
+    @staticmethod
+    def _sc_row(name: str, stats: dict) -> dict:
+        blackjack = stats.get("bjcount", 0)
+        wins = stats.get("bjwincount", 0)
+        return {
+            "name": name,
+            "slots": stats.get("slotcount", 0),
+            "slot_profit": stats.get("slotprofit", 0),
+            "blackjack": blackjack,
+            "bj_wins": wins,
+            "bj_profit": stats.get("bjprofit", 0),
+            "win_rate": round(wins / blackjack * 100) if blackjack else 0,
+            "profit": stats.get("slotprofit", 0) + stats.get("bjprofit", 0),
+        }
+
+    async def _sc_stats(self, guild: discord.Guild, limit: int = 15) -> list[dict]:
+        try:
+            data = await self.config.all_members(guild)
+        except Exception:  # noqa: BLE001
+            log.exception("Could not read casino statistics")
+            return []
+        rows = []
+        for member_id, stats in data.items():
+            member = guild.get_member(member_id)
+            if member is None:
+                continue
+            row = self._sc_row(member.display_name, stats)
+            if row["slots"] or row["blackjack"]:
+                rows.append(row)
+        rows.sort(key=lambda r: -r["profit"])
+        for position, row in enumerate(rows[:limit], start=1):
+            row["position"] = position
+        return rows[:limit]
+
+    async def _sc_member_stats(self, guild: discord.Guild, member: discord.Member) -> dict | None:
+        try:
+            stats = await self.config.member(member).all()
+        except Exception:  # noqa: BLE001
+            return None
+        row = self._sc_row(member.display_name, stats)
+        return row if (row["slots"] or row["blackjack"]) else None
+
+    async def _sc_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+        field = form_reader(kwargs)
+        if field("action") != "save":
+            return [{"message": "Unknown action.", "category": "warning"}]
+
+        global_bank = await self._sc_global_bank()
+        scope = self.config if global_bank else self.config.guild(guild)
+
+        errors: list[dict] = []
+        values: dict[str, int] = {}
+        for key, label, _h, low, high in LIMITS:
+            raw = (field(f"f_{key}") or "").strip()
+            if raw == "":
+                continue
+            try:
+                value = int(raw)
+            except ValueError:
+                errors.append({"message": f"{label}: '{raw}' is not a number.", "category": "danger"})
+                continue
+            if not low <= value <= high:
+                errors.append(
+                    {"message": f"{label}: must be between {low} and {high}.", "category": "danger"}
+                )
+                continue
+            values[key] = value
+
+        current = await scope.all()
+        for low_key, high_key, game in PAIRS:
+            low = values.get(low_key, current.get(low_key))
+            high = values.get(high_key, current.get(high_key))
+            if low is not None and high is not None and low > high:
+                errors.append(
+                    {
+                        "message": f"{game}: minimum bet cannot exceed the maximum.",
+                        "category": "danger",
+                    }
+                )
+                values.pop(low_key, None)
+                values.pop(high_key, None)
+
+        for key, value in values.items():
+            await scope.get_attr(key).set(value)
+        for key, _lbl, _h in TOGGLES:
+            await scope.get_attr(key).set(field.checked(f"t_{key}"))
+
+        return errors + [
+            {
+                "message": f"Saved {len(values)} limit(s)"
+                + (" (global bank)." if global_bank else "."),
+                "category": "success",
+            }
+        ]
+
+
+CASINO_TEMPLATE = (
+    BASE_CSS
+    + """
+<div class="dz">
+  <div class="dz-head">
+    <h4><i class="fa fa-diamond"></i> Casino in {{ guild_name }}</h4>
+    <p>
+      Bets in <b>{{ currency }}</b>
+      {% if global_bank %}&middot; <b>global bank</b> - editing the bot-wide limits
+      {% else %}&middot; per-server limits{% endif %}
+      {% if you %}&middot; your net: <b>{{ "{:,}".format(you.profit) }}</b>{% endif %}
+    </p>
+  </div>
+
+  {% if is_staff %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-grid two">
+        <div class="dz-panel">
+          <h5><i class="fa fa-sliders"></i> Limits</h5>
+          {% for f in limits %}
+            <div style="margin-bottom:11px;">
+              <div class="dz-label">{{ f.label }}</div>
+              <input class="dz-input" type="number" min="{{ f.min }}" max="{{ f.max }}"
+                     name="f_{{ f.key }}" value="{{ f.value }}" />
+              <div style="font-size:.72rem; opacity:.45; margin-top:4px;">{{ f.help }}</div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="dz-panel">
+          <h5><i class="fa fa-random"></i> Odds</h5>
+          {% for t in toggles %}
+            <div style="margin-bottom:9px;">
+              <label class="dz-toggle" style="padding:0;">
+                <input type="checkbox" name="t_{{ t.key }}" {% if t.on %}checked{% endif %} />
+                <span>{{ t.label }}</span>
+              </label>
+              <div style="font-size:.72rem; opacity:.45; margin-left:26px;">{{ t.help }}</div>
+            </div>
+          {% endfor %}
+          <div style="margin-top:14px;">
+            <button class="dz-btn primary" name="action" value="save">
+              <i class="fa fa-save"></i> Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  {% endif %}
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-bar-chart"></i> Player statistics</h5>
+    <p class="dz-hint">Ranked by net profit across slots and blackjack.</p>
+    {% if stats %}
+      <table class="dz-t">
+        <thead>
+          <tr><th>#</th><th>Member</th><th>Slots</th><th>Blackjack</th>
+              <th>BJ win rate</th><th style="text-align:right;">Net</th></tr>
+        </thead>
+        <tbody>
+          {% for row in stats %}
+            <tr>
+              <td style="opacity:.5; width:34px;">{{ row.position }}</td>
+              <td>{{ row.name }}</td>
+              <td style="opacity:.7;">{{ row.slots }}</td>
+              <td style="opacity:.7;">{{ row.blackjack }}</td>
+              <td style="opacity:.7;">{{ row.win_rate }}%</td>
+              <td style="text-align:right; font-variant-numeric:tabular-nums;
+                         color:{% if row.profit > 0 %}#3ba55d{% elif row.profit < 0 %}#ff8b8b{% else %}inherit{% endif %};">
+                {{ "{:,}".format(row.profit) }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="dz-empty">Nobody has played yet.</p>
+    {% endif %}
+  </div>
+</div>
+"""
+)

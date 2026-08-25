@@ -11,6 +11,7 @@ from redbot.core.utils.predicates import MessagePredicate
 
 from .announcer import Announcer
 from .converters import SelfRole
+from .dashboard_integration import DashboardIntegration
 
 log = logging.getLogger("red.admin")
 
@@ -69,7 +70,7 @@ _ = T_
 
 
 @cog_i18n(_)
-class Admin(commands.Cog):
+class Admin(DashboardIntegration, commands.Cog):
     """A collection of server administration utilities."""
 
     def __init__(self, bot):

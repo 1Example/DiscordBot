@@ -13,6 +13,7 @@ from redbot.core.commands.converter import RelativedeltaConverter
 from redbot.core.config import Config
 from redbot.core.utils.chat_formatting import box, humanize_timedelta, pagify
 from redbot.core.utils.views import SimpleMenu
+from .dashboard_integration import DashboardIntegration
 
 TIMESTAMP_STYLES = ["R", "D", "d", "T", "t", "F", "f"]
 
@@ -152,7 +153,7 @@ class AbsoluteTimeFlags(commands.FlagConverter, case_insensitive=True):
         )
 
 
-class Timestamp(commands.Cog):
+class Timestamp(DashboardIntegration, commands.Cog):
     """
     A discord timestamp creator cog.
     """

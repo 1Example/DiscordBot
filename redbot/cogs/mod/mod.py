@@ -16,6 +16,7 @@ from .kickban import KickBanMixin
 from .names import ModInfo
 from .slowmode import Slowmode
 from .settings import ModSettings
+from .dashboard_integration import DashboardIntegration
 
 _ = T_ = Translator("Mod", __file__)
 
@@ -33,6 +34,7 @@ class CompositeMetaClass(type(commands.Cog), type(ABC)):
 
 @cog_i18n(_)
 class Mod(
+    DashboardIntegration,
     ModSettings,
     Events,
     KickBanMixin,

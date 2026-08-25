@@ -18,12 +18,13 @@ from redbot.core.utils.chat_formatting import (
 )
 from redbot.core.utils.menus import DEFAULT_CONTROLS, menu
 from redbot.core.utils.predicates import MessagePredicate
+from .dashboard_integration import DashboardIntegration
 
 __version__ = "3.5.2"
 log = logging.getLogger("red.vrt.hunting")
 
 
-class Hunting(commands.Cog):
+class Hunting(DashboardIntegration, commands.Cog):
     """Hunting, it hunts birds and things that fly."""
 
     async def red_delete_data_for_user(
