@@ -74,6 +74,7 @@ from pylav.helpers.format.strings import format_time_dd_hh_mm_ss
 from pylav.logging import getLogger
 from pylav.players.filters import Equalizer, Volume
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("PyLavNotifier", Path(__file__))
 
@@ -81,7 +82,7 @@ LOGGER = getLogger("PyLav.cog.Notifier")
 
 
 @cog_i18n(_)
-class PyLavNotifier(DISCORD_COG_TYPE_MIXIN):
+class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Listen to events from the PyLav player and send them as messages to the specified channel"""
 
     lavalink: Client

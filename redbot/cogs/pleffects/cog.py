@@ -23,6 +23,7 @@ from pylav.players.filters import Equalizer
 from pylav.storage.models.equilizer import Equalizer as Equalizer_namespace_conflict
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 from pylav.type_hints.dict_typing import JSON_DICT_TYPE
+from .dashboard_integration import DashboardIntegration
 
 LOGGER = getLogger("PyLav.cog.Effects")
 
@@ -30,7 +31,7 @@ _ = Translator("PyLavEffects", Path(__file__))
 
 
 @cog_i18n(_)
-class PyLavEffects(DISCORD_COG_TYPE_MIXIN):
+class PyLavEffects(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Apply filters and effects to the PyLav player"""
 
     __version__ = "1.0.0"

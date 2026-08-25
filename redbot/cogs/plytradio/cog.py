@@ -19,6 +19,7 @@ from pylav.players.player import Player
 from pylav.players.query.obj import Query
 from pylav.players.tracks.obj import Track
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("PyLavYouTubeRadio", Path(__file__))
 
@@ -42,7 +43,7 @@ LOW_WATER_MARK = 1
 
 
 @cog_i18n(_)
-class PyLavYouTubeRadio(DISCORD_COG_TYPE_MIXIN):
+class PyLavYouTubeRadio(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Keeps playing YouTube's recommended tracks when the queue runs dry.
 
     Unlike PyLav's built-in autoplay, this seeds a YouTube Mix from the

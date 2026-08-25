@@ -18,12 +18,14 @@ from .hybrid_commands import HybridCommands
 from .player_commands import PlayerCommands
 from .slash_commands import SlashCommands
 from .utility_commands import UtilityCommands
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("PyLavPlayer", Path(__file__))
 
 
 @cog_i18n(_)
 class PyLavPlayer(
+    DashboardIntegration,
     HybridCommands,
     UtilityCommands,
     PlayerCommands,

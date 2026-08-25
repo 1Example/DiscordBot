@@ -36,12 +36,14 @@ from pylav.players.query.obj import Query
 from pylav.players.tracks.obj import Track
 from pylav.storage.models.playlist import Playlist
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("PyLavPlaylists", Path(__file__))
 
 
 @cog_i18n(_)
 class PyLavPlaylists(
+    DashboardIntegration,
     DISCORD_COG_TYPE_MIXIN,
     metaclass=CompositeMetaClass,
 ):
