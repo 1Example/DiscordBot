@@ -6,9 +6,9 @@ from typing import List, Union
 from redbot.core import bank, errors
 from redbot.core.utils.chat_formatting import humanize_number
 
-from simplecasino.base import BaseCasinoCog
-from simplecasino.card import Card, CardValue, CARD_EMOJI, make_deck
-from simplecasino.views.again_view import AgainView
+from .base import BaseCasinoCog
+from .card import Card, CardValue, CARD_EMOJI, make_deck
+from .views.again_view import AgainView
 
 log = logging.getLogger("red.crab-cogs.simplecasino.blackjack")
 

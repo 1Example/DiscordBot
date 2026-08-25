@@ -7,7 +7,7 @@ from pylav.type_hints.bot import DISCORD_BOT_TYPE
 
 __red_end_user_data_statement__ = get_end_user_data_statement(__file__)
 
-from plradio.cog import PyLavRadio
+from .cog import PyLavRadio
 
 
 async def setup(bot: DISCORD_BOT_TYPE):

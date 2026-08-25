@@ -8,8 +8,8 @@ from collections import deque
 from redbot.core import commands, bank, errors
 from redbot.core.utils.chat_formatting import humanize_number
 
-from simplecasino.base import BaseCasinoCog
-from simplecasino.views.again_view import AgainView
+from .base import BaseCasinoCog
+from .views.again_view import AgainView
 
 JACKPOT_AMOUNT = 100
 TRIPLE = 3

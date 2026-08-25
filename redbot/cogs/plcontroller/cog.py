@@ -16,8 +16,8 @@ from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.antispam import AntiSpam
 from redbot.core.utils.chat_formatting import humanize_number
 
-from plcontroller.dashboard_integration import DashboardIntegration
-from plcontroller.view import PersistentControllerView
+from .dashboard_integration import DashboardIntegration
+from .view import PersistentControllerView
 from pylav import logging
 from pylav.core.context import PyLavContext
 from pylav.events.player import PlayerPausedEvent, PlayerResumedEvent, PlayerStoppedEvent

@@ -19,7 +19,7 @@ from pylav.helpers.format.strings import shorten_string
 from pylav.logging import getLogger
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
 
-from plconfig.view import InfoView
+from .view import InfoView
 
 LOGGER = getLogger("PyLav.cog.Configurator")
 

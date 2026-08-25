@@ -3,7 +3,7 @@
 
 import discord
 
-from simplecasino.base import BasePokerGame
+from ..base import BasePokerGame
 
 
 class PokerRematchView(discord.ui.View):

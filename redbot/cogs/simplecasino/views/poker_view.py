@@ -7,8 +7,8 @@ import discord
 from redbot.core import bank
 from redbot.core.utils.chat_formatting import humanize_number
 
-from simplecasino.base import BasePokerGame
-from simplecasino.utils import InsufficientFundsError
+from ..base import BasePokerGame
+from ..utils import InsufficientFundsError
 
 log = logging.getLogger("red.crab-cogs.simplecasino.poker")
 

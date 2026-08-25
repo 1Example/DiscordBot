@@ -119,7 +119,7 @@ class AutoDeletingFollowup:
 
 
 if TYPE_CHECKING:
-    from plcontroller.cog import PyLavController
+    from .cog import PyLavController
 
 
 class IncreaseVolumeButton(discord.ui.Button):

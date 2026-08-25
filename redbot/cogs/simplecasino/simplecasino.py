@@ -12,13 +12,13 @@ from redbot.cogs.economy.economy import Economy
 from redbot.core.utils.chat_formatting import humanize_number
 from redbot.core.utils.chat_formatting import humanize_timedelta
 
-from simplecasino.base import BaseCasinoCog
-from simplecasino.slots import slots
-from simplecasino.poker import PokerGame
-from simplecasino.blackjack import Blackjack
-from simplecasino.utils import DISCORD_RED, POKER_MINIMUM_BET, POKER_RULES
-from simplecasino.views.again_view import AgainView
-from simplecasino.views.replace_view import ReplaceView
+from .base import BaseCasinoCog
+from .slots import slots
+from .poker import PokerGame
+from .blackjack import Blackjack
+from .utils import DISCORD_RED, POKER_MINIMUM_BET, POKER_RULES
+from .views.again_view import AgainView
+from .views.replace_view import ReplaceView
 
 log = logging.getLogger("red.crab-cogs.simplecasino")
 

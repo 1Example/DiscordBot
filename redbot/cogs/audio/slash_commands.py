@@ -22,7 +22,7 @@ from pylav.players.query.obj import Query
 from pylav.players.tracks.obj import Track
 from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 
-from audio.shared import SharedMethods
+from .shared import SharedMethods
 
 LOGGER = getLogger("PyLav.cog.Player.commands.slashes")
 _ = Translator("PyLavPlayer", Path(__file__))

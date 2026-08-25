@@ -22,7 +22,7 @@ from pylav.helpers.format.ascii import EightBitANSI
 from pylav.logging import getLogger
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
 
-from plmanagednode.view import ConfigureHTTPProxyView, ConfigureIPRotationView
+from .view import ConfigureHTTPProxyView, ConfigureIPRotationView
 
 LOGGER = getLogger("PyLav.cog.ManagedNode")
 

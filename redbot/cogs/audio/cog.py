@@ -12,12 +12,12 @@ from redbot.core.i18n import Translator, cog_i18n
 from pylav.extension.red.utils import CompositeMetaClass
 from pylav.type_hints.bot import DISCORD_BOT_TYPE
 
-from audio.config_commands import ConfigCommands
-from audio.context_menus import ContextMenus
-from audio.hybrid_commands import HybridCommands
-from audio.player_commands import PlayerCommands
-from audio.slash_commands import SlashCommands
-from audio.utility_commands import UtilityCommands
+from .config_commands import ConfigCommands
+from .context_menus import ContextMenus
+from .hybrid_commands import HybridCommands
+from .player_commands import PlayerCommands
+from .slash_commands import SlashCommands
+from .utility_commands import UtilityCommands
 
 _ = Translator("PyLavPlayer", Path(__file__))
 
