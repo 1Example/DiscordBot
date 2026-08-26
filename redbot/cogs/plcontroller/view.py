@@ -1287,9 +1287,16 @@ class PersistentControllerView(discord.ui.View):
             with contextlib.suppress(Exception):
                 conf = self.cog._config.guild(self.guild)
                 async with conf.button_emojis() as stored:
-                    stored.pop(key, None)
+                    token = stored.pop(key, None)
                 async with conf.owned_emojis() as owned:
                     owned.pop(key, None)
+                # Write down what happened. Without this the icon just vanishes
+                # and nobody can tell whether the upload or Discord was at fault.
+                async with conf.rejected_emojis() as rejected:
+                    rejected[key] = (
+                        f"Discord refused {token or 'that emoji'} on the button. "
+                        "If it was uploaded to the bot, try the server instead."
+                    )
         return True
 
     # Buttons every listener may press. Mirrors LISTENER_ACTIONS on the web

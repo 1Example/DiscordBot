@@ -62,6 +62,13 @@ class PyLavController(
             # Emoji this cog uploaded itself, so replacing a picture can delete
             # the old one instead of leaving it in the bot's emoji list.
             owned_emojis={},
+            # "guild" puts an uploaded picture in this server's emoji list, which
+            # is known to work on a button but costs a slot. "bot" puts it in the
+            # bot's own application emoji, which costs no slot - Discord has been
+            # seen refusing those on a component, so any refusal is recorded in
+            # rejected_emojis rather than silently losing the icon.
+            upload_target="guild",
+            rejected_emojis={},
             # Per-action credit costs for the web dashboard. Staff are never
             # charged. "Play now" jumps the queue so it costs more than queueing.
             # Tune with [p]plcontrollerset cost <action> <amount>, 0 = free.

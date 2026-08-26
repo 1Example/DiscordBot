@@ -584,6 +584,7 @@ class DashboardIntegration:
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "button_rows": self._dash_button_rows(settings),
+                "upload_target": settings.get("upload_target") or "guild",
                 "style_options": ("secondary", "primary", "success", "danger"),
                 "guild_emojis": emoji_options(guild),
                 "economy_enabled": bool(settings.get("dashboard_economy_enabled")),
@@ -609,6 +610,7 @@ class DashboardIntegration:
         labels = settings.get("button_labels") or {}
         styles = settings.get("button_styles") or {}
         owned = settings.get("owned_emojis") or {}
+        rejected = settings.get("rejected_emojis") or {}
 
         rows = []
         for key, default_label, default_emoji, blurb in BUTTONS:
@@ -627,6 +629,7 @@ class DashboardIntegration:
                     "broken": bool(current) and parse_emoji(current) is None,
                     "style": styles.get(key) or "secondary",
                     "image": self._dash_emoji_image(owned.get(key), current),
+                    "rejected": rejected.get(key, ""),
                 }
             )
         return rows
@@ -710,7 +713,32 @@ class DashboardIntegration:
             return None, f"the image is {len(raw) // 1024} KB, over Discord's 256 KB limit"
         return raw, ""
 
-    async def _dash_make_emoji(self, guild: discord.Guild, key: str, raw: bytes):
+    async def _dash_make_bot_emoji(self, name: str, raw: bytes):
+        """Upload to the bot's own application emoji. No server slot is used.
+
+        These are shared by every server the bot is in, so the name carries no
+        guild id and a second server uploading the same button reuses whatever
+        is already there rather than colliding.
+        """
+        create = getattr(self.bot, "create_application_emoji", None)
+        if create is None:
+            return None, "this discord.py build has no application emoji support."
+
+        # A duplicate name is rejected outright, so clear the old one first.
+        listing = getattr(self.bot, "fetch_application_emojis", None)
+        if listing is not None:
+            with contextlib.suppress(Exception):
+                for existing in await listing():
+                    if existing.name == name:
+                        await existing.delete()
+        try:
+            emoji = await create(name=name, image=raw)
+        except discord.HTTPException as exc:
+            return None, f"Discord refused the picture: {exc.text or exc}"
+        return f"<{'a' if emoji.animated else ''}:{emoji.name}:{emoji.id}>", ""
+
+    async def _dash_make_emoji(self, guild: discord.Guild, key: str, raw: bytes,
+                               target: str = "guild"):
         """Register an image as a guild emoji and return its `<:name:id>` token.
 
         It has to be a *guild* emoji: Discord rejects an application emoji on a
@@ -720,6 +748,14 @@ class DashboardIntegration:
         the 32-character cap without truncating.
         """
         name = f"plc_{key}"[:32]
+
+        if target == "bot":
+            token, reason = await self._dash_make_bot_emoji(name, raw)
+            if token is not None:
+                return token, reason
+            # Fall through and use a server emoji rather than refusing outright.
+            log.warning("Bot emoji upload failed for %s, using a guild one: %s", key, reason)
+
         me = guild.me
         if me is None or not me.guild_permissions.manage_expressions:
             return None, (
@@ -772,6 +808,13 @@ class DashboardIntegration:
         from .view import BUTTONS
 
         problems: list[str] = []
+        # Read the choice from this submit so a change takes effect on the same
+        # save rather than only on the next one.
+        target = (field("upload_target") or "").strip()
+        if target not in ("guild", "bot"):
+            target = await conf.upload_target()
+        else:
+            await conf.upload_target.set(target)
         async with conf.button_emojis() as emojis, conf.owned_emojis() as owned:
             for key, _label, _emoji, _blurb in BUTTONS:
                 if field.checked(f"clear_img_{key}"):
@@ -786,7 +829,7 @@ class DashboardIntegration:
                 if raw is None:
                     problems.append(f"'{key}': {reason}.")
                     continue
-                token, reason = await self._dash_make_emoji(guild, key, raw)
+                token, reason = await self._dash_make_emoji(guild, key, raw, target)
                 if token is None:
                     problems.append(f"'{key}': {reason}")
                     continue
@@ -794,6 +837,10 @@ class DashboardIntegration:
                     await self._dash_drop_emoji(guild, owned[key])
                 owned[key] = token
                 emojis[key] = token
+        async with conf.rejected_emojis() as rejected:
+            for key, _label, _emoji, _blurb in BUTTONS:
+                if field(f"img_{key}"):
+                    rejected.pop(key, None)
         return problems
 
     async def _dash_save_buttons(self, guild, conf, field) -> list[dict]:
@@ -1395,6 +1442,21 @@ SETTINGS_TEMPLATE = (
         no way around that. Max 256&nbsp;KB, square works best.
       </p>
 
+      <div class="dz-label" style="margin-top:6px;">Put an uploaded picture in</div>
+      <select class="dz-select" name="upload_target" style="max-width:420px;">
+        <option value="guild" {% if upload_target == 'guild' %}selected{% endif %}>
+          this server's emoji &mdash; costs a slot, known to work
+        </option>
+        <option value="bot" {% if upload_target == 'bot' %}selected{% endif %}>
+          the bot's own emoji &mdash; costs no slot, Discord may refuse it
+        </option>
+      </select>
+      <div style="font-size:.72rem; opacity:.45; margin:4px 0 12px;">
+        The bot's own emoji are shared across every server it is in and use none
+        of your slots, but Discord has been seen rejecting them on a button. If
+        that happens the button says so below and you can switch back.
+      </div>
+
       <div style="overflow-x:auto;">
       <table class="dz-t" style="min-width:680px;">
         <thead>
@@ -1412,6 +1474,12 @@ SETTINGS_TEMPLATE = (
                 </span>
                 {% if b.broken %}<span class="dz-tag bad">unusable emoji</span>{% endif %}
                 <div style="font-size:.72rem; opacity:.45;">{{ b.blurb }}</div>
+                {% if b.rejected %}
+                  <div style="font-size:.72rem; color:#ff8b8b; max-width:280px;
+                              white-space:normal;">
+                    <i class="fa fa-exclamation-triangle"></i> {{ b.rejected }}
+                  </div>
+                {% endif %}
               </td>
               <td style="width:18%;">{{ image_field(b) }}</td>
               <td style="width:17%;">
