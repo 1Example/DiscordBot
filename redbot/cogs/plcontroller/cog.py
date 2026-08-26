@@ -54,6 +54,14 @@ class PyLavController(
             persistent_view_message_id=None,
             enable_antispam=True,
             use_slow_mode=True,
+            # Per-button appearance, set from the dashboard's settings page.
+            # Empty means "use the built-in default" - see BUTTONS in view.py.
+            button_emojis={},
+            button_labels={},
+            button_styles={},
+            # Emoji this cog uploaded itself, so replacing a picture can delete
+            # the old one instead of leaving it in the bot's emoji list.
+            owned_emojis={},
             # Per-action credit costs for the web dashboard. Staff are never
             # charged. "Play now" jumps the queue so it costs more than queueing.
             # Tune with [p]plcontrollerset cost <action> <amount>, 0 = free.

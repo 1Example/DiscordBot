@@ -7,6 +7,13 @@ import discord
 from redbot.core import bank, commands
 from redbot.core.errors import BalanceTooHigh  # noqa: F401
 
+from redbot.core.utils.dashboard_helpers import (
+    BASE_CSS,
+    MACROS,
+    emoji_options,
+    form_reader,
+)
+
 from pylav.players.query.obj import Query
 
 log = logging.getLogger("red.plcontroller.dashboard")
@@ -541,6 +548,310 @@ class DashboardIntegration:
         except Exception:  # noqa: BLE001
             return {"enabled": False}
 
+    # ---------- settings page ----------
+
+    @dashboard_page(
+        name="settings",
+        description="Buttons, icons and what each action costs.",
+        methods=("GET", "POST"),
+    )
+    async def dashboard_settings_page(
+        self, user: discord.User, guild: discord.Guild, **kwargs: t.Any
+    ) -> dict[str, t.Any]:
+        member, error = await self._dash_check_perms(user, guild)
+        if error is not None:
+            return error
+        if not await self._dash_is_staff(user, member, guild):
+            return {
+                "status": 1,
+                "error_title": "Forbidden",
+                "error_message": "Only moderators can change the controller settings.",
+            }
+
+        notifications: list[dict] = []
+        if kwargs.get("method") == "POST":
+            notifications = await self._dash_settings_post(guild, kwargs)
+
+        settings = await self._config.guild(guild).all()
+        currency = await self._dash_currency(guild)
+        return {
+            "status": 0,
+            "notifications": notifications,
+            "web_content": {
+                "source": SETTINGS_TEMPLATE,
+                "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
+                "guild_name": guild.name,
+                "button_rows": self._dash_button_rows(settings),
+                "style_options": ("secondary", "primary", "success", "danger"),
+                "guild_emojis": emoji_options(guild),
+                "economy_enabled": bool(settings.get("dashboard_economy_enabled")),
+                "currency": currency,
+                "cost_rows": self._dash_cost_rows(settings),
+                "posted": bool(settings.get("persistent_view_message_id")),
+            },
+        }
+
+    # ---------- settings helpers ----------
+
+    @staticmethod
+    async def _dash_currency(guild: discord.Guild) -> str:
+        try:
+            return await bank.get_currency_name(guild)
+        except Exception:  # noqa: BLE001 - the page must render without a bank
+            return "credits"
+
+    def _dash_button_rows(self, settings: dict) -> list[dict]:
+        from .view import BUTTONS, parse_emoji
+
+        overrides = settings.get("button_emojis") or {}
+        labels = settings.get("button_labels") or {}
+        styles = settings.get("button_styles") or {}
+        owned = settings.get("owned_emojis") or {}
+
+        rows = []
+        for key, default_label, default_emoji, blurb in BUTTONS:
+            current = overrides.get(key) or ""
+            rows.append(
+                {
+                    "key": key,
+                    "blurb": blurb,
+                    "default_label": default_label,
+                    "label_override": labels.get(key, ""),
+                    "default": default_emoji,
+                    "current": current,
+                    "effective": current or default_emoji,
+                    # A stored value that no longer parses means the emoji was
+                    # deleted or mistyped; the button silently drops it.
+                    "broken": bool(current) and parse_emoji(current) is None,
+                    "style": styles.get(key) or "secondary",
+                    "image": self._dash_emoji_image(owned.get(key), current),
+                }
+            )
+        return rows
+
+    @staticmethod
+    def _dash_emoji_image(owned_token, current) -> str:
+        """The CDN url for a custom emoji, so the page can show the picture."""
+        import re as _re
+
+        token = (owned_token or current or "").strip()
+        match = _re.match(r"^<(a?):[A-Za-z0-9_]+:(\d{15,25})>$", token)
+        if not match:
+            return ""
+        animated, emoji_id = match.groups()
+        return f"https://cdn.discordapp.com/emojis/{emoji_id}.{'gif' if animated else 'png'}"
+
+    def _dash_cost_rows(self, settings: dict) -> list[dict]:
+        costs = settings.get("dashboard_action_costs") or {}
+        return [
+            {"key": key, "label": key.replace("_", " ").title(), "value": int(value or 0)}
+            for key, value in sorted(costs.items())
+        ]
+
+    async def _dash_settings_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+        field = form_reader(kwargs)
+        action = field("action")
+        conf = self._config.guild(guild)
+        try:
+            if action == "save_buttons":
+                return await self._dash_save_buttons(guild, conf, field)
+            if action == "save_costs":
+                return await self._dash_save_costs(conf, field)
+            if action == "reset_buttons":
+                await conf.button_emojis.set({})
+                await conf.button_labels.set({})
+                await conf.button_styles.set({})
+                return [
+                    {"message": "Buttons are back to the defaults.", "category": "success"}
+                ]
+        except Exception as exc:  # noqa: BLE001 - surfaced, not swallowed
+            log.exception("Controller settings action %r failed", action)
+            return [{"message": f"Action failed: {exc}", "category": "danger"}]
+        return [{"message": f"Unknown action: {action}", "category": "warning"}]
+
+    # Discord caps an emoji image at 256 KB. The browser sends base64, which is
+    # about a third larger, so the raw form value runs a little over that.
+    _MAX_IMAGE_BYTES = 256 * 1024
+    _IMAGE_TYPES = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/gif": "gif",
+        "image/webp": "webp",
+    }
+
+    @classmethod
+    def _dash_decode_image(cls, value: str) -> tuple[bytes | None, str]:
+        """Turn a `data:image/png;base64,...` field into bytes.
+
+        Returns (None, reason) rather than raising: a bad paste should report
+        itself on the page instead of failing the whole save.
+        """
+        import base64
+
+        if not value or not value.startswith("data:"):
+            return None, "that was not an image"
+        try:
+            header, payload = value.split(",", 1)
+            mime = header[5:].split(";", 1)[0].strip().lower()
+        except ValueError:
+            return None, "the image data was malformed"
+        if mime not in cls._IMAGE_TYPES:
+            return None, f"{mime or 'that file type'} is not supported"
+        try:
+            raw = base64.b64decode(payload, validate=True)
+        except Exception:  # noqa: BLE001
+            return None, "the image data was malformed"
+        if not raw:
+            return None, "the image was empty"
+        if len(raw) > cls._MAX_IMAGE_BYTES:
+            return None, f"the image is {len(raw) // 1024} KB, over Discord's 256 KB limit"
+        return raw, ""
+
+    async def _dash_make_emoji(self, guild: discord.Guild, key: str, raw: bytes):
+        """Register an image as an emoji and return its `<:name:id>` token.
+
+        Application emoji are preferred: they belong to the bot, work in every
+        guild, and leave the guild's own emoji slots alone.
+        """
+        name = f"plc_{key}_{guild.id}"[:32]
+
+        create_app = getattr(self.bot, "create_application_emoji", None)
+        if create_app is not None:
+            try:
+                emoji = await create_app(name=name, image=raw)
+                return f"<{'a' if emoji.animated else ''}:{emoji.name}:{emoji.id}>", ""
+            except discord.HTTPException as exc:
+                log.warning("Application emoji upload failed, trying a guild emoji: %s", exc)
+
+        me = guild.me
+        if me is None or not me.guild_permissions.manage_expressions:
+            return None, "I need the Manage Expressions permission to upload an image."
+        try:
+            emoji = await guild.create_custom_emoji(
+                name=name, image=raw, reason="PyLavController button image"
+            )
+        except discord.HTTPException as exc:
+            return None, f"Discord refused the image: {exc.text or exc}"
+        return f"<{'a' if emoji.animated else ''}:{emoji.name}:{emoji.id}>", ""
+
+    async def _dash_drop_emoji(self, guild: discord.Guild, token: str) -> None:
+        """Delete an emoji this cog created, so replacing a picture is not a leak."""
+        import contextlib
+        import re as _re
+
+        match = _re.search(r":(\d{15,25})>$", token or "")
+        if not match:
+            return
+        emoji_id = int(match.group(1))
+        fetch = getattr(self.bot, "fetch_application_emoji", None)
+        if fetch is not None:
+            try:
+                emoji = await fetch(emoji_id)
+                await emoji.delete()
+                return
+            except (discord.HTTPException, discord.NotFound):
+                pass
+        emoji = guild.get_emoji(emoji_id)
+        if emoji is not None:
+            with contextlib.suppress(discord.HTTPException):
+                await emoji.delete(reason="PyLavController button image replaced")
+
+    async def _dash_save_images(self, guild, conf, field) -> list[str]:
+        """Apply any uploaded or cleared button pictures. Returns problems."""
+        from .view import BUTTONS
+
+        problems: list[str] = []
+        async with conf.button_emojis() as emojis, conf.owned_emojis() as owned:
+            for key, _label, _emoji, _blurb in BUTTONS:
+                if field.checked(f"clear_img_{key}"):
+                    if key in owned:
+                        await self._dash_drop_emoji(guild, owned.pop(key))
+                        emojis.pop(key, None)
+                    continue
+                value = field(f"img_{key}") or ""
+                if not value:
+                    continue
+                raw, reason = self._dash_decode_image(value)
+                if raw is None:
+                    problems.append(f"'{key}': {reason}.")
+                    continue
+                token, reason = await self._dash_make_emoji(guild, key, raw)
+                if token is None:
+                    problems.append(f"'{key}': {reason}")
+                    continue
+                if key in owned:
+                    await self._dash_drop_emoji(guild, owned[key])
+                owned[key] = token
+                emojis[key] = token
+        return problems
+
+    async def _dash_save_buttons(self, guild, conf, field) -> list[dict]:
+        from .view import BUTTONS, BUTTON_STYLES, parse_emoji
+
+        problems = await self._dash_save_images(guild, conf, field)
+        uploaded = set(await conf.owned_emojis())
+        bad = []
+
+        async with conf.button_emojis() as emojis, conf.button_labels() as labels:
+            async with conf.button_styles() as styles:
+                for key, _label, _emoji, _blurb in BUTTONS:
+                    value = (field(f"e_{key}") or "").strip()
+                    if not value:
+                        # A blank box must not wipe a picture uploaded in the
+                        # same submit.
+                        if key not in uploaded:
+                            emojis.pop(key, None)
+                    elif parse_emoji(value) is None:
+                        bad.append(key)
+                    else:
+                        emojis[key] = value
+
+                    text = (field(f"l_{key}") or "").strip()
+                    if text:
+                        labels[key] = text[:80]
+                    else:
+                        labels.pop(key, None)
+
+                    style = (field(f"s_{key}") or "").strip()
+                    if style in BUTTON_STYLES and style != "secondary":
+                        styles[key] = style
+                    else:
+                        styles.pop(key, None)
+
+        notes = [
+            {"message": f"'{k}' was not a usable emoji and was skipped.", "category": "warning"}
+            for k in bad
+        ] + [{"message": text, "category": "warning"} for text in problems]
+        return notes + [
+            {
+                "message": "Buttons saved. The controller picks them up on its next refresh.",
+                "category": "success",
+            }
+        ]
+
+    async def _dash_save_costs(self, conf, field) -> list[dict]:
+        costs = await conf.dashboard_action_costs()
+        bad = []
+        updated = {}
+        for key in costs:
+            raw = field.integer(f"c_{key}", None)
+            if raw is None:
+                updated[key] = int(costs[key] or 0)
+                continue
+            if raw < 0:
+                bad.append(key)
+                updated[key] = int(costs[key] or 0)
+                continue
+            updated[key] = raw
+        await conf.dashboard_action_costs.set(updated)
+        await conf.dashboard_economy_enabled.set(field.checked("economy_enabled"))
+        notes = [
+            {"message": f"'{k}' cannot be negative and was left alone.", "category": "warning"}
+            for k in bad
+        ]
+        return notes + [{"message": "Prices saved.", "category": "success"}]
+
     # ---------- guild favourites ----------
 
     FAV_PLAYLIST_NAME = "Dashboard Favourites"
@@ -1011,3 +1322,203 @@ PLAYER_TEMPLATE = """
 </div>
 {% endif %}
 """
+
+
+SETTINGS_TEMPLATE = (
+    BASE_CSS
+    + MACROS
+    + """
+<style>
+  .plcs-img { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+  .plcs-pick { display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+               font-size:.74rem; padding:5px 10px; border-radius:7px;
+               border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); }
+  .plcs-pick:hover { background:rgba(255,255,255,.09); }
+  .plcs-pick.set { border-color:rgba(59,165,93,.5); color:#3ba55d; }
+  .plcs-clear { display:inline-flex; align-items:center; gap:5px;
+                font-size:.7rem; opacity:.6; cursor:pointer; }
+  .plcs-btn { display:inline-flex; align-items:center; gap:6px; font-size:.8rem;
+              font-weight:500; color:#fff; padding:8px 14px; border-radius:8px;
+              background:#4e5058; white-space:nowrap; }
+  .plcs-btn.primary { background:#5865f2; }
+  .plcs-btn.success { background:#248046; }
+  .plcs-btn.danger  { background:#da373c; }
+</style>
+
+{% macro image_field(b) %}
+  <div class="plcs-img">
+    <label class="plcs-pick">
+      <input type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+             data-target="img_{{ b.key }}" hidden />
+      <i class="fa fa-upload"></i> <span class="plcs-pick-name">
+        {%- if b.image %}replace{% else %}upload{% endif -%}
+      </span>
+    </label>
+    <input type="hidden" name="img_{{ b.key }}" id="img_{{ b.key }}" value="" />
+    {% if b.image %}
+      <label class="plcs-clear">
+        <input type="checkbox" name="clear_img_{{ b.key }}" /> remove
+      </label>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+<div class="dz">
+  <div class="dz-head">
+    <h4><i class="fa fa-sliders"></i> Controller settings for {{ guild_name }}</h4>
+    <p>
+      How the controller looks and what each action costs.
+      {% if posted %}The panel picks changes up on its next refresh.
+      {% else %}No controller has been posted yet.{% endif %}
+    </p>
+  </div>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-hand-pointer-o"></i> Buttons</h5>
+      <p class="dz-hint">
+        Every button on the controller, as the listener sees it. Blank fields
+        fall back to the default. Paste a custom emoji as
+        <code>&lt;:name:id&gt;</code>, or upload a picture and it becomes one.
+      </p>
+
+      <div style="overflow-x:auto;">
+      <table class="dz-t" style="min-width:680px;">
+        <thead>
+          <tr><th style="width:1%;">Preview</th><th>Picture</th><th>Emoji</th>
+              <th>Label</th><th>Colour</th></tr>
+        </thead>
+        <tbody>
+          {% for b in button_rows %}
+            <tr>
+              <td style="white-space:nowrap;">
+                <span class="plcs-btn {{ b.style }}">
+                  {% if b.image %}<img class="dz-emoji" src="{{ b.image }}" alt="" />
+                  {%- else %}{{ b.effective }}{% endif %}
+                  {{ b.label_override or b.default_label }}
+                </span>
+                {% if b.broken %}<span class="dz-tag bad">unusable emoji</span>{% endif %}
+                <div style="font-size:.72rem; opacity:.45;">{{ b.blurb }}</div>
+              </td>
+              <td style="width:18%;">{{ image_field(b) }}</td>
+              <td style="width:17%;">
+                <input class="dz-input" type="text" name="e_{{ b.key }}"
+                       value="{{ b.current }}" placeholder="{{ b.default }}" />
+              </td>
+              <td style="width:24%;">
+                <input class="dz-input" type="text" name="l_{{ b.key }}" maxlength="80"
+                       value="{{ b.label_override }}" placeholder="{{ b.default_label }}" />
+              </td>
+              <td style="width:18%;">
+                <select class="dz-select" name="s_{{ b.key }}">
+                  {% for opt in style_options %}
+                    <option value="{{ opt }}" {% if opt == b.style %}selected{% endif %}>
+                      {{ opt }}{% if opt == 'secondary' %} (transparent){% endif %}
+                    </option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+
+      {% if guild_emojis %}
+        <div class="dz-label" style="margin-top:14px;">
+          Available custom emoji ({{ guild_emojis|length }})
+        </div>
+        <div class="dz-row" style="max-height:120px; overflow-y:auto;">
+          {% for g in guild_emojis %}
+            <span class="dz-tag" title="{{ g.id }}"
+                  style="cursor:pointer; display:inline-flex; align-items:center; gap:5px;"
+                  onclick="navigator.clipboard && navigator.clipboard.writeText('{{ g.id }}');">
+              <img class="dz-emoji" src="{{ g.url }}" alt="" /> {{ g.name }}
+            </span>
+          {% endfor %}
+        </div>
+        <div style="font-size:.72rem; opacity:.45; margin-top:5px;">
+          Click one to copy its token, then paste it into a field above.
+        </div>
+      {% endif %}
+
+      <div class="dz-save">
+        <button class="dz-btn primary" name="action" value="save_buttons">
+          <i class="fa fa-save"></i> Save buttons
+        </button>
+        <button class="dz-btn" name="action" value="reset_buttons"
+                onclick="return confirm('Put every button back to its default?');">
+          <i class="fa fa-undo"></i> Reset to defaults
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-money"></i> What actions cost</h5>
+      <p class="dz-hint">
+        Charged in {{ currency }}, on the buttons here and in Discord alike.
+        Staff are never charged. 0 makes an action free.
+      </p>
+
+      <label class="dz-toggle">
+        <input type="checkbox" name="economy_enabled"
+               {% if economy_enabled %}checked{% endif %} />
+        <span>Charge for using the player</span>
+      </label>
+
+      <div class="dz-grid three" style="margin-top:12px;">
+        {% for c in cost_rows %}
+          <div>
+            <div class="dz-label">{{ c.label }}</div>
+            <input class="dz-input" type="number" min="0" name="c_{{ c.key }}"
+                   value="{{ c.value }}" />
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="dz-save">
+        <button class="dz-btn primary" name="action" value="save_costs">
+          <i class="fa fa-save"></i> Save prices
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  // reddash forwards request.form but not request.files, so the picture is read
+  // here and posted as an ordinary base64 field instead of a real upload.
+  var MAX = 256 * 1024;
+  document.querySelectorAll('input[type=file][data-target]').forEach(function (input) {
+    input.addEventListener('change', function () {
+      var target = document.getElementById(input.dataset.target);
+      var pick = input.closest('.plcs-pick');
+      var name = pick ? pick.querySelector('.plcs-pick-name') : null;
+      var file = input.files && input.files[0];
+      if (!target) { return; }
+      if (!file) { target.value = ''; return; }
+      if (file.size > MAX) {
+        if (name) { name.textContent = Math.round(file.size / 1024) + ' KB - too big'; }
+        pick && pick.classList.remove('set');
+        input.value = '';
+        target.value = '';
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function () {
+        target.value = reader.result;
+        if (name) { name.textContent = file.name.slice(0, 18); }
+        pick && pick.classList.add('set');
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+})();
+</script>
+"""
+)

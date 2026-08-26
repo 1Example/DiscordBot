@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -84,6 +85,64 @@ def silence_replies(context) -> None:
 
     with contextlib.suppress(Exception):
         context.send = send
+
+
+# Every button on the controller: the attribute holding it, the label shown by
+# default, the default emoji, and a line of help for the settings page. This is
+# the single source of truth - the view, the dashboard page and the validation
+# all read it, so a button cannot exist in one and not the others.
+BUTTONS = (
+    ("previous_track_button", "Previous", "\N{BLACK LEFT-POINTING DOUBLE TRIANGLE WITH VERTICAL BAR}",
+     "jump back to the previous track"),
+    ("resume_button", "Play", "\N{BLACK RIGHT-POINTING TRIANGLE}", "resume playback"),
+    ("paused_button", "Pause", "\N{DOUBLE VERTICAL BAR}", "pause playback"),
+    ("skip_button", "Skip", "\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE WITH VERTICAL BAR}",
+     "skip to the next track"),
+    ("shuffle_button", "Shuffle", "\N{TWISTED RIGHTWARDS ARROWS}", "shuffle the queue"),
+    ("stop_button", "Stop", "\N{BLACK SQUARE FOR STOP}", "stop and clear the queue"),
+    ("decrease_volume_button", "Vol -", "\N{SPEAKER WITH ONE SOUND WAVE}", "turn it down"),
+    ("increase_volume_button", "Vol +", "\N{SPEAKER WITH THREE SOUND WAVES}", "turn it up"),
+    ("repeat_button_on", "Repeat track", "\N{CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS WITH CIRCLED ONE OVERLAY}",
+     "shown while a single track is on repeat"),
+    ("repeat_queue_button_on", "Repeat queue", "\N{CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS}",
+     "shown while the whole queue is on repeat"),
+    ("repeat_button_off", "Repeat", "\N{CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS}",
+     "shown while repeat is off"),
+    ("queue_button", "Queue", "\N{SCROLL}", "list what is queued"),
+    ("show_history_button", "History", "\N{CLOCKWISE DOWNWARDS AND UPWARDS OPEN CIRCLE ARROWS}",
+     "list what was played"),
+    ("refresh_button", "Refresh", "\N{ANTICLOCKWISE DOWNWARDS AND UPWARDS OPEN CIRCLE ARROWS}",
+     "redraw the controller"),
+    ("clear_queue_button", "Clear queue", "\N{WASTEBASKET}", "empty the queue"),
+    ("disconnect_button", "Disconnect", "\N{EJECT SYMBOL}", "leave the voice channel"),
+)
+
+BUTTON_STYLES = {
+    "secondary": discord.ButtonStyle.secondary,
+    "primary": discord.ButtonStyle.primary,
+    "success": discord.ButtonStyle.success,
+    "danger": discord.ButtonStyle.danger,
+}
+
+CUSTOM_EMOJI_RE = re.compile(r"^<(a?):([A-Za-z0-9_]{2,32}):(\d{15,25})>$")
+
+
+def parse_emoji(raw):
+    """Turn a stored emoji string into something discord.py accepts.
+
+    Returns None when the value is unusable, so a bad override degrades to the
+    default rather than breaking the whole controller.
+    """
+    if not raw:
+        return None
+    raw = raw.strip()
+    match = CUSTOM_EMOJI_RE.match(raw)
+    if match:
+        animated, name, emoji_id = match.groups()
+        return discord.PartialEmoji(name=name, id=int(emoji_id), animated=bool(animated))
+    if len(raw) <= 8 and not raw.isascii():
+        return raw
+    return None
 
 
 class PrivateInteractionResponse:
@@ -859,9 +918,35 @@ class PersistentControllerView(discord.ui.View):
                         reason=_("PyLav Controller"),
                     )
 
+    async def _apply_button_styling(self) -> None:
+        """Put this guild's emoji, labels and colours on the buttons.
+
+        Called from `prepare`, which runs before every redraw, so a change on
+        the dashboard shows up on the next update without re-posting the panel.
+        """
+        try:
+            settings = await self.cog._config.guild(self.guild).all()
+        except Exception:  # noqa: BLE001 - styling must never stop playback
+            LOGGER.exception("Could not read the controller button settings")
+            return
+        emoji_overrides = settings.get("button_emojis") or {}
+        labels = settings.get("button_labels") or {}
+        styles = settings.get("button_styles") or {}
+
+        for attribute, default_label, default_emoji, _blurb in BUTTONS:
+            button = getattr(self, attribute, None)
+            if button is None:
+                continue
+            parsed = parse_emoji(emoji_overrides.get(attribute)) or parse_emoji(default_emoji)
+            button.emoji = parsed
+            label = (labels.get(attribute) or "").strip()
+            button.label = (label or default_label)[:80]
+            button.style = BUTTON_STYLES.get(styles.get(attribute) or "", TRANSPARENT)
+
     async def prepare(self):
         async with self.__prepare_lock:
             player = self.cog.pylav.get_player(self.channel.guild.id)
+            await self._apply_button_styling()
             self.clear_items()
             self.show_history_button.disabled = False
             self.queue_button.disabled = False
