@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import typing as t
 
@@ -11,6 +12,7 @@ from redbot.core.utils.dashboard_helpers import (
     MACROS,
     channel_options,
     dashboard_page,
+    fake_context,
     form_reader,
     guild_member,
     is_staff,
@@ -142,7 +144,7 @@ class DashboardIntegration:
                     "error_title": "Forbidden",
                     "error_message": "Only server administrators can change Mafia settings.",
                 }
-            notifications = await self._mafia_handle_post(guild, kwargs)
+            notifications = await self._mafia_handle_post(guild, member, kwargs)
 
         settings = await self.config.guild(guild).all()
         game = self._mafia_live_game(guild)
@@ -160,6 +162,12 @@ class DashboardIntegration:
                 "groups": self._mafia_groups(guild, settings),
                 "leaderboard": await self._mafia_leaderboard(guild),
                 "modes": self._mafia_mode_cards(),
+                "text_channels": channel_options(guild, require_send=True),
+                "mode_options": [
+                    {"id": name, "name": name, "group": group, "selected": False}
+                    for name, group in self._mafia_names("modes")
+                ],
+                "can_manage": bool(guild.me and guild.me.guild_permissions.manage_channels),
             },
         }
 
@@ -406,16 +414,103 @@ class DashboardIntegration:
 
     # ------------------------------------------------------------- post logic
 
-    async def _mafia_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+    async def _mafia_handle_post(
+        self, guild: discord.Guild, actor: discord.Member, kwargs: dict
+    ) -> list[dict]:
         field = form_reader(kwargs)
         action = field("action")
         try:
+            if action == "start_game":
+                return await self._mafia_start_game(guild, actor, field)
+            if action == "end_game":
+                return await self._mafia_end_game(guild, actor)
             if action and action.startswith("save_"):
                 return await self._mafia_save_group(guild, field, action[len("save_"):])
         except Exception as exc:  # noqa: BLE001 - surfaced, not swallowed
             log.exception("Mafia dashboard action %r failed", action)
             return [{"message": f"Action failed: {exc}", "category": "danger"}]
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
+
+    async def _mafia_start_game(self, guild: discord.Guild, actor, field) -> list[dict]:
+        """Open a join lobby in the chosen channel.
+
+        The cog's own `start` command runs the lobby and blocks until it fills,
+        so it goes on the event loop as a task. What this returns is "the lobby
+        is open", which is all the web request can honestly say.
+        """
+        if (getattr(self, "games", None) or {}).get(guild) is not None:
+            return [
+                {"message": "A game is already running in this server.",
+                 "category": "warning"}
+            ]
+
+        me = guild.me
+        if me is None or not me.guild_permissions.manage_channels:
+            return [
+                {"message": "I need Manage Channels to create the game channel.",
+                 "category": "danger"}
+            ]
+
+        channel = guild.get_channel(field.integer("channel", 0) or 0)
+        if channel is None or not hasattr(channel, "send"):
+            return [{"message": "Pick a channel for the lobby.", "category": "warning"}]
+        if not channel.permissions_for(me).send_messages:
+            return [
+                {"message": f"I cannot post in #{channel.name}.", "category": "danger"}
+            ]
+
+        mode_name = (field("mode") or "").strip()
+        mode = None
+        if mode_name:
+            try:
+                from .modes import MODES
+
+                mode = discord.utils.get(MODES, name=mode_name)
+            except Exception:  # noqa: BLE001
+                log.exception("Could not resolve the Mafia mode %r", mode_name)
+            if mode is None:
+                return [
+                    {"message": f"There is no mode called '{mode_name}'.",
+                     "category": "warning"}
+                ]
+
+        context = await fake_context(
+            self.bot, actor, f"{guild.me.mention} mafia start", channel=channel
+        )
+        if context is None:
+            return [
+                {"message": "I could not open a lobby in that channel.",
+                 "category": "danger"}
+            ]
+
+        async def run() -> None:
+            try:
+                await context.invoke(self.start, mode=mode)
+            except Exception:  # noqa: BLE001 - nobody is waiting on this task
+                log.exception("Starting a Mafia game from the dashboard failed")
+
+        asyncio.create_task(run())
+        return [
+            {
+                "message": f"Lobby opened in #{channel.name}"
+                + (f" on {mode_name}." if mode_name else " on the default mode.")
+                + " Players join from there.",
+                "category": "success",
+            }
+        ]
+
+    async def _mafia_end_game(self, guild: discord.Guild, actor) -> list[dict]:
+        game = (getattr(self, "games", None) or {}).get(guild)
+        if game is None:
+            return [
+                {"message": "No game is running in this server.", "category": "warning"}
+            ]
+        try:
+            await game.end()
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Ending the Mafia game from the dashboard failed")
+            return [{"message": f"Could not end the game: {exc}", "category": "danger"}]
+        return [{"message": "The game has been ended.", "category": "success"}]
 
     async def _mafia_save_group(self, guild, field, slug: str) -> list[dict]:
         wanted = next(
@@ -537,6 +632,55 @@ MAFIA_TEMPLATE = (
         {% endfor %}
       </div>
     </div>
+  {% endif %}
+
+  {% if is_staff %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-play"></i> Run a game</h5>
+        {% if not can_manage %}
+          <p style="margin:0 0 9px; color:#ff8b8b;">
+            <i class="fa fa-exclamation-circle"></i>
+            I do not have <b>Manage Channels</b>, so I cannot create the game channel.
+          </p>
+        {% endif %}
+        {% if game %}
+          <p class="dz-hint">
+            A game is already running. End it before starting another.
+          </p>
+          <div class="dz-save">
+            <button class="dz-btn danger" name="action" value="end_game"
+                    onclick="return confirm('End the game that is running?');">
+              <i class="fa fa-stop"></i> End the game
+            </button>
+          </div>
+        {% else %}
+          <p class="dz-hint">
+            Opens the join lobby in the channel you pick &mdash; players still join
+            from Discord, and the game runs itself from there.
+          </p>
+          <div class="dz-row">
+            <div style="flex:1 1 240px;">
+              <div class="dz-label">Lobby channel</div>
+              {{ picker('channel', text_channels, allow_none=true,
+                        none_label='pick a channel') }}
+            </div>
+            <div style="flex:1 1 200px;">
+              <div class="dz-label">Mode</div>
+              {{ picker('mode', mode_options, allow_none=true,
+                        none_label='the server default') }}
+            </div>
+          </div>
+          <div class="dz-save">
+            <button class="dz-btn primary" name="action" value="start_game"
+                    {% if not can_manage %}disabled{% endif %}>
+              <i class="fa fa-play"></i> Open the lobby
+            </button>
+          </div>
+        {% endif %}
+      </div>
+    </form>
   {% endif %}
 
   {% if not is_staff %}
