@@ -46,8 +46,12 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         for cid, conf in all_channels.items():
             try:
                 channel = self.bot.get_channel(cid)
-                assert isinstance(channel, (discord.TextChannel, discord.Thread))
-                if not channel:
+                # A saved game whose channel was deleted, or that lives in a
+                # guild the bot has left, is an ordinary condition rather than a
+                # programming error - skip it instead of asserting. The assert
+                # used to run before this check, so it fired on every such game
+                # and logged a traceback.
+                if not isinstance(channel, (discord.TextChannel, discord.Thread)):
                     continue
                 game_config = conf.get("game", {})
                 game = await PokerGame.from_config(self, channel, game_config)

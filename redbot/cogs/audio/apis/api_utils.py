@@ -1,3 +1,8 @@
+# `lavalink` here is the standalone package the pre-PyLav Audio cog used. In this
+# fork the name resolves elsewhere and no longer exposes `Track`, so annotations
+# are kept unevaluated to stop a class body from breaking the whole import.
+from __future__ import annotations
+
 import datetime
 import json
 from collections import namedtuple

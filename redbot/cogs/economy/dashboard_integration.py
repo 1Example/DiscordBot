@@ -24,21 +24,6 @@ FIELDS = (
     ("PAYDAY_TIME", "Payday cooldown (seconds)", "How long between paydays.", 0),
     ("PAYDAY_CREDITS", "Payday amount", "Credits granted per payday.", 0),
     ("REGISTER_CREDITS", "Starting balance", "Credits a new account begins with.", 0),
-    ("SLOT_MIN", "Minimum slot bid", "Smallest allowed slot machine bid.", 1),
-    ("SLOT_MAX", "Maximum slot bid", "Largest allowed slot machine bid.", 1),
-    ("SLOT_TIME", "Slot cooldown (seconds)", "How long between slot spins.", 0),
-)
-
-
-# What the slot machine pays, mirroring the PAYOUTS table in the cog.
-SLOT_PAYOUTS = (
-    ("2 2 6", "x50", "Jackpot"),
-    ("4LC 4LC 4LC", "x25", "Three four-leaf clovers"),
-    ("Cherry Cherry Cherry", "x20", "Three cherries"),
-    ("Any three matching symbols", "x10", ""),
-    ("2 6", "x4", "Two then six"),
-    ("Cherry Cherry", "x3", "Two cherries"),
-    ("Any two consecutive symbols", "x2", ""),
 )
 
 
@@ -47,7 +32,7 @@ class DashboardIntegration:
 
     Covers every ``[p]economyset`` option including per-role payday amounts, the
     bank operations (``[p]bank set``, ``[p]bank add``, ``[p]bank sub``,
-    ``[p]bank transfer``), the leaderboard and the slot payout table.
+    ``[p]bank transfer``) and the leaderboard.
     """
 
     bot: t.Any
@@ -60,7 +45,7 @@ class DashboardIntegration:
 
     @dashboard_page(
         name=None,
-        description="Payday, slots and the credit leaderboard.",
+        description="Payday, balances and the credit leaderboard.",
         methods=("GET", "POST"),
         context_ids=["guild_id", "user_id"],
     )
@@ -121,7 +106,6 @@ class DashboardIntegration:
                 "member_options": member_options(guild, humans_only=True),
                 "role_options": role_options(guild),
                 "role_paydays": await self._eco_role_paydays(guild, global_bank),
-                "payouts": SLOT_PAYOUTS,
             },
         }
 
@@ -317,17 +301,6 @@ class DashboardIntegration:
                 continue
             values[key] = value
 
-        # A minimum bid above the maximum makes slots unplayable with no error
-        # message anywhere, so reject the pair rather than storing it.
-        slot_min = values.get("SLOT_MIN")
-        slot_max = values.get("SLOT_MAX")
-        if slot_min is not None and slot_max is not None and slot_min > slot_max:
-            errors.append(
-                {"message": "Minimum slot bid cannot exceed the maximum.", "category": "danger"}
-            )
-            values.pop("SLOT_MIN", None)
-            values.pop("SLOT_MAX", None)
-
         for key, value in values.items():
             await scope.get_attr(key).set(value)
 
@@ -481,16 +454,6 @@ ECONOMY_TEMPLATE = (
     {% endif %}
   </div>
 
-  <div class="dz-panel">
-    <h5><i class="fa fa-diamond"></i> Slot payouts</h5>
-    <p class="dz-hint">What each result multiplies the bid by.</p>
-    <table class="dz-t">
-      <tr><th>Result</th><th>Payout</th><th></th></tr>
-      {% for result, payout, note in payouts %}
-        <tr><td>{{ result }}</td><td>{{ payout }}</td><td>{{ note }}</td></tr>
-      {% endfor %}
-    </table>
-  </div>
 </div>
 """
 )

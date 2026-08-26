@@ -221,6 +221,9 @@ class PyLavYouTubeRadio(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             node=await self.pylav.node_manager.find_best_node(),
             data=results[0],
             query=None,
+            # `player_instance` is required; this track is only built to read an
+            # identifier off it, so it belongs to no player.
+            player_instance=None,
             requester=self.bot.user.id,
         )
         with contextlib.suppress(Exception):
