@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import typing as t
 
@@ -11,6 +12,7 @@ from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
     emoji_options,
+    emoji_rejection,
     form_reader,
 )
 
@@ -709,53 +711,61 @@ class DashboardIntegration:
         return raw, ""
 
     async def _dash_make_emoji(self, guild: discord.Guild, key: str, raw: bytes):
-        """Register an image as an emoji and return its `<:name:id>` token.
+        """Register an image as a guild emoji and return its `<:name:id>` token.
 
-        Application emoji are preferred: they belong to the bot, work in every
-        guild, and leave the guild's own emoji slots alone.
+        It has to be a *guild* emoji: Discord rejects an application emoji on a
+        message component, even though the application owns it and the CDN
+        serves it happily. The name carries no guild id because a guild emoji
+        only needs to be unique within its own guild, which also keeps it under
+        the 32-character cap without truncating.
         """
-        name = f"plc_{key}_{guild.id}"[:32]
-
-        create_app = getattr(self.bot, "create_application_emoji", None)
-        if create_app is not None:
-            try:
-                emoji = await create_app(name=name, image=raw)
-                return f"<{'a' if emoji.animated else ''}:{emoji.name}:{emoji.id}>", ""
-            except discord.HTTPException as exc:
-                log.warning("Application emoji upload failed, trying a guild emoji: %s", exc)
-
+        name = f"plc_{key}"[:32]
         me = guild.me
         if me is None or not me.guild_permissions.manage_expressions:
-            return None, "I need the Manage Expressions permission to upload an image."
+            return None, (
+                "I need the Manage Expressions permission to upload a picture. "
+                "Grant it, or paste an existing emoji as <:name:id> instead."
+            )
+
+        # Clear a previous upload for this button first; creating a duplicate
+        # name is rejected outright.
+        for existing in guild.emojis:
+            if existing.name == name:
+                with contextlib.suppress(discord.HTTPException):
+                    await existing.delete(reason="PyLavController button image replaced")
+
         try:
             emoji = await guild.create_custom_emoji(
                 name=name, image=raw, reason="PyLavController button image"
             )
         except discord.HTTPException as exc:
-            return None, f"Discord refused the image: {exc.text or exc}"
+            if exc.code == 30008:
+                return None, "this server has no free emoji slots."
+            return None, f"Discord refused the picture: {exc.text or exc}"
         return f"<{'a' if emoji.animated else ''}:{emoji.name}:{emoji.id}>", ""
 
     async def _dash_drop_emoji(self, guild: discord.Guild, token: str) -> None:
-        """Delete an emoji this cog created, so replacing a picture is not a leak."""
-        import contextlib
+        """Delete an emoji this cog created, so a replaced picture is not a leak.
+
+        Still checks the application's own emoji: earlier versions uploaded
+        there, and those need cleaning up even though they were never usable on
+        a button.
+        """
         import re as _re
 
-        match = _re.search(r":(\d{15,25})>$", token or "")
+        match = _re.search(r":(\\d{15,25})>$", token or "")
         if not match:
             return
         emoji_id = int(match.group(1))
-        fetch = getattr(self.bot, "fetch_application_emoji", None)
-        if fetch is not None:
-            try:
-                emoji = await fetch(emoji_id)
-                await emoji.delete()
-                return
-            except (discord.HTTPException, discord.NotFound):
-                pass
         emoji = guild.get_emoji(emoji_id)
         if emoji is not None:
             with contextlib.suppress(discord.HTTPException):
                 await emoji.delete(reason="PyLavController button image replaced")
+            return
+        fetch = getattr(self.bot, "fetch_application_emoji", None)
+        if fetch is not None:
+            with contextlib.suppress(Exception):
+                await (await fetch(emoji_id)).delete()
 
     async def _dash_save_images(self, guild, conf, field) -> list[str]:
         """Apply any uploaded or cleared button pictures. Returns problems."""
@@ -803,7 +813,7 @@ class DashboardIntegration:
                         if key not in uploaded:
                             emojis.pop(key, None)
                     elif parse_emoji(value) is None:
-                        bad.append(key)
+                        bad.append((key, value))
                     else:
                         emojis[key] = value
 
@@ -819,10 +829,9 @@ class DashboardIntegration:
                     else:
                         styles.pop(key, None)
 
-        notes = [
-            {"message": f"'{k}' was not a usable emoji and was skipped.", "category": "warning"}
-            for k in bad
-        ] + [{"message": text, "category": "warning"} for text in problems]
+        notes = [emoji_rejection(k, v) for k, v in bad] + [
+            {"message": text, "category": "warning"} for text in problems
+        ]
         return notes + [
             {
                 "message": "Buttons saved. The controller picks them up on its next refresh.",
@@ -1381,6 +1390,9 @@ SETTINGS_TEMPLATE = (
         Every button on the controller, as the listener sees it. Blank fields
         fall back to the default. Paste a custom emoji as
         <code>&lt;:name:id&gt;</code>, or upload a picture and it becomes one.
+        <b>An uploaded picture is added to this server&#39;s emoji</b> and takes a
+        slot &mdash; Discord only accepts a server emoji on a button, so there is
+        no way around that. Max 256&nbsp;KB, square works best.
       </p>
 
       <div style="overflow-x:auto;">

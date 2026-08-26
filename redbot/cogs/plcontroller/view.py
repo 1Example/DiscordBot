@@ -1239,7 +1239,58 @@ class PersistentControllerView(discord.ui.View):
                 attachments = kwargs.pop("files")
             if attachments:
                 kwargs["attachments"] = attachments
-            await self.message.edit(view=self, **kwargs)
+            try:
+                await self.message.edit(view=self, **kwargs)
+            except discord.HTTPException as exc:
+                if not await self._drop_rejected_emoji(exc):
+                    raise
+                await self.message.edit(view=self, **kwargs)
+
+    # Discord points at the offending component by index: the error reads
+    # `components.0.components.4.emoji.id: Invalid emoji`.
+    _BAD_EMOJI_PATH = re.compile(r"components\.(\d+)\.components\.(\d+)\.emoji")
+
+    async def _drop_rejected_emoji(self, exc: discord.HTTPException) -> bool:
+        """Strip an emoji Discord refused, and forget it. True if we can retry.
+
+        An emoji can stop being usable at any time - someone deletes it, or it
+        was never valid on a component to begin with. Losing the picture is a
+        great deal better than losing the controller.
+        """
+        if exc.code != 50035:
+            return False
+        match = self._BAD_EMOJI_PATH.search(str(exc.text or exc))
+        if match is None:
+            return False
+        row, index = int(match.group(1)), int(match.group(2))
+
+        # `self.children` is the flat list in the order Discord received it.
+        in_row = [child for child in self.children if getattr(child, "row", 0) == row]
+        if index >= len(in_row):
+            return False
+        button = in_row[index]
+        button.emoji = None
+
+        key = next(
+            (
+                attribute
+                for attribute, *_rest in BUTTONS
+                if getattr(self, attribute, None) is button
+            ),
+            None,
+        )
+        LOGGER.warning(
+            "Discord rejected the emoji on %s; dropping it and carrying on.",
+            key or f"row {row} button {index}",
+        )
+        if key is not None:
+            with contextlib.suppress(Exception):
+                conf = self.cog._config.guild(self.guild)
+                async with conf.button_emojis() as stored:
+                    stored.pop(key, None)
+                async with conf.owned_emojis() as owned:
+                    owned.pop(key, None)
+        return True
 
     # Buttons every listener may press. Mirrors LISTENER_ACTIONS on the web
     # dashboard so both surfaces enforce the same rules.

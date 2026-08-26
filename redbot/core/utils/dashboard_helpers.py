@@ -85,6 +85,46 @@ def form_reader(kwargs: dict) -> t.Callable[[str, t.Any], t.Any]:
     return field
 
 
+def emoji_problem(raw: str) -> str:
+    """Why `raw` cannot be used as a button emoji, phrased for the page.
+
+    Discord accepts exactly two things on a button: one unicode emoji, or a
+    custom-emoji token. Everything else has to be explained, because "not
+    usable" leaves the person staring at a box with no idea what to change.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return "it was empty"
+    if raw.startswith(("http://", "https://")):
+        return (
+            "that is a link - use the upload button for a picture, or paste a "
+            "<:name:id> token"
+        )
+    if raw.startswith("<") and raw.endswith(">"):
+        return (
+            "that looks like a custom emoji token but Discord did not accept it; "
+            "the id must be the numeric one, as in <:name:123456789012345678>"
+        )
+    if len(raw) > 2 and raw.startswith(":") and raw.endswith(":"):
+        return "shortcodes like :name: do not work - paste the <:name:id> token instead"
+    if raw.isascii():
+        return "plain text is not an emoji - paste a real one, or a <:name:id> token"
+    if len(raw) > 8:
+        return f"it is {len(raw)} characters long; a single emoji is expected"
+    return "Discord did not recognise it as an emoji"
+
+
+def emoji_rejection(key: str, raw: str, *, limit: int = 40) -> dict:
+    """A ready-made warning notification for a rejected emoji."""
+    shown = (raw or "").strip()
+    if len(shown) > limit:
+        shown = shown[:limit] + "..."
+    return {
+        "message": f"{key}: {emoji_problem(raw)}. Got: {shown!r}",
+        "category": "warning",
+    }
+
+
 async def fake_context(bot, member: discord.Member, content: str, channel=None):
     """Build a real `Context` for a command that was triggered from the dashboard.
 
