@@ -95,13 +95,10 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         super().__init__(*args, **kwargs)
         self.bot = bot
         self._config = Config.get_conf(self, identifier=208903205982044161)
-        self._config.register_global(
-            notify_channel_id=None,
-            # Node up/down is operator noise, not something a music channel
-            # wants; these read from the global config rather than per-guild.
-            node_connected=dict(enabled=False, mention=True),
-            node_disconnected=dict(enabled=False, mention=True),
-        )
+        # Kept only so the owner-only `channel` command has somewhere to write;
+        # nothing reads it any more. Node events are configured per guild like
+        # everything else - see `_node_channels`.
+        self._config.register_global(notify_channel_id=None)
         self._config.register_guild(
             track_stuck=dict(enabled=False, mention=True),
             track_exception=dict(enabled=False, mention=True),
@@ -570,6 +567,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             config = self.pylav.player_config_manager.get_config(context.guild.id)
         await config.update_notify_channel_id(channel.id if channel else 0)
         if await self.bot.is_owner(context.author):
+            # Vestigial: node notices read the per-guild channel now.
             await self._config.notify_channel_id.set(channel.id)
         await context.send(
             embed=await context.pylav.construct_embed(
@@ -2325,47 +2323,64 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             ), member=self._member_of(event), event=event
         , kind="player")
 
+    async def _node_channels(self, key: str) -> list:
+        """Channels whose guild asked to hear about this node event.
+
+        A node belongs to no guild, but the switch for it lives per guild like
+        every other event, so ask each guild that enabled it and has somewhere
+        to post. Returning a list rather than one channel is the point: two
+        servers can both want node notices, in their own channels.
+        """
+        channels = []
+        try:
+            all_guilds = await self._config.all_guilds()
+        except Exception:  # noqa: BLE001
+            LOGGER.exception("Could not read the per-guild notifier settings")
+            return channels
+        for guild_id, data in all_guilds.items():
+            if not (data.get(key) or {}).get("enabled"):
+                continue
+            channel_id = data.get("notify_channel_id")
+            if not channel_id:
+                continue
+            channel = self.bot.get_channel(channel_id)
+            if channel is not None and getattr(channel, "guild", None) is not None:
+                channels.append(channel)
+        return channels
+
     @commands.Cog.listener()
     async def on_pylav_node_connected_event(self, event: NodeConnectedEvent) -> None:
-        data = await self._config.get_raw("node_connected", default={"enabled": True, "mention": True})
-        notify, mention = data["enabled"], data["mention"]
-        if not notify:
-            return
-        if channel_id := await self._config.notify_channel_id():
-            if notify_channel := self.bot.get_channel(channel_id):
-                await self.pylav.set_context_locale(notify_channel.guild)
-                self._message_queue[notify_channel].append(
-                    await self.pylav.construct_embed(
-                        title=_("Node Connected Event"),
-                        description=_("Node {name_variable_do_not_translate} has been connected").format(
-                            name_variable_do_not_translate=inline(event.node.name)
-                        ),
-                        messageable=notify_channel,
-                    )
-                )
+        for notify_channel in await self._node_channels("node_connected"):
+            await self.pylav.set_context_locale(notify_channel.guild)
+            await self._notify(
+                notify_channel,
+                await self.pylav.construct_embed(
+                    title=_("Node Connected Event"),
+                    description=_("Node {name_variable_do_not_translate} has been connected").format(
+                        name_variable_do_not_translate=inline(event.node.name)
+                    ),
+                    messageable=notify_channel,
+                ),
+            )
 
     @commands.Cog.listener()
     async def on_pylav_node_disconnected_event(self, event: NodeDisconnectedEvent) -> None:
-        data = await self._config.get_raw("node_disconnected", default={"enabled": True, "mention": True})
-        notify, mention = data["enabled"], data["mention"]
-        if not notify:
-            return
-        if channel_id := await self._config.notify_channel_id():
-            if notify_channel := self.bot.get_channel(channel_id):
-                await self.pylav.set_context_locale(notify_channel.guild)
-                self._message_queue[notify_channel].append(
-                    await self.pylav.construct_embed(
-                        title=_("Node Disconnected Event"),
-                        description=_(
-                            "Node {name_variable_do_not_translate} has been disconnected with code {code_variable_do_not_translate} and reason: {reason_variable_do_not_translate}"
-                        ).format(
-                            name_variable_do_not_translate=inline(event.node.name),
-                            code_variable_do_not_translate=event.code,
-                            reason_variable_do_not_translate=event.reason,
-                        ),
-                        messageable=notify_channel,
-                    )
-                )
+        for notify_channel in await self._node_channels("node_disconnected"):
+            await self.pylav.set_context_locale(notify_channel.guild)
+            await self._notify(
+                notify_channel,
+                await self.pylav.construct_embed(
+                    title=_("Node Disconnected Event"),
+                    description=_(
+                        "Node {name_variable_do_not_translate} has been disconnected with code {code_variable_do_not_translate} and reason: {reason_variable_do_not_translate}"
+                    ).format(
+                        name_variable_do_not_translate=inline(event.node.name),
+                        code_variable_do_not_translate=event.code,
+                        reason_variable_do_not_translate=event.reason,
+                    ),
+                    messageable=notify_channel,
+                ),
+            )
 
     @commands.Cog.listener()
     async def on_pylav_node_changed_event(self, event: NodeChangedEvent) -> None:

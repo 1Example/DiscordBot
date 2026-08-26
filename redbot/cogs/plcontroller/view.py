@@ -59,22 +59,25 @@ RESPONSE_SLOT = _cached_slot_name(discord.Interaction, "response", "_cs_response
 FOLLOWUP_SLOT = _cached_slot_name(discord.Interaction, "followup", "_cs_followup")
 
 
-def make_replies_private(context) -> None:
-    """Force every `ctx.send` from a button callback to reach only the clicker.
+def silence_replies(context) -> None:
+    """Swallow whatever the cog command this button delegates to wants to say.
 
     The callbacks hand a Context straight to a cog command, and that command
-    answers with `ctx.send`. discord.py sends that through the interaction
-    followup with `ephemeral=False`, so the flag has to be injected here -
-    there is no way to pass it through the command call itself.
+    confirms with `ctx.send` - "I have skipped X as requested." PyLavNotifier
+    already posts that publicly, so the command's copy is pure duplication.
+
+    The interaction still gets its deferred acknowledgement from
+    `interaction_check`, so nothing is left hanging; the click simply produces
+    no message of its own. Anything swallowed is logged, so a command that
+    fails and only reports through `ctx.send` is still diagnosable.
     """
-    original = context.send
 
     async def send(content=None, **kwargs):
-        kwargs["ephemeral"] = True
-        # An ephemeral message cannot be deleted through the API; Discord
-        # dismisses it on its own, and asking anyway raises.
-        kwargs.pop("delete_after", None)
-        return await original(content=content, **kwargs)
+        LOGGER.debug(
+            "Suppressed a controller command reply: %r",
+            content or kwargs.get("embed") or kwargs,
+        )
+        return None
 
     with contextlib.suppress(Exception):
         context.send = send
@@ -158,7 +161,7 @@ class IncreaseVolumeButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         await self.cog.volume(context, change_by=5)
         await self.view.update_view()
 
@@ -185,7 +188,7 @@ class DecreaseVolumeButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         await self.cog.volume(context, change_by=-5)
         await self.view.update_view()
 
@@ -212,7 +215,7 @@ class StopTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         await self.cog.stop(context)
         await self.view.update_view(forced=True)
 
@@ -239,7 +242,7 @@ class PauseTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         await self.cog.pause(context)
         await self.view.update_view()
 
@@ -266,7 +269,7 @@ class ResumeTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         await self.cog.resume(context)
         await self.view.update_view()
 
@@ -293,7 +296,7 @@ class SkipTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         await self.cog.skip(context)
         await self.view.update_view()
 
@@ -320,13 +323,11 @@ class ToggleRepeatButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         player = context.player
         if not player:
-            return await context.send(
-                embed=await self.cog.pylav.construct_embed(
-                    description=_("I am not connected to any voice channel at the moment."), messageable=interaction
-                ),
+            return await self.view._tell(
+                interaction, _("I am not connected to any voice channel at the moment.")
             )
         await self.cog.repeat(context, queue=await player.config.fetch_repeat_current())
         await self.view.update_view()
@@ -491,13 +492,11 @@ class ToggleRepeatQueueButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         player = context.player
         if not player:
-            return await context.send(
-                embed=await self.cog.pylav.construct_embed(
-                    description=_("I am not connected to any voice channel at the moment."), messageable=interaction
-                ),
+            return await self.view._tell(
+                interaction, _("I am not connected to any voice channel at the moment.")
             )
         repeat_queue = bool(await player.config.fetch_repeat_current())
         await self.cog.repeat(context, queue=repeat_queue)
@@ -526,7 +525,7 @@ class ShuffleButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         await self.cog.shuffle(context)
         await self.view.update_view()
 
@@ -553,7 +552,7 @@ class PreviousTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
-        make_replies_private(context)
+        silence_replies(context)
         await self.cog.previous(context)
         await self.view.update_view()
 
