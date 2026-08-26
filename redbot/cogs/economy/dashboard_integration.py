@@ -118,7 +118,11 @@ class DashboardIntegration:
         is shared across servers, but whether a server hands it out on a timer
         and where it says so are that server's business.
         """
-        from .economy import DEFAULT_PAYDAY_MESSAGE, DEFAULT_PAYDAY_TITLE
+        from .economy import (
+            DEFAULT_PAYDAY_MESSAGE,
+            DEFAULT_PAYDAY_TITLE,
+            MAX_PAYSLIP_LEADERBOARD,
+        )
 
         auto = await self.config.guild(guild).all()
         colour = auto.get("AUTO_PAYDAY_COLOUR") or 0
@@ -132,6 +136,14 @@ class DashboardIntegration:
             "auto_title": auto.get("AUTO_PAYDAY_TITLE") or "",
             "auto_message": auto.get("AUTO_PAYDAY_MESSAGE") or "",
             "auto_image": auto.get("AUTO_PAYDAY_IMAGE") or "",
+            "auto_board": bool(auto.get("AUTO_PAYDAY_LEADERBOARD", True)),
+            "auto_board_size": auto.get("AUTO_PAYDAY_LEADERBOARD_SIZE", 5) or 5,
+            "auto_board_max": MAX_PAYSLIP_LEADERBOARD,
+            "auto_board_preview": await self._eco_leaderboard(
+                guild,
+                await bank.is_global(),
+                limit=auto.get("AUTO_PAYDAY_LEADERBOARD_SIZE", 5) or 5,
+            ),
             "auto_colour": f"#{colour:06x}" if colour else "#f1c40f",
             "auto_title_default": DEFAULT_PAYDAY_TITLE,
             "auto_message_default": DEFAULT_PAYDAY_MESSAGE,
@@ -156,6 +168,15 @@ class DashboardIntegration:
                         "category": "warning",
                     }
                 ]
+
+        from .economy import MAX_PAYSLIP_LEADERBOARD as board_max
+
+        size = field.integer("auto_board_size", 5) or 5
+        if not 1 <= size <= board_max:
+            return [
+                {"message": f"The leaderboard has to show between 1 and {board_max} members.",
+                 "category": "warning"}
+            ]
 
         image = (field("auto_image") or "").strip()
         if image and not image.startswith(("http://", "https://")):
@@ -186,6 +207,10 @@ class DashboardIntegration:
         await conf.AUTO_PAYDAY_MESSAGE.set(message[:2000])
         await conf.AUTO_PAYDAY_IMAGE.set(image[:500])
         await conf.AUTO_PAYDAY_COLOUR.set(self._eco_colour_int(field("auto_colour")))
+        await conf.AUTO_PAYDAY_LEADERBOARD.set(field.checked("auto_board"))
+        await conf.AUTO_PAYDAY_LEADERBOARD_SIZE.set(
+            max(1, min(field.integer("auto_board_size", 5) or 5, board_max))
+        )
 
         if not enabled:
             return [
@@ -445,6 +470,12 @@ ECONOMY_TEMPLATE = (
   .eco-slip-t { font-weight:600; font-size:.86rem; margin-bottom:7px; }
   .eco-slip-img { max-width:100%; max-height:190px; border-radius:6px; display:block; }
   .eco-slip-bad { font-size:.75rem; color:#ff8b8b; }
+  .eco-rank { display:flex; align-items:center; gap:9px; padding:3px 0;
+              font-size:.82rem; }
+  .eco-pos { width:24px; text-align:center; opacity:.6; flex:none; }
+  .eco-who { flex:1 1 auto; overflow:hidden; text-overflow:ellipsis;
+             white-space:nowrap; }
+  .eco-bal { font-weight:600; flex:none; }
 </style>
 
 <div class="dz">
@@ -613,11 +644,50 @@ ECONOMY_TEMPLATE = (
           <code>{total}</code>, <code>{members}</code> and <code>{average}</code>.
         </div>
 
+        <div style="margin-top:15px; padding-top:12px;
+                    border-top:1px solid rgba(255,255,255,.07);">
+          <label class="dz-toggle">
+            <input type="checkbox" name="auto_board" {% if auto_board %}checked{% endif %} />
+            <span>List the richest members on the payslip</span>
+          </label>
+
+          <div class="dz-label" style="margin-top:10px;">How many to show</div>
+          <input class="dz-input" type="number" min="1" max="{{ auto_board_max }}"
+                 name="auto_board_size" value="{{ auto_board_size }}"
+                 style="max-width:160px;" />
+          <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+            1 to {{ auto_board_max }}. Anyone on zero is left off.
+          </div>
+
+          {% if auto_board %}
+            <div class="eco-slip" style="border-left-color:{{ auto_colour }}; margin-top:11px;">
+              <div class="eco-slip-t">Richest in {{ guild_name }}</div>
+              {% if auto_board_preview %}
+                {% for row in auto_board_preview %}
+                  <div class="eco-rank">
+                    <span class="eco-pos">
+                      {%- if row.position == 1 %}&#129351;
+                      {%- elif row.position == 2 %}&#129352;
+                      {%- elif row.position == 3 %}&#129353;
+                      {%- else %}{{ row.position }}.{% endif -%}
+                    </span>
+                    <span class="eco-who">{{ row.name }}</span>
+                    <span class="eco-bal">{{ "{:,}".format(row.balance) }}</span>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p class="dz-empty" style="margin:0;">Nobody holds any {{ currency }} yet.</p>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+
         <div class="dz-label" style="margin-top:11px;">Gif or image</div>
         <input class="dz-input" type="url" name="auto_image" value="{{ auto_image }}"
                placeholder="https://.../payday.gif" />
         <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
-          A direct http(s) link. Sits under the text in the embed.
+          A direct http(s) link, shown under everything else. Leave it empty to
+          let the leaderboard stand on its own.
         </div>
 
         {% if auto_image %}

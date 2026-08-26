@@ -25,6 +25,16 @@ logger = logging.getLogger("red.economy")
 # the shortest, so a minute of granularity is plenty and costs almost nothing.
 AUTO_PAYDAY_INTERVAL = 60
 
+# Discord renders at most 1024 characters per field, and a payslip nobody reads
+# is worse than a short one.
+MAX_PAYSLIP_LEADERBOARD = 15
+
+PAYSLIP_MEDALS = (
+    "\N{FIRST PLACE MEDAL}",
+    "\N{SECOND PLACE MEDAL}",
+    "\N{THIRD PLACE MEDAL}",
+)
+
 DEFAULT_PAYDAY_TITLE = "\N{MONEY WITH WINGS} Payslip's here"
 DEFAULT_PAYDAY_MESSAGE = "**{bot}** pays **{total} {currency}** to **{members}** members."
 
@@ -99,6 +109,9 @@ class Economy(DashboardIntegration, commands.Cog):
         "AUTO_PAYDAY_MESSAGE": "",
         "AUTO_PAYDAY_IMAGE": "",
         "AUTO_PAYDAY_COLOUR": 0,
+        # Who is holding the most, listed under the payslip.
+        "AUTO_PAYDAY_LEADERBOARD": True,
+        "AUTO_PAYDAY_LEADERBOARD_SIZE": 5,
     }
 
     default_global_settings = default_guild_settings
@@ -236,6 +249,51 @@ class Economy(DashboardIntegration, commands.Cog):
             )
         return summary
 
+    async def _payslip_leaderboard(self, guild: discord.Guild, size: int) -> str:
+        """The richest members, as a block for the payslip embed.
+
+        Returns an empty string when there is nothing worth showing, so the
+        caller can leave the field off entirely rather than print a header over
+        nothing.
+        """
+        size = max(1, min(int(size or 0), MAX_PAYSLIP_LEADERBOARD))
+        try:
+            is_global = await bank.is_global()
+            raw = await bank.get_leaderboard(positions=size, guild=guild)
+        except Exception:  # noqa: BLE001 - the payslip matters more than the extra
+            logger.exception("Could not build the payslip leaderboard for %s", guild.id)
+            return ""
+
+        lines = []
+        for position, (user_id, data) in enumerate(raw, start=1):
+            balance = (data or {}).get("balance", 0)
+            if balance <= 0:
+                continue
+            member = guild.get_member(user_id)
+            name = (
+                member.display_name
+                if member is not None
+                else (data or {}).get("name") or _("Unknown")
+            )
+            rank = (
+                PAYSLIP_MEDALS[position - 1]
+                if position <= len(PAYSLIP_MEDALS)
+                else f"`{position}.`"
+            )
+            # Names are user-controlled; bolding them would let anyone smuggle
+            # markdown into the payslip, so only the balance is styled.
+            lines.append(f"{rank} {discord.utils.escape_markdown(name)} \u2014 "
+                         f"**{humanize_number(balance)}**")
+            # A field caps at 1024 characters; stop well short of it.
+            if sum(len(line) + 1 for line in lines) > 900:
+                break
+
+        if not lines:
+            return ""
+        if is_global:
+            lines.append(_("*Balances are shared across every server.*"))
+        return "\n".join(lines)
+
     async def _announce_payday(self, guild: discord.Guild, settings: dict, summary: dict) -> None:
         channel = guild.get_channel(settings.get("AUTO_PAYDAY_CHANNEL") or 0)
         if channel is None or not hasattr(channel, "send"):
@@ -291,6 +349,17 @@ class Economy(DashboardIntegration, commands.Cog):
                 ),
                 inline=False,
             )
+        if settings.get("AUTO_PAYDAY_LEADERBOARD", True):
+            board = await self._payslip_leaderboard(
+                guild, settings.get("AUTO_PAYDAY_LEADERBOARD_SIZE", 5)
+            )
+            if board:
+                embed.add_field(
+                    name=_("Richest in {guild}").format(guild=guild.name),
+                    value=board,
+                    inline=False,
+                )
+
         image = (settings.get("AUTO_PAYDAY_IMAGE") or "").strip()
         if image.startswith(("http://", "https://")):
             embed.set_image(url=image)
