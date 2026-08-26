@@ -36,43 +36,57 @@ TRANSPARENT = discord.ButtonStyle.secondary
 # the controller for ten minutes.
 QUEUE_MENU_TIMEOUT = 60
 
-# How long confirmations ("I have skipped ...") stay in the channel before
-# they are deleted. These are public now, so they are visible to everyone and
-# are removed on this timer rather than lingering per-user.
+# Button replies are private, and Discord clears those itself. This timer is
+# only for the handful of messages that cannot be private: the ones answering a
+# plain text message typed in the controller channel, where there is no
+# interaction to attach a reply to.
 PUBLIC_DELETE_AFTER = 10
 
-# Queue-menu buttons that reply with an ephemeral confirmation. These all
-# defer with thinking=True, so their response is safe to delete. Navigation
-# buttons are deliberately excluded -- they defer against the menu message
-# itself, and deleting their response would delete the menu.
-CONFIRMING_BUTTONS = frozenset(
-    {
-        "PreviousTrackButton",
-        "StopTrackButton",
-        "PauseTrackButton",
-        "ResumeTrackButton",
-        "SkipTrackButton",
-        "IncreaseVolumeButton",
-        "DecreaseVolumeButton",
-        "ToggleRepeatButton",
-        "ToggleRepeatQueueButton",
-        "ShuffleButton",
-        "DisconnectButton",
-        "EmptyQueueButton",
-        "RemoveFromQueueButton",
-        "PlayNowFromQueueButton",
-    }
-)
+
+def _cached_slot_name(cls, attribute: str, fallback: str) -> str:
+    """The private attribute discord.py caches ``attribute`` in.
+
+    ``Interaction.response`` and ``Interaction.followup`` are declared with
+    ``cached_slot_property``, whose descriptor knows the slot it writes to.
+    Reading it from the descriptor keeps this working if discord.py renames it.
+    """
+    descriptor = getattr(cls, attribute, None)
+    name = getattr(descriptor, "name", None)
+    return name if isinstance(name, str) and name else fallback
 
 
-class PublicInteractionResponse:
-    """Wraps ``interaction.response`` to force replies out of ephemeral mode.
+RESPONSE_SLOT = _cached_slot_name(discord.Interaction, "response", "_cs_response")
+FOLLOWUP_SLOT = _cached_slot_name(discord.Interaction, "followup", "_cs_followup")
 
-    PyLav's queue-menu buttons hardcode ``defer(ephemeral=True, thinking=True)``.
-    Ephemeral messages cannot be deleted on a timer and are only ever visible
-    to the clicker, so they pile up in that person's view instead of being
-    cleaned up. ``Interaction.response`` is a cached-slot property, so the
-    cached value can be swapped for this proxy while the callback runs.
+
+def make_replies_private(context) -> None:
+    """Force every `ctx.send` from a button callback to reach only the clicker.
+
+    The callbacks hand a Context straight to a cog command, and that command
+    answers with `ctx.send`. discord.py sends that through the interaction
+    followup with `ephemeral=False`, so the flag has to be injected here -
+    there is no way to pass it through the command call itself.
+    """
+    original = context.send
+
+    async def send(content=None, **kwargs):
+        kwargs["ephemeral"] = True
+        # An ephemeral message cannot be deleted through the API; Discord
+        # dismisses it on its own, and asking anyway raises.
+        kwargs.pop("delete_after", None)
+        return await original(content=content, **kwargs)
+
+    with contextlib.suppress(Exception):
+        context.send = send
+
+
+class PrivateInteractionResponse:
+    """Wraps ``interaction.response`` so a button's reply reaches only the clicker.
+
+    A controller sits in a channel everyone can see, and a confirmation is only
+    of interest to whoever pressed the button. ``Interaction.response`` is a
+    cached-slot property, so the cached value can be swapped for this proxy for
+    the duration of a callback.
     """
 
     __slots__ = ("_response",)
@@ -84,43 +98,38 @@ class PublicInteractionResponse:
         return getattr(self._response, item)
 
     async def defer(self, *args, **kwargs):
-        kwargs["ephemeral"] = False
+        kwargs["ephemeral"] = True
         return await self._response.defer(*args, **kwargs)
 
     async def send_message(self, *args, **kwargs):
-        kwargs["ephemeral"] = False
-        result = await self._response.send_message(*args, **kwargs)
-        return result
+        kwargs["ephemeral"] = True
+        kwargs.pop("delete_after", None)
+        return await self._response.send_message(*args, **kwargs)
 
 
-class AutoDeletingFollowup:
-    """Wraps ``interaction.followup`` so ephemeral replies clean themselves up.
+class PrivateFollowup:
+    """Wraps ``interaction.followup`` so anything sent from a callback is private.
 
-    Red sends command responses through ``interaction.followup.send``. We
-    cannot patch the Webhook itself (it uses ``__slots__``), but
-    ``Interaction.followup`` is a cached-slot property, so swapping the
-    cached value for this proxy lets us schedule a delete on anything sent
-    while a button callback is running.
+    PyLav and Red both reach for ``interaction.followup.send`` directly. The
+    Webhook itself uses ``__slots__`` and cannot be patched, but
+    ``Interaction.followup`` is a cached-slot property, so the cached value is
+    swapped for this proxy instead.
     """
 
-    __slots__ = ("_webhook", "_delay")
+    __slots__ = ("_webhook",)
 
-    def __init__(self, webhook, delay: float):
+    def __init__(self, webhook):
         self._webhook = webhook
-        self._delay = delay
 
     def __getattr__(self, item):
         return getattr(self._webhook, item)
 
     async def send(self, *args, **kwargs):
-        kwargs.setdefault("wait", True)
-        kwargs["ephemeral"] = False
-        message = await self._webhook.send(*args, **kwargs)
-        if message is not None:
-            with contextlib.suppress(Exception):
-                # delay= schedules a background task and returns immediately.
-                await message.delete(delay=self._delay)
-        return message
+        kwargs["ephemeral"] = True
+        # Discord clears an ephemeral message itself, and the delete endpoint
+        # refuses one, so any timer the caller asked for is dropped.
+        kwargs.pop("delete_after", None)
+        return await self._webhook.send(*args, **kwargs)
 
 
 if TYPE_CHECKING:
@@ -149,6 +158,7 @@ class IncreaseVolumeButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         await self.cog.volume(context, change_by=5)
         await self.view.update_view()
 
@@ -175,6 +185,7 @@ class DecreaseVolumeButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         await self.cog.volume(context, change_by=-5)
         await self.view.update_view()
 
@@ -201,6 +212,7 @@ class StopTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         await self.cog.stop(context)
         await self.view.update_view(forced=True)
 
@@ -227,6 +239,7 @@ class PauseTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         await self.cog.pause(context)
         await self.view.update_view()
 
@@ -253,6 +266,7 @@ class ResumeTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         await self.cog.resume(context)
         await self.view.update_view()
 
@@ -279,6 +293,7 @@ class SkipTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         await self.cog.skip(context)
         await self.view.update_view()
 
@@ -305,13 +320,13 @@ class ToggleRepeatButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         player = context.player
         if not player:
             return await context.send(
                 embed=await self.cog.pylav.construct_embed(
                     description=_("I am not connected to any voice channel at the moment."), messageable=interaction
                 ),
-                delete_after=PUBLIC_DELETE_AFTER,
             )
         await self.cog.repeat(context, queue=await player.config.fetch_repeat_current())
         await self.view.update_view()
@@ -476,13 +491,13 @@ class ToggleRepeatQueueButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         player = context.player
         if not player:
             return await context.send(
                 embed=await self.cog.pylav.construct_embed(
                     description=_("I am not connected to any voice channel at the moment."), messageable=interaction
                 ),
-                delete_after=PUBLIC_DELETE_AFTER,
             )
         repeat_queue = bool(await player.config.fetch_repeat_current())
         await self.cog.repeat(context, queue=repeat_queue)
@@ -511,6 +526,7 @@ class ShuffleButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         await self.cog.shuffle(context)
         await self.view.update_view()
 
@@ -537,6 +553,7 @@ class PreviousTrackButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer()
         context = await self.cog.bot.get_context(interaction)
+        make_replies_private(context)
         await self.cog.previous(context)
         await self.view.update_view()
 
@@ -1168,17 +1185,15 @@ class PersistentControllerView(discord.ui.View):
         payload = {"embed": embed} if embed is not None else {"content": description}
 
         try:
-            message = await interaction.followup.send(**payload, wait=True)
+            await interaction.followup.send(**payload, ephemeral=True)
+            return
         except Exception:  # noqa: BLE001
             LOGGER.debug("Followup refused, falling back to the channel", exc_info=True)
-            message = None
-        if message is None:
-            channel = getattr(interaction, "channel", None) or self.channel
-            with contextlib.suppress(Exception):
-                await channel.send(**payload, delete_after=PUBLIC_DELETE_AFTER)
-            return
+        # Only reachable if the interaction is already dead. Nothing can be
+        # private at that point, so the channel copy removes itself instead.
+        channel = getattr(interaction, "channel", None) or self.channel
         with contextlib.suppress(Exception):
-            await message.delete(delay=PUBLIC_DELETE_AFTER)
+            await channel.send(**payload, delete_after=PUBLIC_DELETE_AFTER)
 
     async def _may_manage(self, interaction: DISCORD_INTERACTION_TYPE) -> bool:
         """Whether this member may use the staff-only buttons.
@@ -1208,18 +1223,24 @@ class PersistentControllerView(discord.ui.View):
         return False
 
     async def interaction_check(self, interaction: DISCORD_INTERACTION_TYPE, /) -> bool:
-        # PyLav's own callbacks hardcode ephemeral replies, which cannot be
-        # deleted on a timer and only ever pile up in the clicker's view. Both
-        # `response` and `followup` are cached-slot properties, so swapping the
-        # cached objects for the proxies above makes every reply public and
-        # short-lived for the rest of this callback.
-        with contextlib.suppress(Exception):
-            interaction._cs_response = PublicInteractionResponse(interaction.response)
-            interaction._cs_followup = AutoDeletingFollowup(
-                interaction.followup, PUBLIC_DELETE_AFTER
+        # Both are cached-slot properties, so swapping the cached objects for the
+        # proxies above makes every reply private for the rest of this callback.
+        try:
+            setattr(interaction, RESPONSE_SLOT, PrivateInteractionResponse(interaction.response))
+            setattr(interaction, FOLLOWUP_SLOT, PrivateFollowup(interaction.followup))
+            if not isinstance(interaction.followup, PrivateFollowup):
+                raise RuntimeError(f"{FOLLOWUP_SLOT} is not the cached followup slot")
+        except Exception:  # noqa: BLE001
+            # Worth shouting about: without the swap, replies go out publicly.
+            LOGGER.warning(
+                "Could not make controller replies private; they will be public.",
+                exc_info=True,
             )
+        # This defer decides the visibility of everything that follows: a
+        # response deferred without the flag makes every later followup public,
+        # whatever that followup asks for.
         if not interaction.response.is_done():
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
 
         # custom_id format: "pylav__pylavcontroller_persistent_view:<name>:<n>"
         custom_id = (interaction.data or {}).get("custom_id", "")
