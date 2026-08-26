@@ -161,6 +161,9 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             action_charged=dict(enabled=True, mention=True),
             # Seconds before a notification removes itself. 0 keeps them.
             auto_delete_after=120,
+            # Tint each notification by what happened rather than using the
+            # one guild embed colour for everything.
+            colour_coded=True,
             webhook_url=None,
             webhook_channel_id=None,
         )
@@ -250,8 +253,15 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                 artwork = await track.artworkUrl()
                 if artwork:
                     embed.set_thumbnail(url=artwork)
-        if kind and embed.colour is None:
-            embed.colour = discord.Colour(self._COLOURS[kind])
+        # `construct_embed` always fills in the guild's embed colour, so a
+        # per-kind colour has to override it rather than fill a blank.
+        if kind:
+            try:
+                colour_coded = await self._config.guild(channel.guild).colour_coded()
+            except Exception:  # noqa: BLE001
+                colour_coded = True
+            if colour_coded:
+                embed.colour = discord.Colour(self._COLOURS[kind])
         self._enqueue(channel, embed)
 
     async def chunk_embed_task(self) -> None:

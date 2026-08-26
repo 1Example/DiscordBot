@@ -185,6 +185,22 @@ class DashboardIntegration:
                 "active": active,
                 "channels": channel_options(guild, selected=settings.get("notify_channel_id")),
                 "auto_delete_after": settings.get("auto_delete_after", 0) or 0,
+                "colour_coded": bool(settings.get("colour_coded", True)),
+                "channel_name": (
+                    f"#{guild.get_channel(settings['notify_channel_id']).name}"
+                    if settings.get("notify_channel_id")
+                    and guild.get_channel(settings["notify_channel_id"])
+                    else ""
+                ),
+                # Mirrors PyLavNotifier._COLOURS so the legend matches reality.
+                "swatches": (
+                    ("Now playing", "#3ba55d"),
+                    ("Queue", "#5865f2"),
+                    ("Skipped", "#e67e22"),
+                    ("Problems", "#ed4245"),
+                    ("Charges", "#f1c40f"),
+                    ("Player", "#95a5a6"),
+                ),
             },
         }
 
@@ -236,39 +252,48 @@ class DashboardIntegration:
                     }
                 ]
 
-            if action == "save_cleanup":
+            if action == "save_setup":
+                notes: list[dict] = []
+
                 seconds = field.integer("auto_delete_after", 0) or 0
-                if seconds < 0 or seconds > 3600:
+                if not 0 <= seconds <= 3600:
                     return [
                         {"message": "Choose between 0 and 3600 seconds.",
                          "category": "warning"}
                     ]
-                await self._config.guild(guild).auto_delete_after.set(seconds)
-                if seconds:
-                    return [
-                        {"message": f"Notifications will delete themselves after "
-                                    f"{seconds} seconds.", "category": "success"}
-                    ]
-                return [
-                    {"message": "Notifications will stay in the channel.",
-                     "category": "success"}
-                ]
+                await conf.auto_delete_after.set(seconds)
+                await conf.colour_coded.set(field.checked("colour_coded"))
 
-            if action == "save_channel":
                 raw = field("notify_channel_id") or ""
                 channel_id = int(raw) if raw.isdigit() else None
-                warnings = []
                 if channel_id is not None:
                     channel = guild.get_channel(channel_id)
-                    if channel is not None and not channel.permissions_for(guild.me).send_messages:
-                        warnings.append(
+                    if channel is None:
+                        channel_id = None
+                    elif not channel.permissions_for(guild.me).send_messages:
+                        notes.append(
                             {
-                                "message": f"I cannot send messages in #{channel.name}.",
+                                "message": f"I cannot send messages in #{channel.name}, "
+                                "so nothing will appear there.",
                                 "category": "warning",
                             }
                         )
                 await conf.notify_channel_id.set(channel_id)
-                return warnings + [{"message": "Notification channel saved.", "category": "success"}]
+
+                where = (
+                    f"#{guild.get_channel(channel_id).name}"
+                    if channel_id
+                    else "the player's own channel"
+                )
+                lifetime = (
+                    f"cleared after {seconds}s" if seconds else "kept indefinitely"
+                )
+                return notes + [
+                    {
+                        "message": f"Announcing in {where}, {lifetime}.",
+                        "category": "success",
+                    }
+                ]
 
             if action in ("enable_all", "disable_all", "mentions_off"):
                 target = action == "enable_all"
@@ -300,114 +325,153 @@ PLNOTIFIER_TEMPLATE = (
     BASE_CSS
     + MACROS
     + """
+<style>
+  .pn-ev { display:grid; grid-template-columns:1fr auto auto; align-items:center;
+           gap:12px; padding:8px 10px; border-radius:9px; }
+  .pn-ev:nth-child(odd) { background:rgba(255,255,255,.025); }
+  .pn-ev .pn-name { font-size:.87rem; }
+  .pn-col { width:74px; text-align:center; font-size:.68rem; opacity:.5;
+            text-transform:uppercase; letter-spacing:.05em; }
+  .pn-grid { display:grid; gap:14px; grid-template-columns:1fr; }
+  @media (min-width:1150px){ .pn-grid { grid-template-columns:1fr 1fr; } }
+  .pn-preview { display:flex; gap:12px; padding:12px 14px; border-radius:10px;
+                background:rgba(0,0,0,.28); border-left:4px solid #5865f2; }
+  .pn-preview .pn-av { width:38px; height:38px; border-radius:50%;
+                       background:rgba(255,255,255,.12); flex:0 0 auto; }
+  .pn-preview .pn-art { width:56px; height:56px; border-radius:6px;
+                        background:rgba(255,255,255,.09); flex:0 0 auto; margin-left:auto; }
+  .pn-swatch { display:inline-block; width:10px; height:10px; border-radius:3px;
+               margin-right:6px; vertical-align:-1px; }
+</style>
+
 <div class="dz">
   <div class="dz-head">
     <h4><i class="fa fa-bell"></i> Music notifications in {{ guild_name }}</h4>
-    <p>{{ active }} of {{ total }} events are announced.</p>
+    <p>
+      {{ active }} of {{ total }} events announced
+      &middot; posting to {{ channel_name or "the player's own channel" }}
+      &middot; {% if auto_delete_after %}clearing after {{ auto_delete_after }}s
+               {% else %}kept indefinitely{% endif %}
+    </p>
+  </div>
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-eye"></i> What they look like</h5>
+    <p class="dz-hint">
+      The requester's avatar sits on the author line and the track's artwork on
+      the right. Colour tells you the kind of event at a glance.
+    </p>
+    <div class="pn-preview">
+      <div class="pn-av"></div>
+      <div style="min-width:0;">
+        <div style="font-size:.78rem; opacity:.65;">Someone</div>
+        <div style="font-weight:600; font-size:.9rem;">Added to queue</div>
+        <div style="font-size:.84rem; opacity:.85;">Artist &mdash; Track title</div>
+      </div>
+      <div class="pn-art"></div>
+    </div>
+    <p class="dz-hint" style="margin-top:10px;">
+      {% for label, colour in swatches %}
+        <span class="dz-tag"><span class="pn-swatch"
+              style="background:{{ colour }};"></span>{{ label }}</span>
+      {% endfor %}
+    </p>
   </div>
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-    <form method="POST">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
     <div class="dz-panel">
-      <h5><i class="fa fa-clock-o"></i> Tidying up</h5>
-      <p class="dz-hint">
-        Notifications are chatter rather than a record, so they can remove
-        themselves once they have been seen. Set 0 to keep them.
-      </p>
-      <div class="dz-row">
-        <input class="dz-input" type="number" min="0" max="3600"
-               name="auto_delete_after" value="{{ auto_delete_after }}"
-               style="max-width:180px;" />
-        <button class="dz-btn primary" name="action" value="save_cleanup">
-          <i class="fa fa-save"></i> Save
-        </button>
-        {{ confirm('Just the basics', 'reset_basics',
-                   'Turn off every event except the handful worth announcing (play, queue, skip, connect, problems, charges)?',
-                   '', 'fa-magic') }}
-      </div>
-    </div>
-  </form>
-
-  <div class="dz-panel">
-      <h5><i class="fa fa-hashtag"></i> Notification channel</h5>
-      <p class="dz-hint">Leave unset to announce in the channel the player was summoned to.</p>
-      <div class="dz-row">
-        <select class="dz-select" style="flex:1 1 260px;" name="notify_channel_id">
-          <option value="">&mdash; player's channel &mdash;</option>
-          {% for c in channels %}
-            <option value="{{ c.id }}" {% if c.selected %}selected{% endif %}>{{ c.name }}</option>
-          {% endfor %}
-        </select>
-        <button class="dz-btn primary" name="action" value="save_channel">
-          <i class="fa fa-save"></i> Save channel
-        </button>
-      </div>
-    </div>
-  </form>
-
-  <div class="dz-panel">
-    <div class="dz-row">
-      <form method="POST" style="display:inline;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-        <button class="dz-btn" name="action" value="enable_all">
-          <i class="fa fa-check-square-o"></i> Announce everything
-        </button>
-      </form>
-      <form method="POST" style="display:inline;"
-            onsubmit="return confirm('Silence every event?');">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-        <button class="dz-btn danger" name="action" value="disable_all">
-          <i class="fa fa-bell-slash"></i> Silence everything
-        </button>
-      </form>
-      <form method="POST" style="display:inline;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-        <button class="dz-btn" name="action" value="mentions_off">
-          <i class="fa fa-at"></i> Turn off all mentions
-        </button>
-      </form>
-    </div>
-  </div>
-
-  {% for g in groups %}
-    <form method="POST">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-      <input type="hidden" name="keys"
-             value="{% for e in g.events %}{{ e.key }}{% if not loop.last %},{% endif %}{% endfor %}" />
-      <div class="dz-panel">
-        <h5><i class="fa fa-music"></i> {{ g.title }}</h5>
-        <p class="dz-hint">
-          {{ g.events|length }} event(s). &ldquo;Mention&rdquo; pings the requester.
-        </p>
-        <table class="dz-t">
-          <thead><tr><th>Event</th><th style="width:110px;">Announce</th>
-                     <th style="width:110px;">Mention</th></tr></thead>
-          <tbody>
-            {% for e in g.events %}
-              <tr>
-                <td>{{ e.label }}</td>
-                <td>
-                  <input type="checkbox" name="{{ e.key }}__enabled"
-                         {% if e.enabled %}checked{% endif %} />
-                </td>
-                <td>
-                  <input type="checkbox" name="{{ e.key }}__mention"
-                         {% if e.mention %}checked{% endif %} />
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        <div style="margin-top:11px;">
-          <button class="dz-btn primary" name="action" value="save_group">
-            <i class="fa fa-save"></i> Save {{ g.title|lower }}
-          </button>
+      <h5><i class="fa fa-sliders"></i> Setup</h5>
+      <div class="dz-grid two">
+        <div>
+          <label class="dz-label">Where to announce</label>
+          <p class="dz-hint">Leave unset to post wherever the player was summoned.</p>
+          {{ picker('notify_channel_id', channels, false, 8, 'Search channels...',
+                    true, "the player's own channel") }}
+        </div>
+        <div>
+          <label class="dz-label">Remove notifications after</label>
+          <p class="dz-hint">Seconds. 0 keeps them in the channel for good.</p>
+          <input class="dz-input" type="number" min="0" max="3600"
+                 name="auto_delete_after" value="{{ auto_delete_after }}"
+                 style="max-width:200px;" />
+          <label class="dz-toggle" style="margin-top:12px;">
+            <input type="checkbox" name="colour_coded"
+                   {% if colour_coded %}checked{% endif %} />
+            <span>Colour each notification by what happened</span>
+          </label>
         </div>
       </div>
-    </form>
-  {% endfor %}
+      <div class="dz-save">
+        <button class="dz-btn primary" name="action" value="save_setup">
+          <i class="fa fa-save"></i> Save setup
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-magic"></i> Presets</h5>
+      <p class="dz-hint">
+        Fifty-nine events is a lot to curate by hand. Start from one of these,
+        then adjust below.
+      </p>
+      <div class="dz-row">
+        {{ confirm('Just the basics', 'reset_basics',
+                   'Announce only play, queue, skip, connect, problems and charges?',
+                   'primary', 'fa-magic') }}
+        {{ confirm('Announce everything', 'enable_all',
+                   'Turn on all 59 events? Busy servers get very noisy.',
+                   '', 'fa-check-square-o') }}
+        {{ confirm('Silence everything', 'disable_all', 'Turn off every event?') }}
+        <button class="dz-btn" name="action" value="mentions_off">
+          <i class="fa fa-at"></i> Stop pinging requesters
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <div class="pn-grid">
+    {% for g in groups %}
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+        <input type="hidden" name="keys"
+               value="{% for e in g.events %}{{ e.key }}{% if not loop.last %},{% endif %}{% endfor %}" />
+        <div class="dz-panel">
+          <h5><i class="fa fa-music"></i> {{ g.title }}</h5>
+          <p class="dz-hint">
+            {{ g.events|selectattr('enabled')|list|length }} of
+            {{ g.events|length }} on. &ldquo;Mention&rdquo; pings the requester.
+          </p>
+          <div class="pn-ev" style="background:none;">
+            <span></span>
+            <span class="pn-col">Announce</span>
+            <span class="pn-col">Mention</span>
+          </div>
+          {% for e in g.events %}
+            <label class="pn-ev">
+              <span class="pn-name">{{ e.label }}</span>
+              <span class="pn-col">
+                <input type="checkbox" name="{{ e.key }}__enabled"
+                       {% if e.enabled %}checked{% endif %} />
+              </span>
+              <span class="pn-col">
+                <input type="checkbox" name="{{ e.key }}__mention"
+                       {% if e.mention %}checked{% endif %} />
+              </span>
+            </label>
+          {% endfor %}
+          <div class="dz-save">
+            <button class="dz-btn primary" name="action" value="save_group">
+              <i class="fa fa-save"></i> Save {{ g.title|lower }}
+            </button>
+          </div>
+        </div>
+      </form>
+    {% endfor %}
+  </div>
 </div>
 """
 )
