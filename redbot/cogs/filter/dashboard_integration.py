@@ -16,7 +16,7 @@ from redbot.core.utils.dashboard_helpers import (
     is_staff,
 )
 
-log = logging.getLogger("red.filter")
+log = logging.getLogger("red.filter.dashboard")
 
 FILTER_CHANNEL_KINDS = ("text", "voice", "stage", "forum")
 

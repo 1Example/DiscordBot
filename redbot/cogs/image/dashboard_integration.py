@@ -6,13 +6,22 @@ import typing as t
 import discord
 from redbot.core import commands
 
-from redbot.core.utils.dashboard_helpers import BASE_CSS, dashboard_page, form_reader
+from redbot.core.utils.dashboard_helpers import (
+    BASE_CSS,
+    MACROS,
+    dashboard_page,
+    form_reader,
+)
 
 log = logging.getLogger("red.image.dashboard")
 
 
 class DashboardIntegration:
-    """Imgur credentials, owner only."""
+    """Image searches and the Imgur credentials, owner only.
+
+    Covers ``[p]gif``, ``[p]gifr``, ``[p]imgur search``, ``[p]imgur subreddit``
+    and the stored Imgur client ID.
+    """
 
     bot: t.Any
     config: t.Any
