@@ -33,10 +33,6 @@ EVENT_GROUPS = (
         ("track_stuck", "track_exception", "websocket_closed"),
     ),
     (
-        "Economy",
-        ("action_charged",),
-    ),
-    (
         "Queue",
         (
             "queue_shuffled", "queue_end", "queue_track_position_changed",
@@ -74,19 +70,7 @@ SOURCE_PREFIX = "track_start_"
 # What "just the basics" means: the handful of events worth announcing, used by
 # the reset button and matching the cog's registered defaults.
 BASIC_EVENTS = frozenset(
-    {
-        "tracks_requested",
-        "track_skipped",
-        "track_start",
-        "queue_end",
-        "player_connected",
-        "player_disconnected",
-        "player_paused",
-        "player_resumed",
-        "track_stuck",
-        "track_exception",
-        "action_charged",
-    }
+    {"tracks_requested", "track_skipped", "track_start", "queue_end"}
 )
 
 PRETTY_SOURCES = {
@@ -332,8 +316,12 @@ PLNOTIFIER_TEMPLATE = (
   .pn-ev .pn-name { font-size:.87rem; }
   .pn-col { width:74px; text-align:center; font-size:.68rem; opacity:.5;
             text-transform:uppercase; letter-spacing:.05em; }
-  .pn-grid { display:grid; gap:14px; grid-template-columns:1fr; }
-  @media (min-width:1150px){ .pn-grid { grid-template-columns:1fr 1fr; } }
+  /* Grid rows share a height, so a short card leaves a hole beside a tall one.
+     Multi-column packs each card directly under the previous one instead. */
+  .pn-grid { column-gap:14px; }
+  @media (min-width:1150px){ .pn-grid { column-count:2; } }
+  .pn-grid > form { break-inside:avoid; page-break-inside:avoid; display:block;
+                    margin:0 0 14px; }
   .pn-preview { display:flex; gap:12px; padding:12px 14px; border-radius:10px;
                 background:rgba(0,0,0,.28); border-left:4px solid #5865f2; }
   .pn-preview .pn-av { width:38px; height:38px; border-radius:50%;

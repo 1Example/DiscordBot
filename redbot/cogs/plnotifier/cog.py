@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import re
+import time
 from collections import defaultdict
 from functools import partial
 from pathlib import Path
@@ -96,12 +97,14 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         self._config = Config.get_conf(self, identifier=208903205982044161)
         self._config.register_global(
             notify_channel_id=None,
-            node_connected=dict(enabled=True, mention=True),
-            node_disconnected=dict(enabled=True, mention=True),
+            # Node up/down is operator noise, not something a music channel
+            # wants; these read from the global config rather than per-guild.
+            node_connected=dict(enabled=False, mention=True),
+            node_disconnected=dict(enabled=False, mention=True),
         )
         self._config.register_guild(
-            track_stuck=dict(enabled=True, mention=True),
-            track_exception=dict(enabled=True, mention=True),
+            track_stuck=dict(enabled=False, mention=True),
+            track_exception=dict(enabled=False, mention=True),
             track_end=dict(enabled=False, mention=True),
             track_start=dict(enabled=True, mention=True),
             track_start_youtube_music=dict(enabled=False, mention=True),
@@ -138,12 +141,12 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             queue_end=dict(enabled=True, mention=True),
             queue_track_position_changed=dict(enabled=False, mention=True),
             queue_tracks_removed=dict(enabled=False, mention=True),
-            player_paused=dict(enabled=True, mention=True),
+            player_paused=dict(enabled=False, mention=True),
             player_stopped=dict(enabled=False, mention=True),
-            player_resumed=dict(enabled=True, mention=True),
+            player_resumed=dict(enabled=False, mention=True),
             player_moved=dict(enabled=False, mention=True),
-            player_disconnected=dict(enabled=True, mention=True),
-            player_connected=dict(enabled=True, mention=True),
+            player_disconnected=dict(enabled=False, mention=True),
+            player_connected=dict(enabled=False, mention=True),
             volume_changed=dict(enabled=False, mention=True),
             player_repeat=dict(enabled=False, mention=True),
             player_restored=dict(enabled=False, mention=True),
@@ -158,7 +161,6 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             player_auto_resumed=dict(enabled=False, mention=True),
             player_auto_disconnected=dict(enabled=False, mention=True),
             player_auto_disconnected_empty_queue=dict(enabled=False, mention=True),
-            action_charged=dict(enabled=True, mention=True),
             # Seconds before a notification removes itself. 0 keeps them.
             auto_delete_after=120,
             # Tint each notification by what happened rather than using the
@@ -172,6 +174,10 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         )
         self._scheduled_jobs: list[Job] = []
         self._webhook_cache: dict[int, discord.Webhook] = {}
+        # What a dashboard action just cost, keyed by (guild, member). The charge
+        # is announced as part of the event it paid for rather than on its own,
+        # so it is held here until that event arrives.
+        self._pending_charges: dict[tuple[int, int], tuple[int, str, float]] = {}
         self._session = aiohttp.ClientSession(json_serialize=json.dumps, auto_decompress=False)
 
     async def initialize(self, *args, **kwargs) -> None:
@@ -225,6 +231,21 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         "player": 0x95A5A6,
     }
 
+    # How long a charge stays claimable by an incoming notification. The event
+    # follows the charge almost immediately; anything later is a different action.
+    _CHARGE_WINDOW = 15.0
+
+    def _with_cost(self, description: str | None, member) -> str | None:
+        """Append what this action cost, if the member just paid for one."""
+        key = (getattr(getattr(member, "guild", None), "id", 0), getattr(member, "id", 0))
+        charge = self._pending_charges.pop(key, None)
+        if charge is None or not description:
+            return description
+        cost, currency, stamp = charge
+        if time.monotonic() - stamp > self._CHARGE_WINDOW:
+            return description
+        return f"{description.rstrip().rstrip('.')} for {cost} {currency}."
+
     async def _notify(
         self,
         channel,
@@ -243,6 +264,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         if embed is None:
             return
         if member is not None:
+            embed.description = self._with_cost(embed.description, member)
             with contextlib.suppress(Exception):
                 embed.set_author(
                     name=getattr(member, "display_name", None) or str(member),
@@ -548,38 +570,11 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     async def on_plcontroller_charged(
         self, member: discord.Member, action: str, cost: int, currency: str
     ) -> None:
-        """Report what a dashboard action cost the member who triggered it."""
-        guild = member.guild
-        player = self.pylav.get_player(guild.id)
-        if player is None:
-            return
-        channel = await player.notify_channel()
-        if channel is None:
-            return
-        data = await self._config.guild(guild=guild).get_raw(
-            "action_charged", default={"enabled": True, "mention": True}
-        )
-        if not data["enabled"]:
-            return
-        who = member.mention if data["mention"] else member.display_name
-        await self._notify(
-            channel,
-            await self.pylav.construct_embed(
-                title=_("Paid for an action"),
-                description=_(
-                    "{user_variable_do_not_translate} paid "
-                    "{cost_variable_do_not_translate} {currency_variable_do_not_translate} "
-                    "to {action_variable_do_not_translate}."
-                ).format(
-                    user_variable_do_not_translate=who,
-                    cost_variable_do_not_translate=cost,
-                    currency_variable_do_not_translate=currency,
-                    action_variable_do_not_translate=action.replace("_", " "),
-                ),
-                messageable=channel,
-            ),
-            member=member,
-            kind="economy",
+        """Hold onto what an action cost so its notification can mention it."""
+        self._pending_charges[(member.guild.id, member.id)] = (
+            cost,
+            currency,
+            time.monotonic(),
         )
 
     @commands.Cog.listener()

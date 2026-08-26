@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
+from redbot.core import bank
+
+from pylav.logging import getLogger
 from redbot.core.i18n import Translator
 
 from pylav.constants.config import DEFAULT_SEARCH_SOURCE
@@ -24,6 +27,8 @@ __view_version__ = "2026.08.14.3-public-queue-menu"
 # Discord has no true "transparent" button; secondary/grey is the neutral style
 # that blends into the message background. Change this in one place to restyle
 # the whole controller.
+LOGGER = getLogger("PyLav.cog.Controller.view")
+
 TRANSPARENT = discord.ButtonStyle.secondary
 
 # How long the queue menu stays open with no interaction before it deletes
@@ -633,36 +638,42 @@ class PersistentControllerView(discord.ui.View):
         self.previous_track_button = PreviousTrackButton(
             style=TRANSPARENT,
             row=0,
+            label=_("Previous"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:previous_track_button:9",
         )
         self.paused_button = PauseTrackButton(
-            style=TRANSPARENT,
+            style=discord.ButtonStyle.primary,
             row=0,
+            label=_("Pause"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:paused_button:7",
         )
         self.resume_button = ResumeTrackButton(
-            style=TRANSPARENT,
+            style=discord.ButtonStyle.success,
             row=0,
+            label=_("Play"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:resume_button:8",
         )
         self.skip_button = SkipTrackButton(
             style=TRANSPARENT,
             row=0,
+            label=_("Skip"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:skip_button:10",
         )
         self.shuffle_button = ShuffleButton(
             style=TRANSPARENT,
             row=0,
+            label=_("Shuffle"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:shuffle_button:11",
         )
         self.stop_button = StopTrackButton(
-            style=TRANSPARENT,
+            style=discord.ButtonStyle.danger,
             row=0,
+            label=_("Stop"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:stop_button:12",
         )
@@ -671,62 +682,72 @@ class PersistentControllerView(discord.ui.View):
         self.decrease_volume_button = DecreaseVolumeButton(
             style=TRANSPARENT,
             row=1,
+            label=_("Vol -"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:decrease_volume_button:5",
         )
         self.increase_volume_button = IncreaseVolumeButton(
             style=TRANSPARENT,
             row=1,
+            label=_("Vol +"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:increase_volume_button:6",
         )
         self.repeat_queue_button_on = ToggleRepeatQueueButton(
-            style=TRANSPARENT,
+            style=discord.ButtonStyle.primary,
             row=1,
+            label=_("Repeat queue"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:repeat_queue_button_on:1",
         )
         self.repeat_button_on = ToggleRepeatButton(
-            style=TRANSPARENT,
+            style=discord.ButtonStyle.primary,
             row=1,
+            label=_("Repeat track"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:repeat_button_on:2",
         )
         self.repeat_button_off = ToggleRepeatButton(
             style=TRANSPARENT,
             row=1,
+            label=_("Repeat"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:repeat_button_off:3",
         )
         self.queue_button = QueueButton(
             style=TRANSPARENT,
             row=1,
+            label=_("Queue"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:queue_button:14",
         )
         self.show_history_button = QueueHistoryButton(
             style=TRANSPARENT,
             row=1,
+            label=_("History"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:show_history_button:4",
         )
 
         # Row 2 - utility
         self.clear_queue_button = ControllerClearQueueButton(
-            style=TRANSPARENT,
+            style=discord.ButtonStyle.danger,
             row=2,
+            label=_("Clear queue"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:clear_queue_button:15",
         )
         self.disconnect_button = ControllerDisconnectButton(
-            style=TRANSPARENT,
+            style=discord.ButtonStyle.danger,
             row=2,
+            label=_("Disconnect"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:disconnect_button:16",
         )
         self.refresh_button = RefreshButton(
             style=TRANSPARENT,
             row=2,
+            label=_("Refresh"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:refresh_button:13",
         )
@@ -1132,8 +1153,18 @@ class PersistentControllerView(discord.ui.View):
     )
 
     async def interaction_check(self, interaction: DISCORD_INTERACTION_TYPE, /) -> bool:
+        # PyLav's own callbacks hardcode ephemeral replies, which cannot be
+        # deleted on a timer and only ever pile up in the clicker's view. Both
+        # `response` and `followup` are cached-slot properties, so swapping the
+        # cached objects for the proxies above makes every reply public and
+        # short-lived for the rest of this callback.
+        with contextlib.suppress(Exception):
+            interaction._cs_response = PublicInteractionResponse(interaction.response)
+            interaction._cs_followup = AutoDeletingFollowup(
+                interaction.followup, PUBLIC_DELETE_AFTER
+            )
         if not interaction.response.is_done():
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer()
 
         # custom_id format: "pylav__pylavcontroller_persistent_view:<name>:<n>"
         custom_id = (interaction.data or {}).get("custom_id", "")
@@ -1162,4 +1193,71 @@ class PersistentControllerView(discord.ui.View):
                 delete_after=PUBLIC_DELETE_AFTER,
             )
             return False
+        return await self._charge_for(interaction, button_name)
+
+    # Button name -> the cost key it shares with the dashboard, so a click in
+    # Discord costs exactly what the same action costs on the web player.
+    COST_KEYS = {
+        "previous_track_button": "previous",
+        "paused_button": "pause",
+        "resume_button": "resume",
+        "skip_button": "skip",
+        "shuffle_button": "shuffle",
+        "stop_button": "pause",
+        "decrease_volume_button": "volume_down",
+        "increase_volume_button": "volume_up",
+        "repeat_queue_button_on": "repeat",
+        "repeat_button_on": "repeat",
+        "repeat_button_off": "repeat",
+        "clear_queue_button": "clear_queue",
+        "disconnect_button": "disconnect",
+    }
+
+    async def _charge_for(self, interaction: DISCORD_INTERACTION_TYPE, button_name: str) -> bool:
+        """Bill the clicker for the action, refusing it when they cannot pay.
+
+        Everyone pays here, staff included - the point of a price is that it
+        applies to the people actually pressing the buttons.
+        """
+        action = self.COST_KEYS.get(button_name)
+        member = interaction.user
+        if action is None or not isinstance(member, discord.Member):
+            return True
+        try:
+            config = self.cog._config.guild(self.channel.guild)
+            if not await config.dashboard_economy_enabled():
+                return True
+            costs = await config.dashboard_action_costs()
+        except Exception:  # noqa: BLE001 - never block playback on a config read
+            return True
+        cost = int((costs or {}).get(action, 0) or 0)
+        if cost <= 0:
+            return True
+
+        try:
+            if not await bank.can_spend(member, cost):
+                currency = await bank.get_currency_name(self.channel.guild)
+                balance = await bank.get_balance(member)
+                await interaction.send(
+                    embed=await interaction.client.pylav.construct_embed(
+                        description=_(
+                            "That costs {cost_variable_do_not_translate} "
+                            "{currency_variable_do_not_translate}, but you only have "
+                            "{balance_variable_do_not_translate}."
+                        ).format(
+                            cost_variable_do_not_translate=cost,
+                            currency_variable_do_not_translate=currency,
+                            balance_variable_do_not_translate=balance,
+                        ),
+                        messageable=interaction,
+                    ),
+                    delete_after=PUBLIC_DELETE_AFTER,
+                )
+                return False
+            await bank.withdraw_credits(member, cost)
+            currency = await bank.get_currency_name(self.channel.guild)
+            # The notifier folds this into the notification for the action.
+            self.cog.bot.dispatch("plcontroller_charged", member, action, cost, currency)
+        except Exception:  # noqa: BLE001
+            LOGGER.exception("Could not charge %s for %r", member, action)
         return True
