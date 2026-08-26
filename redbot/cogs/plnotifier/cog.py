@@ -205,7 +205,54 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         cleaned = self._NODE_PREFIX.sub("", description).strip()
         if cleaned != description:
             embed.description = cleaned
+        # Every handler names its embed "<Something> Event", which reads like a
+        # log line rather than a message to people in a music channel.
+        title = embed.title or ""
+        if title.endswith(" Event"):
+            embed.title = title[: -len(" Event")]
         self._message_queue[channel].append(embed)
+
+    # Each event kind gets its own colour so a busy channel stays scannable.
+    _COLOURS = {
+        "play": 0x3BA55D,
+        "queue": 0x5865F2,
+        "skip": 0xE67E22,
+        "problem": 0xED4245,
+        "economy": 0xF1C40F,
+        "player": 0x95A5A6,
+    }
+
+    async def _notify(
+        self,
+        channel,
+        embed: discord.Embed,
+        *,
+        track=None,
+        member=None,
+        kind: str | None = None,
+    ) -> None:
+        """Attach the human context to a notification before it is queued.
+
+        The requester becomes the author line, complete with their avatar, and
+        the track's artwork becomes the thumbnail - so a notification reads like
+        a message about a song rather than a log entry.
+        """
+        if embed is None:
+            return
+        if member is not None:
+            with contextlib.suppress(Exception):
+                embed.set_author(
+                    name=getattr(member, "display_name", None) or str(member),
+                    icon_url=str(getattr(member, "display_avatar", "")) or None,
+                )
+        if track is not None and not embed.thumbnail:
+            with contextlib.suppress(Exception):
+                artwork = await track.artworkUrl()
+                if artwork:
+                    embed.set_thumbnail(url=artwork)
+        if kind and embed.colour is None:
+            embed.colour = discord.Colour(self._COLOURS[kind])
+        self._enqueue(channel, embed)
 
     async def chunk_embed_task(self) -> None:
         await asyncio.gather(
@@ -505,9 +552,10 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         if not data["enabled"]:
             return
         who = member.mention if data["mention"] else member.display_name
-        self._enqueue(
+        await self._notify(
             channel,
             await self.pylav.construct_embed(
+                title=_("Paid for an action"),
                 description=_(
                     "{user_variable_do_not_translate} paid "
                     "{cost_variable_do_not_translate} {currency_variable_do_not_translate} "
@@ -520,6 +568,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                 ),
                 messageable=channel,
             ),
+            member=member,
+            kind="economy",
         )
 
     @commands.Cog.listener()
@@ -529,7 +579,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         channel = await player.notify_channel()
         if channel is None:
             return
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Track Stuck Event"),
                 description=_(
@@ -540,8 +591,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track
+        , kind="problem")
 
     @commands.Cog.listener()
     async def on_pylav_track_exception_event(self, event: TrackExceptionEvent) -> None:
@@ -557,7 +608,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         if not notify:
             return
 
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Track Exception Event"),
                 description=_(
@@ -568,8 +620,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track
+        , kind="problem")
 
     @commands.Cog.listener()
     async def on_pylav_track_end_event(self, event: TrackEndEvent) -> None:
@@ -621,12 +673,13 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 )
 
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Track End Event"),
                 description=message,
                 messageable=channel,
-            )
+            ), track=event.track
         )
 
     @commands.Cog.listener()
@@ -647,7 +700,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Track Start Event"),
                 description=_(
@@ -659,8 +713,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_youtube_music_event(self, event: TrackStartYouTubeMusicEvent) -> None:
@@ -680,7 +734,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("YouTube Music Track Start Event"),
                 description=_(
@@ -691,8 +746,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_deezer_event(self, event: TrackStartDeezerEvent) -> None:
@@ -712,7 +767,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Deezer Track Start Event"),
                 description=_(
@@ -723,8 +779,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_spotify_event(self, event: TrackStartSpotifyEvent) -> None:
@@ -744,7 +800,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Spotify Track Start Event"),
                 description=_(
@@ -755,8 +812,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_apple_music_event(self, event: TrackStartAppleMusicEvent) -> None:
@@ -776,7 +833,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Apple Music Track Start Event"),
                 description=_(
@@ -787,8 +845,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_localfile_event(self, event: TrackStartLocalFileEvent) -> None:
@@ -808,7 +866,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Local Track Start Event"),
                 description=_(
@@ -819,8 +878,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_http_event(self, event: TrackStartHTTPEvent) -> None:
@@ -840,7 +899,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("HTTP Track Start Event"),
                 description=_(
@@ -851,8 +911,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_speak_event(self, event: TrackStartSpeakEvent) -> None:
@@ -872,7 +932,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Text-To-Speech Track Start Event"),
                 description=_(
@@ -883,8 +944,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_youtube_event(self, event: TrackStartYouTubeEvent) -> None:
@@ -904,7 +965,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("YouTube Track Start Event"),
                 description=_(
@@ -915,8 +977,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_clypit_event(self, event: TrackStartGetYarnEvent) -> None:
@@ -936,7 +998,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -950,8 +1013,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_getyarn_event(self, event: TrackStartGetYarnEvent) -> None:
@@ -971,7 +1034,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -985,8 +1049,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_mixcloud_event(self, event: TrackStartMixCloudEvent) -> None:
@@ -1006,7 +1070,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1020,8 +1085,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_ocrmix_event(self, event: TrackStartMixCloudEvent) -> None:
@@ -1041,7 +1106,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1055,8 +1121,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_pornhub_event(self, event: TrackStartPornHubEvent) -> None:
@@ -1076,7 +1142,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1090,8 +1157,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_reddit_event(self, event: TrackStartPornHubEvent) -> None:
@@ -1111,7 +1178,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1125,8 +1193,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_soundgasm_event(self, event: TrackStartSoundgasmEvent) -> None:
@@ -1146,7 +1214,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1160,8 +1229,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_tiktok_event(self, event: TrackStartSoundgasmEvent) -> None:
@@ -1181,7 +1250,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1195,8 +1265,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_bandcamp_event(self, event: TrackStartBandcampEvent) -> None:
@@ -1216,7 +1286,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1230,8 +1301,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_soundcloud_event(self, event: TrackStartSoundCloudEvent) -> None:
@@ -1251,7 +1322,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1265,8 +1337,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_twitch_event(self, event: TrackStartTwitchEvent) -> None:
@@ -1286,7 +1358,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1300,8 +1373,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_vimeo_event(self, event: TrackStartVimeoEvent) -> None:
@@ -1321,7 +1394,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1335,8 +1409,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_gctts_event(self, event: TrackStartGCTTSEvent) -> None:
@@ -1356,7 +1430,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1370,8 +1445,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_flowery_tts_event(self, event: TrackStartFloweryTTSEvent) -> None:
@@ -1391,7 +1466,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1405,8 +1481,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_start_niconico_event(self, event: TrackStartNicoNicoEvent) -> None:
@@ -1426,7 +1502,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1440,8 +1517,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.track.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_skipped_event(self, event: TrackSkippedEvent) -> None:
@@ -1461,7 +1538,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Track Skipped Event"),
                 description=_(
@@ -1472,8 +1550,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.requester or self.bot.user
+        , kind="skip")
 
     @commands.Cog.listener()
     async def on_pylav_track_seek_event(self, event: TrackSeekEvent) -> None:
@@ -1493,7 +1571,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Track Seek Event"),
                 description=_(
@@ -1507,8 +1586,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_track_previous_requested_event(self, event: TrackPreviousRequestedEvent) -> None:
@@ -1528,7 +1607,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Track Previous Requested Event"),
                 description=_(
@@ -1539,8 +1619,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.requester or self.bot.user
+        , kind="skip")
 
     @commands.Cog.listener()
     async def on_pylav_queue_tracks_added_event(self, event: QueueTracksAddedEvent) -> None:
@@ -1560,7 +1640,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Tracks Requested Event"),
                 description=_(
@@ -1575,8 +1656,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.requester or self.bot.user
+        , kind="queue")
 
     @commands.Cog.listener()
     async def on_pylav_track_auto_play_event(self, event: TrackAutoPlayEvent) -> None:
@@ -1591,7 +1672,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         notify, mention = data["enabled"], data["mention"]
         if not notify:
             return
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Track AutoPlay Event"),
                 description=_(
@@ -1601,7 +1683,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            )
+            ), track=event.track
         )
 
     @commands.Cog.listener()
@@ -1622,7 +1704,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Track Resumed Event"),
                 description=_(
@@ -1633,8 +1716,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_queue_shuffled_event(self, event: QueueShuffledEvent) -> None:
@@ -1654,7 +1737,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Queue Shuffled Event"),
                 description=_(
@@ -1663,8 +1747,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="queue")
 
     @commands.Cog.listener()
     async def on_pylav_queue_end_event(self, event: QueueEndEvent) -> None:
@@ -1679,7 +1763,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         notify, mention = data["enabled"], data["mention"]
         if not notify:
             return
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Queue End Event"),
                 description=_(
@@ -1687,7 +1772,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                 ).format(node_variable_do_not_translate=event.player.node.name),
                 messageable=channel,
             )
-        )
+        , kind="queue")
 
     @commands.Cog.listener()
     async def on_pylav_queue_tracks_removed_event(self, event: QueueTracksRemovedEvent) -> None:
@@ -1707,7 +1792,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Tracks Removed Event"),
                 description=_(
@@ -1718,8 +1804,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), track=event.track, member=event.requester or self.bot.user
+        , kind="queue")
 
     @commands.Cog.listener()
     async def on_pylav_player_paused_event(self, event: PlayerPausedEvent) -> None:
@@ -1739,7 +1825,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Paused Event"),
                 description=_(
@@ -1748,8 +1835,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_stopped_event(self, event: PlayerStoppedEvent) -> None:
@@ -1769,7 +1856,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Stopped Event"),
                 description=_(
@@ -1778,8 +1866,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_resumed_event(self, event: PlayerResumedEvent) -> None:
@@ -1799,7 +1887,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Resumed Event"),
                 description=_(
@@ -1808,8 +1897,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="play")
 
     @commands.Cog.listener()
     async def on_pylav_player_moved_event(self, event: PlayerMovedEvent) -> None:
@@ -1829,7 +1918,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Moved Event"),
                 description=_(
@@ -1841,8 +1931,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_disconnected_event(self, event: PlayerDisconnectedEvent) -> None:
@@ -1862,7 +1952,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Disconnected Event"),
                 description=_(
@@ -1871,8 +1962,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_connected_event(self, event: PlayerConnectedEvent) -> None:
@@ -1892,15 +1983,16 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Connected Event"),
                 description=_("[Node={node}] {requester} connected the player").format(
                     requester=user, node=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_volume_changed_event(self, event: PlayerVolumeChangedEvent) -> None:
@@ -1920,7 +2012,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Volume Changed Event"),
                 description=_(
@@ -1932,8 +2025,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_repeat_event(self, event: PlayerRepeatEvent) -> None:
@@ -1955,7 +2048,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = event.requester or self.bot.user
 
         if event.type == "disable":
-            self._enqueue(channel, 
+            await self._notify(
+            channel,
                 await self.pylav.construct_embed(
                     title=_("Player Repeat Event"),
                     description=_(
@@ -1964,10 +2058,11 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                         requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                     ),
                     messageable=channel,
-                )
-            )
+                ), member=event.requester or self.bot.user
+        , kind="player")
         elif event.type == "queue":
-            self._enqueue(channel, 
+            await self._notify(
+            channel,
                 await self.pylav.construct_embed(
                     title=_("Player Repeat Event"),
                     description=_(
@@ -1977,10 +2072,11 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                         status_variable_do_not_translate=_("enabled") if event.queue_after else _("disabled"),
                     ),
                     messageable=channel,
-                )
-            )
+                ), member=event.requester or self.bot.user
+        , kind="player")
         else:
-            self._enqueue(channel, 
+            await self._notify(
+            channel,
                 await self.pylav.construct_embed(
                     title=_("Player Repeat Event"),
                     description=_(
@@ -1994,8 +2090,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                         node_variable_do_not_translate=event.player.node.name,
                     ),
                     messageable=channel,
-                )
-            )
+                ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_restored_event(self, event: PlayerRestoredEvent) -> None:
@@ -2015,7 +2111,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Restored Event"),
                 description=_(
@@ -2024,8 +2121,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_segment_skipped_event(self, event: SegmentSkippedEvent) -> None:
@@ -2059,7 +2156,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         else:
             explanation = _("an interaction section")
 
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Sponsor Segment Skipped Event"),
                 description=_(
@@ -2072,7 +2170,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                 ),
                 messageable=channel,
             )
-        )
+        , kind="skip")
 
     @commands.Cog.listener()
     async def on_pylav_filters_applied_event(self, event: FiltersAppliedEvent) -> None:
@@ -2133,7 +2231,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     ]
                 )
             data.append(data_)
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Filters Applied Event"),
                 description="{translation1}\n\n__**{translation2}:**__"
@@ -2149,8 +2248,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     ),
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_node_connected_event(self, event: NodeConnectedEvent) -> None:
@@ -2207,7 +2306,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         notify, mention = data["enabled"], data["mention"]
         if not notify:
             return
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Node Changed Event"),
                 description=_(
@@ -2217,7 +2317,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                 ),
                 messageable=channel,
             )
-        )
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_web_socket_closed_event(self, event: WebSocketClosedEvent) -> None:
@@ -2232,7 +2332,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         notify, mention = data["enabled"], data["mention"]
         if not notify:
             return
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("WebSocket Closed Event"),
                 description=_(
@@ -2265,7 +2366,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Paused Event"),
                 description=_(
@@ -2274,8 +2376,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_auto_resumed_event(self, event: PlayerAutoResumedEvent) -> None:
@@ -2295,7 +2397,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Player Resumed Event"),
                 description=_(
@@ -2304,8 +2407,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_auto_disconnected_alone_event(self, event: PlayerAutoDisconnectedAloneEvent) -> None:
@@ -2325,7 +2428,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Auto Player Disconnected Event"),
                 description=_(
@@ -2334,8 +2438,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
 
     @commands.Cog.listener()
     async def on_pylav_player_auto_disconnected_empty_queue_event(
@@ -2357,7 +2461,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._enqueue(channel, 
+        await self._notify(
+            channel,
             await self.pylav.construct_embed(
                 title=_("Auto Player Disconnected Event"),
                 description=_(
@@ -2366,5 +2471,5 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            )
-        )
+            ), member=event.requester or self.bot.user
+        , kind="player")
