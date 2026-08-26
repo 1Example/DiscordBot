@@ -20,15 +20,18 @@ BUTTON_STYLES = {
     "danger": discord.ButtonStyle.danger,
 }
 
+# All transparent by default: "secondary" is the only Discord style that takes
+# no colour of its own, so the icon does the talking rather than the fill. Any
+# button can still be given a colour from the dashboard.
 DEFAULT_STYLES = {
-    "lock": "danger",
-    "unlock": "success",
-    "hide": "danger",
-    "unhide": "success",
-    "rename": "primary",
-    "limit": "primary",
-    "kick": "danger",
-    "claim": "success",
+    "lock": "secondary",
+    "unlock": "secondary",
+    "hide": "secondary",
+    "unhide": "secondary",
+    "rename": "secondary",
+    "limit": "secondary",
+    "kick": "secondary",
+    "claim": "secondary",
 }
 
 ACTIONS = (

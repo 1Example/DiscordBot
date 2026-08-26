@@ -29,6 +29,9 @@ __view_version__ = "2026.08.14.3-public-queue-menu"
 # the whole controller.
 LOGGER = getLogger("PyLav.cog.Controller.view")
 
+# Discord has no transparent button; secondary is the one that takes no
+# colour of its own and sits flat against the message. Every controller
+# button uses it, so the icon carries the meaning rather than the fill.
 TRANSPARENT = discord.ButtonStyle.secondary
 
 # How long the queue menu stays open with no interaction before it deletes
@@ -659,14 +662,14 @@ class PersistentControllerView(discord.ui.View):
             custom_id="pylav__pylavcontroller_persistent_view:previous_track_button:9",
         )
         self.paused_button = PauseTrackButton(
-            style=discord.ButtonStyle.primary,
+            style=TRANSPARENT,
             row=0,
             label=_("Pause"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:paused_button:7",
         )
         self.resume_button = ResumeTrackButton(
-            style=discord.ButtonStyle.success,
+            style=TRANSPARENT,
             row=0,
             label=_("Play"),
             cog=cog,
@@ -687,7 +690,7 @@ class PersistentControllerView(discord.ui.View):
             custom_id="pylav__pylavcontroller_persistent_view:shuffle_button:11",
         )
         self.stop_button = StopTrackButton(
-            style=discord.ButtonStyle.danger,
+            style=TRANSPARENT,
             row=0,
             label=_("Stop"),
             cog=cog,
@@ -710,14 +713,14 @@ class PersistentControllerView(discord.ui.View):
             custom_id="pylav__pylavcontroller_persistent_view:increase_volume_button:6",
         )
         self.repeat_queue_button_on = ToggleRepeatQueueButton(
-            style=discord.ButtonStyle.primary,
+            style=TRANSPARENT,
             row=1,
             label=_("Repeat queue"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:repeat_queue_button_on:1",
         )
         self.repeat_button_on = ToggleRepeatButton(
-            style=discord.ButtonStyle.primary,
+            style=TRANSPARENT,
             row=1,
             label=_("Repeat track"),
             cog=cog,
@@ -747,14 +750,14 @@ class PersistentControllerView(discord.ui.View):
 
         # Row 2 - utility
         self.clear_queue_button = ControllerClearQueueButton(
-            style=discord.ButtonStyle.danger,
+            style=TRANSPARENT,
             row=2,
             label=_("Clear queue"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:clear_queue_button:15",
         )
         self.disconnect_button = ControllerDisconnectButton(
-            style=discord.ButtonStyle.danger,
+            style=TRANSPARENT,
             row=2,
             label=_("Disconnect"),
             cog=cog,
