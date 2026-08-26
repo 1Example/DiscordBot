@@ -63,7 +63,11 @@ class DashboardIntegration:
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "supported": node is not None,
-                "playing": await current.get_track_display_name() if current else "",
+                # PyLav's formatter does `max_length - 8` whenever `with_url` is
+                # False, so calling this without an explicit length raises on None.
+                "playing": await current.get_track_display_name(max_length=100)
+                if current
+                else "",
                 "result": result,
             },
         }
@@ -90,7 +94,7 @@ class DashboardIntegration:
                         {},
                     )
                 return [], {
-                    "title": await player.current.get_track_display_name(),
+                    "title": await player.current.get_track_display_name(max_length=100),
                     "artwork": await player.current.artworkUrl() or "",
                     "text": lyrics if isinstance(lyrics, str) else getattr(lyrics, "text", ""),
                 }

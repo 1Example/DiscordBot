@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 from collections import defaultdict
 from functools import partial
 from pathlib import Path
@@ -101,62 +102,65 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         self._config.register_guild(
             track_stuck=dict(enabled=True, mention=True),
             track_exception=dict(enabled=True, mention=True),
-            track_end=dict(enabled=True, mention=True),
-            track_start=dict(enabled=False, mention=True),
-            track_start_youtube_music=dict(enabled=True, mention=True),
-            track_start_spotify=dict(enabled=True, mention=True),
-            track_start_apple_music=dict(enabled=True, mention=True),
-            track_start_deezer=dict(enabled=True, mention=True),
-            track_start_localfile=dict(enabled=True, mention=True),
-            track_start_http=dict(enabled=True, mention=True),
-            track_start_speak=dict(enabled=True, mention=True),
-            track_start_youtube=dict(enabled=True, mention=True),
-            track_start_clypit=dict(enabled=True, mention=True),
-            track_start_getyarn=dict(enabled=True, mention=True),
-            track_start_mixcloud=dict(enabled=True, mention=True),
-            track_start_ocrmix=dict(enabled=True, mention=True),
-            track_start_pornhub=dict(enabled=True, mention=True),
-            track_start_reddit=dict(enabled=True, mention=True),
-            track_start_soundgasm=dict(enabled=True, mention=True),
-            track_start_tiktok=dict(enabled=True, mention=True),
-            track_start_bandcamp=dict(enabled=True, mention=True),
-            track_start_soundcloud=dict(enabled=True, mention=True),
-            track_start_twitch=dict(enabled=True, mention=True),
-            track_start_vimeo=dict(enabled=True, mention=True),
-            track_start_gctts=dict(enabled=True, mention=True),
-            track_start_flowery_tts=dict(enabled=True, mention=True),
-            track_start_niconico=dict(enabled=True, mention=True),
+            track_end=dict(enabled=False, mention=True),
+            track_start=dict(enabled=True, mention=True),
+            track_start_youtube_music=dict(enabled=False, mention=True),
+            track_start_spotify=dict(enabled=False, mention=True),
+            track_start_apple_music=dict(enabled=False, mention=True),
+            track_start_deezer=dict(enabled=False, mention=True),
+            track_start_localfile=dict(enabled=False, mention=True),
+            track_start_http=dict(enabled=False, mention=True),
+            track_start_speak=dict(enabled=False, mention=True),
+            track_start_youtube=dict(enabled=False, mention=True),
+            track_start_clypit=dict(enabled=False, mention=True),
+            track_start_getyarn=dict(enabled=False, mention=True),
+            track_start_mixcloud=dict(enabled=False, mention=True),
+            track_start_ocrmix=dict(enabled=False, mention=True),
+            track_start_pornhub=dict(enabled=False, mention=True),
+            track_start_reddit=dict(enabled=False, mention=True),
+            track_start_soundgasm=dict(enabled=False, mention=True),
+            track_start_tiktok=dict(enabled=False, mention=True),
+            track_start_bandcamp=dict(enabled=False, mention=True),
+            track_start_soundcloud=dict(enabled=False, mention=True),
+            track_start_twitch=dict(enabled=False, mention=True),
+            track_start_vimeo=dict(enabled=False, mention=True),
+            track_start_gctts=dict(enabled=False, mention=True),
+            track_start_flowery_tts=dict(enabled=False, mention=True),
+            track_start_niconico=dict(enabled=False, mention=True),
             track_skipped=dict(enabled=True, mention=True),
-            track_seek=dict(enabled=True, mention=True),
-            track_replaced=dict(enabled=True, mention=True),
-            track_previous_requested=dict(enabled=True, mention=True),
+            track_seek=dict(enabled=False, mention=True),
+            track_replaced=dict(enabled=False, mention=True),
+            track_previous_requested=dict(enabled=False, mention=True),
             tracks_requested=dict(enabled=True, mention=True),
-            track_autoplay=dict(enabled=True, mention=True),
-            track_resumed=dict(enabled=True, mention=True),
-            queue_shuffled=dict(enabled=True, mention=True),
+            track_autoplay=dict(enabled=False, mention=True),
+            track_resumed=dict(enabled=False, mention=True),
+            queue_shuffled=dict(enabled=False, mention=True),
             queue_end=dict(enabled=True, mention=True),
-            queue_track_position_changed=dict(enabled=True, mention=True),
-            queue_tracks_removed=dict(enabled=True, mention=True),
+            queue_track_position_changed=dict(enabled=False, mention=True),
+            queue_tracks_removed=dict(enabled=False, mention=True),
             player_paused=dict(enabled=True, mention=True),
-            player_stopped=dict(enabled=True, mention=True),
+            player_stopped=dict(enabled=False, mention=True),
             player_resumed=dict(enabled=True, mention=True),
-            player_moved=dict(enabled=True, mention=True),
+            player_moved=dict(enabled=False, mention=True),
             player_disconnected=dict(enabled=True, mention=True),
             player_connected=dict(enabled=True, mention=True),
-            volume_changed=dict(enabled=True, mention=True),
-            player_repeat=dict(enabled=True, mention=True),
-            player_restored=dict(enabled=True, mention=True),
-            segment_skipped=dict(enabled=True, mention=True),
+            volume_changed=dict(enabled=False, mention=True),
+            player_repeat=dict(enabled=False, mention=True),
+            player_restored=dict(enabled=False, mention=True),
+            segment_skipped=dict(enabled=False, mention=True),
             segments_loaded=dict(enabled=False, mention=True),
-            filters_applied=dict(enabled=True, mention=True),
+            filters_applied=dict(enabled=False, mention=True),
             node_connected=dict(enabled=False, mention=True),
             node_disconnected=dict(enabled=False, mention=True),
             node_changed=dict(enabled=False, mention=True),
             websocket_closed=dict(enabled=False, mention=True),
-            player_auto_paused=dict(enabled=True, mention=True),
-            player_auto_resumed=dict(enabled=True, mention=True),
-            player_auto_disconnected=dict(enabled=True, mention=True),
-            player_auto_disconnected_empty_queue=dict(enabled=True, mention=True),
+            player_auto_paused=dict(enabled=False, mention=True),
+            player_auto_resumed=dict(enabled=False, mention=True),
+            player_auto_disconnected=dict(enabled=False, mention=True),
+            player_auto_disconnected_empty_queue=dict(enabled=False, mention=True),
+            action_charged=dict(enabled=True, mention=True),
+            # Seconds before a notification removes itself. 0 keeps them.
+            auto_delete_after=120,
             webhook_url=None,
             webhook_channel_id=None,
         )
@@ -187,6 +191,21 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             job.remove()
         if not self._session.closed:
             await self._session.close()
+
+    # Every event handler builds its description as
+    # "[Node=<name>] <what happened>", which is noise for anyone reading the
+    # channel. Strip it once here rather than in each handler.
+    _NODE_PREFIX = re.compile(r"^\[Node=[^\]]*\]\s*")
+
+    def _enqueue(self, channel, embed: discord.Embed) -> None:
+        """Queue one notification, tidied for a human audience."""
+        if embed is None:
+            return
+        description = embed.description or ""
+        cleaned = self._NODE_PREFIX.sub("", description).strip()
+        if cleaned != description:
+            embed.description = cleaned
+        self._message_queue[channel].append(embed)
 
     async def chunk_embed_task(self) -> None:
         await asyncio.gather(
@@ -223,8 +242,30 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
 
         LOGGER.trace("Sending up to last 10 embeds to %s channels", len(dispatch_mapping))
 
+        # Notifications are chatter, not a record; clearing them keeps the
+        # channel readable. Webhook sends need `wait` so there is a message to
+        # delete, and channel sends can do it themselves.
+        try:
+            delete_after = await self._config.guild(channel.guild).auto_delete_after()
+        except Exception:  # noqa: BLE001 - never block a send on a config read
+            delete_after = 0
+
+        async def dispatch(sender, payload: list[discord.Embed]) -> None:
+            if not delete_after:
+                await sender(embeds=payload)
+                return
+            if sender is channel.send:
+                await sender(embeds=payload, delete_after=delete_after)
+                return
+            message = await sender(embeds=payload, wait=True)
+            if message is not None:
+                await asyncio.sleep(delete_after)
+                with contextlib.suppress(discord.HTTPException):
+                    await message.delete()
+
         await asyncio.gather(
-            *[send(embeds=embeds) for send, embeds in dispatch_mapping.items()], return_exceptions=True
+            *[dispatch(sender, payload) for sender, payload in dispatch_mapping.items()],
+            return_exceptions=True,
         )
 
     @commands.guildowner_or_permissions(manage_guild=True)
@@ -447,13 +488,48 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         )
 
     @commands.Cog.listener()
+    async def on_plcontroller_charged(
+        self, member: discord.Member, action: str, cost: int, currency: str
+    ) -> None:
+        """Report what a dashboard action cost the member who triggered it."""
+        guild = member.guild
+        player = self.pylav.get_player(guild.id)
+        if player is None:
+            return
+        channel = await player.notify_channel()
+        if channel is None:
+            return
+        data = await self._config.guild(guild=guild).get_raw(
+            "action_charged", default={"enabled": True, "mention": True}
+        )
+        if not data["enabled"]:
+            return
+        who = member.mention if data["mention"] else member.display_name
+        self._enqueue(
+            channel,
+            await self.pylav.construct_embed(
+                description=_(
+                    "{user_variable_do_not_translate} paid "
+                    "{cost_variable_do_not_translate} {currency_variable_do_not_translate} "
+                    "to {action_variable_do_not_translate}."
+                ).format(
+                    user_variable_do_not_translate=who,
+                    cost_variable_do_not_translate=cost,
+                    currency_variable_do_not_translate=currency,
+                    action_variable_do_not_translate=action.replace("_", " "),
+                ),
+                messageable=channel,
+            ),
+        )
+
+    @commands.Cog.listener()
     async def on_pylav_track_stuck_event(self, event: TrackStuckEvent) -> None:
         player = event.player
         await self.pylav.set_context_locale(player.guild)
         channel = await player.notify_channel()
         if channel is None:
             return
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Track Stuck Event"),
                 description=_(
@@ -481,7 +557,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         if not notify:
             return
 
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Track Exception Event"),
                 description=_(
@@ -545,7 +621,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 )
 
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Track End Event"),
                 description=message,
@@ -571,7 +647,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Track Start Event"),
                 description=_(
@@ -604,7 +680,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("YouTube Music Track Start Event"),
                 description=_(
@@ -636,7 +712,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Deezer Track Start Event"),
                 description=_(
@@ -668,7 +744,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Spotify Track Start Event"),
                 description=_(
@@ -700,7 +776,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Apple Music Track Start Event"),
                 description=_(
@@ -732,7 +808,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Local Track Start Event"),
                 description=_(
@@ -764,7 +840,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("HTTP Track Start Event"),
                 description=_(
@@ -796,7 +872,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Text-To-Speech Track Start Event"),
                 description=_(
@@ -828,7 +904,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("YouTube Track Start Event"),
                 description=_(
@@ -860,7 +936,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -895,7 +971,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -930,7 +1006,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -965,7 +1041,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1000,7 +1076,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1035,7 +1111,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1070,7 +1146,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1105,7 +1181,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1140,7 +1216,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1175,7 +1251,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1210,7 +1286,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1245,7 +1321,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1280,7 +1356,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1315,7 +1391,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1350,7 +1426,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.track.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("{source_variable_do_not_translate} Track Start Event").format(
                     source_variable_do_not_translate=await event.track.query_source()
@@ -1385,7 +1461,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Track Skipped Event"),
                 description=_(
@@ -1417,7 +1493,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Track Seek Event"),
                 description=_(
@@ -1452,7 +1528,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Track Previous Requested Event"),
                 description=_(
@@ -1484,7 +1560,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Tracks Requested Event"),
                 description=_(
@@ -1515,7 +1591,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         notify, mention = data["enabled"], data["mention"]
         if not notify:
             return
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Track AutoPlay Event"),
                 description=_(
@@ -1546,7 +1622,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Track Resumed Event"),
                 description=_(
@@ -1578,7 +1654,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Queue Shuffled Event"),
                 description=_(
@@ -1603,7 +1679,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         notify, mention = data["enabled"], data["mention"]
         if not notify:
             return
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Queue End Event"),
                 description=_(
@@ -1631,7 +1707,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Tracks Removed Event"),
                 description=_(
@@ -1663,7 +1739,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Paused Event"),
                 description=_(
@@ -1693,7 +1769,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Stopped Event"),
                 description=_(
@@ -1723,7 +1799,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Resumed Event"),
                 description=_(
@@ -1753,7 +1829,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Moved Event"),
                 description=_(
@@ -1786,7 +1862,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Disconnected Event"),
                 description=_(
@@ -1816,7 +1892,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Connected Event"),
                 description=_("[Node={node}] {requester} connected the player").format(
@@ -1844,7 +1920,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Volume Changed Event"),
                 description=_(
@@ -1879,7 +1955,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = event.requester or self.bot.user
 
         if event.type == "disable":
-            self._message_queue[channel].append(
+            self._enqueue(channel, 
                 await self.pylav.construct_embed(
                     title=_("Player Repeat Event"),
                     description=_(
@@ -1891,7 +1967,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                 )
             )
         elif event.type == "queue":
-            self._message_queue[channel].append(
+            self._enqueue(channel, 
                 await self.pylav.construct_embed(
                     title=_("Player Repeat Event"),
                     description=_(
@@ -1904,7 +1980,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                 )
             )
         else:
-            self._message_queue[channel].append(
+            self._enqueue(channel, 
                 await self.pylav.construct_embed(
                     title=_("Player Repeat Event"),
                     description=_(
@@ -1939,7 +2015,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Restored Event"),
                 description=_(
@@ -1983,7 +2059,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         else:
             explanation = _("an interaction section")
 
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Sponsor Segment Skipped Event"),
                 description=_(
@@ -2057,7 +2133,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     ]
                 )
             data.append(data_)
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Filters Applied Event"),
                 description="{translation1}\n\n__**{translation2}:**__"
@@ -2131,7 +2207,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         notify, mention = data["enabled"], data["mention"]
         if not notify:
             return
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Node Changed Event"),
                 description=_(
@@ -2156,7 +2232,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         notify, mention = data["enabled"], data["mention"]
         if not notify:
             return
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("WebSocket Closed Event"),
                 description=_(
@@ -2189,7 +2265,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Paused Event"),
                 description=_(
@@ -2219,7 +2295,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Player Resumed Event"),
                 description=_(
@@ -2249,7 +2325,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Auto Player Disconnected Event"),
                 description=_(
@@ -2281,7 +2357,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             user = req.mention
         else:
             user = event.requester or self.bot.user
-        self._message_queue[channel].append(
+        self._enqueue(channel, 
             await self.pylav.construct_embed(
                 title=_("Auto Player Disconnected Event"),
                 description=_(

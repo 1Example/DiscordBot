@@ -500,6 +500,9 @@ class DashboardIntegration:
                 )
             await bank.withdraw_credits(member, cost)
             currency = await bank.get_currency_name(guild)
+            # Let anything else that cares (the notifier, for one) report the
+            # charge without having to reach into this cog.
+            self.bot.dispatch("plcontroller_charged", member, action, cost, currency)
             return True, f"Charged {cost} {currency}."
         except Exception as exc:  # noqa: BLE001
             log.exception("Economy charge failed for %r", action)

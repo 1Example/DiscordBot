@@ -8,6 +8,7 @@ from redbot.core import commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     channel_options,
     dashboard_page,
     form_reader,
@@ -30,6 +31,10 @@ EVENT_GROUPS = (
     (
         "Problems",
         ("track_stuck", "track_exception", "websocket_closed"),
+    ),
+    (
+        "Economy",
+        ("action_charged",),
     ),
     (
         "Queue",
@@ -65,6 +70,24 @@ EVENT_GROUPS = (
 
 # Every track_start_* variant, collapsed into one section.
 SOURCE_PREFIX = "track_start_"
+
+# What "just the basics" means: the handful of events worth announcing, used by
+# the reset button and matching the cog's registered defaults.
+BASIC_EVENTS = frozenset(
+    {
+        "tracks_requested",
+        "track_skipped",
+        "track_start",
+        "queue_end",
+        "player_connected",
+        "player_disconnected",
+        "player_paused",
+        "player_resumed",
+        "track_stuck",
+        "track_exception",
+        "action_charged",
+    }
+)
 
 PRETTY_SOURCES = {
     "youtube_music": "YouTube Music",
@@ -161,6 +184,7 @@ class DashboardIntegration:
                 "total": total,
                 "active": active,
                 "channels": channel_options(guild, selected=settings.get("notify_channel_id")),
+                "auto_delete_after": settings.get("auto_delete_after", 0) or 0,
             },
         }
 
@@ -193,6 +217,42 @@ class DashboardIntegration:
                         }
                     )
                 return [{"message": f"Saved {len(keys)} event(s).", "category": "success"}]
+
+            if action == "reset_basics":
+                changed = 0
+                async with self._config.guild(guild).all() as stored:
+                    for key, value in stored.items():
+                        if not isinstance(value, dict) or "enabled" not in value:
+                            continue
+                        wanted = key in BASIC_EVENTS
+                        if value["enabled"] != wanted:
+                            value["enabled"] = wanted
+                            changed += 1
+                return [
+                    {
+                        "message": f"Reset to the basic notifications; "
+                        f"{changed} event(s) changed.",
+                        "category": "success",
+                    }
+                ]
+
+            if action == "save_cleanup":
+                seconds = field.integer("auto_delete_after", 0) or 0
+                if seconds < 0 or seconds > 3600:
+                    return [
+                        {"message": "Choose between 0 and 3600 seconds.",
+                         "category": "warning"}
+                    ]
+                await self._config.guild(guild).auto_delete_after.set(seconds)
+                if seconds:
+                    return [
+                        {"message": f"Notifications will delete themselves after "
+                                    f"{seconds} seconds.", "category": "success"}
+                    ]
+                return [
+                    {"message": "Notifications will stay in the channel.",
+                     "category": "success"}
+                ]
 
             if action == "save_channel":
                 raw = field("notify_channel_id") or ""
@@ -238,6 +298,7 @@ class DashboardIntegration:
 
 PLNOTIFIER_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -247,7 +308,29 @@ PLNOTIFIER_TEMPLATE = (
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
     <div class="dz-panel">
+      <h5><i class="fa fa-clock-o"></i> Tidying up</h5>
+      <p class="dz-hint">
+        Notifications are chatter rather than a record, so they can remove
+        themselves once they have been seen. Set 0 to keep them.
+      </p>
+      <div class="dz-row">
+        <input class="dz-input" type="number" min="0" max="3600"
+               name="auto_delete_after" value="{{ auto_delete_after }}"
+               style="max-width:180px;" />
+        <button class="dz-btn primary" name="action" value="save_cleanup">
+          <i class="fa fa-save"></i> Save
+        </button>
+        {{ confirm('Just the basics', 'reset_basics',
+                   'Turn off every event except the handful worth announcing (play, queue, skip, connect, problems, charges)?',
+                   '', 'fa-magic') }}
+      </div>
+    </div>
+  </form>
+
+  <div class="dz-panel">
       <h5><i class="fa fa-hashtag"></i> Notification channel</h5>
       <p class="dz-hint">Leave unset to announce in the channel the player was summoned to.</p>
       <div class="dz-row">

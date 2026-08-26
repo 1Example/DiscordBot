@@ -121,7 +121,7 @@ class DashboardIntegration:
                 "cases": visible,
                 "total": total,
                 "all_total": len(cases),
-                "page": page,
+                "page_number": page,
                 "pages": max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE),
                 "query": query,
                 "wanted_type": wanted_type,
@@ -322,14 +322,14 @@ MODLOG_TEMPLATE = (
       </table>
       {% if pages > 1 %}
         <div class="dz-row dz-save">
-          {% if page > 1 %}
-            <a class="dz-btn" href="?q={{ query }}&case_type={{ wanted_type }}&page={{ page - 1 }}">
+          {% if page_number > 1 %}
+            <a class="dz-btn" href="?q={{ query }}&case_type={{ wanted_type }}&page={{ page_number - 1 }}">
               <i class="fa fa-chevron-left"></i> Newer
             </a>
           {% endif %}
-          <span class="dz-hint">Page {{ page }} of {{ pages }}</span>
-          {% if page < pages %}
-            <a class="dz-btn" href="?q={{ query }}&case_type={{ wanted_type }}&page={{ page + 1 }}">
+          <span class="dz-hint">Page {{ page_number }} of {{ pages }}</span>
+          {% if page_number < pages %}
+            <a class="dz-btn" href="?q={{ query }}&case_type={{ wanted_type }}&page={{ page_number + 1 }}">
               Older <i class="fa fa-chevron-right"></i>
             </a>
           {% endif %}

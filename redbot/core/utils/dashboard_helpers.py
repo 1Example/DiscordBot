@@ -44,19 +44,35 @@ def dashboard_page(*args: t.Any, **kwargs: t.Any) -> t.Callable:
 def form_reader(kwargs: dict) -> t.Callable[[str, t.Any], t.Any]:
     """Return a getter for POST fields.
 
-    The webserver builds the form with ``request.form.to_dict(flat=False)``, so
-    every value arrives as a list even when it is single-valued.
+    The webserver builds the form with ``request.form.to_dict(flat=False)`` and
+    the RPC layer hands it over as a ``werkzeug`` ``ImmutableMultiDict``. On that
+    type ``get`` returns only the *first* value, so reading a multi-select needs
+    ``getlist``; a plain dict of lists is also accepted so the helper stays
+    usable outside a request.
     """
     form = (kwargs.get("data") or {}).get("form") or {}
 
+    def values(key: str) -> list:
+        """Every value submitted under `key`, whatever container `form` is."""
+        getlist = getattr(form, "getlist", None)
+        if getlist is not None:
+            return list(getlist(key))
+        raw = form.get(key)
+        if raw is None:
+            return []
+        if isinstance(raw, (list, tuple)):
+            return list(raw)
+        return [raw]
+
     def field(key: str, default: t.Any = None) -> t.Any:
-        value = form.get(key, default)
-        if isinstance(value, (list, tuple)):
-            return value[-1] if value else default
-        return value
+        found = values(key)
+        if not found:
+            return default
+        return found[-1]
 
     field.raw = form  # type: ignore[attr-defined]
-    field.many = lambda key: [x for x in (form.get(key) or []) if x not in ("", None)]  # type: ignore[attr-defined]
+    field.values = values  # type: ignore[attr-defined]
+    field.many = lambda key: [x for x in values(key) if x not in ("", None)]  # type: ignore[attr-defined]
     field.checked = lambda key: key in form  # type: ignore[attr-defined]
 
     def integer(key: str, default=None):

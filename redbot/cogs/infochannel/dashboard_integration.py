@@ -9,6 +9,7 @@ from redbot.core import commands
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
+    channel_options,
     role_options,
     dashboard_page,
     form_reader,
@@ -99,6 +100,10 @@ class DashboardIntegration:
                 "counters": counters,
                 "category": category.name if category else None,
                 "active": sum(1 for c in counters if c["enabled"]),
+                "category_options": channel_options(
+                    guild, kinds=("category",), selected=data.get("category_id")
+                ),
+                "category_missing": bool(data.get("category_id")) and category is None,
                 "role_counters": await self._ic_role_counters(guild),
                 "role_options": role_options(guild),
                 "default_role_name": self.default_role["name"],
@@ -162,6 +167,32 @@ class DashboardIntegration:
                 {"message": f"Counter for {role.name} {verb}.", "category": "success"}
             ]
 
+        if action == "rebuild":
+            try:
+                await self.make_infochannel(guild)
+                await self.update_infochannel(guild)
+            except discord.Forbidden:
+                return [
+                    {"message": "I need Manage Channels to rebuild the counters.",
+                     "category": "danger"}
+                ]
+            return [
+                {"message": "Every enabled counter channel was rebuilt.",
+                 "category": "success"}
+            ]
+
+        if action == "delete_all":
+            try:
+                await self.delete_all_infochannels(guild)
+            except discord.Forbidden:
+                return [
+                    {"message": "I need Manage Channels to remove the counters.",
+                     "category": "danger"}
+                ]
+            return [
+                {"message": "All counter channels were deleted.", "category": "success"}
+            ]
+
         if action != "save":
             return [{"message": "Unknown action.", "category": "warning"}]
 
@@ -184,21 +215,63 @@ class DashboardIntegration:
                 # Discord truncates channel names at 100 characters.
                 names[key] = template[:100]
 
-        # Toggling is applied through the cog so that channels are actually
-        # created or deleted, rather than only flipping a Config flag.
+        # Where the counter channels live. Clearing this lets the cog create its
+        # own "Server Stats" category the next time it builds them.
+        raw_category = (field("category_id") or "").strip()
+        chosen_category = int(raw_category) if raw_category.isdigit() else None
+        if chosen_category is not None and guild.get_channel(chosen_category) is None:
+            chosen_category = None
+        previous_category = await conf.category_id()
+        if chosen_category != previous_category:
+            await conf.category_id.set(chosen_category)
+
+        # Flipping the stored flag is not enough: the channel itself has to be
+        # created or deleted, which is what `make_infochannel` does. Only the
+        # counters that actually changed are rebuilt, because each rebuild is a
+        # channel create or delete against the Discord API.
+        changed: list[str] = []
         async with conf.enabled_channels() as enabled:
             for key in self.default_channel_names:
-                enabled[key] = field.checked(f"t_{key}")
+                wanted = field.checked(f"t_{key}")
+                channel_id = await conf.channel_ids.get_raw(key, default=None)
+                # A counter that is on but whose channel is gone needs rebuilding
+                # too, otherwise it stays stuck showing "channel missing".
+                orphaned = wanted and (
+                    channel_id is None or guild.get_channel(channel_id) is None
+                )
+                if enabled.get(key) != wanted or orphaned:
+                    changed.append(key)
+                enabled[key] = wanted
+
+        # Moving the category means every existing counter has to be recreated
+        # inside the new one.
+        if chosen_category != previous_category:
+            changed = list(self.default_channel_names)
 
         try:
+            for key in changed:
+                await self.make_infochannel(guild, channel_type=key)
             await self.update_infochannel(guild)
+        except discord.Forbidden:
+            errors.append(
+                {
+                    "message": "Saved, but I need Manage Channels to create or remove "
+                    "the counter channels.",
+                    "category": "warning",
+                }
+            )
         except Exception as exc:  # noqa: BLE001
             log.exception("InfoChannel update failed after a dashboard save")
             errors.append(
                 {"message": f"Saved, but refreshing the channels failed: {exc}", "category": "warning"}
             )
 
-        return errors + [{"message": "Counter settings saved.", "category": "success"}]
+        summary = (
+            f"Counter settings saved; {len(changed)} channel(s) rebuilt."
+            if changed
+            else "Counter settings saved."
+        )
+        return errors + [{"message": summary, "category": "success"}]
 
 
 INFOCHANNEL_TEMPLATE = (
@@ -216,6 +289,19 @@ INFOCHANNEL_TEMPLATE = (
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+
+    <div class="dz-panel">
+      <h5><i class="fa fa-folder"></i> Where the counters live</h5>
+      <p class="dz-hint">
+        Pick an existing category, or leave this empty and I will create one
+        called "Server Stats". Changing it recreates every counter channel.
+        {% if category_missing %}
+          <b>The category that was set has been deleted.</b>
+        {% endif %}
+      </p>
+      {{ picker('category_id', category_options, false, 8, 'Search categories...',
+                true, 'create Server Stats for me') }}
+    </div>
 
     <div class="dz-grid two">
       {% for c in counters %}
@@ -241,10 +327,15 @@ INFOCHANNEL_TEMPLATE = (
       {% endfor %}
     </div>
 
-    <div class="dz-save">
+    <div class="dz-row dz-save">
       <button class="dz-btn primary" name="action" value="save">
         <i class="fa fa-save"></i> Save counters
       </button>
+      {{ confirm('Rebuild channels', 'rebuild',
+                 'Recreate every enabled counter channel? Existing ones are deleted and made again.',
+                 '', 'fa-refresh') }}
+      {{ confirm('Delete all counters', 'delete_all',
+                 'Delete every counter channel and the category holding them?') }}
     </div>
   </form>
 

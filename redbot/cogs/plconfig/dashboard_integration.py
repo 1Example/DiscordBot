@@ -65,8 +65,12 @@ class DashboardIntegration:
                     "listeners": sum(
                         1 for m in getattr(channel, "members", []) or [] if not m.bot
                     ),
-                    "track": getattr(current, "title", None) or "Nothing playing",
-                    "author": getattr(current, "author", "") or "",
+                    # `title` and `author` are coroutine methods on a PyLav
+                    # track; passing the bound method through breaks the RPC
+                    # response, so they are resolved before rendering.
+                    "track": (await current.title() if current else "")
+                    or "Nothing playing",
+                    "author": (await current.author() if current else "") or "",
                     "paused": bool(getattr(player, "paused", False)),
                     "volume": int(getattr(player, "volume", 0) or 0),
                     "queue": queue_length,

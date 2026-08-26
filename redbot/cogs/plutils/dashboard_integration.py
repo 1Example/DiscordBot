@@ -68,12 +68,15 @@ class DashboardIntegration:
         current = getattr(player, "current", None)
         track = {}
         if current is not None:
+            # These are all coroutine methods on a PyLav track, not plain
+            # attributes; handing an un-awaited one to the template makes the
+            # RPC layer fail to serialise the whole response.
             track = {
                 "title": await current.title(),
                 "author": await current.author(),
                 "source": await current.source(),
                 "encoded": current.encoded,
-                "uri": getattr(current, "uri", "") or "",
+                "uri": await current.uri() or "",
                 "artwork": await current.artworkUrl() or "",
             }
 
