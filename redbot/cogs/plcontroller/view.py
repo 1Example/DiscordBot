@@ -1290,12 +1290,14 @@ class PersistentControllerView(discord.ui.View):
     async def _charge_for(self, interaction: DISCORD_INTERACTION_TYPE, button_name: str) -> bool:
         """Bill the clicker for the action, refusing it when they cannot pay.
 
-        Everyone pays here, staff included - the point of a price is that it
-        applies to the people actually pressing the buttons.
+        Staff are exempt, matching `_dash_charge` on the dashboard - the same
+        person must not be charged on one surface and not the other.
         """
         action = self.COST_KEYS.get(button_name)
         member = interaction.user
         if action is None or not isinstance(member, discord.Member):
+            return True
+        if await self._may_manage(interaction):
             return True
         try:
             config = self.cog._config.guild(self.channel.guild)

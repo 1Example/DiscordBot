@@ -170,6 +170,7 @@ class DashboardIntegration:
                 "channels": channel_options(guild, selected=settings.get("notify_channel_id")),
                 "auto_delete_after": settings.get("auto_delete_after", 0) or 0,
                 "colour_coded": bool(settings.get("colour_coded", True)),
+                "members_only": bool(settings.get("members_only", True)),
                 "channel_name": (
                     f"#{guild.get_channel(settings['notify_channel_id']).name}"
                     if settings.get("notify_channel_id")
@@ -247,6 +248,7 @@ class DashboardIntegration:
                     ]
                 await conf.auto_delete_after.set(seconds)
                 await conf.colour_coded.set(field.checked("colour_coded"))
+                await conf.members_only.set(field.checked("members_only"))
 
                 raw = field("notify_channel_id") or ""
                 channel_id = int(raw) if raw.isdigit() else None
@@ -388,6 +390,16 @@ PLNOTIFIER_TEMPLATE = (
                    {% if colour_coded %}checked{% endif %} />
             <span>Colour each notification by what happened</span>
           </label>
+          <label class="dz-toggle" style="margin-top:8px;">
+            <input type="checkbox" name="members_only"
+                   {% if members_only %}checked{% endif %} />
+            <span>Only announce what members did</span>
+          </label>
+          <p class="dz-hint" style="margin-top:4px;">
+            Drops anything the bot did to itself &mdash; autoplay queueing a
+            track, or an action it could not attribute to anyone. Notifications
+            that name nobody at all, like the queue running out, still go out.
+          </p>
         </div>
       </div>
       <div class="dz-save">

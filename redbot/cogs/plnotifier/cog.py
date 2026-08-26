@@ -166,6 +166,8 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             # Tint each notification by what happened rather than using the
             # one guild embed colour for everything.
             colour_coded=True,
+            # Say nothing about what the bot did to itself. See `_is_bot_action`.
+            members_only=True,
             webhook_url=None,
             webhook_channel_id=None,
         )
@@ -265,21 +267,44 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         player = getattr(event, "player", None)
         return getattr(player, "current", None)
 
+    # Attributes an event uses to name whoever caused it.
+    _ACTOR_ATTRS = ("requester", "member", "user", "author")
+
     def _member_of(self, event):
-        """Who caused an event, falling back to the bot for automatic ones."""
-        for source in (event, getattr(event, "track", None)):
+        """Who caused an event, or None when nothing did.
+
+        This deliberately does not fall back to the bot. "The bot did it" and
+        "nobody did it" have to stay distinguishable, because the first is what
+        `_is_bot_action` filters on.
+        """
+        for source in (event, getattr(event, "track", None), self._track_of(event)):
             if source is None:
                 continue
-            for attribute in ("requester", "member", "user", "author"):
+            for attribute in self._ACTOR_ATTRS:
                 found = getattr(source, attribute, None)
                 if isinstance(found, (discord.Member, discord.User, discord.ClientUser)):
                     return found
-        track = self._track_of(event)
-        if track is not None:
-            found = getattr(track, "requester", None)
-            if isinstance(found, (discord.Member, discord.User, discord.ClientUser)):
-                return found
-        return self.bot.user
+        return None
+
+    def _is_bot_action(self, event, member) -> bool:
+        """Whether this notification would be the bot talking about itself.
+
+        Two ways that happens. Either the resolved actor really is the bot -
+        autoplay queues a track as itself - or the event carries a requester
+        that PyLav could not fill in, in which case PyLav's own wording
+        substitutes the bot and the message reads "Cubix added ...".
+        """
+        bot_user = getattr(self.bot, "user", None)
+        if member is not None:
+            return bot_user is not None and member.id == bot_user.id
+        # No actor. Only events that *name* one would have rendered as the bot;
+        # ambient ones (a node reconnecting, say) name nobody and are unaffected.
+        for source in (event, getattr(event, "track", None)):
+            if source is None:
+                continue
+            if any(hasattr(source, attribute) for attribute in self._ACTOR_ATTRS):
+                return True
+        return False
 
     async def _notify(
         self,
@@ -289,6 +314,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         track=None,
         member=None,
         kind: str | None = None,
+        event=None,
     ) -> None:
         """Attach the human context to a notification before it is queued.
 
@@ -298,6 +324,14 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         """
         if embed is None:
             return
+        if event is not None and self._is_bot_action(event, member):
+            try:
+                members_only = await self._config.guild(channel.guild).members_only()
+            except Exception:  # noqa: BLE001
+                members_only = True
+            if members_only:
+                LOGGER.trace("Skipping a notification for a bot action in %s", channel)
+                return
         if member is not None:
             embed.description = self._with_cost(embed.description, member)
             with contextlib.suppress(Exception):
@@ -631,7 +665,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event)
+            ), track=self._track_of(event), event=event
         , kind="problem")
 
     @commands.Cog.listener()
@@ -660,7 +694,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event)
+            ), track=self._track_of(event), event=event
         , kind="problem")
 
     @commands.Cog.listener()
@@ -719,7 +753,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                 title=_("Track End Event"),
                 description=message,
                 messageable=channel,
-            ), track=self._track_of(event)
+            ), track=self._track_of(event), event=event
         )
 
     @commands.Cog.listener()
@@ -753,7 +787,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -786,7 +820,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -819,7 +853,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -852,7 +886,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -885,7 +919,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -918,7 +952,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -951,7 +985,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -984,7 +1018,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1017,7 +1051,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1053,7 +1087,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1089,7 +1123,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1125,7 +1159,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1161,7 +1195,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1197,7 +1231,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1233,7 +1267,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1269,7 +1303,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1305,7 +1339,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1341,7 +1375,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1377,7 +1411,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1413,7 +1447,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1449,7 +1483,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1485,7 +1519,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1521,7 +1555,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1557,7 +1591,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     source_variable_do_not_translate=await event.track.query_source(),
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1590,7 +1624,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="skip")
 
     @commands.Cog.listener()
@@ -1626,7 +1660,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1659,7 +1693,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="skip")
 
     @commands.Cog.listener()
@@ -1696,7 +1730,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="queue")
 
     @commands.Cog.listener()
@@ -1723,7 +1757,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event)
+            ), track=self._track_of(event), event=event
         )
 
     @commands.Cog.listener()
@@ -1756,7 +1790,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1787,7 +1821,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="queue")
 
     @commands.Cog.listener()
@@ -1844,7 +1878,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            ), track=self._track_of(event), member=self._member_of(event)
+            ), track=self._track_of(event), member=self._member_of(event), event=event
         , kind="queue")
 
     @commands.Cog.listener()
@@ -1875,7 +1909,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -1906,7 +1940,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -1937,7 +1971,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="play")
 
     @commands.Cog.listener()
@@ -1971,7 +2005,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2002,7 +2036,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2031,7 +2065,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester=user, node=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2065,7 +2099,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     node_variable_do_not_translate=event.player.node.name,
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2098,7 +2132,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                         requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                     ),
                     messageable=channel,
-                ), member=self._member_of(event)
+                ), member=self._member_of(event), event=event
         , kind="player")
         elif event.type == "queue":
             await self._notify(
@@ -2112,7 +2146,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                         status_variable_do_not_translate=_("enabled") if event.queue_after else _("disabled"),
                     ),
                     messageable=channel,
-                ), member=self._member_of(event)
+                ), member=self._member_of(event), event=event
         , kind="player")
         else:
             await self._notify(
@@ -2130,7 +2164,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                         node_variable_do_not_translate=event.player.node.name,
                     ),
                     messageable=channel,
-                ), member=self._member_of(event)
+                ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2161,7 +2195,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2288,7 +2322,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     ),
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2416,7 +2450,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2447,7 +2481,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2478,7 +2512,7 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")
 
     @commands.Cog.listener()
@@ -2511,5 +2545,5 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
                     requester_variable_do_not_translate=user, node_variable_do_not_translate=event.player.node.name
                 ),
                 messageable=channel,
-            ), member=self._member_of(event)
+            ), member=self._member_of(event), event=event
         , kind="player")

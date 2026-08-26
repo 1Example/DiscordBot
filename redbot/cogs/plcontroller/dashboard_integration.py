@@ -116,16 +116,19 @@ class DashboardIntegration:
                     "status": 0,
                     "notifications": [
                         {
-                            "message": "Only moderators can do that. You can still play, pause, skip and queue music.",
+                            "message": "That one is for moderators. You can still play, pause, "
+                            "skip, shuffle and queue music.",
                             "category": "warning",
                         }
                     ],
+                    "redirect_url": kwargs.get("request_url"),
                 }
             _ok, _charge_msg = await self._dash_charge(member, guild, action, _is_staff)
             if not _ok:
                 return {
                     "status": 0,
                     "notifications": [{"message": _charge_msg, "category": "warning"}],
+                    "redirect_url": kwargs.get("request_url"),
                 }
 
         # --- search: doesn't need an existing player ---
@@ -134,11 +137,18 @@ class DashboardIntegration:
             if not search_term:
                 return {
                     "status": 0,
-                    "notifications": [{"message": "Enter something to search for.", "category": "warning"}],
+                    "notifications": [
+                        {"message": "Enter something to search for.", "category": "warning"}
+                    ],
+                    "redirect_url": kwargs.get("request_url"),
                 }
             results, error = await self._dash_search(search_term)
             if error:
-                return {"status": 0, "notifications": [{"message": error, "category": "danger"}]}
+                return {
+                    "status": 0,
+                    "notifications": [{"message": error, "category": "danger"}],
+                    "redirect_url": kwargs.get("request_url"),
+                }
             return {
                 "status": 0,
                 "web_content": {
@@ -172,6 +182,7 @@ class DashboardIntegration:
                 return {
                     "status": 0,
                     "notifications": [{"message": "Nothing to play.", "category": "warning"}],
+                    "redirect_url": kwargs.get("request_url"),
                 }
             message, category = await self._dash_play(
                 member, guild, player, identifier, play_now=(action == "play_now")
@@ -236,12 +247,14 @@ class DashboardIntegration:
                         "notifications": [
                             {"message": f"Unknown action: {action}", "category": "warning"}
                         ],
+                        "redirect_url": kwargs.get("request_url"),
                     }
             except Exception as exc:  # noqa: BLE001 - surfaced to the user, not swallowed
                 log.exception("Dashboard player action %r failed", action)
                 return {
                     "status": 0,
                     "notifications": [{"message": f"Action failed: {exc}", "category": "danger"}],
+                    "redirect_url": kwargs.get("request_url"),
                 }
             return {
                 "status": 0,
