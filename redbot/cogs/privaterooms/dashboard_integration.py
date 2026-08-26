@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import typing as t
 
@@ -163,6 +164,7 @@ class DashboardIntegration:
 
         labels = settings.get("button_labels") or {}
         styles = settings.get("button_styles") or {}
+        owned = settings.get("owned_emojis") or {}
         for key, default, label, blurb in ACTIONS:
             row = self._pr_emoji_row(key, label, default, overrides, parse_emoji)
             # Only these are real buttons; the entries added below decorate the
@@ -172,12 +174,26 @@ class DashboardIntegration:
             row["label_override"] = labels.get(key, "")
             row["default_label"] = label.capitalize()
             row["style"] = styles.get(key) or DEFAULT_STYLES.get(key, "secondary")
+            row["image"] = self._pr_emoji_image(owned.get(key), overrides.get(key))
             rows.append(row)
         for key, label in extra:
             row = self._pr_emoji_row(key, label, DEFAULT_EMOJIS[key], overrides, parse_emoji)
             row["is_button"] = False
+            row["image"] = self._pr_emoji_image(overrides.get(key), overrides.get(key))
             rows.append(row)
         return rows
+
+    @staticmethod
+    def _pr_emoji_image(owned_token: str | None, current: str | None) -> str:
+        """The CDN url for a custom emoji, so the page can show the picture."""
+        import re as _re
+
+        token = owned_token or current or ""
+        match = _re.match(r"^<(a?):[A-Za-z0-9_]+:(\d{15,25})>$", token.strip())
+        if not match:
+            return ""
+        animated, emoji_id = match.groups()
+        return f"https://cdn.discordapp.com/emojis/{emoji_id}.{'gif' if animated else 'png'}"
 
     @staticmethod
     def _pr_emoji_row(key, label, default, overrides, parse_emoji) -> dict:
@@ -220,6 +236,22 @@ class DashboardIntegration:
             )
         return sorted(rooms, key=lambda r: (-r["members"], r["name"].lower()))
 
+    @staticmethod
+    def _pr_plain(text: str) -> str:
+        """Flatten Discord markdown so the preview reads like the posted message.
+
+        The card renders as escaped text, so `**bold**` would show its asterisks
+        and `<#123>` its raw id. Neither is what the member will see.
+        """
+        import re as _re
+
+        text = text or ""
+        text = _re.sub(r"<#(\d+)>", "#channel", text)
+        text = _re.sub(r"<@!?(\d+)>", "@member", text)
+        text = _re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+        text = _re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"\1", text)
+        return text.replace("\u200b", "").strip()
+
     def _pr_preview(self, guild: discord.Guild, settings: dict, member: discord.Member) -> dict:
         """Render the panel embed exactly as the hub message will look."""
         from .privaterooms import room_embed
@@ -244,7 +276,17 @@ class DashboardIntegration:
                     "description": embed.description or "",
                     "colour": f"#{embed.colour.value:06x}" if embed.colour else "#5865f2",
                     "footer": embed.footer.text if embed.footer else "",
-                    "fields": [],
+                    "fields": [
+                        {
+                            "name": self._pr_plain(f.name),
+                            "value": self._pr_plain(f.value),
+                            "inline": bool(f.inline),
+                        }
+                        for f in embed.fields
+                        # A blank spacer field only exists to force a row break
+                        # in Discord's own layout; it is noise in the preview.
+                        if self._pr_plain(f.name) or self._pr_plain(f.value)
+                    ],
                 }
             ],
         }
@@ -262,7 +304,7 @@ class DashboardIntegration:
             if action == "save_branding":
                 return await self._pr_save_branding(conf, field)
             if action == "save_emojis":
-                return await self._pr_save_emojis(conf, field)
+                return await self._pr_save_emojis(guild, conf, field)
             if action == "save_economy":
                 return await self._pr_save_economy(guild, conf, field)
             if action == "create_hubs":
@@ -337,15 +379,137 @@ class DashboardIntegration:
             }
         ]
 
-    async def _pr_save_emojis(self, conf, field) -> list[dict]:
+    # Discord caps an emoji image at 256 KB. The browser sends base64, which is
+    # about a third larger again, so the raw form value is allowed a little more.
+    _MAX_IMAGE_BYTES = 256 * 1024
+    _IMAGE_TYPES = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/gif": "gif",
+        "image/webp": "webp",
+    }
+
+    @staticmethod
+    def _pr_decode_image(value: str) -> tuple[bytes | None, str]:
+        """Turn a `data:image/png;base64,...` field into bytes.
+
+        Returns (None, reason) rather than raising, because a bad paste should
+        report itself on the page instead of failing the whole save.
+        """
+        import base64
+
+        if not value or not value.startswith("data:"):
+            return None, "that was not an image"
+        try:
+            header, payload = value.split(",", 1)
+            mime = header[5:].split(";", 1)[0].strip().lower()
+        except ValueError:
+            return None, "the image data was malformed"
+        if mime not in DashboardIntegration._IMAGE_TYPES:
+            return None, f"{mime or 'that file type'} is not supported"
+        try:
+            raw = base64.b64decode(payload, validate=True)
+        except Exception:  # noqa: BLE001
+            return None, "the image data was malformed"
+        if not raw:
+            return None, "the image was empty"
+        if len(raw) > DashboardIntegration._MAX_IMAGE_BYTES:
+            return None, f"the image is {len(raw) // 1024} KB, over Discord's 256 KB limit"
+        return raw, ""
+
+    async def _pr_make_emoji(self, guild: discord.Guild, key: str, raw: bytes):
+        """Register an image as an emoji and return its `<:name:id>` token.
+
+        Application emoji are preferred: they belong to the bot, work in every
+        guild, and leave the guild's own emoji slots alone. Older discord.py
+        builds have no such thing, so a guild emoji is the fallback.
+        """
+        name = f"pr_{key}_{guild.id}"[:32]
+
+        create_app = getattr(self.bot, "create_application_emoji", None)
+        if create_app is not None:
+            try:
+                emoji = await create_app(name=name, image=raw)
+                return f"<{'a' if emoji.animated else ''}:{emoji.name}:{emoji.id}>", ""
+            except discord.HTTPException as exc:
+                log.warning("Application emoji upload failed, trying a guild emoji: %s", exc)
+
+        me = guild.me
+        if me is None or not me.guild_permissions.manage_expressions:
+            return None, "I need the Manage Expressions permission to upload an image."
+        try:
+            emoji = await guild.create_custom_emoji(
+                name=name, image=raw, reason="PrivateRooms button image"
+            )
+        except discord.HTTPException as exc:
+            return None, f"Discord refused the image: {exc.text or exc}"
+        return f"<{'a' if emoji.animated else ''}:{emoji.name}:{emoji.id}>", ""
+
+    async def _pr_drop_emoji(self, guild: discord.Guild, token: str) -> None:
+        """Delete an emoji this cog created, so replacing an image is not a leak."""
+        import re as _re
+
+        match = _re.search(r":(\d{15,25})>$", token or "")
+        if not match:
+            return
+        emoji_id = int(match.group(1))
+        fetch = getattr(self.bot, "fetch_application_emoji", None)
+        if fetch is not None:
+            try:
+                emoji = await fetch(emoji_id)
+                await emoji.delete()
+                return
+            except (discord.HTTPException, discord.NotFound):
+                pass
+        emoji = guild.get_emoji(emoji_id)
+        if emoji is not None:
+            with contextlib.suppress(discord.HTTPException):
+                await emoji.delete(reason="PrivateRooms button image replaced")
+
+    async def _pr_save_images(self, guild, conf, field) -> list[str]:
+        """Apply any uploaded or cleared button images. Returns problem strings."""
+        from .privaterooms import ACTIONS, DEFAULT_EMOJIS
+
+        problems: list[str] = []
+        keys = [key for key, _d, _l, _b in ACTIONS] + list(DEFAULT_EMOJIS)
+        async with conf.emojis() as emojis, conf.owned_emojis() as owned:
+            for key in dict.fromkeys(keys):
+                if field.checked(f"clear_img_{key}"):
+                    if key in owned:
+                        await self._pr_drop_emoji(guild, owned.pop(key))
+                        emojis.pop(key, None)
+                    continue
+                value = field(f"img_{key}") or ""
+                if not value:
+                    continue
+                raw, reason = self._pr_decode_image(value)
+                if raw is None:
+                    problems.append(f"'{key}': {reason}.")
+                    continue
+                token, reason = await self._pr_make_emoji(guild, key, raw)
+                if token is None:
+                    problems.append(f"'{key}': {reason}")
+                    continue
+                # Out with the old one, so uploads do not pile up unused.
+                if key in owned:
+                    await self._pr_drop_emoji(guild, owned[key])
+                owned[key] = token
+                emojis[key] = token
+        return problems
+
+    async def _pr_save_emojis(self, guild, conf, field) -> list[dict]:
         from .privaterooms import DEFAULT_EMOJIS, parse_emoji
 
+        image_problems = await self._pr_save_images(guild, conf, field)
+        uploaded = set(await conf.owned_emojis())
         bad = []
         async with conf.emojis() as emojis:
             for key in DEFAULT_EMOJIS:
                 value = (field(f"e_{key}") or "").strip()
                 if not value:
-                    emojis.pop(key, None)
+                    if key not in uploaded:
+                        emojis.pop(key, None)
                     continue
                 if parse_emoji(value) is None:
                     bad.append(key)
@@ -370,7 +534,7 @@ class DashboardIntegration:
         notes = [
             {"message": f"'{k}' was not a usable emoji and was skipped.", "category": "warning"}
             for k in bad
-        ]
+        ] + [{"message": text, "category": "warning"} for text in image_problems]
         return notes + [
             {
                 "message": "Buttons saved. Re-post the panel to update the live ones.",
@@ -550,6 +714,73 @@ PRIVATEROOMS_TEMPLATE = (
     BASE_CSS
     + MACROS
     + """
+{% macro image_field(e) %}
+  <div class="pr-img">
+    <label class="pr-pick">
+      <input type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+             data-target="img_{{ e.key }}" hidden />
+      <i class="fa fa-upload"></i> <span class="pr-pick-name">
+        {%- if e.image %}replace{% else %}upload{% endif -%}
+      </span>
+    </label>
+    <input type="hidden" name="img_{{ e.key }}" id="img_{{ e.key }}" value="" />
+    {% if e.image %}
+      <label class="pr-clear">
+        <input type="checkbox" name="clear_img_{{ e.key }}" /> remove
+      </label>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+<style>
+  .pr-img { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+  .pr-pick { display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+             font-size:.74rem; padding:5px 10px; border-radius:7px;
+             border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); }
+  .pr-pick:hover { background:rgba(255,255,255,.09); }
+  .pr-pick.set { border-color:rgba(59,165,93,.5); color:#3ba55d; }
+  .pr-clear { display:inline-flex; align-items:center; gap:5px;
+              font-size:.7rem; opacity:.6; cursor:pointer; }
+  .pr-btnrow { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 0 52px; }
+  .pr-btn { display:inline-flex; align-items:center; gap:6px; font-size:.8rem;
+            font-weight:500; color:#fff; padding:8px 14px; border-radius:8px;
+            background:#4e5058; }
+  .pr-btn.primary { background:#5865f2; }
+  .pr-btn.success { background:#248046; }
+  .pr-btn.danger  { background:#da373c; }
+</style>
+<script>
+(function () {
+  // reddash forwards request.form but not request.files, so the picture is read
+  // here and posted as an ordinary base64 field instead of a real upload.
+  var MAX = 256 * 1024;
+  document.querySelectorAll('input[type=file][data-target]').forEach(function (input) {
+    input.addEventListener('change', function () {
+      var target = document.getElementById(input.dataset.target);
+      var pick = input.closest('.pr-pick');
+      var name = pick ? pick.querySelector('.pr-pick-name') : null;
+      var file = input.files && input.files[0];
+      if (!target) { return; }
+      if (!file) { target.value = ''; return; }
+      if (file.size > MAX) {
+        if (name) { name.textContent = Math.round(file.size / 1024) + ' KB - too big'; }
+        pick && pick.classList.remove('set');
+        input.value = '';
+        target.value = '';
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function () {
+        target.value = reader.result;
+        if (name) { name.textContent = file.name.slice(0, 18); }
+        pick && pick.classList.add('set');
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+})();
+</script>
+
 <div class="dz">
   <div class="dz-head">
     <h4><i class="fa fa-microphone"></i> Private rooms in {{ guild_name }}</h4>
@@ -578,7 +809,18 @@ PRIVATEROOMS_TEMPLATE = (
   <div class="dz-panel">
     <h5><i class="fa fa-eye"></i> Panel preview</h5>
     <p class="dz-hint">Exactly what the hub message looks like with your current settings.</p>
-    {% if preview %}{{ msg(preview) }}{% else %}<p class="dz-empty">Preview unavailable.</p>{% endif %}
+    {% if preview %}
+      {{ msg(preview) }}
+      <div class="pr-btnrow">
+        {% for e in button_rows %}
+          <span class="pr-btn {{ e.style }}">
+            {% if e.image %}<img class="dz-emoji" src="{{ e.image }}" alt="" />
+            {%- else %}{{ e.effective }}{% endif %}
+            {{ e.label_override or e.default_label }}
+          </span>
+        {% endfor %}
+      </div>
+    {% else %}<p class="dz-empty">Preview unavailable.</p>{% endif %}
     <form method="POST" class="dz-row" style="margin-top:11px;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
       <div style="flex:1 1 260px;">{{ picker('panel_channel', text_channels, allow_none=true, none_label='pick a channel') }}</div>
@@ -743,7 +985,8 @@ PRIVATEROOMS_TEMPLATE = (
       <div style="overflow-x:auto;">
       <table class="dz-t" style="min-width:640px;">
         <thead>
-          <tr><th style="width:1%;">Preview</th><th>Emoji</th><th>Label</th><th>Colour</th></tr>
+          <tr><th style="width:1%;">Preview</th><th>Picture</th><th>Emoji</th>
+              <th>Label</th><th>Colour</th></tr>
         </thead>
         <tbody>
           {% for e in button_rows %}
@@ -752,12 +995,17 @@ PRIVATEROOMS_TEMPLATE = (
                 <span class="dz-tag {% if e.style == 'danger' %}bad
                       {%- elif e.style == 'success' %}good
                       {%- elif e.style == 'primary' %}warn{% endif %}">
-                  {{ e.effective }} {{ e.label_override or e.default_label }}
+                  {% if e.image %}<img class="dz-emoji" src="{{ e.image }}" alt="" />
+                  {%- else %}{{ e.effective }}{% endif %}
+                  {{ e.label_override or e.default_label }}
                 </span>
                 {% if e.broken %}<span class="dz-tag bad">unusable emoji</span>{% endif %}
                 <div style="font-size:.72rem; opacity:.45;">{{ e.blurb }}</div>
               </td>
-              <td style="width:22%;">
+              <td style="width:20%;">
+                {{ image_field(e) }}
+              </td>
+              <td style="width:18%;">
                 <input class="dz-input" type="text" name="e_{{ e.key }}" value="{{ e.current }}"
                        placeholder="{{ e.default }}" />
               </td>
@@ -793,6 +1041,7 @@ PRIVATEROOMS_TEMPLATE = (
             </div>
             <input class="dz-input" type="text" name="e_{{ e.key }}" value="{{ e.current }}"
                    placeholder="default {{ e.default }}" />
+            {{ image_field(e) }}
           </div>
         {% endfor %}
       </div>

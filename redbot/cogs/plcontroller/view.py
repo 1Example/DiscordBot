@@ -1152,6 +1152,35 @@ class PersistentControllerView(discord.ui.View):
         "refresh_button",
     )
 
+    async def _may_manage(self, interaction: DISCORD_INTERACTION_TYPE) -> bool:
+        """Whether this member may use the staff-only buttons.
+
+        Mirrors `_dash_is_staff` on the dashboard. `is_dj_logic` is still
+        honoured on top, so a configured DJ role keeps working - but on its own
+        it is not enough, because PyLav lets everyone through when a guild has
+        no DJ role set, which is the default.
+        """
+        member = interaction.user
+        guild = getattr(interaction, "guild", None) or self.channel.guild
+        if not isinstance(member, discord.Member):
+            return False
+        try:
+            if (
+                member.id == guild.owner_id
+                or member.guild_permissions.administrator
+                or await self.cog.bot.is_owner(member)
+                or await self.cog.bot.is_admin(member)
+                or await self.cog.bot.is_mod(member)
+            ):
+                return True
+        except Exception:  # noqa: BLE001 - a failed lookup must not grant access
+            LOGGER.exception("Could not resolve staff status for %s", member)
+            return False
+        try:
+            return await is_dj_logic(interaction)
+        except Exception:  # noqa: BLE001
+            return False
+
     async def interaction_check(self, interaction: DISCORD_INTERACTION_TYPE, /) -> bool:
         # PyLav's own callbacks hardcode ephemeral replies, which cannot be
         # deleted on a timer and only ever pile up in the clicker's view. Both
@@ -1170,14 +1199,18 @@ class PersistentControllerView(discord.ui.View):
         custom_id = (interaction.data or {}).get("custom_id", "")
         parts = custom_id.split(":")
         button_name = parts[1] if len(parts) > 2 else ""
+        if not button_name:
+            # An unrecognised custom_id is gated as staff-only rather than
+            # falling through as "not in the listener list, so ask for DJ".
+            LOGGER.warning("Controller button with an unparsable custom_id: %r", custom_id)
         listener_allowed = button_name in self.LISTENER_BUTTONS
 
-        if not listener_allowed and not await is_dj_logic(interaction):
+        if not listener_allowed and not await self._may_manage(interaction):
             await interaction.send(
                 embed=await interaction.client.pylav.construct_embed(
                     description=_(
-                        "Only a disc jockey can do that. You can still play, pause, skip, "
-                        "shuffle and adjust the volume."
+                        "That one is for staff and disc jockeys. You can still play, pause, "
+                        "skip, previous, shuffle and adjust the volume."
                     ),
                     messageable=interaction,
                 ),

@@ -93,9 +93,11 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
 
     # Mention the real channel where we can - a clickable hub beats a name the
     # member then has to go hunting for in the sidebar.
-    def hub_label(config_key: str, fallback: str) -> str:
+    def hub_label(config_key: str) -> str:
+        # The field name already carries the hub's name, so repeating it when
+        # the channel is missing just reads as a stutter.
         channel = guild.get_channel(settings.get(config_key) or 0)
-        return channel.mention if channel is not None else f"**{fallback}**"
+        return channel.mention if channel is not None else "*not set up yet*"
 
     colour_value = settings.get("panel_colour")
     try:
@@ -126,7 +128,7 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
     embed.add_field(
         name=f"{emojis['public']} {public_name}",
         value=(
-            f"{hub_label('hub_public', public_name)}\nAnyone can join."
+            f"{hub_label('hub_public')}\nAnyone can join."
             f"{price_suffix(cost_public)}"
         ),
         inline=True,
@@ -134,7 +136,7 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
     embed.add_field(
         name=f"{emojis['private']} {private_name}",
         value=(
-            f"{hub_label('hub_private', private_name)}\nLocked until you invite people."
+            f"{hub_label('hub_private')}\nLocked until you invite people."
             f"{price_suffix(cost_private)}"
         ),
         inline=True,
@@ -382,6 +384,9 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             "hub_private_name": "CREATE PRIVATE",
             "emojis": {},
             "button_labels": {},
+            # Tokens for emoji this cog uploaded itself, so a replaced image can
+            # be deleted instead of sitting in the bot's emoji list forever.
+            "owned_emojis": {},
             "button_styles": {},
             # Creating a room can cost credits. 0 is free; the two kinds are
             # priced separately so a private room can be worth more.
