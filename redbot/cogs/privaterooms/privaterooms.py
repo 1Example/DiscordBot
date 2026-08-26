@@ -1,7 +1,8 @@
+import contextlib
 import re
 
 import discord
-from redbot.core import commands, Config, checks
+from redbot.core import bank, commands, Config, checks
 from redbot.core.bot import Red
 from typing import Optional
 from .dashboard_integration import DashboardIntegration
@@ -10,6 +11,26 @@ from .dashboard_integration import DashboardIntegration
 # Action keys, their default (unicode) emoji, and the panel description line.
 # Guilds can override any emoji with one of their own; nothing here is tied to
 # a specific server.
+# What each button looks like out of the box. Guilds override the emoji, the
+# label and the colour from the dashboard, so nothing here is fixed.
+BUTTON_STYLES = {
+    "secondary": discord.ButtonStyle.secondary,
+    "primary": discord.ButtonStyle.primary,
+    "success": discord.ButtonStyle.success,
+    "danger": discord.ButtonStyle.danger,
+}
+
+DEFAULT_STYLES = {
+    "lock": "danger",
+    "unlock": "success",
+    "hide": "danger",
+    "unhide": "success",
+    "rename": "primary",
+    "limit": "primary",
+    "kick": "danger",
+    "claim": "success",
+}
+
 ACTIONS = (
     ("lock", "\N{LOCK}", "Lock", "stop new people from joining"),
     ("unlock", "\N{OPEN LOCK}", "Unlock", "let anyone join again"),
@@ -65,19 +86,16 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
     """
     settings = settings or {}
     emojis = resolve_emojis(settings.get("emojis"))
+    labels = settings.get("button_labels") or {}
     title = settings.get("panel_title") or f"{guild.name} | Voice Hub"
     public_name = settings.get("hub_public_name") or "CREATE PUBLIC"
     private_name = settings.get("hub_private_name") or "CREATE PRIVATE"
 
-    lines = [
-        f"Join **{emojis['public']} {public_name}** for a room anyone can join, or "
-        f"**{emojis['private']} {private_name}** for a room that's locked to just you "
-        f"until you let others in.\n",
-        "Use the buttons below to manage **your own** room from anywhere \u2014 "
-        "you don't need to be in the room's own chat to use these.\n",
-    ]
-    for key, _default, label, blurb in ACTIONS:
-        lines.append(f"{emojis[key]} **{label}** \u2014 {blurb}")
+    # Mention the real channel where we can - a clickable hub beats a name the
+    # member then has to go hunting for in the sidebar.
+    def hub_label(config_key: str, fallback: str) -> str:
+        channel = guild.get_channel(settings.get(config_key) or 0)
+        return channel.mention if channel is not None else f"**{fallback}**"
 
     colour_value = settings.get("panel_colour")
     try:
@@ -87,12 +105,55 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
 
     embed = discord.Embed(
         title=f"{emojis['hub']} {title}",
-        description="\n".join(lines),
+        description=(
+            "Join a hub below and a room is made for you straight away. "
+            "You will be pinged here once it exists."
+        ),
         colour=colour,
     )
+
+    # Pricing is only mentioned when there is something to pay, so a free
+    # server's panel stays uncluttered.
+    cost_public = cost_private = 0
+    if settings.get("economy_enabled"):
+        cost_public = int(settings.get("cost_public", 0) or 0)
+        cost_private = int(settings.get("cost_private", 0) or 0)
+    currency = settings.get("currency_name") or "credits"
+
+    def price_suffix(amount: int) -> str:
+        return f"\n\N{RIGHTWARDS ARROW WITH TIP DOWNWARDS} **{amount}** {currency}" if amount else ""
+
+    embed.add_field(
+        name=f"{emojis['public']} {public_name}",
+        value=(
+            f"{hub_label('hub_public', public_name)}\nAnyone can join."
+            f"{price_suffix(cost_public)}"
+        ),
+        inline=True,
+    )
+    embed.add_field(
+        name=f"{emojis['private']} {private_name}",
+        value=(
+            f"{hub_label('hub_private', private_name)}\nLocked until you invite people."
+            f"{price_suffix(cost_private)}"
+        ),
+        inline=True,
+    )
+
+    # Two balanced columns instead of one long list. The buttons now carry their
+    # own labels, so this only has to say what each one does.
+    entries = [
+        f"{emojis[key]} **{labels.get(key) or label}** \N{EM DASH} {blurb}"
+        for key, _default, label, blurb in ACTIONS
+    ]
+    half = (len(entries) + 1) // 2
+    embed.add_field(name="\N{ZERO WIDTH SPACE}", value="\N{ZERO WIDTH SPACE}", inline=False)
+    embed.add_field(name="Your room", value="\n".join(entries[:half]), inline=True)
+    embed.add_field(name="\N{ZERO WIDTH SPACE}", value="\n".join(entries[half:]), inline=True)
+
     footer = settings.get("panel_footer") or (
-        "Rooms are created at your server's maximum voice quality. "
-        "You must own a room to manage it (except Claim)."
+        "Rooms run at your server's maximum voice quality. "
+        "You must own a room to manage it \N{EM DASH} Claim is the exception."
     )
     embed.set_footer(text=footer)
     return embed
@@ -173,20 +234,31 @@ class ControlPanelView(discord.ui.View):
     cog_load and works for every guild/message it's attached to, since every
     callback resolves the acting member's room dynamically."""
 
-    def __init__(self, cog: "PrivateRooms", emojis: Optional[dict] = None):
+    def __init__(
+        self,
+        cog: "PrivateRooms",
+        emojis: Optional[dict] = None,
+        labels: Optional[dict] = None,
+        styles: Optional[dict] = None,
+    ):
         super().__init__(timeout=None)
         self.cog = cog
         # discord.py matches persistent views by custom_id, so the globally
-        # registered instance needs no emoji. The copy used when *posting* a
+        # registered instance needs no styling. The copy used when *posting* a
         # panel carries the guild's own, and those are what the message keeps.
-        if emojis:
-            for child in self.children:
-                if not isinstance(child, discord.ui.Button) or not child.custom_id:
-                    continue
-                key = child.custom_id.split(":", 1)[-1]
+        for child in self.children:
+            if not isinstance(child, discord.ui.Button) or not child.custom_id:
+                continue
+            key = child.custom_id.split(":", 1)[-1]
+            if emojis:
                 parsed = parse_emoji(emojis.get(key))
                 if parsed is not None:
                     child.emoji = parsed
+            if labels and (label := (labels.get(key) or "").strip()):
+                child.label = label[:80]
+            wanted = (styles or {}).get(key) or DEFAULT_STYLES.get(key)
+            if wanted in BUTTON_STYLES:
+                child.style = BUTTON_STYLES[wanted]
 
     async def _get_channel_or_warn(self, interaction: discord.Interaction) -> Optional[discord.VoiceChannel]:
         channel = await self.cog.get_owned_channel(interaction)
@@ -309,6 +381,22 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             "hub_public_name": "CREATE PUBLIC",
             "hub_private_name": "CREATE PRIVATE",
             "emojis": {},
+            "button_labels": {},
+            "button_styles": {},
+            # Creating a room can cost credits. 0 is free; the two kinds are
+            # priced separately so a private room can be worth more.
+            "economy_enabled": False,
+            "cost_public": 0,
+            "cost_private": 0,
+            # After a room is made, point its owner at the panel. Discord has no
+            # way to send a truly private message outside an interaction, so
+            # this is a mention that removes itself.
+            "notice_enabled": True,
+            "notice_text": (
+                "{user}, your room is ready \N{EM DASH} from here you can control "
+                "your voice chat."
+            ),
+            "notice_delete_after": 30,
             "rooms": {},  # str(voice_channel_id) -> {"owner": user_id, "public": bool}
         }
         self.config.register_guild(**default_guild)
@@ -356,9 +444,59 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
         except discord.HTTPException:
             pass
 
+    async def _charge_for_room(
+        self, member: discord.Member, settings: dict, public: bool
+    ) -> tuple[bool, int, str]:
+        """Bill the member for a room. Returns (allowed, cost, currency)."""
+        if not settings.get("economy_enabled"):
+            return True, 0, ""
+        cost = int(settings.get("cost_public" if public else "cost_private", 0) or 0)
+        if cost <= 0:
+            return True, 0, ""
+        try:
+            currency = await bank.get_currency_name(member.guild)
+            if not await bank.can_spend(member, cost):
+                return False, cost, currency
+            await bank.withdraw_credits(member, cost)
+        except Exception:  # noqa: BLE001 - a broken bank should not block rooms
+            return True, 0, ""
+        return True, cost, currency
+
+    async def _send_notice(self, guild: discord.Guild, settings: dict, text: str) -> None:
+        """Post a self-removing message in the panel channel."""
+        channel = guild.get_channel(settings.get("panel_channel") or 0)
+        me = guild.me
+        if channel is None or me is None or not hasattr(channel, "send"):
+            return
+        if not channel.permissions_for(me).send_messages:
+            return
+        delete_after = settings.get("notice_delete_after") or 0
+        try:
+            await channel.send(
+                text,
+                delete_after=delete_after or None,
+                allowed_mentions=discord.AllowedMentions(users=True),
+            )
+        except discord.HTTPException:
+            pass
+
     async def create_room(self, member: discord.Member, public: bool):
         guild = member.guild
         settings = await self.config.guild(guild).all()
+
+        allowed, cost, currency = await self._charge_for_room(member, settings, public)
+        if not allowed:
+            # Nothing was taken, so put them back where they came from rather
+            # than leaving them sitting in the hub.
+            with contextlib.suppress(discord.HTTPException):
+                await member.move_to(None, reason="Cannot afford a room")
+            await self._send_notice(
+                guild,
+                settings,
+                f"{member.mention} a room costs {cost} {currency}, "
+                f"which is more than you have.",
+            )
+            return
         category = guild.get_channel(settings["category"]) if settings["category"] else None
         hub_id = settings["hub_public"] if public else settings["hub_private"]
         hub = guild.get_channel(hub_id) if hub_id else None
@@ -395,6 +533,10 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
                 reason=f"{'Public' if public else 'Private'} room created for {member}",
             )
         except discord.HTTPException:
+            # They paid for a room Discord then refused to make.
+            if cost:
+                with contextlib.suppress(Exception):
+                    await bank.deposit_credits(member, cost)
             return
 
         async with self.config.guild(guild).rooms() as rooms:
@@ -404,6 +546,23 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             await member.move_to(channel, reason="Moved to their new room")
         except discord.HTTPException:
             pass
+
+        if settings.get("notice_enabled"):
+            template = settings.get("notice_text") or ""
+            try:
+                text = template.format(
+                    user=member.mention,
+                    room=channel.mention,
+                    cost=cost,
+                    currency=currency,
+                )
+            except (KeyError, IndexError, ValueError):
+                # A typo in the template is not worth losing the pointer over.
+                text = f"{member.mention} from here you can control your voice chat."
+            # Only tack the price on when the template did not already say it.
+            if cost and "{cost}" not in template:
+                text = f"{text} It cost you {cost} {currency}."
+            await self._send_notice(guild, settings, text)
 
     async def maybe_delete_room(self, channel: discord.VoiceChannel):
         guild = channel.guild
@@ -509,7 +668,14 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
         own room — it's independent of any voice channel's built-in chat.
         """
         settings = await self.config.guild(ctx.guild).all()
-        view = ControlPanelView(self, emojis=resolve_emojis(settings.get("emojis")))
+        with contextlib.suppress(Exception):
+            settings["currency_name"] = await bank.get_currency_name(ctx.guild)
+        view = ControlPanelView(
+            self,
+            emojis=resolve_emojis(settings.get("emojis")),
+            labels=settings.get("button_labels"),
+            styles=settings.get("button_styles"),
+        )
         message = await channel.send(embed=room_embed(ctx.guild, settings), view=view)
         await self.config.guild(ctx.guild).panel_channel.set(channel.id)
         await self.config.guild(ctx.guild).panel_message.set(message.id)

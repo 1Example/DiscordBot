@@ -58,6 +58,8 @@ class DashboardIntegration:
             notifications = await self._pr_handle_post(guild, member, kwargs)
 
         settings = await self.config.guild(guild).all()
+        currency = await self._pr_currency(guild)
+        settings["currency_name"] = currency
         rooms = await self._pr_rooms(guild, settings)
         emojis = self._pr_emoji_rows(guild, settings)
 
@@ -103,6 +105,16 @@ class DashboardIntegration:
                 ),
                 "members": member_options(guild, humans_only=True),
                 "emoji_rows": emojis,
+                "button_rows": [e for e in emojis if e.get("is_button")],
+                "decor_rows": [e for e in emojis if not e.get("is_button")],
+                "style_options": ("secondary", "primary", "success", "danger"),
+                "currency": currency,
+                "economy_enabled": bool(settings.get("economy_enabled")),
+                "cost_public": settings.get("cost_public", 0) or 0,
+                "cost_private": settings.get("cost_private", 0) or 0,
+                "notice_enabled": bool(settings.get("notice_enabled", True)),
+                "notice_text": settings.get("notice_text") or "",
+                "notice_delete_after": settings.get("notice_delete_after", 30) or 0,
                 "guild_emojis": emoji_options(guild),
                 "setup_ok": bool(hub_public or hub_private),
                 "hub_public": hub_public.name if hub_public else None,
@@ -132,18 +144,39 @@ class DashboardIntegration:
         except (TypeError, ValueError):
             return "#5865f2"
 
+    @staticmethod
+    async def _pr_currency(guild: discord.Guild) -> str:
+        from redbot.core import bank
+
+        try:
+            return await bank.get_currency_name(guild)
+        except Exception:  # noqa: BLE001 - the page must render without a bank
+            return "credits"
+
     def _pr_emoji_rows(self, guild: discord.Guild, settings: dict) -> list[dict]:
         from .privaterooms import ACTIONS, DEFAULT_EMOJIS, parse_emoji
 
         overrides = settings.get("emojis") or {}
         rows = []
         extra = (("hub", "panel title"), ("public", "public hub"), ("private", "private hub"))
-        for key, default, label, _blurb in ACTIONS:
-            rows.append(self._pr_emoji_row(key, label, default, overrides, parse_emoji))
+        from .privaterooms import DEFAULT_STYLES
+
+        labels = settings.get("button_labels") or {}
+        styles = settings.get("button_styles") or {}
+        for key, default, label, blurb in ACTIONS:
+            row = self._pr_emoji_row(key, label, default, overrides, parse_emoji)
+            # Only these are real buttons; the entries added below decorate the
+            # panel embed and have no label or colour to set.
+            row["is_button"] = True
+            row["blurb"] = blurb
+            row["label_override"] = labels.get(key, "")
+            row["default_label"] = label.capitalize()
+            row["style"] = styles.get(key) or DEFAULT_STYLES.get(key, "secondary")
+            rows.append(row)
         for key, label in extra:
-            rows.append(
-                self._pr_emoji_row(key, label, DEFAULT_EMOJIS[key], overrides, parse_emoji)
-            )
+            row = self._pr_emoji_row(key, label, DEFAULT_EMOJIS[key], overrides, parse_emoji)
+            row["is_button"] = False
+            rows.append(row)
         return rows
 
     @staticmethod
@@ -230,6 +263,8 @@ class DashboardIntegration:
                 return await self._pr_save_branding(conf, field)
             if action == "save_emojis":
                 return await self._pr_save_emojis(conf, field)
+            if action == "save_economy":
+                return await self._pr_save_economy(guild, conf, field)
             if action == "create_hubs":
                 return await self._pr_create_hubs(guild, conf, field)
             if action == "post_panel":
@@ -317,13 +352,71 @@ class DashboardIntegration:
                     continue
                 emojis[key] = value
 
+        from .privaterooms import ACTIONS, BUTTON_STYLES
+
+        async with conf.button_labels() as labels, conf.button_styles() as styles:
+            for key, _default, _label, _blurb in ACTIONS:
+                text = (field(f"l_{key}") or "").strip()
+                if text:
+                    labels[key] = text[:80]
+                else:
+                    labels.pop(key, None)
+                style = (field(f"s_{key}") or "").strip()
+                if style in BUTTON_STYLES:
+                    styles[key] = style
+                else:
+                    styles.pop(key, None)
+
         notes = [
             {"message": f"'{k}' was not a usable emoji and was skipped.", "category": "warning"}
             for k in bad
         ]
         return notes + [
             {
-                "message": "Emoji saved. Re-post the panel to update the live buttons.",
+                "message": "Buttons saved. Re-post the panel to update the live ones.",
+                "category": "success",
+            }
+        ]
+
+    async def _pr_save_economy(self, guild, conf, field) -> list[dict]:
+        public = field.integer("cost_public", 0) or 0
+        private = field.integer("cost_private", 0) or 0
+        if public < 0 or private < 0:
+            return [{"message": "A price cannot be negative.", "category": "warning"}]
+
+        seconds = field.integer("notice_delete_after", 0) or 0
+        if not 0 <= seconds <= 600:
+            return [
+                {"message": "The notice has to clear within 0-600 seconds.",
+                 "category": "warning"}
+            ]
+
+        text = (field("notice_text") or "").strip()
+        if text and "{user}" not in text:
+            return [
+                {
+                    "message": "The notice needs {user} in it, otherwise nobody is told "
+                    "the room is theirs.",
+                    "category": "warning",
+                }
+            ]
+
+        enabled = field.checked("economy_enabled")
+        await conf.economy_enabled.set(enabled)
+        await conf.cost_public.set(public)
+        await conf.cost_private.set(private)
+        await conf.notice_enabled.set(field.checked("notice_enabled"))
+        await conf.notice_delete_after.set(seconds)
+        if text:
+            await conf.notice_text.set(text[:1000])
+
+        if not enabled or not (public or private):
+            return [{"message": "Saved. Rooms are free to create.", "category": "success"}]
+        currency = await self._pr_currency(guild)
+        return [
+            {
+                "message": f"Saved. Public rooms cost {public} {currency}, "
+                f"private rooms {private}.",
                 "category": "success",
             }
         ]
@@ -369,7 +462,13 @@ class DashboardIntegration:
             ]
 
         settings = await conf.all()
-        view = ControlPanelView(self, emojis=resolve_emojis(settings.get("emojis")))
+        settings["currency_name"] = await self._pr_currency(guild)
+        view = ControlPanelView(
+            self,
+            emojis=resolve_emojis(settings.get("emojis")),
+            labels=settings.get("button_labels"),
+            styles=settings.get("button_styles"),
+        )
         embed = room_embed(guild, settings)
 
         # Edit the existing panel where possible so the channel does not fill
@@ -570,15 +669,122 @@ PRIVATEROOMS_TEMPLATE = (
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
     <div class="dz-panel">
-      <h5><i class="fa fa-smile-o"></i> Button emoji</h5>
+      <h5><i class="fa fa-money"></i> Price &amp; welcome</h5>
       <p class="dz-hint">
-        Leave blank for the unicode default. Paste a custom emoji as
-        <code>&lt;:name:id&gt;</code>, or copy one from the list below.
-        {% if guild_emojis %}This server has {{ guild_emojis|length }} custom emoji.{% endif %}
+        What a room costs to open, and the pointer the new owner gets afterwards.
       </p>
 
+      <label class="dz-toggle">
+        <input type="checkbox" name="economy_enabled" {% if economy_enabled %}checked{% endif %} />
+        <span>Charge {{ currency }} for creating a room</span>
+      </label>
+
+      <div class="dz-row" style="margin-top:10px;">
+        <div style="flex:1 1 160px;">
+          <div class="dz-label">Public room</div>
+          <input class="dz-input" type="number" min="0" name="cost_public"
+                 value="{{ cost_public }}" />
+        </div>
+        <div style="flex:1 1 160px;">
+          <div class="dz-label">Private room</div>
+          <input class="dz-input" type="number" min="0" name="cost_private"
+                 value="{{ cost_private }}" />
+        </div>
+      </div>
+      <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+        0 is free. Anyone who cannot pay is disconnected from the hub instead of
+        getting a room.
+      </div>
+
+      <div style="margin-top:15px; padding-top:12px;
+                  border-top:1px solid rgba(255,255,255,.07);">
+        <label class="dz-toggle">
+          <input type="checkbox" name="notice_enabled"
+                 {% if notice_enabled %}checked{% endif %} />
+          <span>Point the owner at the panel after their room is made</span>
+        </label>
+
+        <div class="dz-label" style="margin-top:10px;">Message</div>
+        <textarea class="dz-area" name="notice_text"
+                  style="min-height:60px;">{{ notice_text }}</textarea>
+        <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+          <code>{user}</code> mentions the owner and is required;
+          <code>{room}</code>, <code>{cost}</code> and <code>{currency}</code> also work.
+          It is posted in the panel channel and removes itself, because Discord
+          cannot deliver a private message without the user clicking something first.
+        </div>
+
+        <div class="dz-label" style="margin-top:10px;">Remove it after (seconds)</div>
+        <input class="dz-input" type="number" min="0" max="600" name="notice_delete_after"
+               value="{{ notice_delete_after }}" style="max-width:160px;" />
+        <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+          0 keeps it in the channel for good.
+        </div>
+      </div>
+
+      <div class="dz-save">
+        <button class="dz-btn primary" name="action" value="save_economy">
+          <i class="fa fa-save"></i> Save
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-hand-pointer-o"></i> Panel buttons</h5>
+      <p class="dz-hint">
+        Every button on the panel, exactly as the owner sees it. Blank fields fall
+        back to the default. Paste a custom emoji as <code>&lt;:name:id&gt;</code>
+        or copy one from the list at the bottom.
+      </p>
+
+      <div style="overflow-x:auto;">
+      <table class="dz-t" style="min-width:640px;">
+        <thead>
+          <tr><th style="width:1%;">Preview</th><th>Emoji</th><th>Label</th><th>Colour</th></tr>
+        </thead>
+        <tbody>
+          {% for e in button_rows %}
+            <tr>
+              <td style="white-space:nowrap;">
+                <span class="dz-tag {% if e.style == 'danger' %}bad
+                      {%- elif e.style == 'success' %}good
+                      {%- elif e.style == 'primary' %}warn{% endif %}">
+                  {{ e.effective }} {{ e.label_override or e.default_label }}
+                </span>
+                {% if e.broken %}<span class="dz-tag bad">unusable emoji</span>{% endif %}
+                <div style="font-size:.72rem; opacity:.45;">{{ e.blurb }}</div>
+              </td>
+              <td style="width:22%;">
+                <input class="dz-input" type="text" name="e_{{ e.key }}" value="{{ e.current }}"
+                       placeholder="{{ e.default }}" />
+              </td>
+              <td style="width:28%;">
+                <input class="dz-input" type="text" name="l_{{ e.key }}"
+                       maxlength="80" value="{{ e.label_override }}"
+                       placeholder="{{ e.default_label }}" />
+              </td>
+              <td style="width:22%;">
+                <select class="dz-select" name="s_{{ e.key }}">
+                  {% for opt in style_options %}
+                    <option value="{{ opt }}" {% if opt == e.style %}selected{% endif %}>
+                      {{ opt }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+
+      <div class="dz-label" style="margin-top:14px;">Panel decoration</div>
+      <p class="dz-hint">These are not buttons &mdash; they sit in the panel text.</p>
       <div class="dz-grid three">
-        {% for e in emoji_rows %}
+        {% for e in decor_rows %}
           <div>
             <div class="dz-label">
               {{ e.label }}
@@ -592,7 +798,9 @@ PRIVATEROOMS_TEMPLATE = (
       </div>
 
       {% if guild_emojis %}
-        <div class="dz-label" style="margin-top:12px;">Available custom emoji</div>
+        <div class="dz-label" style="margin-top:14px;">
+          Available custom emoji ({{ guild_emojis|length }})
+        </div>
         <div class="dz-row" style="max-height:120px; overflow-y:auto;">
           {% for g in guild_emojis %}
             <span class="dz-tag" title="{{ g.id }}"
@@ -607,9 +815,9 @@ PRIVATEROOMS_TEMPLATE = (
         </div>
       {% endif %}
 
-      <div style="margin-top:13px;">
+      <div class="dz-save">
         <button class="dz-btn primary" name="action" value="save_emojis">
-          <i class="fa fa-save"></i> Save emoji
+          <i class="fa fa-save"></i> Save buttons
         </button>
       </div>
     </div>
