@@ -6,6 +6,7 @@ from redbot.core.data_manager import cog_data_path, core_data_path
 
 from .abc import CompositeMetaClass
 from .commands import Utils
+from .dashboard_integration import DashboardIntegration
 from .rpc import RPCMethods
 
 log = logging.getLogger("red.vrt.vrtutils")
@@ -28,7 +29,7 @@ CASETYPES = [
 ]
 
 
-class VrtUtils(Utils, RPCMethods, commands.Cog, metaclass=CompositeMetaClass):
+class VrtUtils(DashboardIntegration, Utils, RPCMethods, commands.Cog, metaclass=CompositeMetaClass):
     """
     A collection of stateless utility commands for getting info about various things.
     """

@@ -15,6 +15,8 @@ from redbot.core.utils import menus, AsyncIter
 from redbot.core.utils.chat_formatting import box, pagify, escape, humanize_list
 from redbot.core.utils.predicates import MessagePredicate
 
+from .dashboard_integration import DashboardIntegration
+
 _ = Translator("CustomCommands", __file__)
 
 
@@ -232,7 +234,7 @@ class CommandObj:
 
 
 @cog_i18n(_)
-class CustomCommands(commands.Cog):
+class CustomCommands(DashboardIntegration, commands.Cog):
     """This cog contains commands for creating and managing custom commands that display text.
 
     These are useful for storing information members might need, like FAQ answers or invite links.

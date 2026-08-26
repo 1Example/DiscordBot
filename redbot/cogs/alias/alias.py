@@ -13,6 +13,7 @@ from redbot.core.utils.menus import menu
 
 from redbot.core.bot import Red
 from .alias_entry import AliasEntry, AliasCache, ArgParseError
+from .dashboard_integration import DashboardIntegration
 
 _ = Translator("Alias", __file__)
 
@@ -31,7 +32,7 @@ class _TrackingFormatter(Formatter):
 
 
 @cog_i18n(_)
-class Alias(commands.Cog):
+class Alias(DashboardIntegration, commands.Cog):
     """Create aliases for commands.
 
     Aliases are alternative names/shortcuts for commands. They

@@ -8,7 +8,10 @@ from redbot.core import commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
+    channel_options,
     dashboard_page,
+    fake_context,
     form_reader,
     guild_member,
     is_staff,
@@ -33,7 +36,12 @@ TOGGLES = (
 
 
 class DashboardIntegration:
-    """Trivia session settings, available lists and a win leaderboard."""
+    """Trivia sessions, settings, lists and the leaderboard.
+
+    Starts and stops sessions (``[p]trivia``, ``[p]trivia stop``), lists the
+    categories (``[p]trivia list``), covers every ``[p]triviaset`` option, and
+    lets the owner remove an uploaded custom list.
+    """
 
     bot: t.Any
     config: t.Any
@@ -65,7 +73,13 @@ class DashboardIntegration:
                     "error_title": "Forbidden",
                     "error_message": "Only server administrators can change trivia settings.",
                 }
-            notifications = await self._tv_handle_post(guild, kwargs)
+            requested = form_reader(kwargs)("action")
+            if requested in ("start", "stop", "delete_list"):
+                notifications = await self._tv_session_action(
+                    requested, member, guild, form_reader(kwargs)
+                )
+            else:
+                notifications = await self._tv_handle_post(guild, kwargs)
 
         settings = await self.config.guild(guild).all()
 
@@ -94,6 +108,18 @@ class DashboardIntegration:
                     for key, label, help_text in TOGGLES
                 ],
                 "lists": self._tv_lists(),
+                "list_options": [
+                    {
+                        "id": entry["name"],
+                        "name": f"{entry['name']} ({entry['count']})",
+                        "group": "Categories",
+                        "selected": False,
+                        "warn": False,
+                    }
+                    for entry in self._tv_lists()
+                ],
+                "channel_options": channel_options(guild, require_send=True),
+                "is_owner": await self.bot.is_owner(user),
                 "leaderboard": await self._tv_leaderboard(guild),
                 "active_sessions": self._tv_sessions(guild),
             },
@@ -132,6 +158,7 @@ class DashboardIntegration:
             out.append(
                 {
                     "channel": f"#{channel.name}",
+                    "channel_id": str(channel.id),
                     "scores": len(getattr(session, "scores", []) or []),
                 }
             )
@@ -158,6 +185,113 @@ class DashboardIntegration:
         for position, row in enumerate(rows[:limit], start=1):
             row["position"] = position
         return rows[:limit]
+
+    async def _tv_session_action(
+        self, action: str, member: discord.Member, guild: discord.Guild, field
+    ) -> list[dict]:
+        from .trivia import InvalidListError, TriviaSession
+
+        if action == "stop":
+            channel = guild.get_channel(field.integer("channel_id", 0) or 0)
+            session = self._get_trivia_session(channel) if channel else None
+            if session is None:
+                return [
+                    {"message": "No session is running in that channel.",
+                     "category": "info"}
+                ]
+            await session.end_game()
+            session.force_stop()
+            return [
+                {"message": f"Trivia stopped in #{channel.name}.", "category": "success"}
+            ]
+
+        if action == "start":
+            channel = guild.get_channel(field.integer("channel_id", 0) or 0)
+            if channel is None:
+                return [{"message": "Pick a channel.", "category": "warning"}]
+            if not channel.permissions_for(guild.me).send_messages:
+                return [
+                    {"message": f"I cannot post in #{channel.name}.", "category": "warning"}
+                ]
+            if self._get_trivia_session(channel) is not None:
+                return [
+                    {"message": f"A session is already running in #{channel.name}.",
+                     "category": "warning"}
+                ]
+            categories = [c.lower() for c in field.many("categories")]
+            if not categories:
+                return [{"message": "Pick at least one category.", "category": "warning"}]
+
+            trivia_dict: dict = {}
+            authors: list = []
+            # Reversed so the first list chosen wins on conflicting config.
+            for category in reversed(categories):
+                try:
+                    loaded = self.get_trivia_list(category)
+                except FileNotFoundError:
+                    return [
+                        {"message": f"No such category: {category}.",
+                         "category": "warning"}
+                    ]
+                except InvalidListError:
+                    return [
+                        {"message": f"The {category} list is formatted incorrectly.",
+                         "category": "danger"}
+                    ]
+                trivia_dict.update(loaded)
+                authors.append(trivia_dict.pop("AUTHOR", None))
+                trivia_dict.pop("DESCRIPTION", None)
+            trivia_dict.pop("$schema", None)
+            config = trivia_dict.pop("CONFIG", None)
+            if not trivia_dict:
+                return [
+                    {"message": "Those lists parsed fine but hold no questions.",
+                     "category": "warning"}
+                ]
+
+            settings = await self.config.guild(guild).all()
+            if config and settings["allow_override"]:
+                settings.update(config)
+            settings["lists"] = dict(zip(categories, reversed(authors)))
+
+            # `TriviaSession.start` needs a real Context to send into.
+            context = await fake_context(self.bot, member, "trivia", channel=channel)
+            if context is None:
+                return [
+                    {"message": "I could not open a session in that channel.",
+                     "category": "danger"}
+                ]
+            session = TriviaSession.start(context, trivia_dict, settings)
+            self.trivia_sessions.append(session)
+            return [
+                {
+                    "message": f"Trivia started in #{channel.name} with "
+                    + ", ".join(categories)
+                    + ".",
+                    "category": "success",
+                }
+            ]
+
+        if action == "delete_list":
+            if not await self.bot.is_owner(member):
+                return [
+                    {"message": "Only the bot owner can remove a trivia list.",
+                     "category": "danger"}
+                ]
+            name = (field("list_name") or "").strip()
+            from redbot.core.data_manager import cog_data_path
+
+            path = cog_data_path(self) / f"{name}.yaml"
+            if not path.exists():
+                return [
+                    {"message": f"No custom list named {name}.", "category": "warning"}
+                ]
+            path.unlink()
+            return [
+                {"message": f"Custom list {name} deleted.", "category": "success"}
+            ]
+
+        return [{"message": f"Unknown action: {action}", "category": "warning"}]
 
     async def _tv_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
         field = form_reader(kwargs)
@@ -198,6 +332,7 @@ class DashboardIntegration:
 
 TRIVIA_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -212,6 +347,53 @@ TRIVIA_TEMPLATE = (
   </div>
 
   {% if is_staff %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-play"></i> Run a session</h5>
+        <p class="dz-hint">Pick a channel and one or more categories. Combining
+           lists mixes their questions.</p>
+        <div class="dz-grid two">
+          <div>
+            <label class="dz-label">Channel</label>
+            {{ picker('channel_id', channel_options, false, 6, 'Search channels...') }}
+          </div>
+          <div>
+            <label class="dz-label">Categories</label>
+            {{ picker('categories', list_options, true, 8, 'Search categories...') }}
+          </div>
+        </div>
+        <div class="dz-save">
+          <button class="dz-btn primary" name="action" value="start">
+            <i class="fa fa-play"></i> Start trivia
+          </button>
+        </div>
+      </div>
+    </form>
+
+    {% if active_sessions %}
+      <div class="dz-panel">
+        <h5><i class="fa fa-stop"></i> Running sessions</h5>
+        <table class="dz-t">
+          <tr><th>Channel</th><th>Players</th><th></th></tr>
+          {% for s in active_sessions %}
+            <tr>
+              <td>{{ s.channel }}</td>
+              <td>{{ s.scores }}</td>
+              <td>
+                <form method="POST">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+                  <input type="hidden" name="channel_id" value="{{ s.channel_id }}" />
+                  {{ confirm('Stop', 'stop',
+                             'Stop the trivia session in ' ~ s.channel ~ '?') }}
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endif %}
+
     <form method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
       <div class="dz-grid two">
@@ -252,16 +434,31 @@ TRIVIA_TEMPLATE = (
   <div class="dz-grid two">
     <div class="dz-panel">
       <h5><i class="fa fa-list"></i> Available lists</h5>
-      <p class="dz-hint">Start one with the trivia command.</p>
+      <p class="dz-hint">
+        Pick any of these when starting a session above. New lists are uploaded
+        in Discord with <code>[p]triviaset custom upload</code>, since that needs
+        a file attachment.
+      </p>
       {% if lists %}
         <table class="dz-t">
-          <thead><tr><th>List</th><th>Questions</th><th>Author</th></tr></thead>
+          <thead><tr><th>List</th><th>Questions</th><th>Author</th>
+            {% if is_owner %}<th></th>{% endif %}</tr></thead>
           <tbody>
             {% for l in lists %}
               <tr>
                 <td><b>{{ l.name }}</b></td>
                 <td style="opacity:.7;">{{ l.count }}</td>
                 <td style="opacity:.6; font-size:.8rem;">{{ l.author }}</td>
+                {% if is_owner %}
+                  <td>
+                    <form method="POST">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+                      <input type="hidden" name="list_name" value="{{ l.name }}" />
+                      {{ confirm('', 'delete_list',
+                                 'Delete the custom list ' ~ l.name ~ '? Built-in lists cannot be removed.') }}
+                    </form>
+                  </td>
+                {% endif %}
               </tr>
             {% endfor %}
           </tbody>

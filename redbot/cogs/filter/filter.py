@@ -11,11 +11,13 @@ from redbot.core.utils.predicates import MessagePredicate
 from redbot.core.utils import AsyncIter
 from redbot.core.utils.chat_formatting import pagify, humanize_list
 
+from .dashboard_integration import DashboardIntegration
+
 _ = Translator("Filter", __file__)
 
 
 @cog_i18n(_)
-class Filter(commands.Cog):
+class Filter(DashboardIntegration, commands.Cog):
     """This cog is designed for "filtering" unwanted words and phrases from a server.
 
     It provides tools to manage a list of words or sentences, and to customize automatic actions to be taken against users who use those words in channels or in their name/nickname.

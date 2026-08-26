@@ -8,6 +8,7 @@ from redbot.core import bank, commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     channel_options,
     dashboard_page,
     form_reader,
@@ -22,7 +23,12 @@ MAX_INTERVAL = 86400
 
 
 class DashboardIntegration:
-    """Where birds spawn, how often, and the server scoreboard."""
+    """Where birds spawn, how often, the scoreboard, and when the next hunt lands.
+
+    Covers ``[p]hunting start``/``stop`` (through the channel list), ``timing``,
+    ``reward``, ``mode``, ``eagle``, ``bangtime``, ``next``, ``leaderboard``,
+    ``score`` and ``clearleaderboard``.
+    """
 
     bot: t.Any
     config: t.Any
@@ -80,8 +86,27 @@ class DashboardIntegration:
                 "reward_high": reward[1] if len(reward) > 1 else "",
                 "currency": await self._hunt_currency(guild),
                 "scores": await self._hunt_scores(guild),
+                "is_owner": await self.bot.is_owner(user),
+                "next_hunt": self._hunt_next(guild),
+                "in_game": [
+                    getattr(guild.get_channel(cid), "name", str(cid))
+                    for cid in self.in_game
+                    if guild.get_channel(cid) is not None
+                ],
             },
         }
+
+    def _hunt_next(self, guild: discord.Guild) -> str:
+        """How long until the next bird, the way `[p]hunting next` reports it."""
+        from datetime import datetime
+
+        stamp = self.next_bang.get(guild.id)
+        if not stamp:
+            return ""
+        seconds = int(abs(datetime.now().timestamp() - stamp))
+        hours, remainder = divmod(seconds, 3600)
+        minutes, _sec = divmod(remainder, 60)
+        return f"{hours}h {minutes}m"
 
     async def _hunt_currency(self, guild: discord.Guild) -> str:
         try:
@@ -116,7 +141,17 @@ class DashboardIntegration:
 
     async def _hunt_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
         field = form_reader(kwargs)
-        if field("action") != "save":
+        action = field("action")
+
+        if action == "clear_scores":
+            # `[p]hunting clearleaderboard` wipes every user bot-wide, so this
+            # stays behind the owner check the template applies.
+            await self.config.clear_all_users()
+            return [
+                {"message": "Every hunting score was cleared.", "category": "success"}
+            ]
+
+        if action != "save":
             return [{"message": "Unknown action.", "category": "warning"}]
 
         conf = self.config.guild(guild)
@@ -178,6 +213,7 @@ class DashboardIntegration:
 
 HUNTING_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -185,8 +221,23 @@ HUNTING_TEMPLATE = (
     <p>
       {% if active_ids %}Active in {{ active_ids|length }} channel(s).
       {% else %}No channels selected, so nothing will spawn.{% endif %}
+      {% if next_hunt %} Next bird in about {{ next_hunt }}.{% endif %}
+      {% if in_game %} A bird is waiting in {{ in_game|join(', ') }}.{% endif %}
     </p>
   </div>
+
+  {% if is_owner %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-eraser"></i> Leaderboard</h5>
+        <p class="dz-hint">Scores are stored per user across every server, so
+           clearing them wipes the global leaderboard.</p>
+        {{ confirm('Clear every score', 'clear_scores',
+                   'Wipe every hunting score on the whole bot? This cannot be undone.') }}
+      </div>
+    </form>
+  {% endif %}
 
   {% if is_staff %}
     <form method="POST">

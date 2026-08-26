@@ -24,6 +24,8 @@ from pylav.logging import getLogger
 from pylav.players.query.obj import Query
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 
+from .dashboard_integration import DashboardIntegration
+
 LOGGER = getLogger("PyLav.cog.Radio")
 
 
@@ -31,7 +33,7 @@ _ = Translator("PyLavRadio", Path(__file__))
 
 
 @cog_i18n(_)
-class PyLavRadio(DISCORD_COG_TYPE_MIXIN):
+class PyLavRadio(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     lavalink: Client
 
     __version__ = "1.0.0"

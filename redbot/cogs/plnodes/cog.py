@@ -21,13 +21,15 @@ from pylav.helpers.format.ascii import EightBitANSI
 from pylav.logging import getLogger
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
 
+from .dashboard_integration import DashboardIntegration
+
 LOGGER = getLogger("PyLav.cog.Nodes")
 
 _ = Translator("PyLavNodes", Path(__file__))
 
 
 @cog_i18n(_)
-class PyLavNodes(DISCORD_COG_TYPE_MIXIN):
+class PyLavNodes(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Manage the nodes used by PyLav"""
 
     __version__ = "1.0.0"

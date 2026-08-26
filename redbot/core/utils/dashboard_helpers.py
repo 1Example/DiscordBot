@@ -12,6 +12,8 @@ import discord
 __all__ = (
     "dashboard_page",
     "form_reader",
+    "query_reader",
+    "fake_context",
     "is_staff",
     "guild_member",
     "channel_options",
@@ -56,6 +58,92 @@ def form_reader(kwargs: dict) -> t.Callable[[str, t.Any], t.Any]:
     field.raw = form  # type: ignore[attr-defined]
     field.many = lambda key: [x for x in (form.get(key) or []) if x not in ("", None)]  # type: ignore[attr-defined]
     field.checked = lambda key: key in form  # type: ignore[attr-defined]
+
+    def integer(key: str, default=None):
+        try:
+            return int(str(field(key)).strip())
+        except (TypeError, ValueError):
+            return default
+
+    field.integer = integer  # type: ignore[attr-defined]
+    return field
+
+
+async def fake_context(bot, member: discord.Member, content: str, channel=None):
+    """Build a real `Context` for a command that was triggered from the dashboard.
+
+    Some cog internals invoke a configured command string (a warning action, a
+    role-tools command) by copying the invoking message. There is no message
+    behind a dashboard request, so one is synthesised in a channel the bot can
+    talk in and handed to `bot.get_context` as usual.
+
+    Returns `None` when no usable channel exists or discord.py rejects the
+    payload; callers should treat that as "the automated step was skipped".
+    """
+    from datetime import datetime, timezone
+
+    guild = member.guild
+    if channel is None:
+        channel = next(
+            (
+                c
+                for c in guild.text_channels
+                if c.permissions_for(guild.me).send_messages
+            ),
+            None,
+        )
+    if channel is None:
+        return None
+
+    payload = {
+        # The ID only has to be unique and parseable; nothing fetches it.
+        "id": str(discord.utils.time_snowflake(datetime.now(tz=timezone.utc))),
+        "type": 0,
+        "content": content,
+        "channel_id": str(channel.id),
+        "guild_id": str(guild.id),
+        "author": {
+            "id": str(member.id),
+            "username": member.name,
+            "discriminator": getattr(member, "discriminator", "0"),
+            "avatar": None,
+            "bot": False,
+        },
+        "attachments": [],
+        "embeds": [],
+        "mentions": [],
+        "mention_roles": [],
+        "pinned": False,
+        "mention_everyone": False,
+        "tts": False,
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "edited_timestamp": None,
+        "flags": 0,
+    }
+    try:
+        message = channel._state.create_message(channel=channel, data=payload)
+        message.author = member
+    except Exception:  # noqa: BLE001 - discord.py internals vary between versions
+        return None
+    return await bot.get_context(message)
+
+
+def query_reader(kwargs: dict) -> t.Callable[[str, t.Any], t.Any]:
+    """Return a getter for URL query arguments.
+
+    Anything in the query string that a page did not declare as a required or
+    optional kwarg arrives in ``extra_kwargs``, which is how a GET form on a
+    page passes filters, search terms and page numbers back to itself.
+    """
+    args = kwargs.get("extra_kwargs") or {}
+
+    def field(key: str, default: t.Any = None) -> t.Any:
+        value = args.get(key, default)
+        if isinstance(value, (list, tuple)):
+            return value[-1] if value else default
+        return value
+
+    field.raw = args  # type: ignore[attr-defined]
 
     def integer(key: str, default=None):
         try:

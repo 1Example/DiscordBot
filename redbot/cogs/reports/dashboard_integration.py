@@ -8,6 +8,7 @@ from redbot.core import commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     channel_options,
     dashboard_page,
     form_reader,
@@ -71,12 +72,82 @@ class DashboardIntegration:
                 "channel_name": f"#{channel.name}" if channel else None,
                 "channel_missing": bool(channel_id) and channel is None,
                 "can_post": can_post,
+                "tickets": await self._rep_tickets(guild),
             },
         }
 
+    async def _rep_tickets(self, guild: discord.Guild, limit: int = 50) -> list[dict]:
+        """Every stored report for this server, newest ticket first."""
+        try:
+            stored = await self.config.custom("REPORT", guild.id).all()
+        except Exception:  # noqa: BLE001
+            log.exception("Could not read stored reports")
+            return []
+        rows = []
+        for ticket_number, data in stored.items():
+            report = (data or {}).get("report") or {}
+            if not report:
+                continue
+            author_id = report.get("user_id")
+            author = guild.get_member(author_id or 0)
+            rows.append(
+                {
+                    "number": int(ticket_number) if str(ticket_number).isdigit() else 0,
+                    "author": getattr(author, "display_name", None)
+                    or f"ID {author_id}",
+                    "author_id": str(author_id or ""),
+                    "present": author is not None,
+                    "text": report.get("report") or "",
+                }
+            )
+        rows.sort(key=lambda r: -r["number"])
+        return rows[:limit]
+
+    async def _rep_reply(self, guild: discord.Guild, field) -> list[dict]:
+        """DM the reporter, which is what `[p]report interact` is used for."""
+        ticket = field.integer("ticket_number", 0) or 0
+        message = (field("reply") or "").strip()
+        if not message:
+            return [{"message": "Write a reply first.", "category": "warning"}]
+        report = await self.config.custom("REPORT", guild.id, ticket).report()
+        if not report:
+            return [{"message": f"Ticket #{ticket} does not exist.", "category": "warning"}]
+        target = guild.get_member(report.get("user_id") or 0)
+        if target is None:
+            return [
+                {"message": "That reporter is no longer in the server.",
+                 "category": "warning"}
+            ]
+        embed = discord.Embed(
+            title=f"About your report #{ticket} in {guild.name}",
+            description=message,
+            colour=await self.bot.get_embed_colour(guild.text_channels[0])
+            if guild.text_channels
+            else discord.Colour.blurple(),
+        )
+        try:
+            await target.send(embed=embed)
+        except discord.Forbidden:
+            return [
+                {"message": f"{target.display_name} has DMs disabled.",
+                 "category": "warning"}
+            ]
+        return [
+            {"message": f"Reply sent to {target.display_name}.", "category": "success"}
+        ]
+
     async def _rep_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
         field = form_reader(kwargs)
-        if field("action") != "save":
+        action = field("action")
+
+        if action == "reply":
+            try:
+                return await self._rep_reply(guild, field)
+            except Exception as exc:  # noqa: BLE001
+                log.exception("Reports dashboard reply failed")
+                return [{"message": f"Action failed: {exc}", "category": "danger"}]
+
+        if action != "save":
             return [{"message": "Unknown action.", "category": "warning"}]
 
         conf = self.config.guild(guild)
@@ -139,6 +210,7 @@ class DashboardIntegration:
 
 REPORTS_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -200,6 +272,37 @@ REPORTS_TEMPLATE = (
       </div>
     </div>
   </form>
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-inbox"></i> Submitted reports</h5>
+    <p class="dz-hint">Reply here to DM the reporter, the way
+       <code>[p]report interact</code> opens a conversation in Discord.</p>
+    {% if tickets %}
+      {% for t in tickets %}
+        <div style="padding:11px 0; border-bottom:1px solid rgba(255,255,255,.06);">
+          <div class="dz-row">
+            <b>#{{ t.number }}</b>
+            <span class="dz-tag">{{ t.author }}</span>
+            {% if not t.present %}<span class="dz-tag warn">left the server</span>{% endif %}
+          </div>
+          <div class="dz-text" style="margin:6px 0;">{{ t.text }}</div>
+          {% if t.present %}
+            <form method="POST" class="dz-row" style="gap:6px;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+              <input type="hidden" name="ticket_number" value="{{ t.number }}" />
+              <input class="dz-input" type="text" name="reply"
+                     placeholder="reply, sent to them by DM" style="flex:1 1 240px;" />
+              <button class="dz-btn primary" name="action" value="reply">
+                <i class="fa fa-paper-plane"></i> Send
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="dz-empty">No reports submitted yet.</p>
+    {% endif %}
+  </div>
 </div>
 """
 )

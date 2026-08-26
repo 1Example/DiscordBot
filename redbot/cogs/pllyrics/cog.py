@@ -18,13 +18,15 @@ from pylav.players.query.obj import Query
 from pylav.players.tracks.obj import Track
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
 
+from .dashboard_integration import DashboardIntegration
+
 LOGGER = getLogger("PyLav.cog.PyLavLyrics")
 
 _ = Translator("PyLavUtils", Path(__file__))
 
 
 @cog_i18n(_)
-class PyLavLyrics(DISCORD_COG_TYPE_MIXIN):
+class PyLavLyrics(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Lyrics commands for PyLav"""
 
     __version__ = "1.0.0"

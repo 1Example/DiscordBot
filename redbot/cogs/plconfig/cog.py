@@ -19,6 +19,7 @@ from pylav.helpers.format.strings import shorten_string
 from pylav.logging import getLogger
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
 
+from .dashboard_integration import DashboardIntegration
 from .view import InfoView
 
 LOGGER = getLogger("PyLav.cog.Configurator")
@@ -27,7 +28,7 @@ _ = Translator("PyLavConfigurator", Path(__file__))
 
 
 @cog_i18n(_)
-class PyLavConfigurator(DISCORD_COG_TYPE_MIXIN):
+class PyLavConfigurator(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Configure PyLav library settings"""
 
     lavalink: Client

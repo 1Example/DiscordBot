@@ -25,6 +25,8 @@ from pylav.helpers.format.ascii import EightBitANSI
 from pylav.logging import getLogger
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
 
+from .dashboard_integration import DashboardIntegration
+
 LOGGER = getLogger("PyLav.cog.Utils")
 
 _ = Translator("PyLavUtils", Path(__file__))
@@ -55,7 +57,7 @@ def get_top(snapshot, key_type="lineno", limit=10):
 
 
 @cog_i18n(_)
-class PyLavUtils(DISCORD_COG_TYPE_MIXIN):
+class PyLavUtils(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Utility commands for PyLav"""
 
     __version__ = "1.0.0"

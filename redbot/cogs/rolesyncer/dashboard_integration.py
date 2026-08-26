@@ -8,6 +8,7 @@ from redbot.core import commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     dashboard_page,
     form_reader,
     guild_member,
@@ -99,11 +100,15 @@ class DashboardIntegration:
     async def _rs_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
         field = form_reader(kwargs)
         action = field("action")
-        mode = field("mode")
-        if mode not in MODES:
-            return [{"message": "Unknown sync mode.", "category": "warning"}]
 
         try:
+            if action == "apply":
+                return await self._rs_apply(guild)
+
+            mode = field("mode")
+            if mode not in MODES:
+                return [{"message": "Unknown sync mode.", "category": "warning"}]
+
             if action == "add":
                 return await self._rs_add(guild, mode, field("first"), field("second"))
             if action == "remove":
@@ -112,6 +117,56 @@ class DashboardIntegration:
             log.exception("RoleSyncer dashboard action %r failed", action)
             return [{"message": f"Action failed: {exc}", "category": "danger"}]
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
+
+    async def _rs_apply(self, guild: discord.Guild) -> list[dict]:
+        """Retroactively give everyone the roles the pairs imply, like `[p]sync apply`."""
+        settings = await self.config.guild(guild).all()
+        applied = 0
+        skipped = 0
+
+        async def grant(member: discord.Member, role: discord.Role, why: str) -> None:
+            nonlocal applied, skipped
+            if role in member.roles:
+                return
+            try:
+                await member.add_roles(role, reason=why)
+            except discord.HTTPException:
+                skipped += 1
+            else:
+                applied += 1
+
+        for role1_id, role2_id in settings.get("onesync") or []:
+            role1, role2 = guild.get_role(role1_id), guild.get_role(role2_id)
+            if role1 is None or role2 is None:
+                continue
+            for member in list(role1.members):
+                await grant(
+                    member, role2, f"One-way rolesync / {role1.name} -> {role2.name}"
+                )
+
+        for role1_id, role2_id in settings.get("twosync") or []:
+            role1, role2 = guild.get_role(role1_id), guild.get_role(role2_id)
+            if role1 is None or role2 is None:
+                continue
+            for member in list(role1.members):
+                await grant(
+                    member, role2, f"Two-way rolesync / {role1.name} <-> {role2.name}"
+                )
+            for member in list(role2.members):
+                await grant(
+                    member, role1, f"Two-way rolesync / {role2.name} <-> {role1.name}"
+                )
+
+        out = [{"message": f"Applied {applied} role(s).", "category": "success"}]
+        if skipped:
+            out.append(
+                {
+                    "message": f"{skipped} assignment(s) failed; check that my top role "
+                    "is above both synced roles.",
+                    "category": "warning",
+                }
+            )
+        return out
 
     async def _rs_add(self, guild, mode: str, first: str | None, second: str | None) -> list[dict]:
         try:
@@ -162,12 +217,25 @@ class DashboardIntegration:
 
 ROLESYNCER_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
     <h4><i class="fa fa-link"></i> Role syncing in {{ guild_name }}</h4>
     <p>One-way: the second role follows the first. Two-way: either role mirrors the other.</p>
   </div>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-refresh"></i> Apply to everyone</h5>
+      <p class="dz-hint">Syncing normally only reacts to role changes. This walks
+         every member now and grants whatever the pairs below imply.</p>
+      {{ confirm('Apply all pairs now', 'apply',
+                 'Give every member the roles these pairs imply? This can take a while on a large server.',
+                 'primary', 'fa-refresh') }}
+    </div>
+  </form>
 
   {% for mode, label in modes.items() %}
     <div class="dz-panel">

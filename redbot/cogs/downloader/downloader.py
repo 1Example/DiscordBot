@@ -16,6 +16,7 @@ from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 
 from .checks import do_install_agreement
+from .dashboard_integration import DashboardIntegration
 from .converters import InstalledCog, Repo
 from .log import log
 
@@ -30,7 +31,7 @@ DEPRECATION_NOTICE = _(
 
 
 @cog_i18n(_)
-class Downloader(commands.Cog):
+class Downloader(DashboardIntegration, commands.Cog):
     """Install community cogs made by Cog Creators.
 
     Community cogs, also called third party cogs, are not included

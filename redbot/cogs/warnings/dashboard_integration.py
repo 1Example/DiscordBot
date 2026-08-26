@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import logging
 import typing as t
+from datetime import datetime, timezone
 
 import discord
-from redbot.core import commands
+from redbot.core import commands, modlog
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     channel_options,
     dashboard_page,
+    fake_context,
     form_reader,
     guild_member,
     is_staff,
+    member_options,
 )
 
 log = logging.getLogger("red.warnings.dashboard")
@@ -29,7 +33,13 @@ TOGGLES = (
 
 
 class DashboardIntegration:
-    """Warning reasons, automated actions and the server warning list."""
+    """Warnings, end to end.
+
+    Issues and removes warnings (``[p]warn``, ``[p]unwarn``), shows a member's
+    warning history (``[p]warnings``), lists reasons and actions
+    (``[p]reasonlist``, ``[p]actionlist``) and covers every ``[p]warningset``,
+    ``[p]warnreason`` and ``[p]warnaction`` option.
+    """
 
     bot: t.Any
     config: t.Any
@@ -41,7 +51,7 @@ class DashboardIntegration:
 
     @dashboard_page(
         name=None,
-        description="Warning reasons, actions and settings.",
+        description="Issue warnings and configure reasons, actions and settings.",
         methods=("GET", "POST"),
         context_ids=["guild_id", "user_id"],
     )
@@ -51,16 +61,26 @@ class DashboardIntegration:
         member, error = guild_member(user, guild)
         if error:
             return error
-        if not await is_staff(self.bot, user, member, guild):
+        staff = await is_staff(self.bot, user, member, guild)
+        # `[p]warn` needs Ban Members; the settings need administrator.
+        can_warn = staff or member.guild_permissions.ban_members
+        if not can_warn:
             return {
                 "status": 1,
                 "error_title": "Forbidden",
-                "error_message": "Only server administrators can manage warnings.",
+                "error_message": "Only server moderators can manage warnings.",
             }
 
         notifications: list[dict] = []
+        history: dict = {}
         if kwargs.get("method") == "POST":
-            notifications = await self._warn_handle_post(guild, kwargs)
+            requested = form_reader(kwargs)("action")
+            if requested in ("warn", "unwarn", "history"):
+                notifications, history = await self._warn_action(
+                    requested, member, guild, form_reader(kwargs)
+                )
+            else:
+                notifications = await self._warn_handle_post(guild, staff, kwargs)
 
         settings = await self.config.guild(guild).all()
         reasons = settings.get("reasons") or {}
@@ -73,6 +93,9 @@ class DashboardIntegration:
                 "source": WARNINGS_TEMPLATE,
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
+                "is_admin": staff,
+                "history": history,
+                "member_options": member_options(guild, humans_only=True),
                 "toggles": [
                     {"key": k, "label": lbl, "help": h, "on": bool(settings.get(k))}
                     for k, lbl, h in TOGGLES
@@ -122,10 +145,232 @@ class DashboardIntegration:
         rows.sort(key=lambda r: -r["points"])
         return rows[:limit]
 
-    async def _warn_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+    async def _warn_action(
+        self, action: str, author: discord.Member, guild: discord.Guild, field
+    ) -> tuple[list[dict], dict]:
+        from .helpers import warning_points_add_check, warning_points_remove_check
+
+        target = guild.get_member(field.integer("member_id", 0) or 0)
+        if target is None:
+            return [{"message": "Pick a member.", "category": "warning"}], {}
+
+        if action == "history":
+            return [], await self._warn_history(guild, target)
+
+        settings = await self.config.guild(guild).all()
+        member_settings = self.config.member(target)
+
+        try:
+            if action == "warn":
+                if target == author:
+                    return [
+                        {"message": "You cannot warn yourself.", "category": "warning"}
+                    ], {}
+                if target.bot:
+                    return [
+                        {"message": "You cannot warn a bot.", "category": "warning"}
+                    ], {}
+                if target == guild.owner:
+                    return [
+                        {"message": "You cannot warn the server owner.",
+                         "category": "warning"}
+                    ], {}
+                if target.top_role >= author.top_role and author != guild.owner:
+                    return [
+                        {
+                            "message": "That member is equal to or above you in the "
+                            "hierarchy.",
+                            "category": "warning",
+                        }
+                    ], {}
+
+                registered = settings.get("reasons") or {}
+                chosen = (field("reason_name") or "").strip().lower()
+                if chosen and chosen in registered:
+                    reason_type = registered[chosen]
+                else:
+                    if not settings.get("allow_custom_reasons"):
+                        return [
+                            {
+                                "message": "That is not a registered reason, and custom "
+                                "reasons are turned off for this server.",
+                                "category": "warning",
+                            }
+                        ], {}
+                    description = (field("custom_reason") or "").strip()
+                    if not description:
+                        return [
+                            {"message": "Enter a reason.", "category": "warning"}
+                        ], {}
+                    points = field.integer("points", 1) or 1
+                    if points < 0:
+                        return [
+                            {"message": "Points cannot be negative.", "category": "warning"}
+                        ], {}
+                    reason_type = {"description": description, "points": points}
+
+                now = datetime.now(tz=timezone.utc)
+                # The warning key is the invoking message ID in Discord; a
+                # timestamp snowflake keeps the same shape and stays unique.
+                warn_id = str(discord.utils.time_snowflake(now))
+                async with member_settings.warnings() as user_warnings:
+                    user_warnings[warn_id] = {
+                        "points": reason_type["points"],
+                        "description": reason_type["description"],
+                        "mod": author.id,
+                    }
+                total = (await member_settings.total_points()) + reason_type["points"]
+                await member_settings.total_points.set(total)
+
+                notes = []
+                if settings.get("toggle_dm"):
+                    title = (
+                        f"Warning from {author}"
+                        if settings.get("show_mod")
+                        else "Warning"
+                    )
+                    embed = discord.Embed(
+                        title=title,
+                        description=reason_type["description"],
+                        color=await self.bot.get_embed_color(target),
+                    )
+                    embed.add_field(name="Points", value=str(reason_type["points"]))
+                    try:
+                        await target.send(
+                            f"You have received a warning in {guild.name}.", embed=embed
+                        )
+                    except discord.HTTPException:
+                        notes.append(
+                            {"message": "I could not DM them the warning.",
+                             "category": "warning"}
+                        )
+
+                if settings.get("toggle_channel"):
+                    channel = guild.get_channel(settings.get("warn_channel") or 0)
+                    if channel is not None and channel.permissions_for(
+                        guild.me
+                    ).send_messages:
+                        embed = discord.Embed(
+                            title="Warning",
+                            description=reason_type["description"],
+                            color=await self.bot.get_embed_color(channel),
+                        )
+                        embed.add_field(name="Points", value=str(reason_type["points"]))
+                        await channel.send(
+                            f"{target.mention} has been warned.", embed=embed
+                        )
+
+                await modlog.create_case(
+                    self.bot, guild, now, "warning", target, author,
+                    f"{reason_type['description']}\nPoints: {reason_type['points']}",
+                )
+
+                # Automated actions are configured as command strings, so they
+                # need a Context to run in.
+                context = await fake_context(self.bot, author, "warn")
+                if context is not None:
+                    await warning_points_add_check(self.config, context, target, total)
+                else:
+                    notes.append(
+                        {
+                            "message": "The warning was recorded, but I could not run "
+                            "the automated action; no channel I can talk in.",
+                            "category": "warning",
+                        }
+                    )
+
+                return notes + [
+                    {
+                        "message": f"{target.display_name} warned; they now have "
+                        f"{total} point(s).",
+                        "category": "success",
+                    }
+                ], await self._warn_history(guild, target)
+
+            if action == "unwarn":
+                warn_id = (field("warn_id") or "").strip()
+                if target == author:
+                    return [
+                        {"message": "You cannot remove your own warnings.",
+                         "category": "warning"}
+                    ], {}
+                total = await member_settings.total_points()
+                async with member_settings.warnings() as user_warnings:
+                    if warn_id not in user_warnings:
+                        return [
+                            {"message": "That warning no longer exists.",
+                             "category": "warning"}
+                        ], {}
+                    total -= user_warnings[warn_id]["points"]
+                    user_warnings.pop(warn_id)
+                await member_settings.total_points.set(total)
+
+                context = await fake_context(self.bot, author, "unwarn")
+                if context is not None:
+                    await warning_points_remove_check(self.config, context, target, total)
+
+                await modlog.create_case(
+                    self.bot, guild, datetime.now(tz=timezone.utc), "unwarned",
+                    target, author, (field("reason") or "").strip() or None,
+                )
+                return [
+                    {
+                        "message": f"Warning removed; {target.display_name} now has "
+                        f"{total} point(s).",
+                        "category": "success",
+                    }
+                ], await self._warn_history(guild, target)
+        except discord.Forbidden:
+            return [
+                {"message": "Discord refused that action; check my permissions.",
+                 "category": "danger"}
+            ], {}
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Warnings dashboard action %r failed", action)
+            return [{"message": f"Action failed: {exc}", "category": "danger"}], {}
+
+        return [{"message": f"Unknown action: {action}", "category": "warning"}], {}
+
+    async def _warn_history(self, guild: discord.Guild, target: discord.Member) -> dict:
+        data = await self.config.member(target).all()
+        entries = []
+        for warn_id, warning in (data.get("warnings") or {}).items():
+            moderator = guild.get_member(warning.get("mod") or 0)
+            entries.append(
+                {
+                    "id": warn_id,
+                    "points": warning.get("points", 0),
+                    "description": warning.get("description", ""),
+                    "mod": getattr(moderator, "display_name", None) or "Unknown",
+                    "when": discord.utils.snowflake_time(int(warn_id)).strftime(
+                        "%d %b %Y, %H:%M"
+                    )
+                    if warn_id.isdigit()
+                    else "",
+                }
+            )
+        entries.sort(key=lambda e: e["id"], reverse=True)
+        return {
+            "member": target.display_name,
+            "member_id": str(target.id),
+            "total": data.get("total_points", 0),
+            "entries": entries,
+        }
+
+    async def _warn_handle_post(
+        self, guild: discord.Guild, staff: bool, kwargs: dict
+    ) -> list[dict]:
         field = form_reader(kwargs)
         action = field("action")
         conf = self.config.guild(guild)
+
+        if not staff:
+            return [
+                {
+                    "message": "Only server administrators can change warning settings.",
+                    "category": "danger",
+                }
+            ]
 
         try:
             if action == "save_settings":
@@ -224,6 +469,7 @@ class DashboardIntegration:
 
 WARNINGS_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -233,6 +479,72 @@ WARNINGS_TEMPLATE = (
       &middot; {{ members|length }} member(s) with warnings
     </p>
   </div>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-gavel"></i> Warn a member</h5>
+      <p class="dz-hint">Pick a registered reason, or write a custom one if this
+         server allows them. Points drive the automated actions below.</p>
+      <div class="dz-grid two">
+        <div>
+          <label class="dz-label">Member</label>
+          {{ picker('member_id', member_options, false, 8, 'Search members...') }}
+          <label class="dz-label" style="margin-top:10px;">Registered reason</label>
+          <select class="dz-select" name="reason_name">
+            <option value="">&mdash; custom reason &mdash;</option>
+            {% for r in reasons %}
+              <option value="{{ r.name }}">{{ r.name }} ({{ r.points }} pts)</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="dz-label">Custom reason</label>
+          <input class="dz-input" type="text" name="custom_reason"
+                 placeholder="used when no registered reason is chosen" />
+          <label class="dz-label" style="margin-top:10px;">Points for a custom reason</label>
+          <input class="dz-input" type="number" min="0" name="points" value="1" />
+        </div>
+      </div>
+      <div class="dz-row dz-save">
+        {{ confirm('Warn', 'warn', 'Issue this warning?', 'primary',
+                   'fa-exclamation-triangle') }}
+        <button class="dz-btn" name="action" value="history">
+          <i class="fa fa-history"></i> Show their warnings
+        </button>
+      </div>
+    </div>
+  </form>
+
+  {% if history %}
+    <div class="dz-panel">
+      <h5><i class="fa fa-history"></i> {{ history.member }} &mdash;
+          {{ history.total }} point(s)</h5>
+      {% if history.entries %}
+        <table class="dz-t">
+          <tr><th>When</th><th>Points</th><th>Reason</th><th>By</th><th></th></tr>
+          {% for w in history.entries %}
+            <tr>
+              <td>{{ w.when }}</td>
+              <td>{{ w.points }}</td>
+              <td>{{ w.description }}</td>
+              <td>{{ w.mod }}</td>
+              <td>
+                <form method="POST">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+                  <input type="hidden" name="member_id" value="{{ history.member_id }}" />
+                  <input type="hidden" name="warn_id" value="{{ w.id }}" />
+                  {{ confirm('', 'unwarn', 'Remove this warning?') }}
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </table>
+      {% else %}
+        <p class="dz-empty">No warnings on record.</p>
+      {% endif %}
+    </div>
+  {% endif %}
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />

@@ -24,13 +24,15 @@ from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
 
 from .view import ConfigureHTTPProxyView, ConfigureIPRotationView
 
+from .dashboard_integration import DashboardIntegration
+
 LOGGER = getLogger("PyLav.cog.ManagedNode")
 
 _ = Translator("PyLavManagedNode", Path(__file__))
 
 
 @cog_i18n(_)
-class PyLavManagedNode(DISCORD_COG_TYPE_MIXIN):
+class PyLavManagedNode(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Configure the managed Lavalink node used by PyLav"""
 
     __version__ = "1.0.0"

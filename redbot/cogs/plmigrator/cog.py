@@ -26,13 +26,15 @@ from pylav.logging import getLogger
 from pylav.players.query.obj import Query
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
 
+from .dashboard_integration import DashboardIntegration
+
 LOGGER = getLogger("PyLav.cog.Migrator")
 
 _ = Translator("PyLavMigrator", Path(__file__))
 
 
 @cog_i18n(_)
-class PyLavMigrator(DISCORD_COG_TYPE_MIXIN):
+class PyLavMigrator(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Copy the Red Audio settings over to PyLav"""
 
     lavalink: Client

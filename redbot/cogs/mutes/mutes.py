@@ -23,6 +23,7 @@ from redbot.core.utils.views import SimpleMenu
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 
 from .converters import MuteTime
+from .dashboard_integration import DashboardIntegration
 from .models import ChannelMuteResponse, MuteResponse
 from .voicemutes import VoiceMutes
 
@@ -84,7 +85,7 @@ class CompositeMetaClass(type(commands.Cog), type(ABC)):
 
 
 @i18n.cog_i18n(_)
-class Mutes(VoiceMutes, commands.Cog, metaclass=CompositeMetaClass):
+class Mutes(DashboardIntegration, VoiceMutes, commands.Cog, metaclass=CompositeMetaClass):
     """
     Mute users temporarily or indefinitely.
     """

@@ -24,6 +24,8 @@ from pylav.logging import getLogger
 from pylav.players.query.obj import Query
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 
+from .dashboard_integration import DashboardIntegration
+
 LOGGER = getLogger("PyLav.cog.LocalFiles")
 
 
@@ -45,7 +47,7 @@ async def cache_filled(interaction: DISCORD_INTERACTION_TYPE) -> bool:
 
 
 @cog_i18n(_)
-class PyLavLocalFiles(DISCORD_COG_TYPE_MIXIN):
+class PyLavLocalFiles(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
     """Play local files and folders from the owner configured location"""
 
     __version__ = "1.0.0"

@@ -8,10 +8,13 @@ from redbot.core import bank, commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     dashboard_page,
     form_reader,
     guild_member,
     is_staff,
+    member_options,
+    role_options,
 )
 
 log = logging.getLogger("red.economy.dashboard")
@@ -27,8 +30,25 @@ FIELDS = (
 )
 
 
+# What the slot machine pays, mirroring the PAYOUTS table in the cog.
+SLOT_PAYOUTS = (
+    ("2 2 6", "x50", "Jackpot"),
+    ("4LC 4LC 4LC", "x25", "Three four-leaf clovers"),
+    ("Cherry Cherry Cherry", "x20", "Three cherries"),
+    ("Any three matching symbols", "x10", ""),
+    ("2 6", "x4", "Two then six"),
+    ("Cherry Cherry", "x3", "Two cherries"),
+    ("Any two consecutive symbols", "x2", ""),
+)
+
+
 class DashboardIntegration:
-    """Economy tuning plus a live leaderboard."""
+    """Economy management, tuning and a live leaderboard.
+
+    Covers every ``[p]economyset`` option including per-role payday amounts, the
+    bank operations (``[p]bank set``, ``[p]bank add``, ``[p]bank sub``,
+    ``[p]bank transfer``), the leaderboard and the slot payout table.
+    """
 
     bot: t.Any
     config: t.Any
@@ -98,8 +118,28 @@ class DashboardIntegration:
                 ],
                 "leaderboard": await self._eco_leaderboard(guild, global_bank),
                 "balance": await self._eco_balance(member),
+                "member_options": member_options(guild, humans_only=True),
+                "role_options": role_options(guild),
+                "role_paydays": await self._eco_role_paydays(guild, global_bank),
+                "payouts": SLOT_PAYOUTS,
             },
         }
+
+    async def _eco_role_paydays(
+        self, guild: discord.Guild, global_bank: bool
+    ) -> list[dict]:
+        """Per-role payday overrides. These only apply to a per-server bank."""
+        if global_bank:
+            return []
+        rows = []
+        for role_id, data in (await self.config.all_roles()).items():
+            role = guild.get_role(role_id)
+            credits = (data or {}).get("PAYDAY_CREDITS")
+            if role is None or not credits:
+                continue
+            rows.append({"id": str(role.id), "name": role.name, "credits": credits})
+        rows.sort(key=lambda r: -r["credits"])
+        return rows
 
     async def _eco_balance(self, member: discord.Member):
         try:
@@ -125,9 +165,135 @@ class DashboardIntegration:
             )
         return rows
 
+    async def _eco_bank_action(
+        self, action: str, guild: discord.Guild, field
+    ) -> list[dict]:
+        from redbot.core.errors import BalanceTooHigh
+
+        currency = await bank.get_currency_name(guild)
+
+        try:
+            if action == "role_payday":
+                if await bank.is_global():
+                    return [
+                        {
+                            "message": "Per-role paydays need a per-server bank.",
+                            "category": "warning",
+                        }
+                    ]
+                role = guild.get_role(field.integer("role_id", 0) or 0)
+                if role is None:
+                    return [{"message": "Pick a role.", "category": "warning"}]
+                credits = field.integer("role_credits", 0) or 0
+                if credits <= 0:
+                    await self.config.role(role).clear()
+                    default = await self.config.guild(guild).PAYDAY_CREDITS()
+                    return [
+                        {
+                            "message": f"{role.name} now uses the default payday of "
+                            f"{default} {currency}.",
+                            "category": "success",
+                        }
+                    ]
+                max_balance = await bank.get_max_balance(guild)
+                if credits >= max_balance:
+                    return [
+                        {
+                            "message": f"A payday must be below the maximum balance "
+                            f"of {max_balance}.",
+                            "category": "warning",
+                        }
+                    ]
+                await self.config.role(role).PAYDAY_CREDITS.set(credits)
+                return [
+                    {
+                        "message": f"Members with {role.name} now earn {credits} "
+                        f"{currency} per payday.",
+                        "category": "success",
+                    }
+                ]
+
+            target = guild.get_member(field.integer("member_id", 0) or 0)
+            if target is None:
+                return [{"message": "Pick a member.", "category": "warning"}]
+            amount = field.integer("amount", 0) or 0
+
+            if action == "balance":
+                mode = field("balance_mode") or "set"
+                if mode != "set" and amount <= 0:
+                    return [
+                        {"message": "Enter a positive amount.", "category": "warning"}
+                    ]
+                if mode == "set":
+                    if amount < 0:
+                        return [
+                            {"message": "A balance cannot be negative.",
+                             "category": "warning"}
+                        ]
+                    new = await bank.set_balance(target, amount)
+                elif mode == "add":
+                    new = await bank.deposit_credits(target, amount)
+                else:
+                    if not await bank.can_spend(target, amount):
+                        return [
+                            {
+                                "message": f"{target.display_name} does not have that "
+                                "many credits.",
+                                "category": "warning",
+                            }
+                        ]
+                    new = await bank.withdraw_credits(target, amount)
+                return [
+                    {
+                        "message": f"{target.display_name} now has {new} {currency}.",
+                        "category": "success",
+                    }
+                ]
+
+            if action == "transfer":
+                source = guild.get_member(field.integer("from_member_id", 0) or 0)
+                if source is None:
+                    return [
+                        {"message": "Pick who the credits come from.",
+                         "category": "warning"}
+                    ]
+                if source == target:
+                    return [
+                        {"message": "Pick two different members.", "category": "warning"}
+                    ]
+                if amount <= 0:
+                    return [
+                        {"message": "Enter a positive amount.", "category": "warning"}
+                    ]
+                await bank.transfer_credits(source, target, amount)
+                return [
+                    {
+                        "message": f"Transferred {amount} {currency} from "
+                        f"{source.display_name} to {target.display_name}.",
+                        "category": "success",
+                    }
+                ]
+        except BalanceTooHigh as exc:
+            return [
+                {"message": f"That would exceed the maximum balance ({exc.max_balance}).",
+                 "category": "warning"}
+            ]
+        except ValueError as exc:
+            return [{"message": str(exc), "category": "warning"}]
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Economy dashboard action %r failed", action)
+            return [{"message": f"Action failed: {exc}", "category": "danger"}]
+
+        return [{"message": f"Unknown action: {action}", "category": "warning"}]
+
     async def _eco_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
         field = form_reader(kwargs)
-        if field("action") != "save":
+        action = field("action")
+
+        if action in ("balance", "transfer", "role_payday"):
+            return await self._eco_bank_action(action, guild, field)
+
+        if action != "save":
             return [{"message": "Unknown action.", "category": "warning"}]
 
         global_bank = await bank.is_global()
@@ -176,6 +342,7 @@ class DashboardIntegration:
 
 ECONOMY_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -190,6 +357,78 @@ ECONOMY_TEMPLATE = (
   </div>
 
   {% if is_staff %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-bank"></i> Balances</h5>
+        <p class="dz-hint">Set, add or subtract credits, or move them between members.</p>
+        <div class="dz-grid two">
+          <div>
+            <label class="dz-label">Member</label>
+            {{ picker('member_id', member_options, false, 8, 'Search members...') }}
+          </div>
+          <div>
+            <label class="dz-label">Amount</label>
+            <input class="dz-input" type="number" min="0" name="amount" value="0" />
+            <label class="dz-label" style="margin-top:10px;">What to do</label>
+            <select class="dz-select" name="balance_mode">
+              <option value="set">Set their balance to this</option>
+              <option value="add">Add this many</option>
+              <option value="sub">Take this many away</option>
+            </select>
+          </div>
+        </div>
+        <div class="dz-row dz-save">
+          <button class="dz-btn primary" name="action" value="balance">
+            <i class="fa fa-money"></i> Apply
+          </button>
+        </div>
+        <label class="dz-label" style="margin-top:14px;">Transfer from another member</label>
+        <div class="dz-grid two">
+          <div>
+            {{ picker('from_member_id', member_options, false, 6, 'Search members...') }}
+          </div>
+          <div>
+            <p class="dz-hint">Uses the member and amount chosen above as the
+               destination. Transfer fees still apply.</p>
+            <button class="dz-btn" name="action" value="transfer">
+              <i class="fa fa-exchange"></i> Transfer
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    {% if not global_bank %}
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+        <div class="dz-panel">
+          <h5><i class="fa fa-users"></i> Per-role paydays</h5>
+          <p class="dz-hint">Members with one of these roles earn that amount
+             instead of the default. Set 0 to remove an override.</p>
+          {% if role_paydays %}
+            <table class="dz-t">
+              <tr><th>Role</th><th>Payday</th></tr>
+              {% for r in role_paydays %}
+                <tr><td>{{ r.name }}</td>
+                    <td>{{ "{:,}".format(r.credits) }} {{ currency }}</td></tr>
+              {% endfor %}
+            </table>
+          {% else %}
+            <p class="dz-empty">No role overrides set.</p>
+          {% endif %}
+          <div class="dz-row dz-save">
+            {{ picker('role_id', role_options, false, 6, 'Search roles...') }}
+            <input class="dz-input" type="number" min="0" name="role_credits"
+                   placeholder="credits (0 removes)" style="max-width:200px;" />
+            <button class="dz-btn primary" name="action" value="role_payday">
+              <i class="fa fa-save"></i> Save
+            </button>
+          </div>
+        </div>
+      </form>
+    {% endif %}
+
     <form method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
       <div class="dz-panel">
@@ -240,6 +479,17 @@ ECONOMY_TEMPLATE = (
     {% else %}
       <p class="dz-empty">No accounts yet.</p>
     {% endif %}
+  </div>
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-diamond"></i> Slot payouts</h5>
+    <p class="dz-hint">What each result multiplies the bid by.</p>
+    <table class="dz-t">
+      <tr><th>Result</th><th>Payout</th><th></th></tr>
+      {% for result, payout, note in payouts %}
+        <tr><td>{{ result }}</td><td>{{ payout }}</td><td>{{ note }}</td></tr>
+      {% endfor %}
+    </table>
   </div>
 </div>
 """

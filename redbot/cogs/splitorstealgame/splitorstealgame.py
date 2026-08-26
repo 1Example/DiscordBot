@@ -4,6 +4,7 @@ from AAA3A_utils import Cog
 from redbot.core import commands
 from redbot.core.i18n import Translator, cog_i18n
 
+from .dashboard_integration import DashboardIntegration
 from .view import SplitOrStealGameView
 
 # Credits:
@@ -14,7 +15,7 @@ _: Translator = Translator("SplitOrStealGame", __file__)
 
 
 @cog_i18n(_)
-class SplitOrStealGame(Cog):
+class SplitOrStealGame(DashboardIntegration, Cog):
     """A cog to play a match of Split Or Steal game!"""
 
     @property

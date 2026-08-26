@@ -37,12 +37,14 @@ from typing import Optional, List, Tuple, Union, Dict
 
 MAX_RETRY_COUNT = 10
 
+from .dashboard_integration import DashboardIntegration
+
 _ = Translator("Streams", __file__)
 log = logging.getLogger("red.core.cogs.Streams")
 
 
 @cog_i18n(_)
-class Streams(commands.Cog):
+class Streams(DashboardIntegration, commands.Cog):
     """Various commands relating to streaming platforms.
 
     You can check if a Twitch, YouTube or Picarto stream is

@@ -5,6 +5,8 @@ import discord
 from redbot.core import commands
 from redbot.core.i18n import Translator, cog_i18n
 
+from .dashboard_integration import DashboardIntegration
+
 _ = Translator("Insult", __file__)
 
 insults: List[str] = [
@@ -326,7 +328,7 @@ insults: List[str] = [
 
 
 @cog_i18n(_)
-class Insult(commands.Cog):
+class Insult(DashboardIntegration, commands.Cog):
     """Airenkun's Insult Cog"""
 
     __author__ = ["Airen", "JennJenn", "TrustyJAID"]
