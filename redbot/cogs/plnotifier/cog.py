@@ -223,9 +223,11 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             return
         LOGGER.trace("Starting MPNotifier schedule message dispatcher for %s", channel)
 
-        if channel.guild.id in self._webhook_cache and self._webhook_cache[channel.guild.id].channel_id == channel.id:
+        webhook = self._webhook_cache.get(channel.guild.id)
+        via_webhook = webhook is not None and webhook.channel_id == channel.id
+        if via_webhook:
             send = partial(
-                self._webhook_cache[channel.guild.id].send,
+                webhook.send,
                 thread=channel if isinstance(channel, discord.Thread) else discord.utils.MISSING,
             )
         else:
@@ -235,38 +237,36 @@ class PyLavNotifier(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
         if not embeds:
             return
         self._message_queue[channel] = embed_list[10:]
-        dispatch_mapping = {send: embeds}
-        if not dispatch_mapping:
-            LOGGER.trace("No embeds to dispatch")
-            return
 
-        LOGGER.trace("Sending up to last 10 embeds to %s channels", len(dispatch_mapping))
+        LOGGER.trace("Sending up to 10 embeds to %s", channel)
 
         # Notifications are chatter, not a record; clearing them keeps the
-        # channel readable. Webhook sends need `wait` so there is a message to
-        # delete, and channel sends can do it themselves.
+        # channel readable. A channel send can delete itself, while a webhook
+        # has to be asked to return the message so it can be deleted later.
         try:
             delete_after = await self._config.guild(channel.guild).auto_delete_after()
         except Exception:  # noqa: BLE001 - never block a send on a config read
             delete_after = 0
 
-        async def dispatch(sender, payload: list[discord.Embed]) -> None:
+        try:
             if not delete_after:
-                await sender(embeds=payload)
-                return
-            if sender is channel.send:
-                await sender(embeds=payload, delete_after=delete_after)
-                return
-            message = await sender(embeds=payload, wait=True)
-            if message is not None:
-                await asyncio.sleep(delete_after)
-                with contextlib.suppress(discord.HTTPException):
-                    await message.delete()
+                await send(embeds=embeds)
+            elif via_webhook:
+                message = await send(embeds=embeds, wait=True)
+                if message is not None:
+                    asyncio.create_task(self._delete_later(message, delete_after))
+            else:
+                await send(embeds=embeds, delete_after=delete_after)
+        except discord.HTTPException:
+            # Losing a notification is not worth raising, but silently dropping
+            # every one of them is exactly the failure this used to hide.
+            LOGGER.warning("Could not send notifications to %s", channel, exc_info=True)
 
-        await asyncio.gather(
-            *[dispatch(sender, payload) for sender, payload in dispatch_mapping.items()],
-            return_exceptions=True,
-        )
+    @staticmethod
+    async def _delete_later(message: discord.Message, delay: float) -> None:
+        await asyncio.sleep(delay)
+        with contextlib.suppress(discord.HTTPException):
+            await message.delete()
 
     @commands.guildowner_or_permissions(manage_guild=True)
     @commands.guild_only()

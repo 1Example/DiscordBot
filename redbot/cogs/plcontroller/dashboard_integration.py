@@ -679,7 +679,8 @@ PLAYER_TEMPLATE = """
   }
   .plc-btn:hover { background:rgba(255,255,255,.12); }
   .plc-btn:active { transform:translateY(1px); }
-  .plc-btn.round { border-radius:50%; padding:0; width:44px; }
+  .plc-btn.round { border-radius:50%; padding:0; width:44px; position:relative;
+                   overflow:visible; }
   .plc-btn.play { width:56px; height:56px; border-radius:50%; font-size:1.15rem;
                   background:linear-gradient(135deg,#2f6fed,#5aa9ff); border-color:transparent; color:#fff; }
   .plc-btn.danger { border-color:rgba(255,90,90,.45); color:#ff8b8b; }
@@ -723,6 +724,14 @@ PLAYER_TEMPLATE = """
     display:inline-block; margin-left:6px; padding:1px 6px; border-radius:999px;
     font-size:.66rem; font-weight:800; line-height:1.5;
     background:rgba(90,169,255,.25); border:1px solid rgba(130,175,255,.4);
+  }
+  /* Cost badge for the circular transport buttons, which have no room inside. */
+  .plc-tag.corner {
+    position:absolute; top:-5px; right:-5px; margin-left:0;
+    min-width:19px; height:19px; padding:0 5px; box-sizing:border-box;
+    line-height:17px; font-size:.6rem; text-align:center;
+    background:#2f6fed; border-color:rgba(255,255,255,.25); color:#fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.45);
   }
   .plc-sec-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
                    font-weight:800; opacity:.55; margin:0 0 10px; }
@@ -799,13 +808,13 @@ PLAYER_TEMPLATE = """
 
   <form method="POST" class="plc-controls">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-    <button class="plc-btn round" name="action" value="previous" title="Previous"><i class="fa fa-step-backward"></i>{% if economy and economy.costs.get("previous") %}<span class="plc-tag">{{ economy.costs["previous"] }}</span>{% endif %}</button>
+    <button class="plc-btn round" name="action" value="previous" title="Previous"><i class="fa fa-step-backward"></i>{% if economy and economy.costs.get("previous") %}<span class="plc-tag corner">{{ economy.costs["previous"] }}</span>{% endif %}</button>
     {% if player_state.paused %}
       <button class="plc-btn play" name="action" value="resume" title="Resume"><i class="fa fa-play"></i></button>
     {% else %}
       <button class="plc-btn play" name="action" value="pause" title="Pause"><i class="fa fa-pause"></i></button>
     {% endif %}
-    <button class="plc-btn round" name="action" value="skip" title="Skip"><i class="fa fa-step-forward"></i>{% if economy and economy.costs.get("skip") %}<span class="plc-tag">{{ economy.costs["skip"] }}</span>{% endif %}</button>
+    <button class="plc-btn round" name="action" value="skip" title="Skip"><i class="fa fa-step-forward"></i>{% if economy and economy.costs.get("skip") %}<span class="plc-tag corner">{{ economy.costs["skip"] }}</span>{% endif %}</button>
     <button class="plc-btn" name="action" value="shuffle" title="Shuffle the queue"><i class="fa fa-random"></i> Shuffle{% if economy and economy.costs.get("shuffle") %}<span class="plc-tag">{{ economy.costs["shuffle"] }}</span>{% endif %}</button>
     {% if player_state.current %}
       <button class="plc-btn" name="action" value="fav_add" title="Save this track to the guild favourites"><i class="fa fa-star"></i> Favourite{% if economy and economy.costs.get("fav_add") %}<span class="plc-tag">{{ economy.costs["fav_add"] }}</span>{% endif %}</button>
