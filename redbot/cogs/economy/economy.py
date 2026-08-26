@@ -1,3 +1,4 @@
+import asyncio
 import calendar
 import logging
 from collections import namedtuple
@@ -19,6 +20,13 @@ from .dashboard_integration import DashboardIntegration
 _ = T_ = Translator("Economy", __file__)
 
 logger = logging.getLogger("red.economy")
+
+# How often the auto-payday loop wakes up. Paydays are configured in minutes at
+# the shortest, so a minute of granularity is plenty and costs almost nothing.
+AUTO_PAYDAY_INTERVAL = 60
+
+DEFAULT_PAYDAY_TITLE = "\N{MONEY WITH WINGS} Payslip's here"
+DEFAULT_PAYDAY_MESSAGE = "**{bot}** pays **{total} {currency}** to **{members}** members."
 
 NUM_ENC = "\N{COMBINING ENCLOSING KEYCAP}"
 VARIATION_SELECTOR = "\N{VARIATION SELECTOR-16}"
@@ -81,6 +89,16 @@ class Economy(DashboardIntegration, commands.Cog):
         "SLOT_MAX": 100,
         "SLOT_TIME": 5,
         "REGISTER_CREDITS": 0,
+        # Pay everyone on a timer instead of waiting for them to ask.
+        "AUTO_PAYDAY": False,
+        # 0 pays every member; otherwise only members holding this role.
+        "AUTO_PAYDAY_ROLE": 0,
+        "AUTO_PAYDAY_ANNOUNCE": True,
+        "AUTO_PAYDAY_CHANNEL": 0,
+        "AUTO_PAYDAY_TITLE": "",
+        "AUTO_PAYDAY_MESSAGE": "",
+        "AUTO_PAYDAY_IMAGE": "",
+        "AUTO_PAYDAY_COLOUR": 0,
     }
 
     default_global_settings = default_guild_settings
@@ -100,6 +118,188 @@ class Economy(DashboardIntegration, commands.Cog):
         self.config.register_member(**self.default_member_settings)
         self.config.register_user(**self.default_user_settings)
         self.config.register_role(**self.default_role_settings)
+        self._auto_payday_task: asyncio.Task | None = None
+
+    async def cog_load(self) -> None:
+        self._auto_payday_task = asyncio.create_task(self._auto_payday_loop())
+
+    def cog_unload(self) -> None:
+        if self._auto_payday_task is not None:
+            self._auto_payday_task.cancel()
+
+    # ------------------------------------------------------------ auto payday
+
+    async def _auto_payday_loop(self) -> None:
+        """Run a payday pass for every guild that wants one."""
+        await self.bot.wait_until_red_ready()
+        while True:
+            try:
+                await asyncio.sleep(AUTO_PAYDAY_INTERVAL)
+                for guild in list(self.bot.guilds):
+                    if await self.bot.cog_disabled_in_guild(self, guild):
+                        continue
+                    if not await self.config.guild(guild).AUTO_PAYDAY():
+                        continue
+                    try:
+                        await self.run_auto_payday(guild)
+                    except Exception:  # noqa: BLE001 - one guild must not stop the rest
+                        logger.exception("Auto payday failed in %s (%s)", guild, guild.id)
+            except asyncio.CancelledError:
+                return
+            except Exception:  # noqa: BLE001 - the loop itself must never die
+                logger.exception("Auto payday loop error")
+
+    async def _payday_amount_for(self, member: discord.Member, base: int, role_credits: dict) -> int:
+        """What this member earns, taking the best of their role payouts."""
+        amount = base
+        for role in member.roles:
+            role_amount = (role_credits.get(role.id) or {}).get("PAYDAY_CREDITS", 0)
+            if role_amount > amount:
+                amount = role_amount
+        return amount
+
+    async def run_auto_payday(self, guild: discord.Guild) -> dict:
+        """Pay everyone who is due, and announce it. Returns a summary."""
+        settings = await self.config.guild(guild).all()
+        is_global = await bank.is_global()
+        cur_time = calendar.timegm(datetime.now(timezone.utc).utctimetuple())
+
+        # A global bank keeps one timer per user; a per-guild bank keeps one per
+        # member. Reading them in bulk keeps a 500-member guild to two queries.
+        if is_global:
+            payday_time = await self.config.PAYDAY_TIME()
+            base_credits = await self.config.PAYDAY_CREDITS()
+            timers = await self.config.all_users()
+        else:
+            payday_time = settings["PAYDAY_TIME"]
+            base_credits = settings["PAYDAY_CREDITS"]
+            timers = await self.config.all_members(guild)
+        role_credits = {} if is_global else await self.config.all_roles()
+
+        required_role = settings.get("AUTO_PAYDAY_ROLE") or 0
+        total = 0
+        paid: list[discord.Member] = []
+        capped = 0
+
+        for member in guild.members:
+            if member.bot:
+                continue
+            if required_role and not member.get_role(required_role):
+                continue
+            last = (timers.get(member.id) or {}).get("next_payday", 0)
+            if cur_time < last + payday_time:
+                continue
+
+            amount = (
+                base_credits
+                if is_global
+                else await self._payday_amount_for(member, base_credits, role_credits)
+            )
+            if amount <= 0:
+                continue
+            try:
+                await bank.deposit_credits(member, amount)
+            except errors.BalanceTooHigh as exc:
+                # Top them up to the ceiling rather than skipping them, which is
+                # what the command does, then stop counting them as earning.
+                await bank.set_balance(member, exc.max_balance)
+                capped += 1
+            except Exception:  # noqa: BLE001 - a bad account must not stop payroll
+                logger.exception("Could not pay %s (%s)", member, member.id)
+                continue
+            else:
+                total += amount
+                paid.append(member)
+
+            if is_global:
+                await self.config.user(member).next_payday.set(cur_time)
+            else:
+                await self.config.member(member).next_payday.set(cur_time)
+            # Payroll is not urgent; let the rest of the bot breathe.
+            await asyncio.sleep(0)
+
+        summary = {
+            "paid": len(paid),
+            "total": total,
+            "capped": capped,
+            "next": cur_time + payday_time,
+        }
+        if paid and settings.get("AUTO_PAYDAY_ANNOUNCE"):
+            await self._announce_payday(guild, settings, summary)
+        if paid or capped:
+            logger.info(
+                "Auto payday in %s: %s paid %s, %s at the cap",
+                guild.id,
+                len(paid),
+                total,
+                capped,
+            )
+        return summary
+
+    async def _announce_payday(self, guild: discord.Guild, settings: dict, summary: dict) -> None:
+        channel = guild.get_channel(settings.get("AUTO_PAYDAY_CHANNEL") or 0)
+        if channel is None or not hasattr(channel, "send"):
+            return
+        me = guild.me
+        if me is None or not channel.permissions_for(me).embed_links:
+            return
+
+        currency = await bank.get_currency_name(guild)
+        members = summary["paid"]
+        total = summary["total"]
+        fields = {
+            "bot": me.display_name,
+            "guild": guild.name,
+            "currency": currency,
+            "total": humanize_number(total),
+            "members": humanize_number(members),
+            "average": humanize_number(total // members if members else 0),
+        }
+
+        template = settings.get("AUTO_PAYDAY_MESSAGE") or DEFAULT_PAYDAY_MESSAGE
+        try:
+            description = template.format(**fields)
+        except (KeyError, IndexError, ValueError):
+            # A typo in the template is not worth losing the announcement over.
+            description = DEFAULT_PAYDAY_MESSAGE.format(**fields)
+
+        colour_value = settings.get("AUTO_PAYDAY_COLOUR") or 0
+        try:
+            colour = discord.Colour(colour_value) if colour_value else discord.Colour.gold()
+        except (TypeError, ValueError):
+            colour = discord.Colour.gold()
+
+        embed = discord.Embed(
+            title=(settings.get("AUTO_PAYDAY_TITLE") or DEFAULT_PAYDAY_TITLE).format(**fields),
+            description=description,
+            colour=colour,
+            timestamp=datetime.now(timezone.utc),
+        )
+        embed.add_field(name=_("Members paid"), value=fields["members"])
+        embed.add_field(name=_("Average"), value=f"{fields['average']} {currency}")
+        embed.add_field(
+            name=_("Next payday"),
+            value=discord.utils.format_dt(
+                datetime.fromtimestamp(summary["next"], tz=timezone.utc), "R"
+            ),
+        )
+        if summary["capped"]:
+            embed.add_field(
+                name=_("At the cap"),
+                value=_("{count} already hold the maximum.").format(
+                    count=humanize_number(summary["capped"])
+                ),
+                inline=False,
+            )
+        image = (settings.get("AUTO_PAYDAY_IMAGE") or "").strip()
+        if image.startswith(("http://", "https://")):
+            embed.set_image(url=image)
+        embed.set_footer(text=guild.name, icon_url=guild.icon.url if guild.icon else None)
+
+        try:
+            await channel.send(embed=embed)
+        except discord.HTTPException:
+            logger.warning("Could not announce the payday in %s", channel.id, exc_info=True)
 
     async def red_delete_data_for_user(
         self,
@@ -292,6 +492,17 @@ class Economy(DashboardIntegration, commands.Cog):
                 )
             )
 
+    async def _too_soon(self, ctx: commands.Context, relative_time: str) -> str:
+        """Explain the wait, and say so differently when payday is automatic."""
+        if ctx.guild is not None and await self.config.guild(ctx.guild).AUTO_PAYDAY():
+            return _(
+                "{author.mention} You do not need this command here — "
+                "your payday lands on its own. The next one is {relative_time}."
+            ).format(author=ctx.author, relative_time=relative_time)
+        return _("{author.mention} Too soon. Your next payday is {relative_time}.").format(
+            author=ctx.author, relative_time=relative_time
+        )
+
     @guild_only_check()
     @commands.command()
     async def payday(self, ctx: commands.Context):
@@ -347,11 +558,7 @@ class Economy(DashboardIntegration, commands.Cog):
                 relative_time = discord.utils.format_dt(
                     datetime.now(timezone.utc) + timedelta(seconds=next_payday - cur_time), "R"
                 )
-                await ctx.send(
-                    _("{author.mention} Too soon. Your next payday is {relative_time}.").format(
-                        author=author, relative_time=relative_time
-                    )
-                )
+                await ctx.send(await self._too_soon(ctx, relative_time))
         else:
             # Gets the users latest successfully payday and adds the guilds payday time
             next_payday = (
@@ -404,11 +611,7 @@ class Economy(DashboardIntegration, commands.Cog):
                 relative_time = discord.utils.format_dt(
                     datetime.now(timezone.utc) + timedelta(seconds=next_payday - cur_time), "R"
                 )
-                await ctx.send(
-                    _("{author.mention} Too soon. Your next payday is {relative_time}.").format(
-                        author=author, relative_time=relative_time
-                    )
-                )
+                await ctx.send(await self._too_soon(ctx, relative_time))
 
     @commands.command()
     @guild_only_check()

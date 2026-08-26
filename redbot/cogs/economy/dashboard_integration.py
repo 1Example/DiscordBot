@@ -13,6 +13,7 @@ from redbot.core.utils.dashboard_helpers import (
     form_reader,
     guild_member,
     is_staff,
+    channel_options,
     member_options,
     role_options,
 )
@@ -106,8 +107,110 @@ class DashboardIntegration:
                 "member_options": member_options(guild, humans_only=True),
                 "role_options": role_options(guild),
                 "role_paydays": await self._eco_role_paydays(guild, global_bank),
+                **await self._eco_autopayday_context(guild),
             },
         }
+
+    async def _eco_autopayday_context(self, guild: discord.Guild) -> dict:
+        """The automatic-payday card.
+
+        These always live on the guild even when the bank is global: the amount
+        is shared across servers, but whether a server hands it out on a timer
+        and where it says so are that server's business.
+        """
+        from .economy import DEFAULT_PAYDAY_MESSAGE, DEFAULT_PAYDAY_TITLE
+
+        auto = await self.config.guild(guild).all()
+        colour = auto.get("AUTO_PAYDAY_COLOUR") or 0
+        return {
+            "auto_enabled": bool(auto.get("AUTO_PAYDAY")),
+            "auto_announce": bool(auto.get("AUTO_PAYDAY_ANNOUNCE", True)),
+            "auto_channels": channel_options(
+                guild, selected=auto.get("AUTO_PAYDAY_CHANNEL"), require_send=True
+            ),
+            "auto_roles": role_options(guild, selected=auto.get("AUTO_PAYDAY_ROLE")),
+            "auto_title": auto.get("AUTO_PAYDAY_TITLE") or "",
+            "auto_message": auto.get("AUTO_PAYDAY_MESSAGE") or "",
+            "auto_image": auto.get("AUTO_PAYDAY_IMAGE") or "",
+            "auto_colour": f"#{colour:06x}" if colour else "#f1c40f",
+            "auto_title_default": DEFAULT_PAYDAY_TITLE,
+            "auto_message_default": DEFAULT_PAYDAY_MESSAGE,
+            "eligible": sum(1 for m in guild.members if not m.bot),
+        }
+
+    async def _eco_save_autopayday(self, guild: discord.Guild, field) -> list[dict]:
+        conf = self.config.guild(guild)
+
+        message = (field("auto_message") or "").strip()
+        if message:
+            try:
+                message.format(
+                    bot="", guild="", currency="", total="", members="", average=""
+                )
+            except (KeyError, IndexError, ValueError) as exc:
+                return [
+                    {
+                        "message": f"The message uses something I cannot fill in: {exc}. "
+                        "Stick to {bot}, {guild}, {currency}, {total}, {members} "
+                        "and {average}.",
+                        "category": "warning",
+                    }
+                ]
+
+        image = (field("auto_image") or "").strip()
+        if image and not image.startswith(("http://", "https://")):
+            return [
+                {
+                    "message": "The image has to be a http(s) link to a gif or picture.",
+                    "category": "warning",
+                }
+            ]
+
+        enabled = field.checked("auto_enabled")
+        channel = field.integer("auto_channel", 0) or 0
+        announce = field.checked("auto_announce")
+        if enabled and announce and not channel:
+            return [
+                {
+                    "message": "Pick a channel for the payslip, or turn the "
+                    "announcement off.",
+                    "category": "warning",
+                }
+            ]
+
+        await conf.AUTO_PAYDAY.set(enabled)
+        await conf.AUTO_PAYDAY_ROLE.set(field.integer("auto_role", 0) or 0)
+        await conf.AUTO_PAYDAY_ANNOUNCE.set(announce)
+        await conf.AUTO_PAYDAY_CHANNEL.set(channel)
+        await conf.AUTO_PAYDAY_TITLE.set((field("auto_title") or "").strip()[:250])
+        await conf.AUTO_PAYDAY_MESSAGE.set(message[:2000])
+        await conf.AUTO_PAYDAY_IMAGE.set(image[:500])
+        await conf.AUTO_PAYDAY_COLOUR.set(self._eco_colour_int(field("auto_colour")))
+
+        if not enabled:
+            return [
+                {"message": "Automatic payday is off; members claim it themselves.",
+                 "category": "success"}
+            ]
+        every = await (
+            self.config.PAYDAY_TIME() if await bank.is_global()
+            else self.config.guild(guild).PAYDAY_TIME()
+        )
+        return [
+            {
+                "message": f"Automatic payday is on. Everyone due is paid within a "
+                f"minute of their {every // 60 or 1}-minute timer.",
+                "category": "success",
+            }
+        ]
+
+    @staticmethod
+    def _eco_colour_int(value) -> int:
+        raw = (value or "").strip().lstrip("#")
+        try:
+            return int(raw, 16) if raw else 0
+        except ValueError:
+            return 0
 
     async def _eco_role_paydays(
         self, guild: discord.Guild, global_bank: bool
@@ -277,6 +380,25 @@ class DashboardIntegration:
         if action in ("balance", "transfer", "role_payday"):
             return await self._eco_bank_action(action, guild, field)
 
+        if action == "save_autopayday":
+            return await self._eco_save_autopayday(guild, field)
+
+        if action == "run_payday":
+            summary = await self.run_auto_payday(guild)
+            if not summary["paid"]:
+                return [
+                    {"message": "Nobody was due; everyone has been paid recently.",
+                     "category": "info"}
+                ]
+            currency = await bank.get_currency_name(guild)
+            return [
+                {
+                    "message": f"Paid {summary['total']} {currency} to "
+                    f"{summary['paid']} member(s).",
+                    "category": "success",
+                }
+            ]
+
         if action != "save":
             return [{"message": "Unknown action.", "category": "warning"}]
 
@@ -317,6 +439,14 @@ ECONOMY_TEMPLATE = (
     BASE_CSS
     + MACROS
     + """
+<style>
+  .eco-slip { margin-top:11px; padding:10px 13px; border-radius:8px;
+              border-left:4px solid #f1c40f; background:rgba(255,255,255,.04); }
+  .eco-slip-t { font-weight:600; font-size:.86rem; margin-bottom:7px; }
+  .eco-slip-img { max-width:100%; max-height:190px; border-radius:6px; display:block; }
+  .eco-slip-bad { font-size:.75rem; color:#ff8b8b; }
+</style>
+
 <div class="dz">
   <div class="dz-head">
     <h4><i class="fa fa-money"></i> {{ bank_name }}</h4>
@@ -428,6 +558,90 @@ ECONOMY_TEMPLATE = (
       </div>
     </form>
   {% endif %}
+
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-clock-o"></i> Automatic payday</h5>
+      <p class="dz-hint">
+        Hand out the payday on its own timer so nobody has to run the command.
+        Everyone due is paid within a minute of their cooldown expiring, and the
+        <code>payday</code> command keeps working as a way to check the wait.
+      </p>
+
+      <label class="dz-toggle">
+        <input type="checkbox" name="auto_enabled" {% if auto_enabled %}checked{% endif %} />
+        <span>Pay everyone automatically
+          <span class="dz-tag">{{ eligible }} member{{ '' if eligible == 1 else 's' }}</span>
+        </span>
+      </label>
+
+      <div class="dz-label" style="margin-top:11px;">Only pay members with this role</div>
+      {{ picker('auto_role', auto_roles, allow_none=true, none_label='everyone') }}
+
+      <div style="margin-top:16px; padding-top:13px;
+                  border-top:1px solid rgba(255,255,255,.07);">
+        <label class="dz-toggle">
+          <input type="checkbox" name="auto_announce"
+                 {% if auto_announce %}checked{% endif %} />
+          <span>Post a payslip after each run</span>
+        </label>
+
+        <div class="dz-label" style="margin-top:11px;">Payslip channel</div>
+        {{ picker('auto_channel', auto_channels, allow_none=true, none_label='pick a channel') }}
+
+        <div class="dz-grid two" style="margin-top:11px;">
+          <div>
+            <div class="dz-label">Title</div>
+            <input class="dz-input" type="text" name="auto_title" value="{{ auto_title }}"
+                   placeholder="{{ auto_title_default }}" />
+          </div>
+          <div>
+            <div class="dz-label">Accent colour</div>
+            <input class="dz-input" type="text" name="auto_colour" value="{{ auto_colour }}"
+                   placeholder="#f1c40f" />
+          </div>
+        </div>
+
+        <div class="dz-label" style="margin-top:11px;">Message</div>
+        <textarea class="dz-area" name="auto_message"
+                  style="min-height:62px;">{{ auto_message }}</textarea>
+        <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+          Defaults to <code>{{ auto_message_default }}</code>. You can use
+          <code>{bot}</code>, <code>{guild}</code>, <code>{currency}</code>,
+          <code>{total}</code>, <code>{members}</code> and <code>{average}</code>.
+        </div>
+
+        <div class="dz-label" style="margin-top:11px;">Gif or image</div>
+        <input class="dz-input" type="url" name="auto_image" value="{{ auto_image }}"
+               placeholder="https://.../payday.gif" />
+        <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+          A direct http(s) link. Sits under the text in the embed.
+        </div>
+
+        {% if auto_image %}
+          <div class="eco-slip" style="border-left-color:{{ auto_colour }};">
+            <div class="eco-slip-t">{{ auto_title or auto_title_default }}</div>
+            <img src="{{ auto_image }}" alt="" class="eco-slip-img"
+                 onerror="this.replaceWith(Object.assign(document.createElement('div'),
+                          {className:'eco-slip-bad',
+                           textContent:'That link did not load as an image.'}));" />
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="dz-save">
+        <button class="dz-btn primary" name="action" value="save_autopayday">
+          <i class="fa fa-save"></i> Save
+        </button>
+        <button class="dz-btn" name="action" value="run_payday"
+                onclick="return confirm('Pay everyone who is due right now?');">
+          <i class="fa fa-bolt"></i> Run one now
+        </button>
+      </div>
+    </div>
+  </form>
 
   <div class="dz-panel">
     <h5><i class="fa fa-trophy"></i> Leaderboard</h5>
