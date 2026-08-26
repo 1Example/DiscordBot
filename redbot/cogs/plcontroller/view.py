@@ -1152,13 +1152,43 @@ class PersistentControllerView(discord.ui.View):
         "refresh_button",
     )
 
+    async def _tell(self, interaction: DISCORD_INTERACTION_TYPE, description: str) -> None:
+        """Reply to a click, publicly and briefly.
+
+        `discord.Interaction` has no `send`; PyLav's own helper type does, but
+        the object discord.py hands to `interaction_check` is the plain one. The
+        response has already been deferred by this point, so the followup
+        webhook is the route back, with the channel as a last resort.
+        """
+        embed = None
+        with contextlib.suppress(Exception):
+            embed = await interaction.client.pylav.construct_embed(
+                description=description, messageable=interaction
+            )
+        payload = {"embed": embed} if embed is not None else {"content": description}
+
+        try:
+            message = await interaction.followup.send(**payload, wait=True)
+        except Exception:  # noqa: BLE001
+            LOGGER.debug("Followup refused, falling back to the channel", exc_info=True)
+            message = None
+        if message is None:
+            channel = getattr(interaction, "channel", None) or self.channel
+            with contextlib.suppress(Exception):
+                await channel.send(**payload, delete_after=PUBLIC_DELETE_AFTER)
+            return
+        with contextlib.suppress(Exception):
+            await message.delete(delay=PUBLIC_DELETE_AFTER)
+
     async def _may_manage(self, interaction: DISCORD_INTERACTION_TYPE) -> bool:
         """Whether this member may use the staff-only buttons.
 
-        Mirrors `_dash_is_staff` on the dashboard. `is_dj_logic` is still
-        honoured on top, so a configured DJ role keeps working - but on its own
-        it is not enough, because PyLav lets everyone through when a guild has
-        no DJ role set, which is the default.
+        Mirrors `_dash_is_staff` on the dashboard exactly.
+
+        `is_dj_logic` deliberately plays no part: it returns True for every
+        member when a guild has no DJ role configured, which is the default, so
+        allowing it alongside the staff test hands the permission straight back
+        to everyone.
         """
         member = interaction.user
         guild = getattr(interaction, "guild", None) or self.channel.guild
@@ -1175,11 +1205,7 @@ class PersistentControllerView(discord.ui.View):
                 return True
         except Exception:  # noqa: BLE001 - a failed lookup must not grant access
             LOGGER.exception("Could not resolve staff status for %s", member)
-            return False
-        try:
-            return await is_dj_logic(interaction)
-        except Exception:  # noqa: BLE001
-            return False
+        return False
 
     async def interaction_check(self, interaction: DISCORD_INTERACTION_TYPE, /) -> bool:
         # PyLav's own callbacks hardcode ephemeral replies, which cannot be
@@ -1206,24 +1232,18 @@ class PersistentControllerView(discord.ui.View):
         listener_allowed = button_name in self.LISTENER_BUTTONS
 
         if not listener_allowed and not await self._may_manage(interaction):
-            await interaction.send(
-                embed=await interaction.client.pylav.construct_embed(
-                    description=_(
-                        "That one is for staff and disc jockeys. You can still play, pause, "
-                        "skip, previous, shuffle and adjust the volume."
-                    ),
-                    messageable=interaction,
+            LOGGER.debug("Refused %r to %s: not staff", button_name, interaction.user)
+            await self._tell(
+                interaction,
+                _(
+                    "That one is for staff only. You can still play, pause, skip, "
+                    "previous, shuffle and adjust the volume."
                 ),
-                delete_after=PUBLIC_DELETE_AFTER,
             )
             return False
         if not (self.cog.pylav.get_player(self.channel.guild.id)):
-            await interaction.send(
-                embed=await interaction.client.pylav.construct_embed(
-                    description=_("I am not currently playing anything on this server."),
-                    messageable=interaction,
-                ),
-                delete_after=PUBLIC_DELETE_AFTER,
+            await self._tell(
+                interaction, _("I am not currently playing anything on this server.")
             )
             return False
         return await self._charge_for(interaction, button_name)
@@ -1271,20 +1291,17 @@ class PersistentControllerView(discord.ui.View):
             if not await bank.can_spend(member, cost):
                 currency = await bank.get_currency_name(self.channel.guild)
                 balance = await bank.get_balance(member)
-                await interaction.send(
-                    embed=await interaction.client.pylav.construct_embed(
-                        description=_(
-                            "That costs {cost_variable_do_not_translate} "
-                            "{currency_variable_do_not_translate}, but you only have "
-                            "{balance_variable_do_not_translate}."
-                        ).format(
-                            cost_variable_do_not_translate=cost,
-                            currency_variable_do_not_translate=currency,
-                            balance_variable_do_not_translate=balance,
-                        ),
-                        messageable=interaction,
+                await self._tell(
+                    interaction,
+                    _(
+                        "That costs {cost_variable_do_not_translate} "
+                        "{currency_variable_do_not_translate}, but you only have "
+                        "{balance_variable_do_not_translate}."
+                    ).format(
+                        cost_variable_do_not_translate=cost,
+                        currency_variable_do_not_translate=currency,
+                        balance_variable_do_not_translate=balance,
                     ),
-                    delete_after=PUBLIC_DELETE_AFTER,
                 )
                 return False
             await bank.withdraw_credits(member, cost)
