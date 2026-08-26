@@ -1,7 +1,43 @@
 * text eol=lf
 
-# binary file excludsions
+# Binary file exclusions.
+#
+# The `* text eol=lf` above marks every path as text, which makes git strip CR
+# bytes out of file contents on commit. That is fine for source, and silently
+# destroys any binary that happens to contain a CR LF byte pair - the file on
+# disk still looks right, but a fresh clone gets a byte-short, unreadable copy.
+# Anything that is not text belongs on this list.
 *.png binary
+*.webp binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.mo binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.7z binary
+*.jar binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.pyc binary
+*.pyd binary
+*.so binary
+*.dll binary
+*.mp3 binary
+*.ogg binary
+*.wav binary
+*.mp4 binary
+*.webm binary
+*.pdf binary
 
 # include commit/tag information in `.git_archive_info.txt` when packing with git-archive
 .git_archive_info.txt export-subst
