@@ -116,6 +116,10 @@ class DashboardIntegration:
             "text": (field("text") or "").strip(),
             "target": field("target") or None,
             "keep_pinned": field.checked("keep_pinned"),
+            # Message IDs bounding the scan, covering `[p]cleanup before`,
+            # `after` and `between` in one form.
+            "before_id": (field("before_id") or "").strip(),
+            "after_id": (field("after_id") or "").strip(),
         }
 
     def _cu_check(self, guild: discord.Guild, state: dict):
@@ -149,13 +153,26 @@ class DashboardIntegration:
 
     async def _cu_collect(self, channel, state: dict) -> list[discord.Message]:
         check = self._cu_check(channel.guild, state)
+        before = self._cu_bound(state["before_id"])
+        after = self._cu_bound(state["after_id"])
         return await self.get_messages_for_deletion(
             channel=channel,
-            number=state["number"],
+            # With an explicit range the count is a cap, not a target; passing
+            # `number` alongside `after` would cut the range short.
+            number=None if after else state["number"],
             check=check,
             limit=MAX_SCAN,
+            before=before,
+            after=after,
             delete_pinned=not state["keep_pinned"],
         )
+
+    @staticmethod
+    def _cu_bound(raw: str):
+        """Turn a message ID into the timestamp `get_messages_for_deletion` wants."""
+        if not raw or not raw.isdigit():
+            return None
+        return discord.utils.snowflake_time(int(raw))
 
     async def _cu_handle_post(self, guild, actor, kwargs: dict, state: dict):
         field = form_reader(kwargs)
@@ -316,6 +333,23 @@ CLEANUP_TEMPLATE = (
             <input type="checkbox" name="keep_pinned" {% if state.keep_pinned %}checked{% endif %} />
             <span>Keep pinned messages</span>
           </label>
+
+          <div style="margin-top:10px;">
+            <div class="dz-label">Only messages in a range</div>
+            <div class="dz-row">
+              <input class="dz-input" type="text" name="after_id"
+                     value="{{ state.after_id }}" placeholder="after this message ID"
+                     style="flex:1 1 160px;" />
+              <input class="dz-input" type="text" name="before_id"
+                     value="{{ state.before_id }}" placeholder="before this message ID"
+                     style="flex:1 1 160px;" />
+            </div>
+            <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+              Fill one for before or after, both for a window. Copy a message ID in
+              Discord with developer mode on. Discord still refuses to bulk delete
+              anything older than 14 days.
+            </div>
+          </div>
         </div>
       </div>
 

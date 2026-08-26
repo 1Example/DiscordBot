@@ -95,6 +95,8 @@ class DashboardIntegration:
                         "template": (data.get("template") or "")[:120],
                         "embed": bool(data.get("embed", True)),
                         "tag_count": len(data.get("tags") or []),
+                        "limit": data.get("limit") or 0,
+                        "allowed_tags": sorted(data.get("allowed_tags") or []),
                     }
                 )
             out.append(
@@ -123,11 +125,106 @@ class DashboardIntegration:
                 return await self._rss_remove(channel, field("name"))
             if action == "toggle_embed":
                 return await self._rss_toggle_embed(channel, field("name"))
+            if action == "force":
+                return await self._rss_force_post(channel, field("name"))
+            if action == "limit":
+                return await self._rss_set_limit(channel, field("name"), field)
+            if action in ("tag_allow", "tag_deny"):
+                return await self._rss_tag(action, channel, field("name"), field)
         except Exception as exc:  # noqa: BLE001
             log.exception("RSS dashboard action %r failed", action)
             return [{"message": f"Action failed: {exc}", "category": "danger"}]
 
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
+
+    async def _rss_force_post(self, channel, name: str | None) -> list[dict]:
+        """Post the newest entry now, the way `[p]rss force` does."""
+        name = (name or "").strip().lower()
+        feed = await self.config.channel(channel).feeds.get_raw(name, default=None)
+        if not feed:
+            return [
+                {"message": f"'{name}' is not a feed in {channel.mention}.",
+                 "category": "warning"}
+            ]
+        await self.get_current_feed(channel, name, feed, force=True)
+        return [
+            {"message": f"Forced a post of '{name}' into {channel.mention}.",
+             "category": "success"}
+        ]
+
+    async def _rss_set_limit(self, channel, name: str | None, field) -> list[dict]:
+        """Character cap for a feed's posts, matching `[p]rss limit`."""
+        name = (name or "").strip().lower()
+        feed = await self.config.channel(channel).feeds.get_raw(name, default=None)
+        if not feed:
+            return [
+                {"message": f"'{name}' is not a feed in {channel.mention}.",
+                 "category": "warning"}
+            ]
+        limit = field.integer("limit", 0) or 0
+        if limit < 0:
+            return [
+                {"message": "A character limit cannot be negative.", "category": "warning"}
+            ]
+        note = ""
+        # The command treats anything over 20000 as unlimited and floors at 20.
+        if limit > 20000:
+            limit = 0
+        elif 0 < limit < 20:
+            limit = 20
+            note = " The minimum is 20, so that is what was saved."
+        async with self.config.channel(channel).feeds() as feeds:
+            feeds[name]["limit"] = limit
+        if limit == 0:
+            return [
+                {"message": f"'{name}' posts are no longer truncated.{note}",
+                 "category": "success"}
+            ]
+        return [
+            {"message": f"'{name}' posts are capped at {limit} characters.{note}",
+             "category": "success"}
+        ]
+
+    async def _rss_tag(self, action: str, channel, name: str | None, field) -> list[dict]:
+        """Allow-list a feed's tags, matching `[p]rss tag allow`.
+
+        With an allow list set, only entries carrying one of those tags post.
+        """
+        name = (name or "").strip().lower()
+        feed = await self.config.channel(channel).feeds.get_raw(name, default=None)
+        if not feed:
+            return [
+                {"message": f"'{name}' is not a feed in {channel.mention}.",
+                 "category": "warning"}
+            ]
+        tag = (field("tag") or "").strip().lower()
+        if not tag:
+            return [{"message": "Enter a tag.", "category": "warning"}]
+
+        async with self.config.channel(channel).feeds() as feeds:
+            allowed = feeds[name].get("allowed_tags") or []
+            if action == "tag_allow":
+                if tag in allowed:
+                    return [
+                        {"message": f"'{tag}' is already allowed on '{name}'.",
+                         "category": "info"}
+                    ]
+                allowed.append(tag)
+                message = f"'{tag}' added to the allowed tags for '{name}'."
+            else:
+                if tag not in allowed:
+                    return [
+                        {"message": f"'{tag}' is not in the allowed list for '{name}'.",
+                         "category": "info"}
+                    ]
+                allowed.remove(tag)
+                message = f"'{tag}' removed from the allowed tags for '{name}'."
+            feeds[name]["allowed_tags"] = allowed
+            remaining = len(allowed)
+
+        if not remaining:
+            message += " With no allowed tags, every entry posts again."
+        return [{"message": message, "category": "success"}]
 
     async def _rss_add(self, channel, name: str | None, url: str | None) -> list[dict]:
         name = (name or "").strip().lower()
@@ -244,6 +341,10 @@ RSS_TEMPLATE = (
               <td>
                 <span class="dz-tag">{% if f.embed %}embed{% else %}text{% endif %}</span>
                 {% if f.tag_count %}<span class="dz-tag">{{ f.tag_count }} tags</span>{% endif %}
+                {% if f.limit %}<span class="dz-tag">{{ f.limit }} chars</span>{% endif %}
+                {% if f.allowed_tags %}
+                  <span class="dz-tag warn">only: {{ f.allowed_tags|join(', ') }}</span>
+                {% endif %}
               </td>
               <td style="white-space:nowrap; width:1%;">
                 <form method="POST" style="display:inline;">
@@ -254,6 +355,10 @@ RSS_TEMPLATE = (
                           title="Switch between embed and plain text">
                     <i class="fa fa-exchange"></i>
                   </button>
+                  <button class="dz-btn round" name="action" value="force"
+                          title="Post the newest entry now">
+                    <i class="fa fa-paper-plane"></i>
+                  </button>
                 </form>
                 <form method="POST" style="display:inline;"
                       onsubmit="return confirm('Remove {{ f.name }}?');">
@@ -262,6 +367,31 @@ RSS_TEMPLATE = (
                   <input type="hidden" name="name" value="{{ f.name }}" />
                   <button class="dz-btn round danger" name="action" value="remove" title="Remove">
                     <i class="fa fa-trash-o"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="5" style="padding-top:0;">
+                <form method="POST" class="dz-row" style="gap:6px;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+                  <input type="hidden" name="channel" value="{{ ch.id }}" />
+                  <input type="hidden" name="name" value="{{ f.name }}" />
+                  <input class="dz-input" type="number" min="0" name="limit"
+                         value="{{ f.limit }}" placeholder="character limit (0 = none)"
+                         style="max-width:210px;" />
+                  <button class="dz-btn" name="action" value="limit" title="Save the limit">
+                    <i class="fa fa-text-width"></i>
+                  </button>
+                  <input class="dz-input" type="text" name="tag"
+                         placeholder="tag to allow or remove" style="max-width:220px;" />
+                  <button class="dz-btn" name="action" value="tag_allow"
+                          title="Only post entries with this tag">
+                    <i class="fa fa-filter"></i> Allow
+                  </button>
+                  <button class="dz-btn" name="action" value="tag_deny"
+                          title="Stop requiring this tag">
+                    <i class="fa fa-times"></i> Unallow
                   </button>
                 </form>
               </td>

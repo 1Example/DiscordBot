@@ -13,6 +13,7 @@ from redbot.core.utils.dashboard_helpers import (
     MACROS,
     channel_options,
     dashboard_page,
+    fake_context,
     form_reader,
     guild_member,
     is_staff,
@@ -301,6 +302,9 @@ class DashboardIntegration:
         action = field("action")
 
         try:
+            if action == "create_for":
+                return await self._tk_create_for(member, guild, field)
+
             if action.startswith("ticket_"):
                 return await self._tk_ticket_action(action, member, guild, field)
 
@@ -372,6 +376,43 @@ class DashboardIntegration:
             return [{"message": f"Action failed: {exc}", "category": "danger"}]
 
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
+
+    async def _tk_create_for(
+        self, member: discord.Member, guild: discord.Guild, field
+    ) -> list[dict]:
+        """Open a ticket on someone else's behalf, like `[p]ticket createfor`."""
+        owner = guild.get_member(field.integer("owner_id", 0) or 0)
+        if owner is None:
+            return [{"message": "Pick the member the ticket is for.", "category": "warning"}]
+        profile = (field("profile") or "main").strip()
+        profiles = await self.config.guild(guild).profiles()
+        if profile not in profiles:
+            return [{"message": f"No profile named {profile}.", "category": "warning"}]
+        reason = (field("reason") or "").strip() or None
+        if reason and len(reason) > 1000:
+            return [
+                {"message": "A reason cannot exceed 1000 characters.",
+                 "category": "warning"}
+            ]
+
+        # `create_ticket` sends into the context it is handed, so it needs a real one.
+        context = await fake_context(self.bot, member, "ticket createfor")
+        if context is None:
+            return [
+                {
+                    "message": "I could not open a ticket; there is no channel I can "
+                    "talk in.",
+                    "category": "danger",
+                }
+            ]
+        await self.create_ticket(context, profile, owner, reason=reason)
+        return [
+            {
+                "message": f"Ticket opened for {owner.display_name} on the "
+                f"{profile} profile.",
+                "category": "success",
+            }
+        ]
 
     async def _tk_ticket_action(
         self, action: str, member: discord.Member, guild: discord.Guild, field
@@ -528,6 +569,38 @@ TICKETS_TEMPLATE = (
       <p class="dz-empty">You need a support role to manage tickets here.</p>
     </div>
   {% else %}
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-plus"></i> Open a ticket for someone</h5>
+      <p class="dz-hint">Creates the ticket as if that member had opened it themselves.</p>
+      <div class="dz-grid three">
+        <div>
+          <label class="dz-label">Member</label>
+          {{ picker('owner_id', member_options, false, 8, 'Search members...') }}
+        </div>
+        <div>
+          <label class="dz-label">Profile</label>
+          <select class="dz-select" name="profile">
+            {% for name in profile_names %}
+              <option value="{{ name }}">{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="dz-label">Reason</label>
+          <input class="dz-input" type="text" name="reason" maxlength="1000"
+                 placeholder="why the ticket is being opened" />
+        </div>
+      </div>
+      <div class="dz-save">
+        <button class="dz-btn primary" name="action" value="create_for">
+          <i class="fa fa-ticket"></i> Open ticket
+        </button>
+      </div>
+    </div>
+  </form>
 
   <div class="dz-panel">
     <h5><i class="fa fa-inbox"></i> Tickets</h5>

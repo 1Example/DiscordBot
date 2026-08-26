@@ -19,11 +19,14 @@ ACTIVITY_TYPES = {
     "streaming": "Streaming",
 }
 
+# Keys are `discord.Status` members. `offline` is what the `[p]botstatus ...
+# offline` commands store, so it has to round-trip here too.
 PRESENCE_STATES = {
     "online": "Online",
     "idle": "Idle",
     "dnd": "Do not disturb",
     "invisible": "Invisible",
+    "offline": "Offline",
 }
 
 MAX_TEXT = 128

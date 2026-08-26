@@ -8,6 +8,8 @@ from redbot.core import commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
+    member_options,
     channel_options,
     dashboard_page,
     form_reader,
@@ -86,6 +88,12 @@ class DashboardIntegration:
                 ],
                 "channels": channel_options(guild, selected=settings.get("announce_channel")),
                 "announce_set": settings.get("announce_channel") is not None,
+                "member_options": member_options(guild),
+                "all_roles": role_options(guild),
+                "is_owner": await self.bot.is_owner(user),
+                "serverlocked": await self.config.serverlocked(),
+                "announcing": self.is_announcing(),
+                "guild_count": len(self.bot.guilds),
             },
         }
 
@@ -95,6 +103,19 @@ class DashboardIntegration:
         conf = self.config.guild(guild)
 
         try:
+            if action in ("give_role", "take_role", "edit_role"):
+                return await self._admin_role_action(action, guild, field)
+
+            if action in ("serverlock", "announce", "announce_cancel"):
+                return await self._admin_owner_action(action, field)
+
+            if action == "clear_selfroles":
+                await conf.selfroles.clear()
+                return [
+                    {"message": "Every self-assignable role was removed.",
+                     "category": "success"}
+                ]
+
             if action == "add_selfrole":
                 raw = field("role") or ""
                 if not raw.isdigit():
@@ -161,8 +182,147 @@ class DashboardIntegration:
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
 
 
+    async def _admin_owner_action(self, action: str, field) -> list[dict]:
+        """Bot-wide actions: the server lock and the cross-server announcement."""
+        if action == "serverlock":
+            locked = field.checked("serverlocked")
+            await self.config.serverlocked.set(locked)
+            if locked:
+                return [
+                    {
+                        "message": "I will now leave any new server I am added to.",
+                        "category": "success",
+                    }
+                ]
+            return [
+                {"message": "I can be added to new servers again.", "category": "success"}
+            ]
+
+        if action == "announce_cancel":
+            if not self.is_announcing():
+                return [
+                    {"message": "No announcement is running.", "category": "info"}
+                ]
+            # `__current_announcer` is name-mangled on the cog class.
+            getattr(self, "_Admin__current_announcer").cancel()
+            return [{"message": "Announcement cancelled.", "category": "success"}]
+
+        if action == "announce":
+            message = (field("announcement") or "").strip()
+            if not message:
+                return [{"message": "Write something to announce.", "category": "warning"}]
+            if self.is_announcing():
+                return [
+                    {
+                        "message": "An announcement is already running; cancel it first.",
+                        "category": "warning",
+                    }
+                ]
+            from types import SimpleNamespace
+
+            from .announcer import Announcer
+
+            # The announcer only reads `ctx.bot`, so a namespace is enough here.
+            announcer = Announcer(
+                SimpleNamespace(bot=self.bot), message, config=self.config
+            )
+            announcer.start()
+            setattr(self, "_Admin__current_announcer", announcer)
+            return [
+                {
+                    "message": "Announcement started; it posts to every server that has "
+                    "an announcement channel set.",
+                    "category": "success",
+                }
+            ]
+
+        return [{"message": f"Unknown action: {action}", "category": "warning"}]
+
+    async def _admin_role_action(
+        self, action: str, guild: discord.Guild, field
+    ) -> list[dict]:
+        """Assign, unassign or edit a role, matching `[p]addrole`/`removerole`/`editrole`."""
+        raw_role = field("target_role") or ""
+        if not raw_role.isdigit():
+            return [{"message": "Pick a role.", "category": "warning"}]
+        role = guild.get_role(int(raw_role))
+        if role is None:
+            return [{"message": "That role no longer exists.", "category": "danger"}]
+
+        if not guild.me.guild_permissions.manage_roles:
+            return [
+                {"message": "I need the Manage Roles permission.", "category": "warning"}
+            ]
+        if role.position >= guild.me.top_role.position:
+            return [
+                {
+                    "message": f"{role.name} is at or above my highest role, so I "
+                    "cannot touch it.",
+                    "category": "warning",
+                }
+            ]
+
+        if action == "edit_role":
+            name = (field("role_name") or "").strip()
+            colour = (field("role_colour") or "").strip()
+            changes: dict = {}
+            if name:
+                changes["name"] = name
+            if colour:
+                try:
+                    changes["colour"] = discord.Colour(int(colour.lstrip("#"), 16))
+                except ValueError:
+                    return [
+                        {"message": f"'{colour}' is not a hex colour.",
+                         "category": "warning"}
+                    ]
+            if not changes:
+                return [{"message": "Nothing to change.", "category": "warning"}]
+            await role.edit(reason="Edited from the dashboard", **changes)
+            return [{"message": f"{role.name} updated.", "category": "success"}]
+
+        targets = [
+            found
+            for raw in field.many("member_ids")
+            if str(raw).isdigit() and (found := guild.get_member(int(raw)))
+        ]
+        if not targets:
+            return [{"message": "Pick at least one member.", "category": "warning"}]
+
+        done: list[str] = []
+        skipped: list[str] = []
+        for target in targets:
+            has_role = target.get_role(role.id) is not None
+            if action == "give_role" and has_role:
+                skipped.append(f"{target.display_name} already has it")
+                continue
+            if action == "take_role" and not has_role:
+                skipped.append(f"{target.display_name} does not have it")
+                continue
+            try:
+                if action == "give_role":
+                    await target.add_roles(role, reason="Added from the dashboard")
+                else:
+                    await target.remove_roles(role, reason="Removed from the dashboard")
+            except discord.Forbidden:
+                skipped.append(f"Discord refused to change {target.display_name}")
+                continue
+            done.append(target.display_name)
+
+        verb = "given to" if action == "give_role" else "removed from"
+        out = []
+        if done:
+            out.append(
+                {"message": f"{role.name} {verb} {', '.join(done)}.", "category": "success"}
+            )
+        for note in skipped:
+            out.append({"message": note, "category": "info"})
+        return out or [{"message": "Nothing happened.", "category": "info"}]
+
+
 ADMIN_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -218,6 +378,10 @@ ADMIN_TEMPLATE = (
       <button class="dz-btn primary" name="action" value="add_selfrole">
         <i class="fa fa-plus"></i> Add selfrole
       </button>
+      {% if selfroles %}
+        {{ confirm('Clear the list', 'clear_selfroles',
+                   'Remove every self-assignable role from this server?') }}
+      {% endif %}
     </form>
   </div>
 
@@ -239,6 +403,88 @@ ADMIN_TEMPLATE = (
       </div>
     </div>
   </form>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-user-plus"></i> Assign or edit a role</h5>
+      <p class="dz-hint">
+        Plain role assignment, without the self-assign rules. I can only touch
+        roles below my own highest role.
+      </p>
+      <div class="dz-grid two">
+        <div>
+          <label class="dz-label">Role</label>
+          {{ picker('target_role', all_roles, false, 8, 'Search roles...') }}
+        </div>
+        <div>
+          <label class="dz-label">Members</label>
+          {{ picker('member_ids', member_options, true, 8, 'Search members...') }}
+        </div>
+      </div>
+      <div class="dz-row dz-save">
+        <button class="dz-btn primary" name="action" value="give_role">
+          <i class="fa fa-plus"></i> Give role
+        </button>
+        <button class="dz-btn" name="action" value="take_role">
+          <i class="fa fa-minus"></i> Remove role
+        </button>
+      </div>
+      <label class="dz-label" style="margin-top:14px;">Rename or recolour that role</label>
+      <div class="dz-row">
+        <input class="dz-input" type="text" name="role_name"
+               placeholder="new name (optional)" style="flex:1 1 180px;" />
+        <input class="dz-input" type="text" name="role_colour"
+               placeholder="#ff8800 (optional)" style="max-width:180px;" />
+        <button class="dz-btn" name="action" value="edit_role">
+          <i class="fa fa-paint-brush"></i> Apply
+        </button>
+      </div>
+    </div>
+  </form>
+
+  {% if is_owner %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-bullhorn"></i> Announcements</h5>
+        <p class="dz-hint">
+          Posts to the announcement channel of every one of the
+          {{ guild_count }} server(s) I am in that has one set.
+          {% if announcing %}<b>An announcement is running right now.</b>{% endif %}
+        </p>
+        <textarea class="dz-area" name="announcement"
+                  placeholder="what to announce"></textarea>
+        <div class="dz-row dz-save">
+          {{ confirm('Send to every server', 'announce',
+                     'Post this message to every server that has an announcement channel?',
+                     'primary', 'fa-bullhorn') }}
+          {% if announcing %}
+            <button class="dz-btn" name="action" value="announce_cancel">
+              <i class="fa fa-stop"></i> Cancel the running announcement
+            </button>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-lock"></i> Server lock</h5>
+        <p class="dz-hint">While locked I leave any new server I am invited to.</p>
+        <label class="dz-toggle">
+          <input type="checkbox" name="serverlocked" {% if serverlocked %}checked{% endif %} />
+          <span>Only stay in the servers I am already in</span>
+        </label>
+        <div class="dz-save">
+          <button class="dz-btn primary" name="action" value="serverlock">
+            <i class="fa fa-save"></i> Save
+          </button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
 </div>
 """
 )

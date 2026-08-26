@@ -131,6 +131,8 @@ class DashboardIntegration:
                 "ban_body": settings.get("ban_extra_embed_contents") or "",
                 "tempbans": await self._mod_tempbans(guild, settings),
                 "ignored": bool(settings.get("ignored")),
+                "is_owner": await self.bot.is_owner(user),
+                "track_all_names": await self.config.track_all_names(),
             },
         }
 
@@ -158,6 +160,62 @@ class DashboardIntegration:
                 return await self._mod_action(
                     action.removeprefix("act_"), member, guild, field
                 ), {}
+
+            if action in ("save_name_tracking", "purge_names"):
+                if not await self.bot.is_owner(member):
+                    return [
+                        {
+                            "message": "Only the bot owner can change name tracking.",
+                            "category": "danger",
+                        }
+                    ], {}
+                if action == "save_name_tracking":
+                    await self.config.track_all_names.set(
+                        field.checked("track_all_names")
+                    )
+                    if field.checked("track_all_names"):
+                        return [
+                            {
+                                "message": "I will record username and display name "
+                                "changes across every server.",
+                                "category": "success",
+                            }
+                        ], {}
+                    return [
+                        {
+                            "message": "Username tracking is off. Existing history is "
+                            "kept until you purge it.",
+                            "category": "success",
+                        }
+                    ], {}
+                # Same walk `[p]modset deletenames` does: drop the name lists
+                # and then any record left empty by that.
+                async with self.config._get_base_group(
+                    self.config.MEMBER
+                ).all() as member_data:
+                    for guild_id in list(member_data):
+                        guild_records = member_data[guild_id]
+                        for member_id in list(guild_records):
+                            guild_records[member_id].pop("past_nicks", None)
+                            if not guild_records[member_id]:
+                                del guild_records[member_id]
+                        if not guild_records:
+                            del member_data[guild_id]
+                async with self.config._get_base_group(
+                    self.config.USER
+                ).all() as user_data:
+                    for user_id in list(user_data):
+                        user_data[user_id].pop("past_names", None)
+                        user_data[user_id].pop("past_display_names", None)
+                        if not user_data[user_id]:
+                            del user_data[user_id]
+                return [
+                    {
+                        "message": "Every stored username, display name and nickname "
+                        "was deleted.",
+                        "category": "success",
+                    }
+                ], {}
 
             if action == "save" and not staff:
                 return [
@@ -744,6 +802,31 @@ MOD_TEMPLATE = (
         </tbody>
       </table>
     </div>
+  {% endif %}
+
+  {% if is_owner %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-id-card-o"></i> Name history</h5>
+        <p class="dz-hint">
+          Bot-wide. Tracking records username and display name changes so the
+          member lookup above can show them.
+        </p>
+        <label class="dz-toggle">
+          <input type="checkbox" name="track_all_names"
+                 {% if track_all_names %}checked{% endif %} />
+          <span>Record username and display name changes</span>
+        </label>
+        <div class="dz-row dz-save">
+          <button class="dz-btn primary" name="action" value="save_name_tracking">
+            <i class="fa fa-save"></i> Save
+          </button>
+          {{ confirm('Delete all stored names', 'purge_names',
+                     'Permanently delete every stored username, display name and nickname on the whole bot?') }}
+        </div>
+      </div>
+    </form>
   {% endif %}
 </div>
 """

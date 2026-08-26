@@ -43,8 +43,9 @@ class DashboardIntegration:
         from redbot.core import _downloader
 
         notifications: list[dict] = []
+        found: dict = {}
         if kwargs.get("method") == "POST":
-            notifications = await self._dl_handle_post(kwargs)
+            notifications, found = await self._dl_handle_post(kwargs)
 
         repos = sorted(_downloader._repo_manager.repos, key=lambda r: r.name.lower())
         installed = sorted(await _downloader.installed_cogs(), key=lambda c: c.name.lower())
@@ -91,6 +92,7 @@ class DashboardIntegration:
                 "pinned_count": sum(1 for c in installed_rows if c["pinned"]),
                 "loaded_count": sum(1 for c in installed_rows if c["loaded"]),
                 "update_report": self._dl_last_report,
+                "found": found,
             },
         }
 
@@ -119,7 +121,14 @@ class DashboardIntegration:
             "min_bot_version": str(cog.min_bot_version),
         }
 
-    async def _dl_handle_post(self, kwargs: dict) -> list[dict]:
+    async def _dl_handle_post(self, kwargs: dict) -> tuple[list[dict], dict]:
+        """Run one action, returning (notifications, findcog result)."""
+        field = form_reader(kwargs)
+        if field("action") == "findcog":
+            return [], await self._dl_findcog(field)
+        return await self._dl_run_action(kwargs), {}
+
+    async def _dl_run_action(self, kwargs: dict) -> list[dict]:
         from redbot.core import _downloader
         from redbot.core._downloader import errors
 
@@ -362,6 +371,55 @@ class DashboardIntegration:
 
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
 
+    async def _dl_findcog(self, field) -> dict:
+        """Report which cog and repo a command comes from, like `[p]findcog`."""
+        from redbot.core import _downloader
+
+        name = (field("command_name") or "").strip().lstrip("/")
+        if not name:
+            return {"query": "", "error": "Enter a command name."}
+        command = self.bot.get_command(name)
+        if command is None:
+            return {"query": name, "error": "No loaded command by that name."}
+
+        cog = command.cog
+        if cog is None:
+            return {
+                "query": name,
+                "cog": "None",
+                "made_by": "Cog Creators",
+                "repo_name": "Built-in",
+                "repo_url": "https://github.com/Cog-Creators/Red-DiscordBot",
+            }
+
+        package = self.cog_name_from_instance(cog)
+        installed, installable = await _downloader.is_installed(package)
+        if installed:
+            return {
+                "query": name,
+                "cog": installable.name,
+                "made_by": ", ".join(installable.author) or "Not stated in info.json",
+                "repo_name": installable.repo.name
+                if installable.repo
+                else "Repo no longer installed",
+                "repo_url": installable.repo.clean_url if installable.repo else "",
+            }
+        if cog.__module__.startswith("redbot."):
+            return {
+                "query": name,
+                "cog": cog.qualified_name,
+                "made_by": "Cog Creators",
+                "repo_name": "Built-in",
+                "repo_url": "https://github.com/Cog-Creators/Red-DiscordBot",
+            }
+        return {
+            "query": name,
+            "cog": cog.qualified_name,
+            "made_by": "Unknown",
+            "repo_name": "Not installed through Downloader",
+            "repo_url": "",
+        }
+
     def _dl_install_notifications(self, result, repo) -> list[dict]:
         out = []
         if result.installed_cogs:
@@ -450,6 +508,39 @@ DOWNLOADER_TEMPLATE = (
       </div>
       {% if update_report %}
         <pre class="dz-hint" style="white-space:pre-wrap; margin-top:10px;">{{ update_report }}</pre>
+      {% endif %}
+    </div>
+  </form>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-search"></i> Which cog owns a command?</h5>
+      <p class="dz-hint">Only loaded commands can be traced.</p>
+      <div class="dz-row">
+        <input class="dz-input" type="text" name="command_name"
+               placeholder="ping" style="max-width:260px;" />
+        <button class="dz-btn primary" name="action" value="findcog">
+          <i class="fa fa-search"></i> Find cog
+        </button>
+      </div>
+      {% if found %}
+        {% if found.error %}
+          <p class="dz-hint" style="margin-top:10px;">{{ found.error }}</p>
+        {% else %}
+          <table class="dz-t" style="margin-top:10px;">
+            <tr><th>Command</th><td><code>{{ found.query }}</code></td></tr>
+            <tr><th>Cog</th><td>{{ found.cog }}</td></tr>
+            <tr><th>Made by</th><td>{{ found.made_by }}</td></tr>
+            <tr><th>Repo</th>
+                <td>
+                  {% if found.repo_url %}
+                    <a href="{{ found.repo_url }}" target="_blank" rel="noopener">
+                      {{ found.repo_name }}</a>
+                  {% else %}{{ found.repo_name }}{% endif %}
+                </td></tr>
+          </table>
+        {% endif %}
       {% endif %}
     </div>
   </form>

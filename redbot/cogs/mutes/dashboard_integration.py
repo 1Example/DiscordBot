@@ -193,7 +193,14 @@ class DashboardIntegration:
         audit_reason = get_audit_reason(member, reason, shorten=True)
 
         try:
-            if action in ("mute", "timeout", "unmute", "channel_mute", "channel_unmute"):
+            if action in (
+                "mute",
+                "timeout",
+                "unmute",
+                "forceunmute",
+                "channel_mute",
+                "channel_unmute",
+            ):
                 targets = [
                     m
                     for m in (
@@ -324,6 +331,78 @@ class DashboardIntegration:
 
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
 
+    async def _mutes_force_unmute(
+        self,
+        author: discord.Member,
+        guild: discord.Guild,
+        targets: list[discord.Member],
+        reason: str | None,
+        audit_reason: str,
+    ) -> list[dict]:
+        """Clear every channel override for a member, as `[p]forceunmute` does.
+
+        This is the escape hatch for a mute the cog has lost track of: it walks
+        every channel rather than trusting the stored mute records.
+        """
+        import asyncio
+
+        from redbot.core.utils import bounded_gather
+
+        now = datetime.now(tz=timezone.utc)
+        if guild.id in self._channel_mute_events:
+            self._channel_mute_events[guild.id].clear()
+        else:
+            self._channel_mute_events[guild.id] = asyncio.Event()
+
+        done: list[str] = []
+        failed: list[str] = []
+        try:
+            for target in targets:
+                results = await bounded_gather(
+                    *(
+                        self.channel_unmute_user(
+                            guild, channel, author, target, audit_reason
+                        )
+                        for channel in guild.channels
+                    )
+                )
+                if any(result.success for result in results):
+                    done.append(target.display_name)
+                    await modlog.create_case(
+                        self.bot, guild, now, "sunmute", target, author, reason, until=None
+                    )
+                    await self._send_dm_notification(
+                        target, author, guild, "Server unmute", reason
+                    )
+                else:
+                    failed.append(
+                        f"{target.display_name}: nothing to undo in any channel"
+                    )
+                await self.config.member(target).clear()
+        finally:
+            self._channel_mute_events[guild.id].set()
+
+        if done:
+            # Keep the stored server mutes in step with the cache.
+            if self._server_mutes.get(guild.id):
+                await self.config.guild(guild).muted_users.set(
+                    self._server_mutes[guild.id]
+                )
+            else:
+                await self.config.guild(guild).muted_users.clear()
+
+        out = []
+        if done:
+            out.append(
+                {
+                    "message": f"{', '.join(done)} force-unmuted in every channel.",
+                    "category": "success",
+                }
+            )
+        for problem in failed:
+            out.append({"message": problem, "category": "warning"})
+        return out or [{"message": "Nothing happened.", "category": "info"}]
+
     async def _mutes_apply(
         self,
         action: str,
@@ -362,6 +441,11 @@ class DashboardIntegration:
                         "category": "warning",
                     }
                 ]
+
+        if action == "forceunmute":
+            return await self._mutes_force_unmute(
+                author, guild, targets, reason, audit_reason
+            )
 
         done: list[str] = []
         failed: list[str] = []
@@ -504,6 +588,9 @@ MUTES_TEMPLATE = (
         <button class="dz-btn" name="action" value="unmute">
           <i class="fa fa-microphone"></i> Unmute
         </button>
+        {{ confirm('Force unmute', 'forceunmute',
+                   'Clear this member from every channel override, even ones I have no record of?',
+                   '', 'fa-eraser') }}
         <button class="dz-btn" name="action" value="channel_mute">
           <i class="fa fa-hashtag"></i> Mute in channel
         </button>
