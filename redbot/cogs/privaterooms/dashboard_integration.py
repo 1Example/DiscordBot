@@ -543,11 +543,9 @@ class DashboardIntegration:
         notes = [emoji_rejection(k, v) for k, v in bad] + [
             {"message": text, "category": "warning"} for text in image_problems
         ]
+        pushed = await self._pr_refresh_panel(guild, conf)
         return notes + [
-            {
-                "message": "Buttons saved. Re-post the panel to update the live ones.",
-                "category": "success",
-            }
+            {"message": "Buttons saved." + pushed, "category": "success"}
         ]
 
     async def _pr_save_economy(self, guild, conf, field) -> list[dict]:
@@ -620,6 +618,40 @@ class DashboardIntegration:
         return [
             {"message": f"Created {public.name} and {private.name}.", "category": "success"}
         ]
+
+    async def _pr_refresh_panel(self, guild, conf) -> str:
+        """Redraw the posted panel so a save shows up without re-posting by hand.
+
+        Returns a sentence to append to the notification, so the page says what
+        happened instead of leaving you to wonder why Discord looks unchanged.
+        """
+        try:
+            from .privaterooms import ControlPanelView, resolve_emojis, room_embed
+
+            settings = await conf.all()
+            channel = guild.get_channel(settings.get("panel_channel") or 0)
+            message_id = settings.get("panel_message")
+            if channel is None or not message_id:
+                return " No panel is posted yet, so there is nothing to redraw."
+            try:
+                message = await channel.fetch_message(message_id)
+            except discord.NotFound:
+                return " The panel message is gone; post it again."
+            except discord.Forbidden:
+                return f" I cannot read messages in #{channel.name}."
+
+            settings["currency_name"] = await self._pr_currency(guild)
+            view = ControlPanelView(
+                self,
+                emojis=resolve_emojis(settings.get("emojis")),
+                labels=settings.get("button_labels"),
+                styles=settings.get("button_styles"),
+            )
+            await message.edit(embed=room_embed(guild, settings), view=view)
+            return " The panel has been redrawn."
+        except Exception as exc:  # noqa: BLE001 - the save itself already worked
+            log.exception("Could not redraw the private rooms panel")
+            return f" The panel could not be redrawn: {exc}"
 
     async def _pr_post_panel(self, guild, conf, field) -> list[dict]:
         from .privaterooms import ControlPanelView, resolve_emojis, room_embed
@@ -762,6 +794,7 @@ PRIVATEROOMS_TEMPLATE = (
   // reddash forwards request.form but not request.files, so the picture is read
   // here and posted as an ordinary base64 field instead of a real upload.
   var MAX = 256 * 1024;
+  function wire() {
   document.querySelectorAll('input[type=file][data-target]').forEach(function (input) {
     input.addEventListener('change', function () {
       var target = document.getElementById(input.dataset.target);
@@ -786,6 +819,15 @@ PRIVATEROOMS_TEMPLATE = (
       reader.readAsDataURL(file);
     });
   });
+  }
+  // The script can sit before the inputs in the rendered page, in which case
+  // querySelectorAll finds nothing and no picture ever uploads. Wait for the
+  // document when it is still parsing, and run straight away when it is not.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
 })();
 </script>
 

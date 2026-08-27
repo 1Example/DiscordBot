@@ -1748,6 +1748,7 @@ SETTINGS_TEMPLATE = (
   // reddash forwards request.form but not request.files, so the picture is read
   // here and posted as an ordinary base64 field instead of a real upload.
   var MAX = 256 * 1024;
+  function wire() {
   document.querySelectorAll('input[type=file][data-target]').forEach(function (input) {
     input.addEventListener('change', function () {
       var target = document.getElementById(input.dataset.target);
@@ -1772,6 +1773,15 @@ SETTINGS_TEMPLATE = (
       reader.readAsDataURL(file);
     });
   });
+  }
+  // The script can sit before the inputs in the rendered page, in which case
+  // querySelectorAll finds nothing and no picture ever uploads. Wait for the
+  // document when it is still parsing, and run straight away when it is not.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
 })();
 </script>
 """
