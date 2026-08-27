@@ -6,6 +6,8 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from redbot.core.utils.chat_formatting import humanize_timedelta
+from redbot.core.commands import parse_timedelta
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -79,6 +81,10 @@ class DashboardIntegration:
 
         guild_data = await self.config.guild(guild).all()
         managed = await self._rt_managed_roles(guild)
+        # Whatever role the form is pointed at: the one just saved, or the one
+        # an Edit button asked for. Its current values pre-fill the form so a
+        # change is an edit rather than a retype.
+        editing = await self._rt_editing(guild, kwargs)
 
         return {
             "status": 0,
@@ -89,6 +95,12 @@ class DashboardIntegration:
                 "guild_name": guild.name,
                 "managed": managed,
                 "roles": role_options(guild),
+                "editing": editing,
+                "require_modes": (
+                    ("all", "must have every one of them"),
+                    ("any", "must have at least one of them"),
+                ),
+                "components": self._rt_components(guild, guild_data),
                 "flags": [{"key": k, "label": v} for k, v in ROLE_FLAGS],
                 "reaction_roles": self._rt_reaction_summary(guild, guild_data),
                 "auto_roles": self._rt_names(guild, guild_data.get("auto_roles") or []),
@@ -102,6 +114,87 @@ class DashboardIntegration:
                 "global_atomic": await self.config.atomic(),
                 "targets": TARGET_GROUPS,
             },
+        }
+
+    async def _rt_editing(self, guild: discord.Guild, kwargs: dict) -> dict:
+        """The role the form should show, with its settings already filled in.
+
+        Returns {} when nothing is selected, which leaves the form blank for
+        setting up a role that has never been configured.
+        """
+        field = form_reader(kwargs)
+        raw = (field("role") or "").strip()
+        if not raw.isdigit():
+            return {}
+        role = guild.get_role(int(raw))
+        if role is None:
+            return {}
+        settings = await self.config.role(role).all()
+        duration = settings.get("duration")
+        return {
+            "id": str(role.id),
+            "name": role.name,
+            # The role list itself, with this role already chosen, so the
+            # picker keeps its selection across a save.
+            "self": role_options(guild, selected=role.id),
+            "colour": f"#{role.colour.value:06x}" if role.colour.value else "#99aab5",
+            "flags": {key: bool(settings.get(key)) for key, _label in ROLE_FLAGS},
+            "cost": settings.get("cost") or 0,
+            "require_any": "any" if settings.get("require_any") else "all",
+            "duration": self._rt_duration_text(duration),
+            "exclusive": role_options(
+                guild, selected_many=settings.get("exclusive_to") or []
+            ),
+            "required": role_options(guild, selected_many=settings.get("required") or []),
+            "inclusive": role_options(
+                guild, selected_many=settings.get("inclusive_with") or []
+            ),
+        }
+
+    @staticmethod
+    def _rt_duration_text(seconds) -> str:
+        """Seconds back into something a person would type, e.g. '2 hours'."""
+        if not seconds:
+            return ""
+        try:
+            return humanize_timedelta(seconds=int(seconds)) or ""
+        except Exception:  # noqa: BLE001 - a bad stored value must not break the page
+            return ""
+
+    def _rt_components(self, guild: discord.Guild, data: dict) -> dict:
+        """Button sets and select menus, which the page previously only counted.
+
+        They are built with the Discord commands, so this lists them and allows
+        deleting - enough to see what exists and clear out what does not work,
+        without re-implementing the whole builder on the web.
+        """
+        buttons = []
+        for name, cfg in (data.get("buttons") or {}).items():
+            role = guild.get_role(int(cfg.get("role_id") or 0))
+            buttons.append(
+                {
+                    "name": name,
+                    "label": cfg.get("label") or name,
+                    "emoji": cfg.get("emoji") or "",
+                    "style": cfg.get("style") or "",
+                    "role": role.name if role else f"(deleted {cfg.get('role_id')})",
+                    "broken": role is None,
+                    "messages": len(cfg.get("messages") or []),
+                }
+            )
+        menus = []
+        for name, cfg in (data.get("select_menus") or {}).items():
+            menus.append(
+                {
+                    "name": name,
+                    "placeholder": cfg.get("placeholder") or "",
+                    "options": list(cfg.get("options") or []),
+                    "messages": len(cfg.get("messages") or []),
+                }
+            )
+        return {
+            "buttons": sorted(buttons, key=lambda b: b["name"]),
+            "menus": sorted(menus, key=lambda m: m["name"]),
         }
 
     def _rt_names(self, guild: discord.Guild, role_ids: list) -> list[str]:
@@ -140,7 +233,14 @@ class DashboardIntegration:
             role = guild.get_role(role_id)
             if role is None:
                 continue
-            interesting = any(settings.get(k) for k, _ in ROLE_FLAGS) or settings.get("cost")
+            interesting = (
+                any(settings.get(k) for k, _ in ROLE_FLAGS)
+                or settings.get("cost")
+                or settings.get("duration")
+                or settings.get("exclusive_to")
+                or settings.get("inclusive_with")
+                or settings.get("required")
+            )
             if not interesting:
                 continue
             rows.append(
@@ -154,6 +254,8 @@ class DashboardIntegration:
                     "exclusive": self._rt_names(guild, settings.get("exclusive_to") or []),
                     "inclusive": self._rt_names(guild, settings.get("inclusive_with") or []),
                     "required": self._rt_names(guild, settings.get("required") or []),
+                    "require_any": bool(settings.get("require_any")),
+                    "duration": self._rt_duration_text(settings.get("duration")),
                     # The bot cannot hand out a role at or above its own top role.
                     "unmanageable": bool(guild.me and role.position >= guild.me.top_role.position),
                 }
@@ -214,16 +316,62 @@ class DashboardIntegration:
                     ids = [i for i in ids if i != role.id]
                     await conf.get_attr(key).set(ids)
 
+                # Whether the required roles mean ALL of them or any one.
+                await conf.require_any.set(field("require_mode") == "any")
+
+                # Temporary roles. Stored as whole seconds, so it round-trips
+                # through the same humanised text the commands print.
+                raw_duration = (field("duration") or "").strip()
+                if raw_duration:
+                    delta = parse_timedelta(raw_duration)
+                    if delta is None:
+                        warnings.append(
+                            {
+                                "message": f"'{raw_duration}' is not a duration I understand. "
+                                "Try something like '30 minutes', '2 hours' or '7 days'.",
+                                "category": "danger",
+                            }
+                        )
+                    elif delta.total_seconds() < 60:
+                        warnings.append(
+                            {
+                                "message": "A temporary role shorter than a minute will not "
+                                "work reliably; leave it blank for permanent.",
+                                "category": "warning",
+                            }
+                        )
+                    else:
+                        await conf.duration.set(int(delta.total_seconds()))
+                        async with self.config.guild(guild).temporary_roles() as temp:
+                            if role.id not in temp:
+                                temp.append(role.id)
+                else:
+                    await conf.duration.clear()
+                    async with self.config.guild(guild).temporary_roles() as temp:
+                        if role.id in temp:
+                            temp.remove(role.id)
+
                 return warnings + [
                     {"message": f"Saved settings for '{role.name}'.", "category": "success"}
+                ]
+
+            if action == "load_role":
+                # Nothing to save - the page rebuilds with this role filled in.
+                return [
+                    {"message": f"Editing '{role.name}'.", "category": "info"}
                 ]
 
             if action == "clear_role":
                 for key, _label in ROLE_FLAGS:
                     await conf.get_attr(key).set(False)
                 await conf.cost.set(0)
+                await conf.require_any.set(False)
+                await conf.duration.clear()
                 for key in ("exclusive_to", "inclusive_with", "required"):
                     await conf.get_attr(key).set([])
+                async with self.config.guild(guild).temporary_roles() as temp:
+                    if role.id in temp:
+                        temp.remove(role.id)
                 return [{"message": f"Cleared '{role.name}'.", "category": "success"}]
         except Exception as exc:  # noqa: BLE001
             log.exception("RoleTools dashboard action %r failed", action)
@@ -511,52 +659,86 @@ ROLETOOLS_TEMPLATE = (
       <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
 
       <div class="dz-label">Role</div>
-      <select class="dz-select" name="role">
-        {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
-      </select>
+      {{ picker('role', editing.self if editing else roles, false, 8,
+                'Search roles...', true, 'pick a role to configure') }}
+      {% if editing %}
+        <div style="font-size:.72rem; opacity:.55; margin-top:5px;">
+          Showing the current settings for
+          <b style="color:{{ editing.colour }};">{{ editing.name }}</b>.
+          Change what you need and save.
+        </div>
+      {% else %}
+        <div style="font-size:.72rem; opacity:.45; margin-top:5px;">
+          Pick a role and press <b>Load</b> to see what it is set to now,
+          or just fill this in to configure it from scratch.
+        </div>
+      {% endif %}
 
       <div class="dz-row" style="margin-top:10px;">
         {% for f in flags %}
           <label class="dz-toggle">
-            <input type="checkbox" name="f_{{ f.key }}" />
+            <input type="checkbox" name="f_{{ f.key }}"
+                   {% if editing and editing.flags[f.key] %}checked{% endif %} />
             <span>{{ f.label }}</span>
           </label>
         {% endfor %}
       </div>
 
-      <div class="dz-label" style="margin-top:10px;">Cost to self-assign (0 = free)</div>
-      <input class="dz-input" type="number" min="0" name="cost" value="0" />
+      <div class="dz-grid two" style="margin-top:10px;">
+        <div>
+          <div class="dz-label">Cost to self-assign (0 = free)</div>
+          <input class="dz-input" type="number" min="0" name="cost"
+                 value="{{ editing.cost if editing else 0 }}" />
+        </div>
+        <div>
+          <div class="dz-label">Remove automatically after</div>
+          <input class="dz-input" type="text" name="duration"
+                 placeholder="e.g. 30 minutes, 2 hours, 7 days - blank for permanent"
+                 value="{{ editing.duration if editing else '' }}" />
+          <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+            Only applies when RoleTools hands the role out.
+          </div>
+        </div>
+      </div>
 
       <div class="dz-grid two" style="margin-top:12px;">
         <div>
           <div class="dz-label">Exclusive to</div>
-          <select class="dz-select" name="exclusive" multiple size="5">
-            {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
-          </select>
+          {{ picker('exclusive', editing.exclusive if editing else roles, true, 6,
+                    'Search roles...') }}
           <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
-            Cannot be held alongside these.
+            Cannot be held alongside these. Granting this one takes them away.
           </div>
         </div>
         <div>
           <div class="dz-label">Required</div>
-          <select class="dz-select" name="required" multiple size="5">
-            {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
-          </select>
-          <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
-            Member must already have these.
+          {{ picker('required', editing.required if editing else roles, true, 6,
+                    'Search roles...') }}
+          <div class="dz-row" style="margin-top:6px; align-items:center; gap:7px;">
+            <span style="font-size:.72rem; opacity:.55;">Member</span>
+            <select class="dz-select" name="require_mode" style="width:auto; flex:1 1 190px;">
+              {% for value, label in require_modes %}
+                <option value="{{ value }}"
+                        {% if editing and editing.require_any == value %}selected{% endif %}>
+                  {{ label }}
+                </option>
+              {% endfor %}
+            </select>
           </div>
         </div>
       </div>
 
       <div class="dz-label" style="margin-top:12px;">Inclusive with</div>
-      <select class="dz-select" name="inclusive" multiple size="4">
-        {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
-      </select>
+      {{ picker('inclusive', editing.inclusive if editing else roles, true, 5,
+                'Search roles...') }}
       <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
         Granted together with this role.
       </div>
 
       <div class="dz-row" style="margin-top:13px;">
+        <button class="dz-btn" name="action" value="load_role">
+          <i class="fa fa-folder-open"></i> Load
+        </button>
         <button class="dz-btn primary" name="action" value="save_role">
           <i class="fa fa-save"></i> Save role
         </button>
@@ -568,12 +750,67 @@ ROLETOOLS_TEMPLATE = (
     </form>
   </div>
 
+  <div class="dz-grid two">
+    <div class="dz-panel">
+      <h5><i class="fa fa-hand-pointer-o"></i> Button sets</h5>
+      <p class="dz-hint">
+        Built with the <code>roletools buttons</code> commands. Listed here so you
+        can see what exists and which are pointing at a deleted role.
+      </p>
+      {% if components.buttons %}
+        <table class="dz-t">
+          <thead><tr><th>Name</th><th>Role</th><th>On messages</th></tr></thead>
+          <tbody>
+            {% for b in components.buttons %}
+              <tr>
+                <td><b>{{ b.label }}</b>
+                  <span style="opacity:.45; font-size:.74rem;">{{ b.name }}</span></td>
+                <td {% if b.broken %}style="color:#ff8b8b;"{% endif %}>{{ b.role }}</td>
+                <td style="opacity:.7;">{{ b.messages }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="dz-empty">No button sets.</p>
+      {% endif %}
+    </div>
+
+    <div class="dz-panel">
+      <h5><i class="fa fa-caret-square-o-down"></i> Select menus</h5>
+      <p class="dz-hint">Built with the <code>roletools select</code> commands.</p>
+      {% if components.menus %}
+        <table class="dz-t">
+          <thead><tr><th>Name</th><th>Options</th><th>On messages</th></tr></thead>
+          <tbody>
+            {% for m in components.menus %}
+              <tr>
+                <td><b>{{ m.name }}</b>
+                  {% if m.placeholder %}
+                    <div style="opacity:.45; font-size:.74rem;">{{ m.placeholder }}</div>
+                  {% endif %}
+                </td>
+                <td style="opacity:.7; font-size:.78rem;">
+                  {{ m.options|join(", ") if m.options else "-" }}
+                </td>
+                <td style="opacity:.7;">{{ m.messages }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="dz-empty">No select menus.</p>
+      {% endif %}
+    </div>
+  </div>
+
   <div class="dz-panel">
     <h5><i class="fa fa-list"></i> Managed roles</h5>
     {% if managed %}
       <table class="dz-t">
         <thead>
-          <tr><th>Role</th><th>Members</th><th>Flags</th><th>Cost</th><th>Requirements</th></tr>
+          <tr><th>Role</th><th>Members</th><th>Flags</th><th>Cost</th>
+              <th>Expires</th><th>Requirements</th><th></th></tr>
         </thead>
         <tbody>
           {% for r in managed %}
@@ -593,11 +830,27 @@ ROLETOOLS_TEMPLATE = (
                 {% endfor %}
               </td>
               <td style="opacity:.7;">{% if r.cost %}{{ r.cost }}{% else %}-{% endif %}</td>
+              <td style="opacity:.7; font-size:.78rem;">
+                {% if r.duration %}{{ r.duration }}{% else %}-{% endif %}
+              </td>
               <td style="font-size:.78rem; opacity:.7;">
-                {% if r.required %}needs: {{ r.required|join(", ") }}<br>{% endif %}
+                {% if r.required %}
+                  needs {{ 'any of' if r.require_any else 'all of' }}:
+                  {{ r.required|join(", ") }}<br>
+                {% endif %}
                 {% if r.exclusive %}not with: {{ r.exclusive|join(", ") }}<br>{% endif %}
                 {% if r.inclusive %}with: {{ r.inclusive|join(", ") }}{% endif %}
                 {% if not r.required and not r.exclusive and not r.inclusive %}-{% endif %}
+              </td>
+              <td style="text-align:right; white-space:nowrap;">
+                <form method="POST" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+                  <input type="hidden" name="role" value="{{ r.id }}" />
+                  <button class="dz-btn" name="action" value="load_role"
+                          title="Load this role into the form above">
+                    <i class="fa fa-pencil"></i> Edit
+                  </button>
+                </form>
               </td>
             </tr>
           {% endfor %}
