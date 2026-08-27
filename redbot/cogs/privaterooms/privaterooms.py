@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import re
 
 import discord
@@ -6,6 +7,8 @@ from redbot.core import bank, commands, Config, checks
 from redbot.core.bot import Red
 from typing import Optional
 from .dashboard_integration import DashboardIntegration
+
+log = logging.getLogger("red.privaterooms")
 
 
 # Action keys, their default (unicode) emoji, and the panel description line.
@@ -579,12 +582,23 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             return
         if len(channel.members) > 0:
             return
-        async with self.config.guild(guild).rooms() as rooms:
-            rooms.pop(str(channel.id), None)
         try:
             await channel.delete(reason="Room empty")
         except discord.HTTPException:
-            pass
+            # Forgetting the room before the delete succeeds strands the channel:
+            # nothing tracks it any more, so nothing will ever try again. Keep
+            # the entry so the next person to leave, or the dashboard cleanup,
+            # gets another go at it.
+            log.warning(
+                "Could not delete the empty room %s (%s) in %s; leaving it tracked "
+                "so it can be retried.",
+                channel.name,
+                channel.id,
+                guild.name,
+            )
+            return
+        async with self.config.guild(guild).rooms() as rooms:
+            rooms.pop(str(channel.id), None)
 
     # ---------- listener ----------
 

@@ -477,13 +477,17 @@ class DashboardIntegration:
         return [{"message": f"Unknown lookup: {kind}", "category": "warning"}], {}
 
     async def _vrt_wipe_rooms(self, guild: discord.Guild) -> list[dict]:
-        """Delete the empty rooms PrivateRooms is holding open.
+        """Delete the empty PrivateRooms channels, tracked or not.
 
         Deliberately not "every empty voice channel in the server": the AFK
         channel, staff rooms and the hubs people join to create a room are all
-        empty most of the time, and deleting those breaks the server. Only
-        channels PrivateRooms created and still tracks are touched, and the
-        hubs are skipped even if they somehow appear in that list.
+        empty most of the time, and deleting those breaks the server.
+
+        Going by the tracked list alone is not enough either. PrivateRooms drops
+        a room from that list *before* it deletes the channel, so any delete
+        that fails leaves a channel nothing knows about - which is exactly the
+        rubbish this button is for. So the rooms category is swept as well, with
+        the hubs and the AFK channel held back.
         """
         rooms_cog = self.bot.get_cog("PrivateRooms")
         if rooms_cog is None:
@@ -504,46 +508,81 @@ class DashboardIntegration:
                  "category": "danger"}
             ]
 
-        hubs = {settings.get("hub_private"), settings.get("hub_public")}
-        tracked = list((settings.get("rooms") or {}).items())
-        if not tracked:
-            return [
-                {"message": "PrivateRooms is not tracking any rooms right now.",
-                 "category": "info"}
-            ]
+        spared = {settings.get("hub_private"), settings.get("hub_public"),
+                  getattr(guild.afk_channel, "id", None)}
+        spared.discard(None)
 
-        deleted = 0
-        occupied = 0
+        tracked = settings.get("rooms") or {}
+        candidates: dict[int, str] = {}
         stale = 0
-        for raw_id, _data in tracked:
+        # Snapshot the keys: dropping a stale entry below writes to the same
+        # mapping this loop is walking.
+        for raw_id in list(tracked):
             try:
                 channel_id = int(raw_id)
             except (TypeError, ValueError):
                 continue
-            if channel_id in hubs:
+            if channel_id in spared:
                 continue
-            channel = guild.get_channel(channel_id)
-            if channel is None:
+            if guild.get_channel(channel_id) is None:
                 # The channel is gone but the entry is not; drop it so the
-                # count on the page stops lying.
+                # numbers stop lying.
                 async with rooms_cog.config.guild(guild).rooms() as rooms:
-                    rooms.pop(str(channel_id), None)
+                    rooms.pop(str(raw_id), None)
                 stale += 1
                 continue
-            if not isinstance(channel, discord.VoiceChannel) or channel.members:
+            candidates[channel_id] = "tracked"
+
+        # Everything else sitting in the rooms category. Without a category
+        # there is nothing safe to sweep, so the tracked list is all we use.
+        category = self._vrt_rooms_category(guild, settings)
+        if category is not None:
+            for channel in category.voice_channels:
+                if channel.id in spared or channel.id in candidates:
+                    continue
+                candidates[channel.id] = "untracked"
+
+        deleted = {"tracked": 0, "untracked": 0}
+        occupied = 0
+        failed = 0
+        for channel_id, source in candidates.items():
+            channel = guild.get_channel(channel_id)
+            if not isinstance(channel, discord.VoiceChannel):
+                continue
+            if channel.members:
                 occupied += 1
                 continue
             try:
                 await channel.delete(reason="Empty private room, wiped from the dashboard")
             except discord.HTTPException:
+                failed += 1
                 continue
             async with rooms_cog.config.guild(guild).rooms() as rooms:
                 rooms.pop(str(channel_id), None)
-            deleted += 1
+            deleted[source] += 1
 
+        total = deleted["tracked"] + deleted["untracked"]
         out = [
-            {"message": f"Deleted {deleted} empty private room(s).", "category": "success"}
+            {"message": f"Deleted {total} empty private room(s).",
+             "category": "success" if total else "info"}
         ]
+        if deleted["untracked"]:
+            out.append(
+                {
+                    "message": f"{deleted['untracked']} of those were leftovers "
+                    f"PrivateRooms had lost track of in {category.name}.",
+                    "category": "info",
+                }
+            )
+        if not total and category is None and not tracked:
+            out.append(
+                {
+                    "message": "PrivateRooms is not tracking any rooms and has no "
+                    "category set, so there is nothing I can safely sweep. Set one "
+                    "with `[p]prooms setup category`.",
+                    "category": "warning",
+                }
+            )
         if occupied:
             out.append(
                 {"message": f"{occupied} room(s) still have someone in them and were left "
@@ -554,7 +593,30 @@ class DashboardIntegration:
                 {"message": f"Forgot {stale} room(s) that no longer exist.",
                  "category": "info"}
             )
+        if failed:
+            out.append(
+                {"message": f"{failed} room(s) could not be deleted; check that I have "
+                            "Manage Channels.", "category": "warning"}
+            )
         return out
+
+    @staticmethod
+    def _vrt_rooms_category(guild: discord.Guild, settings: dict):
+        """Where PrivateRooms puts new rooms, which is where leftovers collect.
+
+        Mirrors how the cog picks it when creating one: the configured category,
+        otherwise whatever category the hubs live in.
+        """
+        category = guild.get_channel(settings.get("category") or 0)
+        if isinstance(category, discord.CategoryChannel):
+            return category
+        for key in ("hub_private", "hub_public"):
+            hub = guild.get_channel(settings.get(key) or 0)
+            if hub is not None and isinstance(
+                getattr(hub, "category", None), discord.CategoryChannel
+            ):
+                return hub.category
+        return None
 
     async def _vrt_maintenance(
         self, action: str, guild: discord.Guild
