@@ -1255,12 +1255,17 @@ class PersistentControllerView(discord.ui.View):
                 attachments = kwargs.pop("files")
             if attachments:
                 kwargs["attachments"] = attachments
-            try:
-                await self.message.edit(view=self, **kwargs)
-            except discord.HTTPException as exc:
-                if not await self._drop_rejected_emoji(exc):
-                    raise
-                await self.message.edit(view=self, **kwargs)
+            # One bad emoji per round trip: Discord lists them all, but the
+            # component index it names is only valid for the current payload,
+            # so they have to be dropped one at a time until the edit lands.
+            for _attempt in range(len(self.children) + 1):
+                try:
+                    await self.message.edit(view=self, **kwargs)
+                    return
+                except discord.HTTPException as exc:
+                    if not await self._drop_rejected_emoji(exc):
+                        raise
+            LOGGER.error("Gave up redrawing the controller in %s", self.guild.id)
 
     # Discord points at the offending component by index: the error reads
     # `components.0.components.4.emoji.id: Invalid emoji`.

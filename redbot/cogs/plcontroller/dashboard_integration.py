@@ -949,14 +949,19 @@ class DashboardIntegration:
             if attachments:
                 kwargs["attachments"] = attachments
 
-            try:
-                await message.edit(view=view, **kwargs)
-            except discord.HTTPException as exc:
-                # The view knows how to drop an emoji Discord refuses; give it
-                # the chance rather than failing the whole redraw.
-                if not await view._drop_rejected_emoji(exc):
-                    raise
-                await message.edit(view=view, **kwargs)
+            # Discord reports every bad emoji at once but only lets the view
+            # drop the first, so one retry is not enough when two buttons are
+            # bad. Keep dropping until it goes through, bounded by the number
+            # of buttons there are to drop.
+            for _attempt in range(len(view.children) + 1):
+                try:
+                    await message.edit(view=view, **kwargs)
+                    break
+                except discord.HTTPException as exc:
+                    if not await view._drop_rejected_emoji(exc):
+                        raise
+            else:
+                return " Discord refused every emoji on the controller."
 
             # Keep clicks working: the old cached view is now out of date, and
             # the persistent registration has to point at the new one.
