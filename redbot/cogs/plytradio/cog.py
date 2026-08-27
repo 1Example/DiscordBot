@@ -25,10 +25,18 @@ _ = Translator("PyLavYouTubeRadio", Path(__file__))
 
 LOGGER = logging.getLogger("red.PyLav.cog.YouTubeRadio")
 
-# Reasons that mean "the track played through to the end on its own".
-# Anything else (REPLACED, STOPPED, CLEANUP) means a human intervened,
-# and we must not hijack that.
-NATURAL_END_REASONS = {"finished", "FINISHED"}
+# Lavalink ends a track with exactly one of these:
+#   finished    - played through
+#   loadFailed  - the source refused to play it (age-gated, region-locked,
+#                 deleted, or the YouTube plugin having a bad minute)
+#   stopped     - someone pressed stop
+#   replaced    - something else took the player over
+#   cleanup     - the player was torn down
+#
+# Only `stopped` and `replaced` are deliberate acts we must not override.
+# Treating everything else as "not finished" meant a single unplayable video
+# silently ended the station, because the queue was never topped up again.
+DELIBERATE_END_REASONS = {"stopped", "replaced", "STOPPED", "REPLACED"}
 
 # How many seed video IDs we remember per guild so the radio doesn't loop
 # back onto the same handful of tracks.
@@ -272,7 +280,18 @@ class PyLavYouTubeRadio(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
 
         candidates = await self._fetch_mix(video_id, player)
         if not candidates:
-            return 0
+            # One dead mix is not the end of the station: the seed may simply
+            # have no radio (rare uploads, some live streams). Branch off the
+            # tracks already played instead of stopping.
+            LOGGER.info(
+                "Guild %s: mix RD%s came back empty, trying another seed", guild_id, video_id
+            )
+            candidates = await self._reseed_from_history(player)
+            if not candidates:
+                LOGGER.warning(
+                    "Guild %s: no YouTube mix could be loaded for any recent track.", guild_id
+                )
+                return 0
 
         played = set(self._played[guild_id])
         # Also exclude anything sitting in the queue right now, otherwise a
@@ -331,6 +350,24 @@ class PyLavYouTubeRadio(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
 
         LOGGER.debug("Guild %s: queued %s radio tracks", guild_id, len(chosen))
         return len(chosen)
+
+    async def _reseed_from_history(self, player: Player) -> list[Any]:
+        """Find a usable mix from something recently played.
+
+        Used when the current seed has no mix at all, which otherwise ends the
+        station outright.
+        """
+        guild_id = player.guild.id
+        seen = list(self._played[guild_id])
+        random.shuffle(seen)
+        for key in seen[:RESEED_ATTEMPTS]:
+            if not key:
+                continue
+            tracks = await self._fetch_mix(key, player)
+            if tracks:
+                LOGGER.info("Guild %s: recovered onto mix RD%s", guild_id, key)
+                return tracks
+        return []
 
     async def _reseed(self, player: Player, candidates: list[Any], played: set[str]) -> tuple[list[Any], list[Any]]:
         """Branch onto a different YouTube mix when the current one is used up.
@@ -404,7 +441,11 @@ class PyLavYouTubeRadio(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             if player.current is not None or not player.queue.empty():
                 return
             LOGGER.debug("Guild %s: skip emptied the player, reloading radio", guild_id)
-            await self._top_up(player, event.track, start_playback=True)
+            if not await self._top_up(player, event.track, start_playback=True):
+                LOGGER.warning(
+                    "Guild %s: skipping emptied the radio and nothing could be queued.",
+                    guild_id,
+                )
 
     @commands.Cog.listener()
     async def on_pylav_track_end_event(self, event: TrackEndEvent) -> None:
@@ -414,9 +455,18 @@ class PyLavYouTubeRadio(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             return
         guild_id = player.guild.id
 
-        if event.reason not in NATURAL_END_REASONS:
-            LOGGER.debug("Track ended in guild %s with reason %s - ignoring", guild_id, event.reason)
+        if event.reason in DELIBERATE_END_REASONS:
+            LOGGER.debug(
+                "Guild %s: track ended with %s, leaving the player alone", guild_id, event.reason
+            )
             return
+        if event.reason not in ("finished", "FINISHED"):
+            # Worth saying out loud: a run of these is why a station thins out.
+            LOGGER.info(
+                "Guild %s: track ended with %s, topping the radio up anyway",
+                guild_id,
+                event.reason,
+            )
         if not await self.is_enabled(guild_id):
             return
 
@@ -426,7 +476,15 @@ class PyLavYouTubeRadio(DashboardIntegration, DISCORD_COG_TYPE_MIXIN):
             if player.current is not None or not player.queue.empty():
                 return
             LOGGER.debug("Guild %s: queue ran dry, reloading radio", guild_id)
-            await self._top_up(player, event.track, start_playback=True)
+            if not await self._top_up(player, event.track, start_playback=True):
+                # Nothing queued and nothing playing: the station has stopped.
+                # This used to be invisible, which is what made it so hard to
+                # pin down.
+                LOGGER.warning(
+                    "Guild %s: the YouTube radio could not find anything to play and "
+                    "has stopped. Run `[p]ytradio diagnose` for the reason.",
+                    guild_id,
+                )
 
     # ------------------------------------------------------------------
     # Commands
