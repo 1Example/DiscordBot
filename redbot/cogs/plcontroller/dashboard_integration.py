@@ -908,31 +908,65 @@ class DashboardIntegration:
     async def _dash_refresh_controller(self, guild: discord.Guild) -> str:
         """Redraw the live controller so a save is visible immediately.
 
-        Nothing else pushes the panel: `prepare()` restyles the buttons, but it
-        only runs on the way to an edit, and an edit only happens when someone
-        clicks or the player changes. Saving on the web should not leave you
-        waiting for one of those.
+        Deliberately does not trust `_view_cache`: it is populated at cog load
+        and can easily not match the message on screen. The channel and the
+        message id both live in config, so the panel is rebuilt from those, and
+        the fresh view replaces whatever was cached.
 
         Returns a sentence to append to the notification, so the page says what
-        actually happened rather than leaving you guessing whether it worked.
+        actually happened rather than leaving you to guess.
         """
-        # The whole thing is guarded: the settings are already written by the
-        # time this runs, and redrawing is a courtesy. It must never turn a
-        # successful save into "Action failed".
         try:
-            channel_id = (getattr(self, "_channel_cache", None) or {}).get(
-                getattr(guild, "id", None)
-            )
-            if not channel_id:
-                return " No controller channel is set, so nothing to update."
-            view = (getattr(self, "_view_cache", None) or {}).get(channel_id)
-            if view is None:
-                return " No controller is posted, so nothing to update."
-            await view.update_view()
-        except Exception as exc:  # noqa: BLE001
-            log.exception("Could not refresh the controller after a save")
+            from .view import PersistentControllerView
+
+            settings = await self._config.guild(guild).all()
+            channel = guild.get_channel(settings.get("channel") or 0)
+            if channel is None:
+                return " No controller channel is set, so there is nothing to redraw."
+
+            message_id = settings.get("persistent_view_message_id")
+            if not message_id:
+                return " No controller has been posted yet, so there is nothing to redraw."
+
+            try:
+                message = await channel.fetch_message(message_id)
+            except discord.NotFound:
+                return " The controller message is gone; post it again."
+            except discord.Forbidden:
+                return f" I cannot read messages in #{channel.name}."
+
+            view = PersistentControllerView(cog=self, channel=channel, message=message)
+            await view.prepare()
+            with contextlib.suppress(Exception):
+                await view.set_permissions()
+
+            kwargs = await view.get_now_playing_embed()
+            attachments = []
+            if "file" in kwargs:
+                attachments = [kwargs.pop("file")]
+            elif "files" in kwargs:
+                attachments = kwargs.pop("files")
+            if attachments:
+                kwargs["attachments"] = attachments
+
+            try:
+                await message.edit(view=view, **kwargs)
+            except discord.HTTPException as exc:
+                # The view knows how to drop an emoji Discord refuses; give it
+                # the chance rather than failing the whole redraw.
+                if not await view._drop_rejected_emoji(exc):
+                    raise
+                await message.edit(view=view, **kwargs)
+
+            # Keep clicks working: the old cached view is now out of date, and
+            # the persistent registration has to point at the new one.
+            self._view_cache[channel.id] = view
+            with contextlib.suppress(Exception):
+                self.bot.add_view(view, message_id=message.id)
+            return " The controller has been redrawn."
+        except Exception as exc:  # noqa: BLE001 - the save itself already worked
+            log.exception("Could not redraw the controller after a save")
             return f" The controller could not be redrawn: {exc}"
-        return " The controller has been updated."
 
     async def _dash_save_buttons(self, guild, conf, field) -> list[dict]:
         from .view import BUTTONS, BUTTON_STYLES, parse_emoji
