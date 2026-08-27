@@ -947,13 +947,17 @@ class PersistentControllerView(discord.ui.View):
             button.label = (label or default_label)[:80]
             button.style = BUTTON_STYLES.get(styles.get(attribute) or "", TRANSPARENT)
         # Says plainly whether the config reached the buttons, so "it did not
-        # change" can be answered from the log instead of guessed at.
-        LOGGER.debug(
-            "Styled the controller in %s: %s of %s buttons carry a custom emoji.",
-            getattr(self.guild, "id", "?"),
-            applied,
-            len(BUTTONS),
-        )
+        # change" can be answered from the log instead of guessed at. The panel
+        # redraws on every player event, so this only speaks up when the answer
+        # changes - otherwise it would drown the log at normal verbosity.
+        if applied != getattr(self, "_last_styled_count", None):
+            self._last_styled_count = applied
+            LOGGER.info(
+                "Controller buttons in %s: %s of %s carry a custom emoji.",
+                getattr(self.guild, "id", "?"),
+                applied,
+                len(BUTTONS),
+            )
 
     async def prepare(self):
         async with self.__prepare_lock:
