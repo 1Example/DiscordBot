@@ -666,8 +666,11 @@ class DashboardIntegration:
                 await conf.button_emojis.set({})
                 await conf.button_labels.set({})
                 await conf.button_styles.set({})
+                await conf.rejected_emojis.set({})
+                pushed = await self._dash_refresh_controller(guild)
                 return [
-                    {"message": "Buttons are back to the defaults.", "category": "success"}
+                    {"message": "Buttons are back to the defaults." + pushed,
+                     "category": "success"}
                 ]
         except Exception as exc:  # noqa: BLE001 - surfaced, not swallowed
             log.exception("Controller settings action %r failed", action)
@@ -843,6 +846,35 @@ class DashboardIntegration:
                     rejected.pop(key, None)
         return problems
 
+    async def _dash_refresh_controller(self, guild: discord.Guild) -> str:
+        """Redraw the live controller so a save is visible immediately.
+
+        Nothing else pushes the panel: `prepare()` restyles the buttons, but it
+        only runs on the way to an edit, and an edit only happens when someone
+        clicks or the player changes. Saving on the web should not leave you
+        waiting for one of those.
+
+        Returns a sentence to append to the notification, so the page says what
+        actually happened rather than leaving you guessing whether it worked.
+        """
+        # The whole thing is guarded: the settings are already written by the
+        # time this runs, and redrawing is a courtesy. It must never turn a
+        # successful save into "Action failed".
+        try:
+            channel_id = (getattr(self, "_channel_cache", None) or {}).get(
+                getattr(guild, "id", None)
+            )
+            if not channel_id:
+                return " No controller channel is set, so nothing to update."
+            view = (getattr(self, "_view_cache", None) or {}).get(channel_id)
+            if view is None:
+                return " No controller is posted, so nothing to update."
+            await view.update_view()
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Could not refresh the controller after a save")
+            return f" The controller could not be redrawn: {exc}"
+        return " The controller has been updated."
+
     async def _dash_save_buttons(self, guild, conf, field) -> list[dict]:
         from .view import BUTTONS, BUTTON_STYLES, parse_emoji
 
@@ -879,11 +911,9 @@ class DashboardIntegration:
         notes = [emoji_rejection(k, v) for k, v in bad] + [
             {"message": text, "category": "warning"} for text in problems
         ]
+        pushed = await self._dash_refresh_controller(guild)
         return notes + [
-            {
-                "message": "Buttons saved. The controller picks them up on its next refresh.",
-                "category": "success",
-            }
+            {"message": "Buttons saved." + pushed, "category": "success"}
         ]
 
     async def _dash_save_costs(self, conf, field) -> list[dict]:
