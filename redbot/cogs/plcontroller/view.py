@@ -933,15 +933,27 @@ class PersistentControllerView(discord.ui.View):
         labels = settings.get("button_labels") or {}
         styles = settings.get("button_styles") or {}
 
+        applied = 0
         for attribute, default_label, default_emoji, _blurb in BUTTONS:
             button = getattr(self, attribute, None)
             if button is None:
                 continue
-            parsed = parse_emoji(emoji_overrides.get(attribute)) or parse_emoji(default_emoji)
+            override = emoji_overrides.get(attribute)
+            parsed = parse_emoji(override) or parse_emoji(default_emoji)
             button.emoji = parsed
+            if override and parse_emoji(override) is not None:
+                applied += 1
             label = (labels.get(attribute) or "").strip()
             button.label = (label or default_label)[:80]
             button.style = BUTTON_STYLES.get(styles.get(attribute) or "", TRANSPARENT)
+        # Says plainly whether the config reached the buttons, so "it did not
+        # change" can be answered from the log instead of guessed at.
+        LOGGER.debug(
+            "Styled the controller in %s: %s of %s buttons carry a custom emoji.",
+            getattr(self.guild, "id", "?"),
+            applied,
+            len(BUTTONS),
+        )
 
     async def prepare(self):
         async with self.__prepare_lock:

@@ -591,6 +591,7 @@ class DashboardIntegration:
                 "currency": currency,
                 "cost_rows": self._dash_cost_rows(settings),
                 "posted": bool(settings.get("persistent_view_message_id")),
+                "live": self._dash_live_buttons(guild),
             },
         }
 
@@ -845,6 +846,64 @@ class DashboardIntegration:
                 if field(f"img_{key}"):
                     rejected.pop(key, None)
         return problems
+
+    def _dash_live_buttons(self, guild: discord.Guild) -> dict:
+        """What the running controller currently holds, button by button.
+
+        Compares three things that should agree and often do not:
+        what is saved, what the in-memory button carries, and whether this
+        build of the cog even has the code that copies one to the other.
+        """
+        info = {
+            "has_styling_code": False,
+            "channel": None,
+            "posted": False,
+            "rows": [],
+            "note": "",
+        }
+        try:
+            from .view import BUTTONS, PersistentControllerView
+
+            info["has_styling_code"] = hasattr(
+                PersistentControllerView, "_apply_button_styling"
+            )
+
+            channel_id = (getattr(self, "_channel_cache", None) or {}).get(guild.id)
+            if not channel_id:
+                info["note"] = "No controller channel is set for this server."
+                return info
+            channel = guild.get_channel(channel_id)
+            info["channel"] = f"#{channel.name}" if channel is not None else str(channel_id)
+
+            view = (getattr(self, "_view_cache", None) or {}).get(channel_id)
+            if view is None:
+                info["note"] = "No controller view is loaded; post the panel first."
+                return info
+            info["posted"] = getattr(view, "message", None) is not None
+            if not info["posted"]:
+                info["note"] = "The view has no message attached, so nothing can be edited."
+
+            for attribute, default_label, _default_emoji, _blurb in BUTTONS:
+                button = getattr(view, attribute, None)
+                if button is None:
+                    continue
+                emoji = getattr(button, "emoji", None)
+                info["rows"].append(
+                    {
+                        "key": attribute,
+                        "label": getattr(button, "label", None) or default_label,
+                        # A custom emoji has an id; a unicode one does not.
+                        "custom": bool(getattr(emoji, "id", None)),
+                        "emoji": str(emoji) if emoji is not None else "none",
+                        "attached": any(
+                            child is button for child in getattr(view, "children", [])
+                        ),
+                    }
+                )
+        except Exception as exc:  # noqa: BLE001 - diagnostics must not break the page
+            log.exception("Could not inspect the live controller")
+            info["note"] = f"Could not inspect the controller: {exc}"
+        return info
 
     async def _dash_refresh_controller(self, guild: discord.Guild) -> str:
         """Redraw the live controller so a save is visible immediately.
@@ -1564,6 +1623,57 @@ SETTINGS_TEMPLATE = (
       </div>
     </div>
   </form>
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-stethoscope"></i> What the bot is actually showing</h5>
+    <p class="dz-hint">
+      The buttons as they exist in the running controller right now. If a row
+      says <b>default</b> while you have a picture saved above, the setting is
+      not reaching the view; if it says <b>custom</b> but Discord still shows
+      the plain icon, Discord is refusing it.
+    </p>
+
+    {% if not live.has_styling_code %}
+      <p style="margin:0 0 9px; color:#ff8b8b;">
+        <i class="fa fa-exclamation-triangle"></i>
+        <b>This bot is running an older copy of the cog</b> &mdash; it has no
+        button-styling code at all, so nothing here will ever change. Redeploy
+        <code>redbot/cogs/plcontroller/</code> and reload the cog.
+      </p>
+    {% endif %}
+    {% if live.note %}
+      <p class="dz-hint" style="color:#f0aa3c;">{{ live.note }}</p>
+    {% endif %}
+
+    {% if live.rows %}
+      <div style="overflow-x:auto;">
+      <table class="dz-t" style="min-width:520px;">
+        <thead>
+          <tr><th>Button</th><th>Label in use</th><th>Emoji in use</th>
+              <th>On the panel</th></tr>
+        </thead>
+        <tbody>
+          {% for r in live.rows %}
+            <tr>
+              <td style="opacity:.7;">{{ r.key }}</td>
+              <td>{{ r.label }}</td>
+              <td>
+                {% if r.custom %}<span class="dz-tag good">custom</span>
+                {% else %}<span class="dz-tag">default</span>{% endif %}
+                <code style="font-size:.72rem;">{{ r.emoji }}</code>
+              </td>
+              <td style="opacity:.7;">{{ 'yes' if r.attached else 'no' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div style="font-size:.72rem; opacity:.45; margin-top:6px;">
+        Channel: {{ live.channel or 'not set' }} &middot;
+        message attached: {{ 'yes' if live.posted else 'no' }}
+      </div>
+    {% endif %}
+  </div>
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
