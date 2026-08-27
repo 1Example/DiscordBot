@@ -461,6 +461,18 @@ BASE_CSS += """
   .dz-tag.bad  { color:#ff8b8b; border-color:rgba(255,90,90,.4); }
   .dz-tag.good { color:#3ba55d; border-color:rgba(59,165,93,.4); }
 
+  /* A select is width:100% and a flex item shrinks: put one in a .dz-row
+     next to a button and it collapses to the width of its own arrow, which
+     leaves the open dropdown rendering one character per line. Give the
+     controls a floor and stop the buttons being squeezed instead. */
+  .dz-row > .dz-select, .dz-row > .dz-input, .dz-row > .dz-area,
+  .dz-row > .dz-pick { flex:1 1 220px; min-width:170px; width:auto; }
+  .dz-row > .dz-btn, .dz-row > button { flex:0 0 auto; }
+  /* Multi-selects size themselves from `size`; the single-line padding used
+     for a dropdown squashes them. */
+  select.dz-select[multiple] { height:auto; padding:6px; }
+  select.dz-select[multiple] option { padding:3px 6px; border-radius:6px; }
+
   .dz-pick { position:relative; }
   .dz-pick input.dz-search { margin-bottom:6px; }
   .dz-pick .dz-count { font-size:.7rem; opacity:.45; margin-top:4px; }

@@ -476,6 +476,86 @@ class DashboardIntegration:
 
         return [{"message": f"Unknown lookup: {kind}", "category": "warning"}], {}
 
+    async def _vrt_wipe_rooms(self, guild: discord.Guild) -> list[dict]:
+        """Delete the empty rooms PrivateRooms is holding open.
+
+        Deliberately not "every empty voice channel in the server": the AFK
+        channel, staff rooms and the hubs people join to create a room are all
+        empty most of the time, and deleting those breaks the server. Only
+        channels PrivateRooms created and still tracks are touched, and the
+        hubs are skipped even if they somehow appear in that list.
+        """
+        rooms_cog = self.bot.get_cog("PrivateRooms")
+        if rooms_cog is None:
+            return [
+                {
+                    "message": "PrivateRooms is not loaded, so there are no rooms to "
+                    "clean up. Nothing was deleted.",
+                    "category": "warning",
+                }
+            ]
+
+        try:
+            settings = await rooms_cog.config.guild(guild).all()
+        except Exception as exc:  # noqa: BLE001 - another cog's config is not ours to trust
+            log.exception("Could not read PrivateRooms settings")
+            return [
+                {"message": f"Could not read the PrivateRooms settings: {exc}",
+                 "category": "danger"}
+            ]
+
+        hubs = {settings.get("hub_private"), settings.get("hub_public")}
+        tracked = list((settings.get("rooms") or {}).items())
+        if not tracked:
+            return [
+                {"message": "PrivateRooms is not tracking any rooms right now.",
+                 "category": "info"}
+            ]
+
+        deleted = 0
+        occupied = 0
+        stale = 0
+        for raw_id, _data in tracked:
+            try:
+                channel_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if channel_id in hubs:
+                continue
+            channel = guild.get_channel(channel_id)
+            if channel is None:
+                # The channel is gone but the entry is not; drop it so the
+                # count on the page stops lying.
+                async with rooms_cog.config.guild(guild).rooms() as rooms:
+                    rooms.pop(str(channel_id), None)
+                stale += 1
+                continue
+            if not isinstance(channel, discord.VoiceChannel) or channel.members:
+                occupied += 1
+                continue
+            try:
+                await channel.delete(reason="Empty private room, wiped from the dashboard")
+            except discord.HTTPException:
+                continue
+            async with rooms_cog.config.guild(guild).rooms() as rooms:
+                rooms.pop(str(channel_id), None)
+            deleted += 1
+
+        out = [
+            {"message": f"Deleted {deleted} empty private room(s).", "category": "success"}
+        ]
+        if occupied:
+            out.append(
+                {"message": f"{occupied} room(s) still have someone in them and were left "
+                            "alone.", "category": "info"}
+            )
+        if stale:
+            out.append(
+                {"message": f"Forgot {stale} room(s) that no longer exist.",
+                 "category": "info"}
+            )
+        return out
+
     async def _vrt_maintenance(
         self, action: str, guild: discord.Guild
     ) -> tuple[list[dict], dict]:
@@ -508,19 +588,7 @@ class DashboardIntegration:
             return out, {}
 
         if action == "wipevcs":
-            deleted = 0
-            for channel in list(guild.voice_channels):
-                if channel.members:
-                    continue
-                try:
-                    await channel.delete(reason="Wiped from the dashboard")
-                    deleted += 1
-                except discord.HTTPException:
-                    continue
-            return [
-                {"message": f"Deleted {deleted} empty voice channel(s).",
-                 "category": "success"}
-            ], {}
+            return await self._vrt_wipe_rooms(guild), {}
 
         if action == "wipethreads":
             deleted = 0
@@ -643,13 +711,17 @@ VRTUTILS_TEMPLATE = (
       <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
       <div class="dz-panel">
         <h5><i class="fa fa-broom"></i> Server cleanup</h5>
-        <p class="dz-hint">These change the server immediately and cannot be undone.</p>
+        <p class="dz-hint">
+          These change the server immediately and cannot be undone. The room
+          cleanup only touches channels PrivateRooms created, never the hubs,
+          the AFK channel or anything you made yourself.
+        </p>
         <div class="dz-row">
           {{ confirm('Dehoist nicknames', 'nohoist',
                      'Rename every member whose name starts with a symbol so they stop sorting to the top?',
                      '', 'fa-sort-alpha-asc') }}
-          {{ confirm('Delete empty voice channels', 'wipevcs',
-                     'Delete every voice channel that currently has nobody in it?') }}
+          {{ confirm('Delete empty private rooms', 'wipevcs',
+                     'Delete the PrivateRooms channels that nobody is sitting in?') }}
           {{ confirm('Delete all threads', 'wipethreads',
                      'Delete every thread in this server?') }}
         </div>
