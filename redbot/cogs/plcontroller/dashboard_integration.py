@@ -323,6 +323,9 @@ class DashboardIntegration:
                 "status": 0,
                 "web_content": {
                     "source": PLAYER_TEMPLATE,
+                    # No guild hero and no breadcrumb: this page carries its
+                    # own server bar, with the switcher and the stats in it.
+                    "bare": True,
                     # The client boots from the same blob it later polls for,
                     # so the first paint and every later one share one code path.
                     "boot": _dash_json(data),
@@ -449,6 +452,7 @@ class DashboardIntegration:
             "status": 0,
             "web_content": {
                 "source": PLAYER_TEMPLATE,
+                "bare": True,
                 "boot": _dash_json(data),
                 "player_state": data["state"],
                 # kwargs["csrf_token"] is (raw, signed); the signed value goes in the form.
@@ -1832,7 +1836,6 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   color:#ffd9a3; font-size:.83rem;
 }
 #plcRoot.stale .plc-offline{ display:flex; }
-.plc-hide{ display:none !important; }
 
 @media (max-width:640px){
   .plc-hero{ grid-template-columns:1fr; justify-items:center; text-align:center; padding:18px; }
@@ -2865,66 +2868,12 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     if (key !== lastKey) { lastKey = key; render(); }
   }, 500);
 
-  // This page is meant to read as a standalone player, so two bits of
-  // dashboard furniture go: the "back to the third-party list" pill, and the
-  // guild banner - the server bar above replaces the latter, switcher and all.
-  // Both are matched by what they contain rather than by position, and if
-  // neither matches, nothing is hidden and the page is merely as it was.
-  function stripBackLink() {
-    Array.prototype.forEach.call(document.querySelectorAll("a"), function (a) {
-      if (ROOT.contains(a)) return;
-      var href = (a.getAttribute("href") || "").replace(/\/+$/, "");
-      var text = (a.textContent || "").trim().replace(/^[<‹«←]\s*/, "");
-      if (/\/third-party$/i.test(href) || text === "PyLavController") {
-        a.classList.add("plc-hide");
-        var parent = a.parentElement;
-        // Hide the wrapper too, but only when the link was all it held -
-        // otherwise this would take real page furniture with it.
-        if (parent && parent !== document.body && parent.children.length === 1) {
-          parent.classList.add("plc-hide");
-        }
-      }
-    });
-  }
-
-  function stripGuildBanner() {
-    var best = null;
-    var nodes = document.querySelectorAll("div,section,header,nav,aside");
-    for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i];
-      // Never touch anything that wraps this page, or the page itself.
-      if (el === ROOT || el.contains(ROOT) || ROOT.contains(el)) continue;
-      var text = el.textContent || "";
-      if (text.length > 3000) continue;
-      // All four have to be present: the three counters plus one of the
-      // banner's own tabs. That combination is the banner and nothing else.
-      //
-      // Plain substrings, deliberately. The counters are separate elements,
-      // so textContent runs them together as "187Members" - and \bMembers\b
-      // does not match that, because "7" and "M" are both word characters.
-      // That is what made the first version of this quietly never fire.
-      if (text.indexOf("Members") < 0) continue;
-      if (text.indexOf("Channels") < 0) continue;
-      if (text.indexOf("Roles") < 0) continue;
-      if (!/Overview|Bot Settings|Modules/.test(text)) continue;
-      // Keep narrowing: the smallest element that still holds all of it is
-      // the banner, not the column it happens to sit in.
-      if (!best || best.contains(el)) best = el;
-    }
-    if (best) best.classList.add("plc-hide");
-  }
-
   // ---- go ----------------------------------------------------------------
   renderSources();
   renderResults();
   reanchor();
   render();
   markField();
-  // Once now, and once more shortly after: some of the surrounding chrome is
-  // rendered by the dashboard's own scripts and may not exist yet.
-  function stripChrome() { stripBackLink(); stripGuildBanner(); }
-  stripChrome();
-  setTimeout(stripChrome, 700);
   schedule(1200);
 })();
 </script>

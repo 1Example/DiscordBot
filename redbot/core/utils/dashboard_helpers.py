@@ -512,208 +512,30 @@ BASE_CSS += """
 """
 
 
-# Toasts, shared by every dashboard page.
+# Notifications.
 #
-# The webserver renders its own notifications wherever its layout happens to
-# put them, in whatever the underlying CSS framework calls an alert. This
-# adopts those into one fixed, top-right stack with a consistent look, and
-# gives pages ``dzToast(message, category)`` so anything they raise themselves
-# lands in the same place. Appended to BASE_CSS, so importing that is all a cog
-# has to do.
-NOTIFICATIONS = r"""
-<style>
-  .dz-toasts{
-    position:fixed; top:16px; right:16px; z-index:99999;
-    display:flex; flex-direction:column; gap:9px;
-    width:min(380px, calc(100vw - 32px));
-    pointer-events:none;
-  }
-  .dz-toast{
-    display:flex; align-items:flex-start; gap:11px;
-    padding:12px 14px; border-radius:12px;
-    background:#151a30; border:1px solid rgba(255,255,255,.16);
-    border-left:3px solid #6c8cff;
-    color:#eef2ff; font-size:.85rem; line-height:1.4;
-    box-shadow:0 14px 38px rgba(0,0,0,.55);
-    animation:dzToastIn .22s cubic-bezier(.2,.9,.3,1);
-    pointer-events:auto; overflow:hidden;
-  }
-  .dz-toast > i{ margin-top:2px; flex:0 0 auto; color:#6c8cff; }
-  .dz-toast-body{ min-width:0; flex:1 1 auto; word-break:break-word; }
-  .dz-toast-x{
-    flex:0 0 auto; width:22px; height:22px; border:none; border-radius:6px;
-    background:transparent; color:inherit; opacity:.45; cursor:pointer;
-    font-size:.9rem; line-height:1; padding:0;
-  }
-  .dz-toast-x:hover{ opacity:1; background:rgba(255,255,255,.10); }
-  .dz-toast.success{ border-left-color:#38d39f; } .dz-toast.success > i{ color:#38d39f; }
-  .dz-toast.warning{ border-left-color:#ffb454; } .dz-toast.warning > i{ color:#ffb454; }
-  .dz-toast.danger { border-left-color:#ff6b6b; } .dz-toast.danger  > i{ color:#ff6b6b; }
-  .dz-toast.info   { border-left-color:#6c8cff; }
-  .dz-toast.out{ animation:dzToastOut .2s ease-in forwards; }
-  @keyframes dzToastIn { from{ opacity:0; transform:translateX(24px); } to{ opacity:1; transform:none; } }
-  @keyframes dzToastOut{ to{ opacity:0; transform:translateX(24px); height:0;
-                             padding-top:0; padding-bottom:0; margin-bottom:-9px; } }
-  /* An adopted alert keeps its own framework classes; neutralise the parts of
-     them that would fight the toast look. */
-  .dz-toast.alert{ margin:0; }
-  .dz-toast .close, .dz-toast .btn-close{ display:none !important; }
-  @media (prefers-reduced-motion:reduce){
-    .dz-toast, .dz-toast.out{ animation:none; }
-  }
-</style>
+# The webserver already has one: toastr, loaded on every page by the base
+# layout, positioned and themed in `cubix-theme.css`. This is only a thin
+# adapter so a cog page can raise one through the same system rather than
+# inventing a second, differently-styled stack of its own.
+NOTIFICATIONS = """
 {% raw %}
 <script>
 (function () {
   "use strict";
-  if (window.dzToast) return;          // one implementation per page
-
-  var STACK = null;
-  function stack() {
-    if (STACK && document.body.contains(STACK)) return STACK;
-    STACK = document.createElement("div");
-    STACK.className = "dz-toasts";
-    STACK.setAttribute("role", "status");
-    STACK.setAttribute("aria-live", "polite");
-    document.body.appendChild(STACK);
-    return STACK;
-  }
-
-  var ICONS = {
-    success: "fa-check-circle", warning: "fa-exclamation-triangle",
-    danger: "fa-times-circle", info: "fa-info-circle"
-  };
-  // How long each kind stays. An error is the one you most want to still be
-  // there when you look back at the screen.
-  var LIFE = { danger: 9000, warning: 7000, success: 4000, info: 5000 };
-
-  function dismiss(el) {
-    if (!el || el.dataset.dzGone) return;
-    el.dataset.dzGone = "1";
-    el.classList.add("out");
-    setTimeout(function () { el.remove(); }, 220);
-  }
-
-  function mount(el, category) {
-    el.classList.add("dz-toast", category);
-    if (!el.querySelector(".dz-toast-x")) {
-      var x = document.createElement("button");
-      x.type = "button";
-      x.className = "dz-toast-x";
-      x.setAttribute("aria-label", "Dismiss");
-      x.innerHTML = "&times;";
-      x.addEventListener("click", function () { dismiss(el); });
-      el.appendChild(x);
-    }
-    stack().appendChild(el);
-    var timer = setTimeout(function () { dismiss(el); }, LIFE[category] || LIFE.info);
-    // Reading a long message should not be a race against the timer.
-    el.addEventListener("mouseenter", function () { clearTimeout(timer); });
-    el.addEventListener("mouseleave", function () {
-      timer = setTimeout(function () { dismiss(el); }, 1800);
-    });
-    return el;
-  }
-
+  if (window.dzToast) return;
+  var LEVELS = { success: 1, warning: 1, error: 1, danger: 1, info: 1 };
   window.dzToast = function (message, category) {
-    if (!message) return null;
-    category = ICONS[category] ? category : "info";
-    var el = document.createElement("div");
-    el.innerHTML = '<i class="fa ' + ICONS[category] + '"></i><div class="dz-toast-body"></div>';
-    // textContent, not innerHTML: a notification usually carries a name, a
-    // filename or an error string that came from somewhere else.
-    el.querySelector(".dz-toast-body").textContent = String(message);
-    return mount(el, category);
+    if (!message) return;
+    category = LEVELS[category] ? category : "info";
+    // toastr.danger is aliased to toastr.error by the base layout.
+    if (window.toastr && typeof window.toastr[category] === "function") {
+      window.toastr[category](String(message));
+      return;
+    }
+    // Only reachable if the page was rendered without the base layout.
+    console.log("[" + category + "] " + message);
   };
-
-  // ---- adopt whatever the webserver rendered ------------------------------
-  var CATEGORY = [
-    ["danger", /alert-danger|alert-error|toast-danger|is-danger|(^|[\s-])(error|danger)([\s-]|$)/i],
-    ["warning", /alert-warning|toast-warning|is-warning|(^|[\s-])warning([\s-]|$)/i],
-    ["success", /alert-success|toast-success|is-success|(^|[\s-])success([\s-]|$)/i]
-  ];
-  function categoryOf(el) {
-    var name = typeof el.className === "string" ? el.className : "";
-    for (var i = 0; i < CATEGORY.length; i++) {
-      if (CATEGORY[i][1].test(name)) return CATEGORY[i][0];
-    }
-    return "info";
-  }
-
-  function looksLikeAlert(el) {
-    if (!el || el.nodeType !== 1 || el.dataset.dzAdopted) return false;
-    if (el.closest(".dz-toasts")) return false;
-    var name = typeof el.className === "string" ? el.className : "";
-    return /(^|\s)(alert|toast|notification|flash)([\s-]|$)/i.test(name);
-  }
-
-  // An adopted alert usually arrives with a dismiss control of its own, which
-  // would sit next to the one mount() adds and read as two close buttons.
-  // Class names for it vary by framework, so this goes on what the control
-  // *is* rather than what it is called.
-  function dropExistingDismiss(el) {
-    var nodes = el.querySelectorAll("button, a, span, i");
-    Array.prototype.forEach.call(nodes, function (node) {
-      var cls = typeof node.className === "string" ? node.className : "";
-      var label = (node.getAttribute("aria-label") || "") + " " + (node.getAttribute("title") || "");
-      var text = (node.textContent || "").trim();
-      if (
-        /(^|[\s-])(close|dismiss)([\s-]|$)/i.test(cls) ||
-        /close|dismiss/i.test(label) ||
-        node.hasAttribute("data-dismiss") ||
-        node.hasAttribute("data-bs-dismiss") ||
-        // A lone multiplication sign or x, and nothing else in it.
-        (!node.children.length && /^[×✕✖╳xX]$/.test(text))
-      ) {
-        node.remove();
-      }
-    });
-  }
-
-  function adopt(el) {
-    if (!looksLikeAlert(el)) return;
-    // A container of alerts is not itself an alert; take its children instead.
-    if (el.querySelector(".alert, .toast, .notification")) return;
-    if (!(el.textContent || "").trim()) return;
-    el.dataset.dzAdopted = "1";
-    dropExistingDismiss(el);
-    var category = categoryOf(el);
-    if (!el.querySelector(".fa")) {
-      var icon = document.createElement("i");
-      icon.className = "fa " + (ICONS[category] || ICONS.info);
-      el.insertBefore(icon, el.firstChild);
-    }
-    mount(el, category);
-  }
-
-  function sweep(root) {
-    var nodes = (root || document).querySelectorAll(
-      '.alert, .toast, .notification, .flash, [class*="alert-"], [class*="toast-"]'
-    );
-    Array.prototype.forEach.call(nodes, adopt);
-  }
-
-  function start() {
-    sweep(document);
-    // Notifications that arrive after load - a framework toast, or anything a
-    // page injects later - get picked up the same way.
-    if (!window.MutationObserver) return;
-    new MutationObserver(function (records) {
-      records.forEach(function (record) {
-        Array.prototype.forEach.call(record.addedNodes, function (node) {
-          if (node.nodeType !== 1) return;
-          adopt(node);
-          sweep(node);
-        });
-      });
-    }).observe(document.body, { childList: true, subtree: true });
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", start);
-  } else {
-    start();
-  }
 })();
 </script>
 {% endraw %}
