@@ -226,6 +226,23 @@ class DashboardRPC:
             log.debug("Could not read activities for %s", user_id, exc_info=True)
         return out
 
+    @staticmethod
+    def _banner_url(user) -> str:
+        """The banner, asked for at a size worth showing.
+
+        discord.py hands back a 512px asset by default, which a page header
+        several times that wide then upscales into mush. Banners go up to
+        4096; 1024 is the point where it stops looking soft without making an
+        animated one enormous.
+        """
+        banner = getattr(user, "banner", None)
+        if banner is None:
+            return ""
+        try:
+            return banner.with_size(1024).url
+        except Exception:  # noqa: BLE001 - any refusal falls back to the default
+            return banner.url
+
     def _levelup_profile(self, guild_id: int, user_id: int) -> dict | None:
         """Level, XP and activity for one member, if LevelUp is loaded.
 
@@ -270,7 +287,17 @@ class DashboardRPC:
             "status": 0, "shared": 0, "manageable": 0,
             "avatar_url": "", "decoration_url": "",
             "presence": "offline", "presence_colour": "#80848e",
+            # A server to land on when a page needs one and the URL has none -
+            # the Audio link, which otherwise bounces through the guild picker.
+            "default_guild": "",
         }
+        shared_ids: list[str] = []
+        manageable_ids: list[str] = []
+        playing_ids: list[str] = []
+        # Reached through the cog because pylav_auto_setup attaches the client
+        # there, not to the bot.
+        controller = self.bot.get_cog("PyLavController")
+        pylav = getattr(controller, "pylav", None)
         user = self.bot.get_user(user_id)
         if user is not None:
             # The topbar draws the same avatar-and-frame as the profile does,
@@ -293,6 +320,7 @@ class DashboardRPC:
                 if member is None:
                     continue
                 result["shared"] += 1
+                shared_ids.append(str(guild.id))
                 if (
                     is_owner
                     or guild.owner_id == user_id
@@ -302,6 +330,20 @@ class DashboardRPC:
                     or await self.bot.is_mod(member)
                 ):
                     result["manageable"] += 1
+                    manageable_ids.append(str(guild.id))
+                if pylav is not None:
+                    try:
+                        player = pylav.get_player(guild.id)
+                        if player is not None and player.current is not None:
+                            playing_ids.append(str(guild.id))
+                    except Exception:  # noqa: BLE001 - audio is optional
+                        pass
+
+            # Somewhere music is already playing beats somewhere they merely
+            # have rights, which beats the first server they happen to share.
+            result["default_guild"] = next(
+                iter(playing_ids or manageable_ids or shared_ids), ""
+            )
         self.user_access_cache[user_id] = (time.time(), result)
         return result
 
@@ -423,7 +465,7 @@ class DashboardRPC:
             "username": user.name,
             "global_name": getattr(user, "global_name", None),
             "avatar_url": user.display_avatar.url,
-            "banner_url": (full.banner.url if getattr(full, "banner", None) else ""),
+            "banner_url": self._banner_url(full),
             "accent_colour": (
                 str(full.accent_colour) if getattr(full, "accent_colour", None) else ""
             ),
