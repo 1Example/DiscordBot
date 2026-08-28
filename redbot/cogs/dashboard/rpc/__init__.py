@@ -144,6 +144,88 @@ class DashboardRPC:
         self.user_fetch_cache[user_id] = (time.time(), user)
         return user
 
+    # Discord's status values, and the colour each one is drawn in.
+    STATUS_COLOURS = {
+        "online": ("Online", "#3ba55d"),
+        "idle": ("Idle", "#faa81a"),
+        "dnd": ("Do Not Disturb", "#ed4245"),
+        "offline": ("Offline", "#80848e"),
+    }
+
+    def _presence(self, user_id: int) -> dict:
+        """Status and what they are doing, from whichever server can see it.
+
+        Presence rides on `Member`, not `User`, and only exists at all when the
+        bot has the presence intent. A member object is looked at in every
+        shared server because a single one can report `offline` while another
+        has the real state.
+        """
+        out = {"status": "offline", "status_label": "Offline",
+               "status_colour": "#80848e", "activity": None, "has_presence": False}
+        best = None
+        for guild in self.bot.guilds:
+            member = guild.get_member(user_id)
+            if member is None:
+                continue
+            try:
+                status = str(member.status)
+            except Exception:  # noqa: BLE001 - no presence intent
+                continue
+            out["has_presence"] = True
+            if status != "offline":
+                best = member
+                out["status"] = status
+                break
+            best = best or member
+        label, colour = self.STATUS_COLOURS.get(out["status"], ("Offline", "#80848e"))
+        out["status_label"], out["status_colour"] = label, colour
+
+        if best is None:
+            return out
+        try:
+            for activity in best.activities:
+                kind = getattr(getattr(activity, "type", None), "name", "") or ""
+                name = getattr(activity, "name", "") or ""
+                # A custom status is the one Discord shows as free text, and it
+                # carries its own emoji rather than a name.
+                if kind == "custom":
+                    emoji = getattr(activity, "emoji", None)
+                    out["activity"] = {
+                        "kind": "custom",
+                        "verb": "",
+                        "name": getattr(activity, "state", "") or "",
+                        "details": "",
+                        "emoji": str(emoji) if emoji else "",
+                        "image": "",
+                    }
+                    continue
+                if not name:
+                    continue
+                verb = {
+                    "playing": "Playing", "streaming": "Streaming",
+                    "listening": "Listening to", "watching": "Watching",
+                    "competing": "Competing in",
+                }.get(kind, "")
+                image = ""
+                details = getattr(activity, "details", "") or ""
+                # Spotify is its own activity type with nicer fields.
+                if type(activity).__name__ == "Spotify":
+                    verb, name = "Listening to", getattr(activity, "title", name)
+                    details = getattr(activity, "artist", "") or ""
+                    image = getattr(activity, "album_cover_url", "") or ""
+                if not image:
+                    image = getattr(activity, "large_image_url", "") or ""
+                entry = {
+                    "kind": kind, "verb": verb, "name": name,
+                    "details": details, "emoji": "", "image": image,
+                }
+                # A real activity outranks a custom status line.
+                if out["activity"] is None or out["activity"]["kind"] == "custom":
+                    out["activity"] = entry
+        except Exception:  # noqa: BLE001
+            log.debug("Could not read activities for %s", user_id, exc_info=True)
+        return out
+
     def _levelup_profile(self, guild_id: int, user_id: int) -> dict | None:
         """Level, XP and activity for one member, if LevelUp is loaded.
 
@@ -184,9 +266,27 @@ class DashboardRPC:
         if cached is not None and (cached[0] + 120) > time.time():
             return cached[1]
 
-        result = {"status": 0, "shared": 0, "manageable": 0}
+        result = {
+            "status": 0, "shared": 0, "manageable": 0,
+            "avatar_url": "", "decoration_url": "",
+            "presence": "offline", "presence_colour": "#80848e",
+        }
         user = self.bot.get_user(user_id)
         if user is not None:
+            # The topbar draws the same avatar-and-frame as the profile does,
+            # so the decoration comes back here too. It is behind the same
+            # 15-minute fetch cache, not an extra call per page.
+            result["avatar_url"] = user.display_avatar.url
+            try:
+                full = await self._fetch_user_full(user_id)
+                decoration = getattr(full, "avatar_decoration", None) if full else None
+                if decoration is not None:
+                    result["decoration_url"] = decoration.url
+            except Exception:  # noqa: BLE001
+                pass
+            presence = self._presence(user_id)
+            result["presence"] = presence["status"]
+            result["presence_colour"] = presence["status_colour"]
             is_owner = user_id in self.bot.owner_ids
             for guild in self.bot.guilds:
                 member = guild.get_member(user_id)
@@ -302,6 +402,8 @@ class DashboardRPC:
         # Owner first, then admin, then mod, then by name.
         guilds.sort(key=lambda g: (-g["rank"], g["name"].lower()))
 
+        presence = self._presence(user_id)
+
         global_balance = None
         if bank_is_global:
             try:
@@ -333,6 +435,15 @@ class DashboardRPC:
             "created_at": user.created_at.timestamp(),
             "is_owner": is_owner,
             "badges": badges,
+            # Mapped key by key, not spread: `_presence` returns a "status" of
+            # its own, and spreading it clobbered the payload's `status: 0`
+            # success flag - which made the route treat every profile as an
+            # error and serve a 404.
+            "has_presence": presence["has_presence"],
+            "presence": presence["status"],
+            "presence_label": presence["status_label"],
+            "presence_colour": presence["status_colour"],
+            "activity": presence["activity"],
             "shared_guilds": len(guilds),
             "owned_guilds": owned,
             "admin_guilds": admin_of,
