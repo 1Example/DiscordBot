@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import contextlib
+import inspect
+import json
 import logging
+import time
 import typing as t
 
 import discord
@@ -29,6 +32,21 @@ def dashboard_page(*args: t.Any, **kwargs: t.Any) -> t.Callable[[t.Any], t.Any]:
     return decorator
 
 
+def _dash_json(payload: dict) -> str:
+    """Serialise for embedding inside a ``<script>`` tag.
+
+    ``json.dumps`` leaves ``<`` alone, so a track called ``</script>`` would
+    otherwise close the tag and put its own markup on the page. The three
+    escapes below are still valid JSON and decode back to the same string.
+    """
+    return (
+        json.dumps(payload, default=str)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
+
+
 def _fmt_ms(milliseconds: float | int | None) -> str:
     """Format a millisecond duration as H:MM:SS / M:SS."""
     if not milliseconds or milliseconds < 0:
@@ -44,6 +62,19 @@ def _fmt_ms(milliseconds: float | int | None) -> str:
 class DashboardIntegration:
     bot: t.Any
 
+    # Volume before a mute, per guild, so unmuting restores the level instead
+    # of guessing one. In memory only - a restart just means the fallback.
+    _dash_premute: dict[int, int] = {}
+
+    # The web player polls, so anything it reads runs several times a second
+    # per open tab. These two keep that off the hot path: decoded favourites
+    # keyed by the playlist's own contents, and staff status for a few seconds
+    # at a time. Both are in-memory and per-process; losing them costs one
+    # rebuild, never correctness.
+    _dash_fav_cache: dict[int, tuple] = {}
+    _dash_staff_cache: dict[tuple[int, int], tuple[float, bool]] = {}
+    _DASH_STAFF_TTL = 20.0
+
     @commands.Cog.listener()
     async def on_dashboard_cog_add(self, dashboard_cog: commands.Cog) -> None:
         log.info("Dashboard cog found, registering PLController as a third party.")
@@ -55,20 +86,34 @@ class DashboardIntegration:
     LISTENER_ACTIONS = frozenset(
         {
             "pause", "resume", "skip", "previous", "shuffle",
-            "seek", "volume_up", "volume_down", "volume_set",
+            "seek", "volume_up", "volume_down", "volume_set", "mute",
             "search", "play", "play_now",
             "fav_add", "fav_play", "fav_queue",
         }
     )
 
+    # Actions that only read - the client polls these constantly and they must
+    # never hit the permission gate, the charge gate, or the audit log.
+    READONLY_ACTIONS = frozenset({"state"})
+
     async def _dash_is_staff(self, user: discord.User, member: discord.Member, guild: discord.Guild) -> bool:
-        return (
+        # Short-lived, because a demotion should take effect without a restart,
+        # but long enough that a polling page is not re-asking the config four
+        # times a second.
+        key = (guild.id, user.id)
+        cached = self._dash_staff_cache.get(key)
+        now = time.monotonic()
+        if cached is not None and now - cached[0] < self._DASH_STAFF_TTL:
+            return cached[1]
+        result = (
             await self.bot.is_owner(user)
             or member.id == guild.owner_id
             or member.guild_permissions.administrator
             or await self.bot.is_admin(member)
             or await self.bot.is_mod(member)
         )
+        self._dash_staff_cache[key] = (now, result)
+        return result
 
     async def _dash_check_perms(
         self, user: discord.User, guild: discord.Guild
@@ -106,71 +151,118 @@ class DashboardIntegration:
         # The webserver builds this with `request.form.to_dict(flat=False)`, so every
         # value arrives as a list (e.g. {"action": ["pause"]}). Unwrap before comparing.
         raw_form = (kwargs.get("data") or {}).get("form") or {}
+        raw_args = kwargs.get("extra_kwargs") or {}
 
-        def field(key: str, default=None):
-            value = raw_form.get(key, default)
+        def _unwrap(value, default=None):
             if isinstance(value, (list, tuple)):
                 return value[0] if value else default
             return value
 
-        action = field("action") if kwargs.get("method") == "POST" else None
+        def field(key: str, default=None):
+            return _unwrap(raw_form.get(key, default), default)
+
+        def query(key: str, default=None):
+            return _unwrap(raw_args.get(key, default), default)
+
+        is_post = kwargs.get("method") == "POST"
+        action = field("action") if is_post else None
+        # The page talks to itself over fetch(): same route, same session, same
+        # CSRF token, but the answer comes back as a JSON blob in a marker
+        # <script> rather than a whole re-rendered page. Every form on the page
+        # still works with JavaScript off, which is why the classic
+        # redirect-and-reload replies below are all still here.
+        api = bool(field("plc_api") or query("plc_api"))
+        is_staff = await self._dash_is_staff(user, member, guild)
+
+        async def frame(**extra) -> dict[str, t.Any]:
+            """Everything the client redraws from, in one dict."""
+            return {
+                # This page is meant to be left open for hours, so every frame
+                # carries the current token. If the dashboard ever rotates or
+                # expires them, the client rolls forward instead of quietly
+                # failing every action from then on.
+                "csrf": (kwargs.get("csrf_token") or ("", ""))[1],
+                "state": await self._dash_build_state(self._dash_player(guild)),
+                "is_staff": is_staff,
+                "favourites": await self._dash_fav_list(guild),
+                "wallet": await self._dash_wallet(member, guild),
+                "economy": await self._dash_economy_state(member, guild, is_staff),
+                "search_sources": [list(row) for row in self.SEARCH_SOURCES],
+                **extra,
+            }
+
+        async def api_reply(notifications=None, **extra) -> dict[str, t.Any]:
+            """One frame of truth for the client, as embedded JSON."""
+            return {
+                "status": 0,
+                "web_content": {
+                    "source": API_TEMPLATE,
+                    "payload": _dash_json(
+                        await frame(ok=True, notifications=notifications or [], **extra)
+                    ),
+                },
+            }
+
+        async def reply(message: str, category: str = "success", **extra) -> dict[str, t.Any]:
+            """Answer an action either way: JSON for fetch(), redirect for a
+            plain form submit."""
+            notifications = [{"message": message, "category": category}] if message else []
+            if api:
+                return await api_reply(notifications, **extra)
+            return {
+                "status": 0,
+                "notifications": notifications,
+                "redirect_url": kwargs.get("request_url"),
+            }
+
+        # --- polling: read-only, no permission gate, no charge ---
+        if api and (action in (None, "", "state") or not is_post):
+            return await api_reply()
 
         # Permission + billing gates must run before ANY action branch below,
         # including the search/favourites/play early returns - otherwise those
         # actions bypass both checks entirely.
         if action:
-            _is_staff = await self._dash_is_staff(user, member, guild)
-            if action not in self.LISTENER_ACTIONS and not _is_staff:
-                return {
-                    "status": 0,
-                    "notifications": [
-                        {
-                            "message": "That one is for moderators. You can still play, pause, "
-                            "skip, shuffle and queue music.",
-                            "category": "warning",
-                        }
-                    ],
-                    "redirect_url": kwargs.get("request_url"),
-                }
-            _ok, _charge_msg = await self._dash_charge(member, guild, action, _is_staff)
+            if action not in self.LISTENER_ACTIONS and not is_staff:
+                return await reply(
+                    "That one is for moderators. You can still play, pause, "
+                    "skip, shuffle and queue music.",
+                    "warning",
+                )
+            _ok, _charge_msg = await self._dash_charge(member, guild, action, is_staff)
             if not _ok:
-                return {
-                    "status": 0,
-                    "notifications": [{"message": _charge_msg, "category": "warning"}],
-                    "redirect_url": kwargs.get("request_url"),
-                }
+                return await reply(_charge_msg, "warning")
 
         # --- search: doesn't need an existing player ---
         if action == "search":
             search_term = (field("query") or "").strip()
+            source = (field("source") or "ytsearch").strip()
             if not search_term:
-                return {
-                    "status": 0,
-                    "notifications": [
-                        {"message": "Enter something to search for.", "category": "warning"}
-                    ],
-                    "redirect_url": kwargs.get("request_url"),
-                }
-            results, error = await self._dash_search(search_term)
+                return await reply("Enter something to search for.", "warning")
+            results, error = await self._dash_search(search_term, source=source)
             if error:
-                return {
-                    "status": 0,
-                    "notifications": [{"message": error, "category": "danger"}],
-                    "redirect_url": kwargs.get("request_url"),
-                }
+                return await reply(error, "danger")
+            if api:
+                return await api_reply(
+                    [] if results else [{"message": "Nothing found.", "category": "warning"}],
+                    search_results=results,
+                    search_term=search_term,
+                    search_source=source,
+                )
+            data = await frame(
+                search_results=results, search_term=search_term, search_source=source
+            )
             return {
                 "status": 0,
                 "web_content": {
                     "source": PLAYER_TEMPLATE,
-                    "player_state": await self._dash_build_state(player),
+                    # The client boots from the same blob it later polls for,
+                    # so the first paint and every later one share one code path.
+                    "boot": _dash_json(data),
+                    "player_state": data["state"],
                     "search_results": results,
                     "search_term": search_term,
-                    "favourites": await self._dash_fav_list(guild),
-                    "is_staff": await self._dash_is_staff(user, member, guild),
-                    "economy": await self._dash_economy_state(
-                        member, guild, await self._dash_is_staff(user, member, guild)
-                    ),
-                    "wallet": await self._dash_wallet(member, guild),
+                    "is_staff": is_staff,
                     "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 },
             }
@@ -178,39 +270,21 @@ class DashboardIntegration:
         # --- guild favourites playlist ---
         if action in ("fav_add", "fav_remove", "fav_play", "fav_queue", "fav_clear"):
             message, category = await self._dash_favourites(action, member, guild, player, field)
-            return {
-                "status": 0,
-                "notifications": [{"message": message, "category": category}],
-                "redirect_url": kwargs.get("request_url"),
-            }
+            return await reply(message, category)
 
         # --- play / enqueue: connects if needed ---
         if action in ("play", "play_now"):
             identifier = (field("identifier") or field("query") or "").strip()
             if not identifier:
-                return {
-                    "status": 0,
-                    "notifications": [{"message": "Nothing to play.", "category": "warning"}],
-                    "redirect_url": kwargs.get("request_url"),
-                }
+                return await reply("Nothing to play.", "warning")
             message, category = await self._dash_play(
                 member, guild, player, identifier, play_now=(action == "play_now")
             )
-            return {
-                "status": 0,
-                "notifications": [{"message": message, "category": category}],
-                "redirect_url": kwargs.get("request_url"),
-            }
+            return await reply(message, category)
 
         if action:
             if player is None:
-                return {
-                    "status": 0,
-                    "notifications": [
-                        {"message": "I am not connected to a voice channel.", "category": "warning"}
-                    ],
-                    "redirect_url": kwargs.get("request_url"),
-                }
+                return await reply("I am not connected to a voice channel.", "warning")
             try:
                 if action == "pause":
                     await player.set_pause(True, member)
@@ -250,43 +324,58 @@ class DashboardIntegration:
                 elif action == "remove_track":
                     # popindex() is PlayerQueue's supported positional removal.
                     player.queue.popindex(int(field("index")))
+                elif action == "move_top":
+                    # Pull it out and push it back at the front, so "play this
+                    # next" needs one click instead of a skip-and-hope.
+                    index = int(field("index"))
+                    track = player.queue.popindex(index)
+                    player.queue.insert(0, track)
+                elif action == "repeat_cycle":
+                    # One control that walks off -> track -> queue -> off, which
+                    # is what the three separate buttons were really doing.
+                    if await player.config.fetch_repeat_current():
+                        await player.set_repeat("queue", True, member)
+                    elif await player.config.fetch_repeat_queue():
+                        await player.set_repeat("disable", False, member)
+                    else:
+                        await player.set_repeat("current", True, member)
+                elif action == "autoplay":
+                    current = bool(
+                        await self._maybe_await(getattr(player, "autoplay_enabled", None), False)
+                    )
+                    await player.set_autoplay(not current)
+                elif action == "mute":
+                    # Remember the level so unmuting returns to it rather than
+                    # to some arbitrary default.
+                    if player.volume > 0:
+                        self._dash_premute[guild.id] = player.volume
+                        await player.set_volume(0, member)
+                    else:
+                        await player.set_volume(
+                            self._dash_premute.pop(guild.id, None) or 50, member
+                        )
                 else:
-                    return {
-                        "status": 0,
-                        "notifications": [
-                            {"message": f"Unknown action: {action}", "category": "warning"}
-                        ],
-                        "redirect_url": kwargs.get("request_url"),
-                    }
+                    return await reply(f"Unknown action: {action}", "warning")
             except Exception as exc:  # noqa: BLE001 - surfaced to the user, not swallowed
                 log.exception("Dashboard player action %r failed", action)
-                return {
-                    "status": 0,
-                    "notifications": [{"message": f"Action failed: {exc}", "category": "danger"}],
-                    "redirect_url": kwargs.get("request_url"),
-                }
-            return {
-                "status": 0,
-                "notifications": [{"message": "Done.", "category": "success"}],
-                "redirect_url": kwargs.get("request_url"),
-            }
+                return await reply(f"Action failed: {exc}", "danger")
+            # The client redraws from the state in this reply, so a successful
+            # action needs no message of its own - the UI moving is the receipt.
+            return await reply("" if api else "Done.", "success")
 
         # --- build the view ---
+        data = await frame(search_results=[], search_term="", search_source="ytsearch")
         return {
             "status": 0,
             "web_content": {
                 "source": PLAYER_TEMPLATE,
-                "player_state": await self._dash_build_state(player),
+                "boot": _dash_json(data),
+                "player_state": data["state"],
                 # kwargs["csrf_token"] is (raw, signed); the signed value goes in the form.
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "search_results": [],
                 "search_term": "",
-                "favourites": await self._dash_fav_list(guild),
-                "is_staff": await self._dash_is_staff(user, member, guild),
-                "economy": await self._dash_economy_state(
-                    member, guild, await self._dash_is_staff(user, member, guild)
-                ),
-                "wallet": await self._dash_wallet(member, guild),
+                "is_staff": is_staff,
             },
         }
 
@@ -312,9 +401,33 @@ class DashboardIntegration:
             data["position"] = position
         return data
 
+    @staticmethod
+    async def _maybe_await(value, default=None):
+        """Read a PyLav attribute that is a coroutine on some versions and a
+        plain value on others (``autoplay_enabled`` is both, depending on the
+        build), without letting either shape raise."""
+        try:
+            if callable(value):
+                value = value()
+            if inspect.isawaitable(value):
+                value = await value
+        except Exception:  # noqa: BLE001
+            return default
+        return default if value is None else value
+
     async def _dash_build_state(self, player) -> dict[str, t.Any]:
+        """Everything the page needs for one frame, as plain JSON-able data.
+
+        The client polls this a few times a second's worth of interval and
+        redraws from it, so anything the UI shows has to be in here - including
+        the things that only change from Discord, like a skip pressed on the
+        controller embed.
+        """
+        # `stamp` lets the client work out how stale a frame is and extrapolate
+        # the playhead between polls instead of freezing on the last value.
+        stamp = int(time.time() * 1000)
         if player is None:
-            return {"connected": False}
+            return {"connected": False, "stamp": stamp, "queue": [], "queue_length": 0}
 
         current = player.current
         try:
@@ -323,24 +436,64 @@ class DashboardIntegration:
             raw_queue = []
 
         queue_items = []
-        for index, track in enumerate(raw_queue[:25], start=1):
-            queue_items.append(await self._dash_track_dict(track, position=index))
+        queue_ms = 0
+        # Deep enough to be useful, shallow enough that a 500-track queue does
+        # not turn every poll into thousands of field reads.
+        for index, track in enumerate(raw_queue[:50], start=1):
+            item = await self._dash_track_dict(track, position=index)
+            try:
+                item["duration_ms"] = int(await track.duration() or 0)
+            except Exception:  # noqa: BLE001
+                item["duration_ms"] = 0
+            try:
+                item["identifier"] = track.encoded or item.get("uri") or ""
+            except Exception:  # noqa: BLE001
+                item["identifier"] = item.get("uri") or ""
+            queue_ms += item["duration_ms"]
+            queue_items.append(item)
 
         try:
             position_ms = await player.position()
         except Exception:  # noqa: BLE001
             position_ms = 0
 
+        try:
+            repeat_track = bool(await player.config.fetch_repeat_current())
+            repeat_queue = bool(await player.config.fetch_repeat_queue())
+        except Exception:  # noqa: BLE001
+            repeat_track = repeat_queue = False
+
+        voice = getattr(player, "channel", None)
+        listeners = [
+            {"id": str(m.id), "name": m.display_name, "avatar": (m.display_avatar.url if m.display_avatar else "")}
+            for m in getattr(voice, "members", ()) or ()
+            if not m.bot
+        ]
+
+        try:
+            history_length = len(list(player.history.raw_queue))
+        except Exception:  # noqa: BLE001
+            history_length = 0
+
         state: dict[str, t.Any] = {
             "connected": True,
+            "stamp": stamp,
             "position_ms": int(position_ms or 0),
             "position": _fmt_ms(position_ms),
             "paused": bool(player.paused),
             "playing": bool(player.is_playing),
             "volume": int(player.volume),
-            "channel": getattr(getattr(player, "channel", None), "name", ""),
+            "channel": getattr(voice, "name", ""),
+            "channel_id": str(getattr(voice, "id", "") or ""),
             "queue_length": len(raw_queue),
+            "queue_duration_ms": queue_ms,
+            "queue_duration": _fmt_ms(queue_ms),
             "queue": queue_items,
+            "queue_truncated": max(0, len(raw_queue) - len(queue_items)),
+            "repeat": "track" if repeat_track else ("queue" if repeat_queue else "off"),
+            "autoplay": bool(await self._maybe_await(getattr(player, "autoplay_enabled", None), False)),
+            "listeners": listeners,
+            "history_length": history_length,
             "current": None,
         }
 
@@ -358,20 +511,59 @@ class DashboardIntegration:
                 current_data["stream"] = bool(await current.stream())
             except Exception:  # noqa: BLE001
                 current_data["stream"] = False
+            try:
+                current_data["identifier"] = current.encoded or current_data.get("uri") or ""
+            except Exception:  # noqa: BLE001
+                current_data["identifier"] = current_data.get("uri") or ""
+            try:
+                current_data["source"] = await current.source() or ""
+            except Exception:  # noqa: BLE001
+                current_data["source"] = ""
+            requester = self.bot.get_user(getattr(current, "requester_id", 0) or 0)
+            current_data["requester"] = requester.display_name if requester else ""
+            current_data["requester_avatar"] = (
+                requester.display_avatar.url if requester and requester.display_avatar else ""
+            )
+            # A track key that changes whenever the track does, so the client
+            # can tell "same song, later position" from "somebody hit skip".
+            current_data["key"] = f"{current_data.get('identifier','')}|{current_data.get('title','')}"
             state["current"] = current_data
         return state
 
 
     # ---------- search / play helpers ----------
 
-    async def _dash_search(self, search_term: str, limit: int = 10):
+    # Where a search can be pointed. The value is the Lavaplayer prefix; a
+    # source the nodes have no plugin for simply returns nothing, which is why
+    # the page shows the picker rather than silently rewriting the query.
+    SEARCH_SOURCES = (
+        ("ytsearch", "YouTube", "fa-youtube-play"),
+        ("ytmsearch", "YouTube Music", "fa-music"),
+        ("spsearch", "Spotify", "fa-spotify"),
+        ("dzsearch", "Deezer", "fa-headphones"),
+        ("amsearch", "Apple Music", "fa-apple"),
+        ("scsearch", "SoundCloud", "fa-soundcloud"),
+        ("ymsearch", "Yandex Music", "fa-music"),
+    )
+    _SEARCH_PREFIXES = frozenset(key for key, _label, _icon in SEARCH_SOURCES)
+
+    async def _dash_search(self, search_term: str, limit: int = 24, source: str = "ytsearch"):
         """Returns (results, error_message). Results are plain dicts for the template."""
+        if source not in self._SEARCH_PREFIXES:
+            source = "ytsearch"
         try:
             # A bare string can resolve to a single track; prefixing forces the
-            # node to return a search result set instead of one match.
+            # node to return a search result set instead of one match. A term
+            # that already carries its own prefix is left alone, so power users
+            # can still type `scsearch:...` regardless of the picker.
             looks_like_url = search_term.startswith(("http://", "https://", "spotify:"))
+            already_prefixed = any(
+                search_term.lower().startswith(f"{prefix}:") for prefix in self._SEARCH_PREFIXES
+            )
             query = await Query.from_string(
-                search_term if looks_like_url else f"ytsearch:{search_term}"
+                search_term
+                if (looks_like_url or already_prefixed)
+                else f"{source}:{search_term}"
             )
             # fullsearch=True is required, otherwise PyLav returns only the first match.
             response = await self.pylav.search_query(query, fullsearch=True)
@@ -404,15 +596,24 @@ class DashboardIntegration:
             info = getattr(track, "info", None)
             if info is None:
                 continue
+            # The uri is what the play path has always been given, so it stays
+            # the identifier. The encoded blob is carried alongside it because
+            # it is the only handle that survives a source with no public URL,
+            # and it is what the favourites playlist stores.
+            uri = getattr(info, "uri", None) or ""
+            encoded = getattr(track, "encoded", None) or ""
             results.append(
                 {
                     "title": getattr(info, "title", None) or "Unknown title",
                     "author": getattr(info, "author", None) or "",
                     "duration": _fmt_ms(getattr(info, "length", 0)),
-                    "uri": getattr(info, "uri", None) or "",
-                    "identifier": getattr(info, "uri", None) or "",
+                    "duration_ms": int(getattr(info, "length", 0) or 0),
+                    "uri": uri,
+                    "encoded": encoded,
+                    "identifier": uri or encoded,
                     "artwork": getattr(info, "artworkUrl", None) or "",
                     "stream": bool(getattr(info, "isStream", False)),
+                    "source": getattr(info, "sourceName", None) or "",
                 }
             )
         return results, None
@@ -1123,6 +1324,18 @@ class DashboardIntegration:
         except Exception:  # noqa: BLE001
             log.exception("Could not read the guild favourites playlist")
             return []
+
+        # Decoding is the expensive half of this, and the web player asks for
+        # the list on every poll. The stored identifiers are the whole input,
+        # so caching on them means a decode only happens when the playlist
+        # actually changes - not several times a second, per viewer.
+        signature = tuple(
+            entry if isinstance(entry, str) else (entry or {}).get("encoded") for entry in raw[:50]
+        )
+        cached = self._dash_fav_cache.get(guild.id)
+        if cached is not None and cached[0] == signature:
+            return cached[1]
+
         out = []
         for entry in raw[:50]:
             identifier = entry if isinstance(entry, str) else (entry or {}).get("encoded")
@@ -1137,381 +1350,1301 @@ class DashboardIntegration:
             except Exception:  # noqa: BLE001
                 pass
             out.append({"identifier": identifier, "title": title})
+        self._dash_fav_cache[guild.id] = (signature, out)
         return out
 
 
-PLAYER_TEMPLATE = """
+# The reply to every fetch() the page makes. The dashboard always renders a
+# full HTML document around whatever a page returns, so the payload travels as
+# a marker <script> the client digs back out with DOMParser. `payload` is
+# already JSON and already has its angle brackets escaped, so |safe here cannot
+# let a track title close the tag early.
+API_TEMPLATE = """<script type="application/json" id="plc-api-payload">{{ payload|safe }}</script>"""
+
+
+PLAYER_TEMPLATE = r"""
 <style>
-  .plc { display:flex; flex-direction:column; gap:18px; }
+/* ============================================================
+   PyLav web player
+   Self-contained: no dependency on the dashboard's own classes,
+   so it renders the same wherever it is embedded.
+   ============================================================ */
+#plcRoot{
+  --plc-bg:rgba(12,16,28,.55);
+  --plc-line:rgba(255,255,255,.10);
+  --plc-line-2:rgba(255,255,255,.16);
+  --plc-txt:#eef2ff;
+  --plc-dim:rgba(238,242,255,.62);
+  --plc-dimmer:rgba(238,242,255,.40);
+  --plc-accent:#6c8cff;
+  --plc-accent-2:#a06cff;
+  --plc-good:#38d39f;
+  --plc-warn:#ffb454;
+  --plc-bad:#ff6b6b;
+  --plc-r:16px;
+  color:var(--plc-txt);
+  display:flex; flex-direction:column; gap:16px;
+  font-variant-numeric:tabular-nums;
+}
+#plcRoot *{ box-sizing:border-box; }
+/* Several elements below set an explicit display, which outranks the UA rule
+   for [hidden] and leaves them on screen. This puts hidden back in charge. */
+#plcRoot [hidden]{ display:none !important; }
 
-  /* ---------- now playing ---------- */
-  .plc-now {
-    position:relative; overflow:hidden;
-    display:flex; gap:18px; align-items:center; flex-wrap:wrap;
-    padding:20px; border-radius:16px;
-    background:rgba(24,48,105,.22); border:1px solid rgba(130,175,255,.16);
-  }
-  .plc-now-bg {
-    position:absolute; inset:0; background-size:cover; background-position:center;
-    filter:blur(28px) saturate(140%); opacity:.35; transform:scale(1.15); z-index:0;
-  }
-  .plc-now > * { position:relative; z-index:1; }
-  .plc-art { height:112px; width:112px; border-radius:12px; object-fit:cover;
-             box-shadow:0 10px 30px rgba(0,0,0,.55); flex:0 0 auto; }
-  .plc-art-ph { background:rgba(255,255,255,.06); }
-  .plc-meta { flex:1 1 260px; min-width:0; }
-  .plc-title { font-size:1.15rem; font-weight:800; margin:0 0 3px; overflow:hidden;
-               text-overflow:ellipsis; white-space:nowrap; }
-  .plc-author { opacity:.72; font-size:.9rem; margin:0; }
-  .plc-badges { margin-top:9px; display:flex; gap:6px; flex-wrap:wrap; }
-  .plc-badge { font-size:.7rem; padding:3px 9px; border-radius:999px; font-weight:700;
-               letter-spacing:.03em; text-transform:uppercase;
-               background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); }
-  .plc-badge.live { background:rgba(237,66,69,.25); border-color:rgba(237,66,69,.5); }
+/* ---------- hero ---------- */
+.plc-hero{
+  position:relative; overflow:hidden; border-radius:22px;
+  border:1px solid var(--plc-line); background:var(--plc-bg);
+  padding:22px; display:grid; gap:20px;
+  grid-template-columns:auto 1fr; align-items:center;
+}
+.plc-hero-bg{
+  position:absolute; inset:-20%; z-index:0;
+  background-size:cover; background-position:center;
+  filter:blur(46px) saturate(180%); opacity:.34; transform:scale(1.1);
+  transition:background-image .45s ease, opacity .45s ease;
+}
+.plc-hero-veil{
+  position:absolute; inset:0; z-index:0;
+  background:linear-gradient(115deg, rgba(8,10,20,.86) 0%, rgba(8,10,20,.55) 55%, rgba(8,10,20,.80) 100%);
+}
+.plc-hero > *{ position:relative; z-index:1; }
 
-  /* ---------- visualiser ---------- */
-  .plc-viz { display:flex; align-items:flex-end; gap:3px; height:44px; flex:0 0 auto; }
-  .plc-viz i {
-    display:block; width:4px; border-radius:2px; background:linear-gradient(to top,#3ba55d,#5aa9ff);
-    animation:plcBar 900ms ease-in-out infinite alternate;
-  }
-  .plc-viz.paused i { animation-play-state:paused; opacity:.35; }
-  @keyframes plcBar { from { height:12%; } to { height:100%; } }
+.plc-art-wrap{ position:relative; flex:0 0 auto; }
+.plc-art{
+  width:148px; height:148px; border-radius:18px; object-fit:cover; display:block;
+  box-shadow:0 18px 44px rgba(0,0,0,.6); background:rgba(255,255,255,.05);
+}
+.plc-art.ph{ display:grid; place-items:center; font-size:2.6rem; color:rgba(255,255,255,.18); }
+.plc-art-wrap.spin .plc-art{ animation:plcFloat 6s ease-in-out infinite; }
+@keyframes plcFloat{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
 
-  /* ---------- seek ---------- */
-  .plc-seek { display:flex; align-items:center; gap:12px; font-variant-numeric:tabular-nums; }
-  .plc-seek input[type=range] { flex:1 1 auto; }
-  .plc-time { font-size:.82rem; opacity:.75; min-width:44px; text-align:center; }
+.plc-info{ min-width:0; }
+.plc-eyebrow{
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  font-size:.68rem; letter-spacing:.12em; text-transform:uppercase;
+  font-weight:800; color:var(--plc-dimmer); margin:0 0 8px;
+}
+.plc-live{ display:inline-flex; align-items:center; gap:6px; }
+.plc-dot{
+  width:8px; height:8px; border-radius:50%; background:var(--plc-good);
+  box-shadow:0 0 0 0 rgba(56,211,159,.6); animation:plcPulse 2.2s infinite;
+}
+.plc-dot.stale{ background:var(--plc-warn); animation:none; }
+.plc-dot.dead{ background:var(--plc-bad); animation:none; }
+@keyframes plcPulse{
+  0%{ box-shadow:0 0 0 0 rgba(56,211,159,.55); }
+  70%{ box-shadow:0 0 0 7px rgba(56,211,159,0); }
+  100%{ box-shadow:0 0 0 0 rgba(56,211,159,0); }
+}
+.plc-track-title{
+  font-size:1.5rem; font-weight:800; line-height:1.2; margin:0 0 4px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.plc-track-title a{ color:inherit; text-decoration:none; }
+.plc-track-title a:hover{ text-decoration:underline; }
+.plc-track-author{
+  margin:0; color:var(--plc-dim); font-size:.95rem;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.plc-chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+.plc-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:.7rem; font-weight:700; letter-spacing:.02em;
+  padding:4px 10px; border-radius:999px;
+  background:rgba(255,255,255,.07); border:1px solid var(--plc-line);
+  color:var(--plc-dim);
+}
+.plc-chip i{ opacity:.8; }
+.plc-chip.live{ background:rgba(255,107,107,.18); border-color:rgba(255,107,107,.45); color:#ffb3b3; }
+.plc-chip.on{ background:rgba(108,140,255,.20); border-color:rgba(108,140,255,.50); color:#c3d0ff; }
 
-  /* ---------- controls ---------- */
-  .plc-controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .plc-btn {
-    display:inline-flex; align-items:center; justify-content:center; gap:7px;
-    height:44px; min-width:44px; padding:0 15px; border-radius:11px; cursor:pointer;
-    font-size:.88rem; font-weight:600; color:inherit; text-decoration:none;
-    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12);
-    transition:background .15s ease, border-color .15s ease, transform .08s ease;
-  }
-  .plc-btn:hover { background:rgba(255,255,255,.12); }
-  .plc-btn:active { transform:translateY(1px); }
-  .plc-btn.round { border-radius:50%; padding:0; width:44px; position:relative;
-                   overflow:visible; }
-  .plc-btn.play { width:56px; height:56px; border-radius:50%; font-size:1.15rem;
-                  background:linear-gradient(135deg,#2f6fed,#5aa9ff); border-color:transparent; color:#fff; }
-  .plc-btn.danger { border-color:rgba(255,90,90,.45); color:#ff8b8b; }
-  .plc-btn.on { background:rgba(90,169,255,.22); border-color:rgba(90,169,255,.5); }
+/* ---------- seek ---------- */
+.plc-seek{ margin-top:16px; }
+.plc-bar{
+  position:relative; height:22px; cursor:pointer; touch-action:none;
+  display:flex; align-items:center;
+}
+.plc-bar-track{
+  position:relative; width:100%; height:6px; border-radius:999px;
+  background:rgba(255,255,255,.13); overflow:hidden;
+}
+.plc-bar-fill{
+  position:absolute; inset:0 auto 0 0; width:0%;
+  background:linear-gradient(90deg,var(--plc-accent),var(--plc-accent-2));
+  border-radius:999px;
+}
+.plc-bar-buffer{ position:absolute; inset:0 auto 0 0; width:0%; background:rgba(255,255,255,.08); }
+.plc-bar-knob{
+  position:absolute; top:50%; left:0%; width:14px; height:14px; border-radius:50%;
+  background:#fff; transform:translate(-50%,-50%) scale(.6); opacity:0;
+  box-shadow:0 2px 10px rgba(0,0,0,.6); transition:opacity .15s, transform .15s;
+  pointer-events:none;
+}
+.plc-bar:hover .plc-bar-knob, .plc-bar.dragging .plc-bar-knob{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+.plc-bar.disabled{ cursor:default; opacity:.55; }
+.plc-times{ display:flex; justify-content:space-between; font-size:.76rem; color:var(--plc-dimmer); margin-top:2px; }
+.plc-scrub{
+  position:absolute; bottom:100%; transform:translateX(-50%); margin-bottom:6px;
+  padding:2px 7px; border-radius:7px; font-size:.72rem; font-weight:700;
+  background:#11142a; border:1px solid var(--plc-line-2); white-space:nowrap;
+  opacity:0; transition:opacity .12s; pointer-events:none;
+}
+.plc-bar:hover .plc-scrub, .plc-bar.dragging .plc-scrub{ opacity:1; }
 
-  /* ---------- panels / queue ---------- */
-  .plc-panels { display:grid; gap:16px; grid-template-columns:1fr; }
-  @media (min-width:1100px){ .plc-panels { grid-template-columns:3fr 2fr; } }
-  .plc-panel { padding:16px; border-radius:14px;
-               background:rgba(90,130,220,.06); border:1px solid rgba(120,160,255,.12); }
-  .plc-panel h5 { margin:0 0 3px; font-size:.95rem; }
-  .plc-hint { opacity:.6; font-size:.78rem; margin:0 0 11px; }
-  .plc-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .plc-input { flex:1 1 240px; min-width:0; height:44px; padding:0 13px; border-radius:11px;
-               background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.12);
-               color:inherit; font-size:.9rem; }
-  .plc-input:focus { outline:none; border-color:rgba(130,175,255,.45); }
-  .plc-q { width:100%; border-collapse:collapse; }
-  .plc-q th, .plc-q td { text-align:left; padding:9px 10px; font-size:.86rem;
-                         border-bottom:1px solid rgba(255,255,255,.06); }
-  .plc-q th { opacity:.55; font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; }
-  .plc-q tr:last-child td { border-bottom:none; }
-  .plc-thumb { width:42px; height:42px; border-radius:7px; object-fit:cover; }
-  .plc-empty { opacity:.6; padding:22px; text-align:center; }
-  .plc-wallet {
-    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-    padding:12px 16px; border-radius:14px;
-    background:linear-gradient(90deg, rgba(90,169,255,.14), rgba(90,169,255,.04));
-    border:1px solid rgba(130,175,255,.22);
-  }
-  .plc-wallet-bal { display:flex; align-items:center; gap:9px; font-size:1rem; white-space:nowrap; }
-  .plc-wallet-bal i { color:#5aa9ff; }
-  .plc-wallet-bal b { font-size:1.15rem; }
-  .plc-wallet-costs { display:flex; gap:6px; flex-wrap:wrap; margin-left:auto; }
-  .plc-price {
-    font-size:.7rem; padding:3px 9px; border-radius:999px; opacity:.85;
-    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10);
-  }
-  .plc-price b { color:#8ec5ff; }
-  .plc-tag {
-    display:inline-block; margin-left:6px; padding:1px 6px; border-radius:999px;
-    font-size:.66rem; font-weight:800; line-height:1.5;
-    background:rgba(90,169,255,.25); border:1px solid rgba(130,175,255,.4);
-  }
-  /* Cost badge for the circular transport buttons, which have no room inside. */
-  .plc-tag.corner {
-    position:absolute; top:-5px; right:-5px; margin-left:0;
-    min-width:19px; height:19px; padding:0 5px; box-sizing:border-box;
-    line-height:17px; font-size:.6rem; text-align:center;
-    background:#2f6fed; border-color:rgba(255,255,255,.25); color:#fff;
-    box-shadow:0 1px 4px rgba(0,0,0,.45);
-  }
-  .plc-sec-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
-                   font-weight:800; opacity:.55; margin:0 0 10px; }
+/* ---------- buttons ---------- */
+.plc-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  position:relative; height:42px; min-width:42px; padding:0 14px;
+  border-radius:12px; cursor:pointer; font:inherit; font-size:.85rem; font-weight:650;
+  color:var(--plc-txt); background:rgba(255,255,255,.06);
+  border:1px solid var(--plc-line); text-decoration:none;
+  transition:background .14s, border-color .14s, transform .08s, color .14s;
+  -webkit-appearance:none; appearance:none;
+}
+.plc-btn:hover:not(:disabled){ background:rgba(255,255,255,.13); border-color:var(--plc-line-2); }
+.plc-btn:active:not(:disabled){ transform:translateY(1px); }
+.plc-btn:disabled{ opacity:.35; cursor:not-allowed; }
+.plc-btn:focus-visible{ outline:2px solid var(--plc-accent); outline-offset:2px; }
+.plc-btn.icon{ padding:0; width:42px; border-radius:50%; }
+.plc-btn.sm{ height:34px; min-width:34px; font-size:.78rem; padding:0 10px; }
+.plc-btn.sm.icon{ width:34px; padding:0; }
+.plc-btn.primary{
+  background:linear-gradient(135deg,var(--plc-accent),var(--plc-accent-2));
+  border-color:transparent; color:#fff;
+}
+.plc-btn.primary:hover:not(:disabled){ filter:brightness(1.12); background:linear-gradient(135deg,var(--plc-accent),var(--plc-accent-2)); }
+.plc-btn.play{ width:58px; height:58px; border-radius:50%; padding:0; font-size:1.2rem; }
+.plc-btn.on{ background:rgba(108,140,255,.22); border-color:rgba(108,140,255,.55); color:#cdd8ff; }
+.plc-btn.danger{ color:#ff9d9d; border-color:rgba(255,107,107,.35); }
+.plc-btn.danger:hover:not(:disabled){ background:rgba(255,107,107,.16); border-color:rgba(255,107,107,.55); }
+.plc-btn .plc-cost{
+  position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 5px;
+  border-radius:999px; font-size:.6rem; font-weight:800; line-height:18px;
+  background:var(--plc-accent); color:#fff; border:1px solid rgba(255,255,255,.3);
+}
+.plc-btn.wide .plc-cost{ position:static; margin-left:2px; border:none; }
+
+.plc-transport{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.plc-transport .plc-sep{ width:1px; height:26px; background:var(--plc-line); margin:0 3px; }
+.plc-transport-grp{ display:flex; align-items:center; gap:9px; }
+
+/* ---------- volume ---------- */
+.plc-vol{ display:flex; align-items:center; gap:10px; min-width:190px; }
+.plc-vol input[type=range]{
+  -webkit-appearance:none; appearance:none; height:6px; border-radius:999px;
+  background:rgba(255,255,255,.13); flex:1 1 auto; min-width:80px; cursor:pointer; outline:none;
+}
+.plc-vol input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+  background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.5); cursor:pointer;
+}
+.plc-vol input[type=range]::-moz-range-thumb{
+  width:14px; height:14px; border:none; border-radius:50%;
+  background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.5); cursor:pointer;
+}
+.plc-vol-num{ font-size:.78rem; color:var(--plc-dim); min-width:38px; text-align:right; }
+
+/* ---------- layout ---------- */
+.plc-bar-row{
+  display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+  padding:14px 18px; border-radius:var(--plc-r);
+  background:var(--plc-bg); border:1px solid var(--plc-line);
+}
+.plc-grid{ display:grid; gap:16px; grid-template-columns:1fr; }
+@media (min-width:1080px){ .plc-grid{ grid-template-columns:1.25fr .95fr; align-items:start; } }
+.plc-card{
+  border-radius:var(--plc-r); border:1px solid var(--plc-line);
+  background:var(--plc-bg); overflow:hidden;
+}
+.plc-card-head{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:14px 18px; border-bottom:1px solid var(--plc-line);
+}
+.plc-card-head h5{ margin:0; font-size:.92rem; font-weight:750; display:flex; align-items:center; gap:8px; }
+.plc-card-head .plc-spacer{ margin-left:auto; }
+.plc-card-body{ padding:14px 18px; }
+.plc-card-body.flush{ padding:0; }
+.plc-count{
+  font-size:.68rem; font-weight:800; padding:2px 8px; border-radius:999px;
+  background:rgba(255,255,255,.08); border:1px solid var(--plc-line); color:var(--plc-dim);
+}
+.plc-sub{ font-size:.78rem; color:var(--plc-dimmer); margin:0; }
+
+/* ---------- search ---------- */
+.plc-searchbar{ display:flex; gap:8px; flex-wrap:wrap; }
+.plc-field{ position:relative; flex:1 1 240px; min-width:0; }
+.plc-field > i{ position:absolute; left:13px; top:50%; transform:translateY(-50%); color:var(--plc-dimmer); pointer-events:none; }
+.plc-input{
+  width:100%; height:44px; padding:0 40px 0 36px; border-radius:12px;
+  background:rgba(0,0,0,.32); border:1px solid var(--plc-line);
+  color:var(--plc-txt); font:inherit; font-size:.9rem; outline:none;
+  transition:border-color .14s, background .14s;
+}
+.plc-input::placeholder{ color:var(--plc-dimmer); }
+.plc-input:focus{ border-color:rgba(108,140,255,.55); background:rgba(0,0,0,.45); }
+.plc-clear{
+  position:absolute; right:8px; top:50%; transform:translateY(-50%);
+  width:26px; height:26px; border-radius:50%; border:none; cursor:pointer;
+  background:rgba(255,255,255,.10); color:var(--plc-dim); display:none; place-items:center;
+}
+.plc-field.filled .plc-clear{ display:grid; }
+.plc-sources{ display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.plc-src{
+  font-size:.72rem; font-weight:700; padding:5px 11px; border-radius:999px; cursor:pointer;
+  background:rgba(255,255,255,.05); border:1px solid var(--plc-line); color:var(--plc-dim);
+  display:inline-flex; align-items:center; gap:6px; transition:all .14s;
+}
+.plc-src:hover{ background:rgba(255,255,255,.11); color:var(--plc-txt); }
+.plc-src.sel{ background:rgba(108,140,255,.2); border-color:rgba(108,140,255,.55); color:#cdd8ff; }
+
+/* ---------- track lists ---------- */
+.plc-list{ list-style:none; margin:0; padding:0; }
+.plc-item{
+  display:flex; align-items:center; gap:12px; padding:9px 18px;
+  border-bottom:1px solid rgba(255,255,255,.05); transition:background .12s;
+}
+.plc-item:last-child{ border-bottom:none; }
+.plc-item:hover{ background:rgba(255,255,255,.045); }
+.plc-item.now{ background:linear-gradient(90deg, rgba(108,140,255,.16), transparent 70%); }
+.plc-idx{ width:22px; text-align:right; font-size:.78rem; color:var(--plc-dimmer); flex:0 0 auto; }
+.plc-thumb{
+  width:42px; height:42px; border-radius:9px; object-fit:cover; flex:0 0 auto;
+  background:rgba(255,255,255,.06);
+}
+.plc-thumb.ph{ display:grid; place-items:center; color:rgba(255,255,255,.2); }
+.plc-item-main{ min-width:0; flex:1 1 auto; }
+.plc-item-t{
+  font-size:.87rem; font-weight:600; margin:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.plc-item-t a{ color:inherit; text-decoration:none; }
+.plc-item-t a:hover{ text-decoration:underline; }
+.plc-item-s{
+  font-size:.76rem; color:var(--plc-dimmer); margin:1px 0 0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.plc-item-len{ font-size:.76rem; color:var(--plc-dimmer); flex:0 0 auto; }
+.plc-item-acts{ display:flex; gap:5px; flex:0 0 auto; opacity:.35; transition:opacity .14s; }
+.plc-item:hover .plc-item-acts, .plc-item:focus-within .plc-item-acts{ opacity:1; }
+@media (hover:none){ .plc-item-acts{ opacity:1; } }
+.plc-scroll{ max-height:min(58vh,520px); overflow-y:auto; overscroll-behavior:contain; }
+.plc-scroll::-webkit-scrollbar{ width:9px; }
+.plc-scroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.13); border-radius:9px; }
+
+.plc-empty{
+  padding:34px 18px; text-align:center; color:var(--plc-dimmer); font-size:.85rem;
+}
+.plc-empty i{ display:block; font-size:1.9rem; opacity:.35; margin-bottom:9px; }
+
+/* ---------- listeners ---------- */
+.plc-faces{ display:flex; align-items:center; }
+.plc-face{
+  width:26px; height:26px; border-radius:50%; object-fit:cover;
+  border:2px solid #12162a; margin-left:-8px; background:#2a2f4a;
+}
+.plc-face:first-child{ margin-left:0; }
+.plc-face.more{
+  display:grid; place-items:center; font-size:.62rem; font-weight:800; color:var(--plc-dim);
+}
+
+/* ---------- toasts ---------- */
+.plc-toasts{
+  position:fixed; z-index:9999; right:18px; bottom:18px;
+  display:flex; flex-direction:column; gap:8px; max-width:min(360px,calc(100vw - 36px));
+  pointer-events:none;
+}
+.plc-toast{
+  display:flex; align-items:flex-start; gap:10px; padding:11px 14px; border-radius:12px;
+  background:#151a30; border:1px solid var(--plc-line-2); color:var(--plc-txt);
+  font-size:.84rem; box-shadow:0 12px 34px rgba(0,0,0,.55);
+  animation:plcToastIn .22s ease-out; pointer-events:auto;
+}
+.plc-toast.out{ animation:plcToastOut .2s ease-in forwards; }
+.plc-toast i{ margin-top:2px; }
+.plc-toast.success{ border-left:3px solid var(--plc-good); }
+.plc-toast.success i{ color:var(--plc-good); }
+.plc-toast.warning{ border-left:3px solid var(--plc-warn); }
+.plc-toast.warning i{ color:var(--plc-warn); }
+.plc-toast.danger{ border-left:3px solid var(--plc-bad); }
+.plc-toast.danger i{ color:var(--plc-bad); }
+@keyframes plcToastIn{ from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:none; } }
+@keyframes plcToastOut{ to{ opacity:0; transform:translateX(20px); } }
+
+/* ---------- wallet ---------- */
+.plc-wallet{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:12px 18px; border-radius:var(--plc-r);
+  background:linear-gradient(90deg, rgba(108,140,255,.14), rgba(160,108,255,.05));
+  border:1px solid rgba(108,140,255,.25);
+}
+.plc-wallet b{ font-size:1.05rem; }
+.plc-prices{ display:flex; gap:6px; flex-wrap:wrap; margin-left:auto; }
+.plc-price{
+  font-size:.68rem; padding:3px 9px; border-radius:999px; color:var(--plc-dim);
+  background:rgba(255,255,255,.05); border:1px solid var(--plc-line);
+}
+.plc-price b{ color:#b7c6ff; font-size:.68rem; }
+
+/* ---------- misc ---------- */
+.plc-skeleton{ animation:plcSk 1.3s ease-in-out infinite; }
+@keyframes plcSk{ 0%,100%{ opacity:.4; } 50%{ opacity:.75; } }
+.plc-kbd{
+  font-size:.66rem; padding:1px 5px; border-radius:5px; font-weight:700;
+  background:rgba(255,255,255,.09); border:1px solid var(--plc-line-2); color:var(--plc-dim);
+}
+.plc-offline{
+  display:none; align-items:center; gap:9px; padding:10px 16px; border-radius:12px;
+  background:rgba(255,180,84,.12); border:1px solid rgba(255,180,84,.35);
+  color:#ffd9a3; font-size:.83rem;
+}
+#plcRoot.stale .plc-offline{ display:flex; }
+.plc-hide{ display:none !important; }
+
+@media (max-width:640px){
+  .plc-hero{ grid-template-columns:1fr; justify-items:center; text-align:center; padding:18px; }
+  .plc-art{ width:120px; height:120px; }
+  .plc-track-title{ font-size:1.2rem; white-space:normal; }
+  .plc-eyebrow, .plc-chips{ justify-content:center; }
+  .plc-transport{ justify-content:center; }
+  .plc-item-len{ display:none; }
+  /* The groups wrap onto their own rows here, so the dividers between them
+     end up dangling at the end of a line instead of separating anything. */
+  .plc-transport .plc-sep{ display:none; }
+  .plc-bar-row{ justify-content:center; }
+  .plc-vol{ margin-left:0 !important; width:100%; }
+}
 </style>
+<div id="plcRoot"
+     data-csrf="{{ csrf_token_value }}"
+     data-staff="{% if is_staff %}1{% else %}0{% endif %}">
 
-{% if not player_state.connected %}
-  <div class="plc-empty">
-    <h4>{{ "Not connected" }}</h4>
-    <p>Join a voice channel and play something below &mdash; I'll connect automatically.</p>
-  </div>
-{% else %}
-<div class="plc">
+  <script type="application/json" id="plc-boot">{{ boot|safe }}</script>
 
-  <div class="plc-now">
-    {% if player_state.current and player_state.current.artwork %}
-      <div class="plc-now-bg" style="background-image:url('{{ player_state.current.artwork }}');"></div>
-      <img class="plc-art" src="{{ player_state.current.artwork }}" alt="" />
-    {% else %}
-      <div class="plc-art plc-art-ph"></div>
-    {% endif %}
-
-    <div class="plc-meta">
-      {% if player_state.current %}
-        <p class="plc-title" title="{{ player_state.current.title }}">{{ player_state.current.title }}</p>
-        <p class="plc-author">{{ player_state.current.author }}</p>
-        <div class="plc-badges">
-          {% if player_state.current.stream %}<span class="plc-badge live">Live</span>{% endif %}
-          {% if player_state.paused %}<span class="plc-badge">Paused</span>{% endif %}
-          {% if player_state.channel %}<span class="plc-badge"><i class="fa fa-volume-up"></i> {{ player_state.channel }}</span>{% endif %}
-          <span class="plc-badge"><i class="fa fa-list-ol"></i> {{ player_state.queue_length }} queued</span>
-        </div>
-      {% else %}
-        <p class="plc-title">Nothing playing</p>
-        <p class="plc-author">The queue is idle.</p>
-      {% endif %}
-    </div>
-
-    <div class="plc-viz{% if player_state.paused or not player_state.current %} paused{% endif %}">
-      {% for h in [40, 70, 100, 55, 85, 30, 65, 95, 45, 75, 35, 60] %}
-        <i style="height:{{ h }}%; animation-duration:{{ 600 + h * 6 }}ms; animation-delay:{{ h * 4 }}ms;"></i>
-      {% endfor %}
-    </div>
+  <div class="plc-offline">
+    <i class="fa fa-plug"></i>
+    <span>Lost contact with the bot &mdash; showing the last known state. Retrying&hellip;</span>
   </div>
 
-  {% if economy %}
-    <div class="plc-wallet">
-      <div class="plc-wallet-bal">
-        <i class="fa fa-diamond"></i>
-        <span><b>{{ "{:,}".format(economy.balance) }}</b> {{ economy.currency }}</span>
-      </div>
-      <div class="plc-wallet-costs">
-        {% for name, price in economy.costs.items() %}
-          <span class="plc-price" title="{{ name }}">{{ name|replace("_", " ")|title }} <b>{{ price }}</b></span>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
+  <!-- ============ NOW PLAYING ============ -->
+  <div class="plc-hero">
+    <div class="plc-hero-bg" id="plcHeroBg"></div>
+    <div class="plc-hero-veil"></div>
 
-  {% if player_state.current and not player_state.current.stream and player_state.current.duration_ms %}
-    <form method="POST" class="plc-seek">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-      <span class="plc-time">{{ player_state.position }}</span>
-      <input type="range" name="position" min="0"
-             max="{{ (player_state.current.duration_ms / 1000)|int }}"
-             value="{{ (player_state.position_ms / 1000)|int }}"
-             oninput="document.getElementById('plcSeekOut').textContent = this.value;" />
-      <span class="plc-time">{{ player_state.current.duration }}</span>
-      <button class="plc-btn" name="action" value="seek" title="Seek to position">
-        <i class="fa fa-location-arrow"></i> Seek{% if economy and economy.costs.get("seek") %}<span class="plc-tag">{{ economy.costs["seek"] }}</span>{% endif %}
-      </button>
-      <span class="plc-time" id="plcSeekOut" style="opacity:.45;"></span>
-    </form>
-  {% endif %}
-
-  <form method="POST" class="plc-controls">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-    <button class="plc-btn round" name="action" value="previous" title="Previous"><i class="fa fa-step-backward"></i>{% if economy and economy.costs.get("previous") %}<span class="plc-tag corner">{{ economy.costs["previous"] }}</span>{% endif %}</button>
-    {% if player_state.paused %}
-      <button class="plc-btn play" name="action" value="resume" title="Resume"><i class="fa fa-play"></i></button>
-    {% else %}
-      <button class="plc-btn play" name="action" value="pause" title="Pause"><i class="fa fa-pause"></i></button>
-    {% endif %}
-    <button class="plc-btn round" name="action" value="skip" title="Skip"><i class="fa fa-step-forward"></i>{% if economy and economy.costs.get("skip") %}<span class="plc-tag corner">{{ economy.costs["skip"] }}</span>{% endif %}</button>
-    <button class="plc-btn" name="action" value="shuffle" title="Shuffle the queue"><i class="fa fa-random"></i> Shuffle{% if economy and economy.costs.get("shuffle") %}<span class="plc-tag">{{ economy.costs["shuffle"] }}</span>{% endif %}</button>
-    {% if player_state.current %}
-      <button class="plc-btn" name="action" value="fav_add" title="Save this track to the guild favourites"><i class="fa fa-star"></i> Favourite{% if economy and economy.costs.get("fav_add") %}<span class="plc-tag">{{ economy.costs["fav_add"] }}</span>{% endif %}</button>
-    {% endif %}
-    <button class="plc-btn" name="action" value="repeat_track" title="Repeat current track"><i class="fa fa-repeat"></i> Track</button>
-    <button class="plc-btn" name="action" value="repeat_queue" title="Repeat the queue"><i class="fa fa-refresh"></i> Queue</button>
-    <button class="plc-btn" name="action" value="repeat_off" title="Turn repeat off"><i class="fa fa-ban"></i> Off</button>
-    {% if is_staff %}
-      <button class="plc-btn danger" name="action" value="stop" title="Stop and clear"><i class="fa fa-stop"></i></button>
-      <button class="plc-btn danger" name="action" value="clear_queue" title="Empty the queue"><i class="fa fa-trash-o"></i> Queue</button>
-      <button class="plc-btn danger" name="action" value="disconnect" title="Disconnect"><i class="fa fa-sign-out"></i></button>
-    {% endif %}
-  </form>
-
-  <form method="POST" class="plc-seek">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-    <button class="plc-btn round" name="action" value="volume_down" title="Volume down"><i class="fa fa-volume-down"></i></button>
-    <input type="range" name="volume" min="0" max="150" value="{{ player_state.volume }}"
-           oninput="document.getElementById('plcVolOut').textContent = this.value + '%';" />
-    <span class="plc-time" id="plcVolOut">{{ player_state.volume }}%</span>
-    <button class="plc-btn" name="action" value="volume_set"><i class="fa fa-check"></i> Set</button>
-    <button class="plc-btn round" name="action" value="volume_up" title="Volume up"><i class="fa fa-volume-up"></i></button>
-  </form>
-
-  <div>
-    <p class="plc-sec-title">Queue &mdash; {{ player_state.queue_length }} track(s)</p>
-    {% if player_state.queue %}
-      <table class="plc-q">
-        <thead><tr><th>#</th><th>Title</th><th>Channel</th><th>Length</th><th></th></tr></thead>
-        <tbody>
-          {% for item in player_state.queue %}
-            <tr>
-              <td style="opacity:.5;">{{ item.position }}</td>
-              <td>{% if item.uri %}<a href="{{ item.uri }}" target="_blank">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}</td>
-              <td style="opacity:.7;">{{ item.author }}</td>
-              <td style="opacity:.7;">{{ item.duration }}</td>
-              <td style="width:1%;">
-                <form method="POST" style="display:inline;">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-                  <input type="hidden" name="index" value="{{ loop.index0 }}" />
-                  <button class="plc-btn round danger" name="action" value="remove_track" title="Remove"><i class="fa fa-times"></i></button>
-                </form>
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% if player_state.queue_length > 25 %}
-        <p class="plc-empty">Showing the first 25 of {{ player_state.queue_length }} tracks.</p>
-      {% endif %}
-    {% else %}
-      <p class="plc-empty">The queue is empty.</p>
-    {% endif %}
-  </div>
-
-  <div class="plc-panels">
-    <div class="plc-panel">
-      <h5><i class="fa fa-search me-1"></i> Search &amp; play</h5>
-      <p class="plc-hint">Searches YouTube and any other source your nodes support.</p>
-      <form method="POST" class="plc-row">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-        <input class="plc-input" type="text" name="query" placeholder="Song, artist, or a link..."
-               value="{{ search_term or '' }}" />
-        <button class="plc-btn" name="action" value="search"><i class="fa fa-search"></i> Search{% if economy and economy.costs.get("search") %}<span class="plc-tag">{{ economy.costs["search"] }}</span>{% endif %}</button>
-      </form>
-
-      {% if search_results %}
-        <table class="plc-q" style="margin-top:12px;">
-          <tbody>
-            {% for r in search_results %}
-              <tr>
-                <td style="width:54px;">
-                  {% if r.artwork %}<img class="plc-thumb" src="{{ r.artwork }}" alt="" />{% endif %}
-                </td>
-                <td>
-                  {% if r.uri %}<a href="{{ r.uri }}" target="_blank">{{ r.title }}</a>{% else %}{{ r.title }}{% endif %}
-                  <div style="opacity:.6; font-size:.8rem;">{{ r.author }}</div>
-                </td>
-                <td style="opacity:.7; width:70px;">{% if r.stream %}Live{% else %}{{ r.duration }}{% endif %}</td>
-                <td style="white-space:nowrap; width:1%;">
-                  <form method="POST" style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-                    <input type="hidden" name="identifier" value="{{ r.identifier }}" />
-                    <button class="plc-btn round" name="action" value="play" title="Add to queue"><i class="fa fa-plus"></i></button>
-                  </form>
-                  <form method="POST" style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-                    <input type="hidden" name="identifier" value="{{ r.identifier }}" />
-                    <button class="plc-btn round play" style="width:44px;height:44px;" name="action" value="play_now" title="Play now"><i class="fa fa-play"></i></button>
-                  </form>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% elif search_term %}
-        <p class="plc-empty">No results for &ldquo;{{ search_term }}&rdquo;.</p>
-      {% endif %}
+    <div class="plc-art-wrap" id="plcArtWrap">
+      <img class="plc-art" id="plcArt" alt="" hidden />
+      <div class="plc-art ph" id="plcArtPh"><i class="fa fa-music"></i></div>
     </div>
 
-    <div class="plc-panel">
-      <h5><i class="fa fa-rss me-1"></i> Radio / direct stream</h5>
-      <p class="plc-hint">Icecast/Shoutcast, .mp3, .m3u8 and similar direct URLs.</p>
-      <form method="POST" class="plc-row">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-        <input class="plc-input" type="text" name="identifier" placeholder="https://stream.example.com/live.mp3" />
-        <button class="plc-btn" name="action" value="play"><i class="fa fa-plus"></i> Queue</button>
-        <button class="plc-btn play" style="width:auto;height:44px;border-radius:11px;padding:0 15px;" name="action" value="play_now"><i class="fa fa-play"></i> Play</button>
-      </form>
-    </div>
-  </div>
-
-  <div class="plc-panel">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-      <div>
-        <h5><i class="fa fa-star me-1"></i> Guild favourites</h5>
-        <p class="plc-hint">Shared playlist for this server &mdash; any member can add to it.</p>
-      </div>
-      <form method="POST" class="plc-row">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-        <button class="plc-btn" name="action" value="fav_queue" title="Queue every favourite"><i class="fa fa-plus"></i> Queue all</button>
-        <button class="plc-btn play" style="width:auto;height:44px;border-radius:11px;padding:0 15px;" name="action" value="fav_play" title="Play the favourites now"><i class="fa fa-play"></i> Play all</button>
-        {% if is_staff %}
-          <button class="plc-btn danger" name="action" value="fav_clear" title="Remove every favourite"><i class="fa fa-trash-o"></i></button>
-        {% endif %}
-      </form>
-    </div>
-
-    {% if favourites %}
-      <table class="plc-q" style="margin-top:10px;">
-        <tbody>
-          {% for fav in favourites %}
-            <tr>
-              <td style="opacity:.5; width:34px;">{{ loop.index }}</td>
-              <td style="font-size:.86rem;">{{ fav.title }}</td>
-              <td style="white-space:nowrap; width:1%;">
-                <form method="POST" style="display:inline;">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-                  <input type="hidden" name="identifier" value="{{ fav.identifier }}" />
-                  <button class="plc-btn round" name="action" value="play" title="Queue"><i class="fa fa-plus"></i></button>
-                </form>
-                {% if is_staff %}
-                  <form method="POST" style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-                    <input type="hidden" name="identifier" value="{{ fav.identifier }}" />
-                    <button class="plc-btn round danger" name="action" value="fav_remove" title="Remove"><i class="fa fa-times"></i></button>
-                  </form>
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p class="plc-empty">No favourites yet. Hit <b>Favourite</b> while a track is playing.</p>
-    {% endif %}
-  </div>
-
-  {% if wallet and wallet.enabled %}
-    <div class="plc-panel">
-      <h5><i class="fa fa-money me-1"></i> Your balance</h5>
-      <p class="plc-hint">
-        <b style="font-size:1.05rem; color:#fff;">{{ "{:,}".format(wallet.balance) }} {{ wallet.currency }}</b>
-        {% if not is_staff %}&mdash; some actions cost credits on this server.{% else %}&mdash; staff are not charged.{% endif %}
+    <div class="plc-info">
+      <p class="plc-eyebrow">
+        <span class="plc-live"><span class="plc-dot" id="plcDot"></span><span id="plcStatus">Now playing</span></span>
+        <span id="plcVoice"></span>
       </p>
-      <div class="d-flex flex-wrap gap-2">
-        {% for name, cost in wallet.costs.items() %}
-          <span class="plc-badge">{{ name|replace("_", " ") }}: {{ cost }}</span>
-        {% endfor %}
+      <h3 class="plc-track-title" id="plcTitle">&mdash;</h3>
+      <p class="plc-track-author" id="plcAuthor"></p>
+      <div class="plc-chips" id="plcChips"></div>
+
+      <div class="plc-seek">
+        <div class="plc-bar" id="plcSeek" role="slider" tabindex="0"
+             aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="plc-scrub" id="plcScrub">0:00</div>
+          <div class="plc-bar-track">
+            <div class="plc-bar-buffer"></div>
+            <div class="plc-bar-fill" id="plcFill"></div>
+          </div>
+          <div class="plc-bar-knob" id="plcKnob"></div>
+        </div>
+        <div class="plc-times">
+          <span id="plcPos">0:00</span>
+          <span id="plcDur">0:00</span>
+        </div>
       </div>
     </div>
-  {% endif %}
+  </div>
 
-  {% if not is_staff %}
-    <p class="plc-hint" style="text-align:center;">
-      <i class="fa fa-info-circle"></i>
-      You can play, pause, skip and queue music. Stopping and disconnecting are moderator-only.
-    </p>
-  {% endif %}
+  <!-- ============ TRANSPORT ============ -->
+  <div class="plc-bar-row">
+    <div class="plc-transport">
+      <div class="plc-transport-grp">
+        <button class="plc-btn icon" data-act="previous" title="Previous (Shift+&larr;)" aria-label="Previous">
+          <i class="fa fa-step-backward"></i></button>
+        <button class="plc-btn primary play" data-act="pause" id="plcPlay" title="Play / pause (Space)" aria-label="Play or pause">
+          <i class="fa fa-pause" id="plcPlayIcon"></i></button>
+        <button class="plc-btn icon" data-act="skip" title="Skip (Shift+&rarr;)" aria-label="Skip">
+          <i class="fa fa-step-forward"></i></button>
+      </div>
 
+      <span class="plc-sep"></span>
+
+      <div class="plc-transport-grp">
+        <button class="plc-btn icon" data-act="shuffle" id="plcShuffle" title="Shuffle the queue" aria-label="Shuffle">
+          <i class="fa fa-random"></i></button>
+        <button class="plc-btn" data-act="repeat_cycle" id="plcRepeat" title="Repeat: off / track / queue">
+          <i class="fa fa-repeat"></i> <span id="plcRepeatLabel">Off</span></button>
+        <button class="plc-btn icon" data-act="autoplay" id="plcAutoplay" title="Autoplay similar tracks when the queue runs dry" aria-label="Autoplay">
+          <i class="fa fa-magic"></i></button>
+        <button class="plc-btn icon" data-act="fav_add" id="plcFav" title="Save this track to the guild favourites" aria-label="Favourite">
+          <i class="fa fa-star-o"></i></button>
+      </div>
+    </div>
+
+    <div class="plc-vol" style="margin-left:auto;">
+      <button class="plc-btn icon sm" data-act="mute" id="plcMute" title="Mute / unmute (M)" aria-label="Mute">
+        <i class="fa fa-volume-up" id="plcMuteIcon"></i></button>
+      <input type="range" id="plcVol" min="0" max="150" step="1" value="100" aria-label="Volume" />
+      <span class="plc-vol-num" id="plcVolNum">100%</span>
+    </div>
+
+    <div class="plc-transport-grp" id="plcStaffBar" hidden>
+      <span class="plc-sep"></span>
+      <button class="plc-btn icon danger" data-act="stop" title="Stop and clear" aria-label="Stop">
+        <i class="fa fa-stop"></i></button>
+      <button class="plc-btn icon danger" data-act="disconnect" title="Disconnect the bot" aria-label="Disconnect">
+        <i class="fa fa-sign-out"></i></button>
+    </div>
+  </div>
+
+  <div class="plc-wallet" id="plcWallet" hidden>
+    <span><i class="fa fa-diamond" style="color:#8ea6ff;"></i>
+      <b id="plcBal">0</b> <span id="plcCur">credits</span></span>
+    <span class="plc-sub" id="plcWalletNote"></span>
+    <div class="plc-prices" id="plcPrices"></div>
+  </div>
+
+  <!-- ============ SEARCH + QUEUE ============ -->
+  <div class="plc-grid">
+
+    <div class="plc-card">
+      <div class="plc-card-head">
+        <h5><i class="fa fa-search"></i> Find something to play</h5>
+        <span class="plc-spacer"></span>
+        <span class="plc-sub" id="plcSearchMeta"></span>
+      </div>
+      <div class="plc-card-body">
+        <div class="plc-searchbar">
+          <label class="plc-field" id="plcSearchField">
+            <i class="fa fa-search"></i>
+            <!-- type=text, not search: a search input draws its own clear
+                 button on top of ours, which reads as two X's in a row. -->
+            <input class="plc-input" id="plcQuery" type="text" autocomplete="off"
+                   placeholder="Song, artist, playlist or any link&hellip;" />
+            <button class="plc-clear" id="plcQueryClear" type="button" aria-label="Clear"><i class="fa fa-times"></i></button>
+          </label>
+          <button class="plc-btn primary wide" id="plcSearchGo">
+            <i class="fa fa-search"></i> Search <span class="plc-cost" data-cost="search" hidden></span></button>
+        </div>
+        <div class="plc-sources" id="plcSources"></div>
+        <p class="plc-sub" style="margin-top:9px;">
+          Paste any link &mdash; YouTube, Spotify, a radio stream, a direct <code>.mp3</code> &mdash; and press
+          <span class="plc-kbd">Enter</span> to queue it straight away.
+        </p>
+      </div>
+      <div class="plc-card-body flush">
+        <div class="plc-scroll"><ul class="plc-list" id="plcResults"></ul></div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <div class="plc-card">
+        <div class="plc-card-head">
+          <h5><i class="fa fa-list-ol"></i> Queue</h5>
+          <span class="plc-count" id="plcQueueCount">0</span>
+          <span class="plc-spacer"></span>
+          <span class="plc-sub" id="plcQueueTime"></span>
+          <button class="plc-btn sm danger" data-act="clear_queue" id="plcClearQueue" title="Empty the queue" hidden>
+            <i class="fa fa-trash-o"></i></button>
+        </div>
+        <div class="plc-card-body flush">
+          <div class="plc-scroll"><ul class="plc-list" id="plcQueue"></ul></div>
+        </div>
+      </div>
+
+      <div class="plc-card">
+        <div class="plc-card-head">
+          <h5><i class="fa fa-star"></i> Server favourites</h5>
+          <span class="plc-count" id="plcFavCount">0</span>
+          <span class="plc-spacer"></span>
+          <button class="plc-btn sm" data-act="fav_queue" title="Queue every favourite"><i class="fa fa-plus"></i> Queue all</button>
+          <button class="plc-btn sm primary" data-act="fav_play" title="Play the favourites now"><i class="fa fa-play"></i></button>
+          <button class="plc-btn sm danger" data-act="fav_clear" id="plcFavClear" title="Remove every favourite" hidden>
+            <i class="fa fa-trash-o"></i></button>
+        </div>
+        <div class="plc-card-body flush">
+          <div class="plc-scroll" style="max-height:min(38vh,340px);"><ul class="plc-list" id="plcFavs"></ul></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="plc-sub" style="text-align:center;">
+    <span class="plc-kbd">Space</span> play/pause &nbsp;
+    <span class="plc-kbd">&larr;</span><span class="plc-kbd">&rarr;</span> seek 10s &nbsp;
+    <span class="plc-kbd">Shift</span>+<span class="plc-kbd">&larr;</span><span class="plc-kbd">&rarr;</span> track &nbsp;
+    <span class="plc-kbd">&uarr;</span><span class="plc-kbd">&darr;</span> volume &nbsp;
+    <span class="plc-kbd">M</span> mute &nbsp;
+    <span class="plc-kbd">/</span> search
+    <span id="plcRoleNote"></span>
+  </p>
+
+  <div class="plc-toasts" id="plcToasts"></div>
 </div>
-{% endif %}
+
+<noscript>
+  <div style="padding:16px; border-radius:14px; border:1px solid rgba(255,255,255,.14); margin-top:14px;">
+    <p><b>JavaScript is off</b>, so the live player cannot run. These basic controls still work:</p>
+    <form method="POST" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <button class="plc-btn" name="action" value="resume"><i class="fa fa-play"></i> Play</button>
+      <button class="plc-btn" name="action" value="pause"><i class="fa fa-pause"></i> Pause</button>
+      <button class="plc-btn" name="action" value="skip"><i class="fa fa-step-forward"></i> Skip</button>
+      <button class="plc-btn" name="action" value="shuffle"><i class="fa fa-random"></i> Shuffle</button>
+      {% if is_staff %}
+        <button class="plc-btn danger" name="action" value="stop"><i class="fa fa-stop"></i> Stop</button>
+        <button class="plc-btn danger" name="action" value="disconnect"><i class="fa fa-sign-out"></i> Disconnect</button>
+      {% endif %}
+    </form>
+    <form method="POST" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <input class="plc-input" style="padding-left:13px;" type="text" name="query"
+             placeholder="Song, artist or link" value="{{ search_term or '' }}" />
+      <button class="plc-btn" name="action" value="search"><i class="fa fa-search"></i> Search</button>
+      <button class="plc-btn" name="action" value="play"><i class="fa fa-plus"></i> Queue it</button>
+    </form>
+    {% if search_results %}
+      <ul style="margin-top:12px;">
+        {% for r in search_results %}
+          <li style="margin-bottom:6px;">
+            {{ r.title }} &mdash; {{ r.author }} ({{ r.duration }})
+            <form method="POST" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+              <input type="hidden" name="identifier" value="{{ r.identifier }}" />
+              <button class="plc-btn sm" name="action" value="play">Queue</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if player_state.current %}
+      <p style="margin-top:12px;">Now playing: <b>{{ player_state.current.title }}</b>
+        &mdash; {{ player_state.current.author }} ({{ player_state.position }} / {{ player_state.current.duration }})</p>
+    {% else %}
+      <p style="margin-top:12px;">Nothing is playing.</p>
+    {% endif %}
+  </div>
+</noscript>
+{% raw %}
+<script>
+(function () {
+  "use strict";
+
+  var ROOT = document.getElementById("plcRoot");
+  if (!ROOT || ROOT.dataset.wired) return;
+  ROOT.dataset.wired = "1";
+
+  var CSRF = ROOT.dataset.csrf || "";
+  var ENDPOINT = window.location.pathname;
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------------------------------------------------------------- state
+  var S = {};                 // last server frame
+  var isStaff = ROOT.dataset.staff === "1";
+  var sources = [];
+  var results = [];
+  var searchTerm = "";
+  var searchSource = "ytsearch";
+  // The playhead is extrapolated between polls; `anchor` is the last point we
+  // actually heard from the bot, so the clock never drifts further than one
+  // poll interval no matter how long the page stays open.
+  var anchor = { pos: 0, at: 0, running: false, duration: 0 };
+  var dragging = false;
+  var volumeHeld = false;     // user has the slider grabbed - do not overwrite
+  var pendingPoll = null;
+  var failures = 0;
+  var lastKey = null;
+
+  try { S = JSON.parse($("plc-boot").textContent) || {}; } catch (e) { S = {}; }
+  sources = S.search_sources || [];
+  searchSource = S.search_source || "ytsearch";
+
+  // ---------------------------------------------------------------- utils
+  function esc(v) {
+    return String(v == null ? "" : v)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function fmt(ms) {
+    if (!ms || ms < 0) ms = 0;
+    var t = Math.floor(ms / 1000), h = Math.floor(t / 3600),
+        m = Math.floor((t % 3600) / 60), s = t % 60;
+    var pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+    return h ? h + ":" + pad(m) + ":" + pad(s) : m + ":" + pad(s);
+  }
+  function longFmt(ms) {
+    var t = Math.floor((ms || 0) / 1000), h = Math.floor(t / 3600), m = Math.round((t % 3600) / 60);
+    if (h && m) return h + "h " + m + "m";
+    if (h) return h + "h";
+    return m + "m";
+  }
+  function show(el, on) { if (el) el.hidden = !on; }
+
+  // ---------------------------------------------------------------- toasts
+  var toastBox = $("plcToasts");
+  var ICON = { success: "fa-check-circle", warning: "fa-exclamation-triangle", danger: "fa-times-circle" };
+  function toast(message, category) {
+    if (!message || !toastBox) return;
+    var el = document.createElement("div");
+    el.className = "plc-toast " + (category || "success");
+    el.innerHTML = '<i class="fa ' + (ICON[category] || ICON.success) + '"></i><span>' + esc(message) + "</span>";
+    toastBox.appendChild(el);
+    setTimeout(function () {
+      el.classList.add("out");
+      setTimeout(function () { el.remove(); }, 220);
+    }, category === "danger" ? 6500 : 3800);
+  }
+
+  // ---------------------------------------------------------------- transport
+  // Every exchange with the bot goes through the page's own route, so the
+  // session cookie and the CSRF token that the server already issued are the
+  // only credentials involved. The reply is a full HTML document with our
+  // payload buried in it; DOMParser digs it back out.
+  function extract(html) {
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var node = doc.getElementById("plc-api-payload");
+    if (!node) throw new Error("no payload in response");
+    return JSON.parse(node.textContent);
+  }
+
+  function pull() {
+    return fetch(ENDPOINT + "?plc_api=1&_=" + Date.now(), {
+      credentials: "same-origin",
+      headers: { "X-Requested-With": "XMLHttpRequest" }
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.text();
+    }).then(extract);
+  }
+
+  function act(action, extra) {
+    var fd = new FormData();
+    fd.append("csrf_token", CSRF);
+    fd.append("plc_api", "1");
+    fd.append("action", action);
+    if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) fd.append(k, extra[k]);
+    return fetch(ENDPOINT, { method: "POST", body: fd, credentials: "same-origin" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.text();
+      })
+      .then(extract)
+      .then(function (data) {
+        (data.notifications || []).forEach(function (n) { toast(n.message, n.category); });
+        apply(data);
+        return data;
+      })
+      .catch(function (err) {
+        toast("Could not reach the bot: " + err.message, "danger");
+        throw err;
+      });
+  }
+
+  // ---------------------------------------------------------------- polling
+  var POLL_ACTIVE = 2000;     // something is playing and the tab is visible
+  var POLL_IDLE = 6000;       // nothing playing - no need to be eager
+  var POLL_HIDDEN = 20000;    // tab in the background
+
+  function pollDelay() {
+    if (document.hidden) return POLL_HIDDEN;
+    if (failures) return Math.min(POLL_ACTIVE * Math.pow(2, failures), 30000);
+    return (S.state && S.state.playing && !S.state.paused) ? POLL_ACTIVE : POLL_IDLE;
+  }
+
+  function schedule(delay) {
+    clearTimeout(pendingPoll);
+    pendingPoll = setTimeout(loop, delay == null ? pollDelay() : delay);
+  }
+
+  function loop() {
+    pull().then(function (data) {
+      failures = 0;
+      ROOT.classList.remove("stale");
+      apply(data);
+      schedule();
+    }).catch(function () {
+      failures = Math.min(failures + 1, 5);
+      if (failures >= 2) ROOT.classList.add("stale");
+      setDot();
+      schedule();
+    });
+  }
+
+  // A frame arriving out of order would make the playhead jump backwards, so
+  // anything older than what we already have is dropped.
+  function apply(data) {
+    if (!data || !data.state) return;
+    // The token is reissued on every frame, so a tab left open all evening
+    // keeps working rather than failing on its first click after an expiry.
+    if (data.csrf) CSRF = data.csrf;
+    if (S.state && data.state.stamp && S.state.stamp && data.state.stamp < S.state.stamp) return;
+    S.state = data.state;
+    if (data.is_staff !== undefined) isStaff = !!data.is_staff;
+    if (data.favourites !== undefined) S.favourites = data.favourites;
+    if (data.wallet !== undefined) S.wallet = data.wallet;
+    if (data.economy !== undefined) S.economy = data.economy;
+    if (data.search_results !== undefined) {
+      results = data.search_results;
+      searchTerm = data.search_term || "";
+      if (data.search_source) searchSource = data.search_source;
+      renderResults();
+      renderSources();
+    }
+    reanchor();
+    render();
+  }
+
+  function reanchor() {
+    var st = S.state || {};
+    var cur = st.current;
+    anchor.duration = cur ? (cur.duration_ms || 0) : 0;
+    anchor.pos = st.position_ms || 0;
+    anchor.at = performance.now();
+    // A stream has no length to run along, and a paused track does not move.
+    anchor.running = !!(st.connected && st.playing && !st.paused && cur && !cur.stream && anchor.duration > 0);
+  }
+
+  function livePos() {
+    if (!anchor.running) return anchor.pos;
+    return Math.min(anchor.pos + (performance.now() - anchor.at), anchor.duration);
+  }
+
+  // ---------------------------------------------------------------- render
+  var elFill = $("plcFill"), elKnob = $("plcKnob"), elPos = $("plcPos"),
+      elDur = $("plcDur"), elSeek = $("plcSeek"), elScrub = $("plcScrub");
+
+  function paintSeek() {
+    var st = S.state || {}, cur = st.current;
+    var seekable = !!(cur && !cur.stream && anchor.duration > 0);
+    elSeek.classList.toggle("disabled", !seekable);
+    if (dragging) return;
+    var pos = livePos();
+    var pct = seekable ? Math.max(0, Math.min(100, (pos / anchor.duration) * 100)) : 0;
+    elFill.style.width = pct + "%";
+    elKnob.style.left = pct + "%";
+    elPos.textContent = cur ? fmt(pos) : "0:00";
+    elDur.textContent = cur ? (cur.stream ? "LIVE" : fmt(anchor.duration)) : "0:00";
+    elSeek.setAttribute("aria-valuenow", Math.round(pct));
+  }
+
+  function setDot() {
+    var dot = $("plcDot"), label = $("plcStatus");
+    var st = S.state || {};
+    dot.className = "plc-dot" + (failures >= 4 ? " dead" : failures >= 2 ? " stale" : "");
+    if (failures >= 2) { label.textContent = "Reconnecting"; return; }
+    if (!st.connected) { label.textContent = "Not connected"; return; }
+    if (!st.current) { label.textContent = "Idle"; return; }
+    label.textContent = st.paused ? "Paused" : "Now playing";
+  }
+
+  function render() {
+    var st = S.state || {}, cur = st.current || null;
+
+    setDot();
+
+    // ---- artwork, title, artist
+    var art = $("plcArt"), ph = $("plcArtPh"), bg = $("plcHeroBg");
+    if (cur && cur.artwork) {
+      if (art.getAttribute("src") !== cur.artwork) {
+        art.setAttribute("src", cur.artwork);
+        bg.style.backgroundImage = 'url("' + cur.artwork.replace(/"/g, "%22") + '")';
+      }
+      art.hidden = false; ph.hidden = true;
+    } else {
+      art.removeAttribute("src");
+      art.hidden = true; ph.hidden = false; bg.style.backgroundImage = "";
+    }
+    $("plcArtWrap").classList.toggle("spin", !!(cur && st.playing && !st.paused));
+
+    var title = $("plcTitle");
+    if (cur) {
+      title.innerHTML = cur.uri
+        ? '<a href="' + esc(cur.uri) + '" target="_blank" rel="noopener">' + esc(cur.title) + "</a>"
+        : esc(cur.title);
+      title.setAttribute("title", cur.title || "");
+    } else {
+      title.textContent = st.connected ? "Nothing playing" : "Not connected";
+      title.removeAttribute("title");
+    }
+    $("plcAuthor").textContent = cur ? (cur.author || "") :
+      (st.connected ? "Search below and it will start straight away."
+                    : "Join a voice channel, then queue something — I will connect on my own.");
+
+    // ---- chips
+    var chips = [];
+    if (cur && cur.stream) chips.push('<span class="plc-chip live"><i class="fa fa-dot-circle-o"></i> Live</span>');
+    if (st.paused) chips.push('<span class="plc-chip"><i class="fa fa-pause"></i> Paused</span>');
+    if (st.repeat === "track") chips.push('<span class="plc-chip on"><i class="fa fa-repeat"></i> Repeat track</span>');
+    if (st.repeat === "queue") chips.push('<span class="plc-chip on"><i class="fa fa-repeat"></i> Repeat queue</span>');
+    if (st.autoplay) chips.push('<span class="plc-chip on"><i class="fa fa-magic"></i> Autoplay</span>');
+    if (cur && cur.requester) chips.push('<span class="plc-chip"><i class="fa fa-user"></i> ' + esc(cur.requester) + "</span>");
+    if (cur && cur.source) chips.push('<span class="plc-chip"><i class="fa fa-cloud"></i> ' + esc(cur.source) + "</span>");
+    $("plcChips").innerHTML = chips.join("");
+
+    // ---- voice channel + who is listening
+    var voice = $("plcVoice");
+    if (st.connected && st.channel) {
+      var people = st.listeners || [];
+      var faces = people.slice(0, 5).map(function (p) {
+        return p.avatar
+          ? '<img class="plc-face" src="' + esc(p.avatar) + '" alt="" title="' + esc(p.name) + '" />'
+          : '<span class="plc-face more" title="' + esc(p.name) + '">' + esc((p.name || "?").slice(0, 1)) + "</span>";
+      }).join("");
+      if (people.length > 5) faces += '<span class="plc-face more">+' + (people.length - 5) + "</span>";
+      voice.innerHTML =
+        '<span style="display:inline-flex;align-items:center;gap:8px;">' +
+        '<i class="fa fa-volume-up"></i> ' + esc(st.channel) +
+        (faces ? '<span class="plc-faces">' + faces + "</span>" : "") + "</span>";
+    } else {
+      voice.textContent = "";
+    }
+
+    // ---- transport state
+    var playing = st.connected && st.playing && !st.paused;
+    var playBtn = $("plcPlay");
+    playBtn.dataset.act = playing ? "pause" : "resume";
+    $("plcPlayIcon").className = "fa fa-" + (playing ? "pause" : "play");
+    playBtn.setAttribute("aria-label", playing ? "Pause" : "Play");
+
+    var repeatLabel = st.repeat === "track" ? "Track" : st.repeat === "queue" ? "Queue" : "Off";
+    $("plcRepeatLabel").textContent = repeatLabel;
+    $("plcRepeat").classList.toggle("on", st.repeat !== "off" && st.repeat !== undefined);
+    $("plcAutoplay").classList.toggle("on", !!st.autoplay);
+
+    var favIds = (S.favourites || []).map(function (f) { return f.identifier; });
+    var isFav = !!(cur && cur.identifier && favIds.indexOf(cur.identifier) !== -1);
+    $("plcFav").classList.toggle("on", isFav);
+    $("plcFav").querySelector("i").className = "fa fa-star" + (isFav ? "" : "-o");
+
+    // Nothing to act on means the button says so rather than failing on click.
+    $("plcPlay").disabled = !st.connected;
+    ROOT.querySelectorAll('[data-act="previous"]').forEach(function (b) { b.disabled = !st.history_length; });
+    ROOT.querySelectorAll('[data-act="skip"]').forEach(function (b) { b.disabled = !cur; });
+    $("plcShuffle").disabled = !st.queue_length;
+    $("plcFav").disabled = !cur;
+    $("plcRepeat").disabled = !st.connected;
+    $("plcAutoplay").disabled = !st.connected;
+
+    // ---- volume
+    if (!volumeHeld) {
+      var vol = st.connected ? st.volume : 0;
+      $("plcVol").value = vol;
+      $("plcVolNum").textContent = vol + "%";
+      $("plcMuteIcon").className = "fa fa-volume-" + (vol === 0 ? "off" : vol < 50 ? "down" : "up");
+    }
+
+    // ---- staff-only controls
+    // Repeat and autoplay are moderator-only on the server, exactly as they
+    // are on the Discord controller. Members still see the *state* of both in
+    // the chips above, they just cannot change it, so the buttons go rather
+    // than sit there waiting to refuse.
+    show($("plcStaffBar"), isStaff);
+    show($("plcRepeat"), isStaff);
+    show($("plcAutoplay"), isStaff);
+    show($("plcClearQueue"), isStaff && st.queue_length > 0);
+    show($("plcFavClear"), isStaff && (S.favourites || []).length > 0);
+    $("plcRoleNote").innerHTML = isStaff
+      ? ""
+      : ' &nbsp;&middot;&nbsp; <i class="fa fa-info-circle"></i> Stopping and disconnecting are moderator-only.';
+
+    renderQueue();
+    renderFavs();
+    renderWallet();
+    paintSeek();
+  }
+
+  // ---- queue -------------------------------------------------------------
+  function renderQueue() {
+    var st = S.state || {}, q = st.queue || [];
+    $("plcQueueCount").textContent = st.queue_length || 0;
+    $("plcQueueTime").textContent = q.length ? longFmt(st.queue_duration_ms) + " left" : "";
+    var box = $("plcQueue");
+    if (!q.length) {
+      box.innerHTML = '<li class="plc-empty"><i class="fa fa-list-ol"></i>' +
+        (st.connected ? "Nothing queued. Add something from the search." : "Not connected to a voice channel.") + "</li>";
+      return;
+    }
+    var html = q.map(function (item, i) {
+      // Reordering and removing are both moderator-only on the server, so the
+      // buttons are not offered to anyone who would only be told no.
+      var acts = isStaff
+        ? '<button class="plc-btn sm icon" data-act="move_top" data-index="' + i +
+          '" title="Play this next"><i class="fa fa-level-up"></i></button>' +
+          '<button class="plc-btn sm icon danger" data-act="remove_track" data-index="' + i +
+          '" title="Remove"><i class="fa fa-times"></i></button>'
+        : "";
+      return '<li class="plc-item">' +
+        '<span class="plc-idx">' + (i + 1) + "</span>" +
+        '<div class="plc-item-main">' +
+          '<p class="plc-item-t">' + (item.uri
+            ? '<a href="' + esc(item.uri) + '" target="_blank" rel="noopener">' + esc(item.title) + "</a>"
+            : esc(item.title)) + "</p>" +
+          '<p class="plc-item-s">' + esc(item.author || "") + "</p>" +
+        "</div>" +
+        '<span class="plc-item-len">' + esc(item.duration) + "</span>" +
+        '<span class="plc-item-acts">' + acts + "</span>" +
+        "</li>";
+    }).join("");
+    if (st.queue_truncated) {
+      html += '<li class="plc-empty" style="padding:14px;">and ' + st.queue_truncated + " more not shown</li>";
+    }
+    box.innerHTML = html;
+  }
+
+  // ---- search ------------------------------------------------------------
+  function renderSources() {
+    var box = $("plcSources");
+    if (!sources.length) { box.innerHTML = ""; return; }
+    box.innerHTML = sources.map(function (s) {
+      var key = s[0], label = s[1], icon = s[2];
+      return '<button type="button" class="plc-src' + (key === searchSource ? " sel" : "") +
+        '" data-source="' + esc(key) + '"><i class="fa ' + esc(icon) + '"></i>' + esc(label) + "</button>";
+    }).join("");
+  }
+
+  function renderResults() {
+    var box = $("plcResults");
+    $("plcSearchMeta").textContent = results.length
+      ? results.length + " result" + (results.length === 1 ? "" : "s") + " for “" + searchTerm + "”"
+      : "";
+    if (!results.length) {
+      box.innerHTML = searchTerm
+        ? '<li class="plc-empty"><i class="fa fa-search"></i>Nothing found for “' + esc(searchTerm) + "”.</li>"
+        : '<li class="plc-empty"><i class="fa fa-music"></i>Search for a song, or paste a link.</li>';
+      return;
+    }
+    box.innerHTML = results.map(function (r, i) {
+      var thumb = r.artwork
+        ? '<img class="plc-thumb" src="' + esc(r.artwork) + '" alt="" loading="lazy" />'
+        : '<span class="plc-thumb ph"><i class="fa fa-music"></i></span>';
+      return '<li class="plc-item">' +
+        thumb +
+        '<div class="plc-item-main">' +
+          '<p class="plc-item-t">' + (r.uri
+            ? '<a href="' + esc(r.uri) + '" target="_blank" rel="noopener">' + esc(r.title) + "</a>"
+            : esc(r.title)) + "</p>" +
+          '<p class="plc-item-s">' + esc(r.author || "") + (r.source ? " · " + esc(r.source) : "") + "</p>" +
+        "</div>" +
+        '<span class="plc-item-len">' + (r.stream ? "LIVE" : esc(r.duration)) + "</span>" +
+        '<span class="plc-item-acts">' +
+          '<button class="plc-btn sm icon" data-act="fav_add" data-result="' + i +
+            '" title="Save to server favourites"><i class="fa fa-star-o"></i></button>' +
+          '<button class="plc-btn sm icon" data-act="play" data-result="' + i +
+            '" title="Add to the queue"><i class="fa fa-plus"></i></button>' +
+          '<button class="plc-btn sm icon primary" data-act="play_now" data-result="' + i +
+            '" title="Play it now"><i class="fa fa-play"></i></button>' +
+        "</span>" +
+        "</li>";
+    }).join("");
+  }
+
+  // ---- favourites --------------------------------------------------------
+  function renderFavs() {
+    var favs = S.favourites || [];
+    $("plcFavCount").textContent = favs.length;
+    var box = $("plcFavs");
+    if (!favs.length) {
+      box.innerHTML = '<li class="plc-empty"><i class="fa fa-star-o"></i>No favourites yet. ' +
+        "Star a track and it lands here for everyone.</li>";
+      return;
+    }
+    box.innerHTML = favs.map(function (f, i) {
+      return '<li class="plc-item">' +
+        '<span class="plc-idx">' + (i + 1) + "</span>" +
+        '<div class="plc-item-main"><p class="plc-item-t">' + esc(f.title) + "</p></div>" +
+        '<span class="plc-item-acts">' +
+          '<button class="plc-btn sm icon" data-act="play" data-fav="' + i +
+            '" title="Add to the queue"><i class="fa fa-plus"></i></button>' +
+          '<button class="plc-btn sm icon primary" data-act="play_now" data-fav="' + i +
+            '" title="Play it now"><i class="fa fa-play"></i></button>' +
+          (isStaff
+            ? '<button class="plc-btn sm icon danger" data-act="fav_remove" data-fav="' + i +
+              '" title="Remove"><i class="fa fa-times"></i></button>'
+            : "") +
+        "</span></li>";
+    }).join("");
+  }
+
+  // ---- wallet ------------------------------------------------------------
+  function renderWallet() {
+    var w = S.wallet || {}, eco = S.economy;
+    if (!w.enabled) { show($("plcWallet"), false); return; }
+    show($("plcWallet"), true);
+    $("plcBal").textContent = Number(w.balance || 0).toLocaleString();
+    $("plcCur").textContent = w.currency || "credits";
+    $("plcWalletNote").textContent = isStaff ? "— staff are not charged." : "— some actions cost credits here.";
+    var costs = (eco && eco.costs) || (isStaff ? {} : w.costs) || {};
+    $("plcPrices").innerHTML = Object.keys(costs).map(function (k) {
+      return '<span class="plc-price">' + esc(k.replace(/_/g, " ")) + " <b>" + esc(costs[k]) + "</b></span>";
+    }).join("");
+    // Price tags on the buttons that actually charge.
+    ROOT.querySelectorAll("[data-cost]").forEach(function (tag) {
+      var price = costs[tag.dataset.cost];
+      tag.hidden = !price;
+      if (price) tag.textContent = price;
+    });
+  }
+
+  // ---------------------------------------------------------------- events
+  // One delegated handler for every button that maps straight to an action.
+  ROOT.addEventListener("click", function (ev) {
+    var src = ev.target.closest(".plc-src");
+    if (src) {
+      searchSource = src.dataset.source;
+      renderSources();
+      if ($("plcQuery").value.trim()) runSearch();
+      return;
+    }
+    var btn = ev.target.closest("[data-act]");
+    if (!btn || btn.disabled) return;
+    ev.preventDefault();
+
+    var action = btn.dataset.act;
+    var extra = {};
+    if (btn.dataset.index !== undefined) extra.index = btn.dataset.index;
+    if (btn.dataset.result !== undefined) {
+      var r = results[Number(btn.dataset.result)];
+      if (!r) return;
+      // Favouriting wants the encoded blob, which is the only handle that
+      // survives a source with no public URL; playing wants the identifier.
+      extra.identifier = action === "fav_add" ? (r.encoded || r.identifier) : r.identifier;
+    }
+    if (btn.dataset.fav !== undefined) {
+      var f = (S.favourites || [])[Number(btn.dataset.fav)];
+      if (!f) return;
+      extra.identifier = f.identifier;
+    }
+    if (action === "fav_clear" && !window.confirm("Remove every server favourite?")) return;
+    if (action === "clear_queue" && !window.confirm("Empty the whole queue?")) return;
+
+    busy(btn, true);
+    act(action, extra).catch(function () {}).then(function () {
+      busy(btn, false);
+      schedule(400);   // catch the follow-on state a beat later
+    });
+  });
+
+  function busy(btn, on) {
+    if (!btn) return;
+    if (on) {
+      btn.dataset.busy = "1";
+      btn.style.opacity = ".55";
+      btn.style.pointerEvents = "none";
+    } else {
+      delete btn.dataset.busy;
+      btn.style.opacity = "";
+      btn.style.pointerEvents = "";
+    }
+  }
+
+  // ---- seek bar: click anywhere, or grab and drag -------------------------
+  function ratioAt(ev) {
+    var box = elSeek.getBoundingClientRect();
+    var x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - box.left;
+    return Math.max(0, Math.min(1, x / box.width));
+  }
+  function paintDrag(ratio) {
+    var pct = ratio * 100;
+    elFill.style.width = pct + "%";
+    elKnob.style.left = pct + "%";
+    elPos.textContent = fmt(ratio * anchor.duration);
+    elScrub.style.left = pct + "%";
+    elScrub.textContent = fmt(ratio * anchor.duration);
+  }
+  elSeek.addEventListener("pointermove", function (ev) {
+    if (dragging || !anchor.duration) return;
+    var ratio = ratioAt(ev);
+    elScrub.style.left = ratio * 100 + "%";
+    elScrub.textContent = fmt(ratio * anchor.duration);
+  });
+  elSeek.addEventListener("pointerdown", function (ev) {
+    if (!anchor.duration || elSeek.classList.contains("disabled")) return;
+    dragging = true;
+    elSeek.classList.add("dragging");
+    elSeek.setPointerCapture(ev.pointerId);
+    paintDrag(ratioAt(ev));
+  });
+  elSeek.addEventListener("pointermove", function (ev) {
+    if (dragging) paintDrag(ratioAt(ev));
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    elSeek.classList.remove("dragging");
+    var seconds = Math.round(ratioAt(ev) * anchor.duration / 1000);
+    // Move the local playhead immediately; the next frame confirms it.
+    anchor.pos = seconds * 1000;
+    anchor.at = performance.now();
+    act("seek", { position: seconds }).catch(function () {}).then(function () { schedule(500); });
+  }
+  elSeek.addEventListener("pointerup", endDrag);
+  elSeek.addEventListener("pointercancel", function () {
+    dragging = false; elSeek.classList.remove("dragging"); paintSeek();
+  });
+  elSeek.addEventListener("keydown", function (ev) {
+    if (!anchor.duration) return;
+    var step = ev.shiftKey ? 30000 : 5000;
+    if (ev.key === "ArrowRight") { ev.preventDefault(); nudge(step); }
+    if (ev.key === "ArrowLeft") { ev.preventDefault(); nudge(-step); }
+  });
+
+  function nudge(deltaMs) {
+    if (!anchor.duration) return;
+    var target = Math.max(0, Math.min(anchor.duration, livePos() + deltaMs));
+    anchor.pos = target;
+    anchor.at = performance.now();
+    paintSeek();
+    act("seek", { position: Math.round(target / 1000) }).catch(function () {});
+  }
+
+  // ---- volume: applies on release, never mid-drag -------------------------
+  var volEl = $("plcVol"), volTimer = null;
+  volEl.addEventListener("pointerdown", function () { volumeHeld = true; });
+  volEl.addEventListener("input", function () {
+    volumeHeld = true;
+    $("plcVolNum").textContent = volEl.value + "%";
+    $("plcMuteIcon").className = "fa fa-volume-" +
+      (Number(volEl.value) === 0 ? "off" : Number(volEl.value) < 50 ? "down" : "up");
+    // Keyboard and click-to-jump fire input with no pointerup to follow, so a
+    // debounce is what actually commits the value in those cases.
+    clearTimeout(volTimer);
+    volTimer = setTimeout(commitVolume, 420);
+  });
+  volEl.addEventListener("change", function () { clearTimeout(volTimer); commitVolume(); });
+  function commitVolume() {
+    clearTimeout(volTimer);
+    var value = Number(volEl.value);
+    volumeHeld = false;
+    if (S.state && S.state.volume === value) return;
+    act("volume_set", { volume: value }).catch(function () {});
+  }
+
+  // ---- search ------------------------------------------------------------
+  var queryEl = $("plcQuery"), fieldEl = $("plcSearchField");
+  function markField() { fieldEl.classList.toggle("filled", !!queryEl.value); }
+  queryEl.addEventListener("input", markField);
+  $("plcQueryClear").addEventListener("click", function () {
+    queryEl.value = ""; markField(); results = []; searchTerm = ""; renderResults(); queryEl.focus();
+  });
+  queryEl.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    var value = queryEl.value.trim();
+    // A pasted link has nothing to search for - queue it and be done.
+    if (/^(https?:\/\/|spotify:)/i.test(value)) {
+      act("play", { identifier: value }).catch(function () {}).then(function () { schedule(400); });
+      return;
+    }
+    runSearch();
+  });
+  $("plcSearchGo").addEventListener("click", function (ev) { ev.preventDefault(); runSearch(); });
+
+  function runSearch() {
+    var value = queryEl.value.trim();
+    if (!value) { queryEl.focus(); return; }
+    var box = $("plcResults");
+    box.innerHTML = '<li class="plc-empty plc-skeleton"><i class="fa fa-circle-o-notch fa-spin"></i>Searching…</li>';
+    act("search", { query: value, source: searchSource }).catch(function () {
+      box.innerHTML = '<li class="plc-empty"><i class="fa fa-exclamation-triangle"></i>The search did not come back.</li>';
+    });
+  }
+
+  // ---- keyboard ----------------------------------------------------------
+  document.addEventListener("keydown", function (ev) {
+    var el = document.activeElement;
+    var typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+    if (ev.key === "/" && !typing) { ev.preventDefault(); queryEl.focus(); return; }
+    if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    var hit = function (action, extra) { ev.preventDefault(); act(action, extra).catch(function () {}); };
+    switch (ev.key) {
+      case " ": hit(S.state && S.state.paused ? "resume" : "pause"); break;
+      case "ArrowRight": ev.shiftKey ? hit("skip") : (ev.preventDefault(), nudge(10000)); break;
+      case "ArrowLeft": ev.shiftKey ? hit("previous") : (ev.preventDefault(), nudge(-10000)); break;
+      case "ArrowUp": ev.preventDefault(); stepVolume(5); break;
+      case "ArrowDown": ev.preventDefault(); stepVolume(-5); break;
+      case "m": case "M": hit("mute"); break;
+      default: break;
+    }
+  });
+  function stepVolume(delta) {
+    var value = Math.max(0, Math.min(150, Number(volEl.value) + delta));
+    volEl.value = value;
+    volEl.dispatchEvent(new Event("input"));
+  }
+
+  // Cover art comes from whatever source served the track, so a dead CDN link
+  // has to fall back to the placeholder rather than leave a broken image.
+  $("plcArt").addEventListener("error", function () {
+    this.hidden = true;
+    this.removeAttribute("src");
+    $("plcArtPh").hidden = false;
+    $("plcHeroBg").style.backgroundImage = "";
+  });
+
+  // ---- lifecycle ---------------------------------------------------------
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) { failures = 0; schedule(0); }
+    else schedule();
+  });
+
+  // The playhead is redrawn locally so the clock ticks smoothly instead of
+  // stepping once per poll.
+  setInterval(function () {
+    paintSeek();
+    // A track that has run past its own length means the next one started
+    // without us; ask early rather than waiting out the poll interval.
+    if (anchor.running && anchor.duration && livePos() >= anchor.duration - 250) {
+      anchor.running = false;
+      schedule(600);
+    }
+  }, 250);
+
+  // A track change from anywhere - Discord included - should feel instant on
+  // the parts of the page that are not the playhead.
+  setInterval(function () {
+    var key = (S.state && S.state.current && S.state.current.key) || null;
+    if (key !== lastKey) { lastKey = key; render(); }
+  }, 500);
+
+  // The dashboard puts a "back to the third-party list" pill above every
+  // third-party page. This one is meant to read as a standalone player, so
+  // that pill goes - carefully, by matching the link rather than a position.
+  function stripBackLink() {
+    Array.prototype.forEach.call(document.querySelectorAll("a"), function (a) {
+      if (ROOT.contains(a)) return;
+      var href = (a.getAttribute("href") || "").replace(/\/+$/, "");
+      var text = (a.textContent || "").trim().replace(/^[<‹«←]\s*/, "");
+      if (/\/third-party$/i.test(href) || text === "PyLavController") {
+        a.classList.add("plc-hide");
+        var parent = a.parentElement;
+        // Hide the wrapper too, but only when the link was all it held -
+        // otherwise this would take real page furniture with it.
+        if (parent && parent !== document.body && parent.children.length === 1) {
+          parent.classList.add("plc-hide");
+        }
+      }
+    });
+  }
+
+  // ---- go ----------------------------------------------------------------
+  renderSources();
+  renderResults();
+  reanchor();
+  render();
+  markField();
+  stripBackLink();
+  schedule(1200);
+})();
+</script>
+{% endraw %}
 """
 
 
