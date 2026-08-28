@@ -1631,17 +1631,25 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   padding:14px 18px; border-radius:var(--plc-r);
   background:var(--plc-bg); border:1px solid var(--plc-line);
 }
-.plc-grid{ display:grid; gap:16px; grid-template-columns:1fr; }
-@media (min-width:1080px){ .plc-grid{ grid-template-columns:1.25fr .95fr; align-items:start; } }
+/* minmax(0,…) rather than a bare 1fr: a grid track sized `1fr` still refuses
+   to go below its content's min-content width, and one un-wrappable track
+   title is enough to push the whole column past the viewport. Same reason for
+   the min-width:0 on the nested column and the cards. */
+.plc-grid{ display:grid; gap:16px; grid-template-columns:minmax(0,1fr); }
+@media (min-width:1080px){
+  .plc-grid{ grid-template-columns:minmax(0,1.25fr) minmax(0,.95fr); align-items:start; }
+}
+.plc-grid > *{ min-width:0; }
 .plc-card{
   border-radius:var(--plc-r); border:1px solid var(--plc-line);
-  background:var(--plc-bg); overflow:hidden;
+  background:var(--plc-bg); overflow:hidden; min-width:0;
 }
 .plc-card-head{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   padding:14px 18px; border-bottom:1px solid var(--plc-line);
 }
-.plc-card-head h5{ margin:0; font-size:.92rem; font-weight:750; display:flex; align-items:center; gap:8px; }
+.plc-card-head h5{ margin:0; font-size:.92rem; font-weight:750; display:flex;
+                   align-items:center; gap:8px; min-width:0; }
 .plc-card-head .plc-spacer{ margin-left:auto; }
 .plc-card-body{ padding:14px 18px; }
 .plc-card-body.flush{ padding:0; }
@@ -1681,7 +1689,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 /* ---------- track lists ---------- */
 .plc-list{ list-style:none; margin:0; padding:0; }
 .plc-item{
-  display:flex; align-items:center; gap:12px; padding:9px 18px;
+  display:flex; align-items:center; gap:12px; padding:9px 18px; min-width:0;
   border-bottom:1px solid rgba(255,255,255,.05); transition:background .12s;
 }
 .plc-item:last-child{ border-bottom:none; }
@@ -1708,7 +1716,8 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 .plc-item-acts{ display:flex; gap:5px; flex:0 0 auto; opacity:.35; transition:opacity .14s; }
 .plc-item:hover .plc-item-acts, .plc-item:focus-within .plc-item-acts{ opacity:1; }
 @media (hover:none){ .plc-item-acts{ opacity:1; } }
-.plc-scroll{ max-height:min(58vh,520px); overflow-y:auto; overscroll-behavior:contain; }
+.plc-scroll{ max-height:min(58vh,520px); overflow-y:auto; overflow-x:hidden;
+             overscroll-behavior:contain; min-width:0; }
 .plc-scroll::-webkit-scrollbar{ width:9px; }
 .plc-scroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.13); border-radius:9px; }
 
@@ -1791,6 +1800,10 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 .plc-stat span{ font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; color:var(--plc-dimmer); }
 .plc-stat.live b{ color:var(--plc-good); }
 
+/* margin-left:auto parks the balance on the right of the bar. Once the bar
+   wraps, that auto margin is still pushing it right on a line of its own,
+   which reads as a stray floating box - so below the wrap point it goes. */
+@media (max-width:900px){ .plc-balance{ margin-left:0 !important; } }
 .plc-balance{
   display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-left:auto;
   padding:6px 13px; border-radius:12px;
@@ -1844,6 +1857,34 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   <div class="plc-offline">
     <i class="fa fa-plug"></i>
     <span>Lost contact with the bot &mdash; showing the last known state. Retrying&hellip;</span>
+  </div>
+
+  <!-- Server identity, a few stats, and the balance. This is what replaces
+       the dashboard's own guild banner on this page. -->
+  <div class="plc-serverbar">
+    <div class="plc-switch">
+      <button class="plc-server" id="plcServerBtn" type="button"
+              aria-haspopup="listbox" aria-expanded="false">
+        <img class="plc-server-icon" id="plcServerIcon" alt="" hidden />
+        <span class="plc-server-fallback" id="plcServerFallback">?</span>
+        <span class="plc-server-name" id="plcServerName">&mdash;</span>
+        <i class="fa fa-angle-down"></i>
+      </button>
+      <div class="plc-server-menu" id="plcServerMenu" hidden role="listbox">
+        <input class="plc-server-search" id="plcServerSearch" type="text"
+               autocomplete="off" placeholder="Find a server&hellip;" />
+        <ul class="plc-server-list" id="plcServerList"></ul>
+      </div>
+    </div>
+
+    <div class="plc-stats" id="plcStats"></div>
+
+    <div class="plc-balance" id="plcWallet" hidden>
+      <i class="fa fa-diamond"></i>
+      <span><b id="plcBal">0</b> <span id="plcCur">credits</span></span>
+      <span class="plc-sub" id="plcWalletNote"></span>
+      <div class="plc-prices" id="plcPrices"></div>
+    </div>
   </div>
 
   <!-- ============ NOW PLAYING ============ -->
@@ -1925,34 +1966,6 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     </div>
   </div>
 
-  <!-- Server identity, a few stats, and the balance. This is what replaces
-       the dashboard's own guild banner on this page. -->
-  <div class="plc-serverbar">
-    <div class="plc-switch">
-      <button class="plc-server" id="plcServerBtn" type="button"
-              aria-haspopup="listbox" aria-expanded="false">
-        <img class="plc-server-icon" id="plcServerIcon" alt="" hidden />
-        <span class="plc-server-fallback" id="plcServerFallback">?</span>
-        <span class="plc-server-name" id="plcServerName">&mdash;</span>
-        <i class="fa fa-angle-down"></i>
-      </button>
-      <div class="plc-server-menu" id="plcServerMenu" hidden role="listbox">
-        <input class="plc-server-search" id="plcServerSearch" type="text"
-               autocomplete="off" placeholder="Find a server&hellip;" />
-        <ul class="plc-server-list" id="plcServerList"></ul>
-      </div>
-    </div>
-
-    <div class="plc-stats" id="plcStats"></div>
-
-    <div class="plc-balance" id="plcWallet" hidden>
-      <i class="fa fa-diamond"></i>
-      <span><b id="plcBal">0</b> <span id="plcCur">credits</span></span>
-      <span class="plc-sub" id="plcWalletNote"></span>
-      <div class="plc-prices" id="plcPrices"></div>
-    </div>
-  </div>
-
   <!-- ============ SEARCH + QUEUE ============ -->
   <div class="plc-grid">
 
@@ -1986,7 +1999,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
       </div>
     </div>
 
-    <div style="display:flex; flex-direction:column; gap:16px;">
+    <div style="display:flex; flex-direction:column; gap:16px; min-width:0;">
       <div class="plc-card">
         <div class="plc-card-head">
           <h5><i class="fa fa-list-ol"></i> Queue</h5>
@@ -2612,14 +2625,20 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     show($("plcWallet"), true);
     $("plcBal").textContent = Number(w.balance || 0).toLocaleString();
     $("plcCur").textContent = w.currency || "credits";
-    $("plcWalletNote").textContent = isStaff ? "— staff are not charged." : "— some actions cost credits here.";
-    var costs = (eco && eco.costs) || (isStaff ? {} : w.costs) || {};
+    $("plcWalletNote").textContent = isStaff
+      ? "— what these cost members. Staff are not charged."
+      : "— some actions cost credits here.";
+    // The list is shown to everyone: staff need to see what the server is
+    // charging in order to tune it, even though it never comes out of their
+    // own balance.
+    var costs = (eco && eco.costs) || w.costs || {};
     $("plcPrices").innerHTML = Object.keys(costs).map(function (k) {
       return '<span class="plc-price">' + esc(k.replace(/_/g, " ")) + " <b>" + esc(costs[k]) + "</b></span>";
     }).join("");
-    // Price tags on the buttons that actually charge.
+    // The per-button tags are the other way round: a price on a button you are
+    // about to press means "this will cost you", so staff do not get those.
     ROOT.querySelectorAll("[data-cost]").forEach(function (tag) {
-      var price = costs[tag.dataset.cost];
+      var price = isStaff ? 0 : costs[tag.dataset.cost];
       tag.hidden = !price;
       if (price) tag.textContent = price;
     });
@@ -2879,10 +2898,15 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
       if (text.length > 3000) continue;
       // All four have to be present: the three counters plus one of the
       // banner's own tabs. That combination is the banner and nothing else.
-      if (!/\bMembers\b/.test(text)) continue;
-      if (!/\bChannels\b/.test(text)) continue;
-      if (!/\bRoles\b/.test(text)) continue;
-      if (!/\b(Overview|Bot Settings|Modules)\b/.test(text)) continue;
+      //
+      // Plain substrings, deliberately. The counters are separate elements,
+      // so textContent runs them together as "187Members" - and \bMembers\b
+      // does not match that, because "7" and "M" are both word characters.
+      // That is what made the first version of this quietly never fire.
+      if (text.indexOf("Members") < 0) continue;
+      if (text.indexOf("Channels") < 0) continue;
+      if (text.indexOf("Roles") < 0) continue;
+      if (!/Overview|Bot Settings|Modules/.test(text)) continue;
       // Keep narrowing: the smallest element that still holds all of it is
       // the banner, not the column it happens to sit in.
       if (!best || best.contains(el)) best = el;

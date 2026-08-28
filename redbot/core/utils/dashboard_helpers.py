@@ -647,12 +647,36 @@ NOTIFICATIONS = r"""
     return /(^|\s)(alert|toast|notification|flash)([\s-]|$)/i.test(name);
   }
 
+  // An adopted alert usually arrives with a dismiss control of its own, which
+  // would sit next to the one mount() adds and read as two close buttons.
+  // Class names for it vary by framework, so this goes on what the control
+  // *is* rather than what it is called.
+  function dropExistingDismiss(el) {
+    var nodes = el.querySelectorAll("button, a, span, i");
+    Array.prototype.forEach.call(nodes, function (node) {
+      var cls = typeof node.className === "string" ? node.className : "";
+      var label = (node.getAttribute("aria-label") || "") + " " + (node.getAttribute("title") || "");
+      var text = (node.textContent || "").trim();
+      if (
+        /(^|[\s-])(close|dismiss)([\s-]|$)/i.test(cls) ||
+        /close|dismiss/i.test(label) ||
+        node.hasAttribute("data-dismiss") ||
+        node.hasAttribute("data-bs-dismiss") ||
+        // A lone multiplication sign or x, and nothing else in it.
+        (!node.children.length && /^[×✕✖╳xX]$/.test(text))
+      ) {
+        node.remove();
+      }
+    });
+  }
+
   function adopt(el) {
     if (!looksLikeAlert(el)) return;
     // A container of alerts is not itself an alert; take its children instead.
     if (el.querySelector(".alert, .toast, .notification")) return;
     if (!(el.textContent || "").trim()) return;
     el.dataset.dzAdopted = "1";
+    dropExistingDismiss(el);
     var category = categoryOf(el);
     if (!el.querySelector(".fa")) {
       var icon = document.createElement("i");
