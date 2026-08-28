@@ -605,7 +605,7 @@ class DashboardIntegration:
             return "credits"
 
     def _dash_button_rows(self, settings: dict) -> list[dict]:
-        from .view import BUTTONS, parse_emoji
+        from .view import BUTTONS, DEFAULT_STYLES, parse_emoji
 
         overrides = settings.get("button_emojis") or {}
         labels = settings.get("button_labels") or {}
@@ -628,7 +628,10 @@ class DashboardIntegration:
                     # A stored value that no longer parses means the emoji was
                     # deleted or mistyped; the button silently drops it.
                     "broken": bool(current) and parse_emoji(current) is None,
-                    "style": styles.get(key) or "secondary",
+                    # The page must show the colour the button actually has,
+                    # which is the guild's override or the button's own
+                    # default - not a blanket "secondary".
+                    "style": styles.get(key) or DEFAULT_STYLES.get(key, "secondary"),
                     "image": self._dash_emoji_image(owned.get(key), current),
                     "rejected": rejected.get(key, ""),
                 }
@@ -974,7 +977,7 @@ class DashboardIntegration:
             return f" The controller could not be redrawn: {exc}"
 
     async def _dash_save_buttons(self, guild, conf, field) -> list[dict]:
-        from .view import BUTTONS, BUTTON_STYLES, parse_emoji
+        from .view import BUTTONS, BUTTON_STYLES, DEFAULT_STYLES, parse_emoji
 
         problems = await self._dash_save_images(guild, conf, field)
         uploaded = set(await conf.owned_emojis())
@@ -1000,8 +1003,12 @@ class DashboardIntegration:
                     else:
                         labels.pop(key, None)
 
+                    # Only a colour that differs from the button's default is
+                    # worth storing. Comparing against the default rather than
+                    # against "secondary" is what lets somebody turn Stop back
+                    # to transparent and have it stick.
                     style = (field(f"s_{key}") or "").strip()
-                    if style in BUTTON_STYLES and style != "secondary":
+                    if style in BUTTON_STYLES and style != DEFAULT_STYLES.get(key, "secondary"):
                         styles[key] = style
                     else:
                         styles.pop(key, None)

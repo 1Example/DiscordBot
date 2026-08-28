@@ -23,9 +23,11 @@ BUTTON_STYLES = {
     "danger": discord.ButtonStyle.danger,
 }
 
-# All transparent by default: "secondary" is the only Discord style that takes
-# no colour of its own, so the icon does the talking rather than the fill. Any
-# button can still be given a colour from the dashboard.
+# Mostly transparent: "secondary" is the only Discord style that takes no
+# colour of its own, so the icon does the talking rather than the fill. Two
+# exceptions - Kick throws somebody out and Claim hands over ownership, so
+# neither should look like the toggle sitting next to it. Every one of these
+# is still overridable from the dashboard.
 DEFAULT_STYLES = {
     "lock": "secondary",
     "unlock": "secondary",
@@ -33,8 +35,8 @@ DEFAULT_STYLES = {
     "unhide": "secondary",
     "rename": "secondary",
     "limit": "secondary",
-    "kick": "secondary",
-    "claim": "secondary",
+    "kick": "danger",
+    "claim": "success",
 }
 
 ACTIONS = (
@@ -47,6 +49,28 @@ ACTIONS = (
     ("kick", "\N{WOMANS BOOTS}", "Kick", "remove someone from your room"),
     ("claim", "\N{CROWN}", "Claim", "take ownership of an empty-of-owner room"),
 )
+
+# The panel's two button rows, and the two columns of the legend above them.
+# Reading down a column tells you what the row of buttons under it does.
+ACTION_GROUPS = (
+    ("Access", ("lock", "unlock", "hide", "unhide")),
+    ("Manage", ("rename", "limit", "kick", "claim")),
+)
+
+# An inline embed field is only about half the card wide, so the sentences in
+# ACTIONS - written for the dashboard, where there is room for them - wrap onto
+# three lines each and turn the legend into a wall of text. These are the same
+# meanings, cut to something that fits one line in a column.
+PANEL_BLURBS = {
+    "lock": "no new joins",
+    "unlock": "anyone can join",
+    "hide": "hide from the list",
+    "unhide": "show it again",
+    "rename": "change the name",
+    "limit": "cap the headcount",
+    "kick": "remove someone",
+    "claim": "take an ownerless room",
+}
 
 DEFAULT_EMOJIS = {key: default for key, default, _label, _blurb in ACTIONS}
 DEFAULT_EMOJIS["hub"] = "\N{SPEAKER WITH THREE SOUND WAVES}"
@@ -100,10 +124,12 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
     # Mention the real channel where we can - a clickable hub beats a name the
     # member then has to go hunting for in the sidebar.
     def hub_label(config_key: str) -> str:
-        # The field name already carries the hub's name, so repeating it when
-        # the channel is missing just reads as a stutter.
+        # The field name already carries the hub's name, so an unset hub says
+        # so quietly rather than repeating the name back at you.
         channel = guild.get_channel(settings.get(config_key) or 0)
-        return channel.mention if channel is not None else "*not set up yet*"
+        if channel is None:
+            return "-# *not set up yet*"
+        return f"\N{DOWNWARDS ARROW WITH TIP RIGHTWARDS} {channel.mention}"
 
     colour_value = settings.get("panel_colour")
     try:
@@ -119,6 +145,10 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
         ),
         colour=colour,
     )
+    # The guild icon fills the empty right-hand side of the header, which is
+    # otherwise dead space above the two hub columns.
+    if guild.icon is not None:
+        embed.set_thumbnail(url=guild.icon.url)
 
     # Pricing is only mentioned when there is something to pay, so a free
     # server's panel stays uncluttered.
@@ -129,39 +159,54 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
     currency = settings.get("currency_name") or "credits"
 
     def price_suffix(amount: int) -> str:
-        return f"\n\N{RIGHTWARDS ARROW WITH TIP DOWNWARDS} **{amount}** {currency}" if amount else ""
+        return f"\n\N{MONEY BAG} **{amount}** {currency}" if amount else ""
+
+    # What the hub *does* comes first and the channel to join second. The
+    # sentence is the same shape on every server, so the two columns stay
+    # aligned even when one hub is set up and the other is not.
+    def hub_value(config_key: str, blurb: str, amount: int) -> str:
+        return f"{blurb}\n{hub_label(config_key)}{price_suffix(amount)}"
 
     embed.add_field(
         name=f"{emojis['public']} {public_name}",
-        value=(
-            f"{hub_label('hub_public')}\nAnyone can join."
-            f"{price_suffix(cost_public)}"
-        ),
+        value=hub_value("hub_public", "Anyone can join.", cost_public),
         inline=True,
     )
     embed.add_field(
         name=f"{emojis['private']} {private_name}",
-        value=(
-            f"{hub_label('hub_private')}\nLocked until you invite people."
-            f"{price_suffix(cost_private)}"
-        ),
+        value=hub_value("hub_private", "Locked until you invite people.", cost_private),
         inline=True,
     )
 
-    # Two balanced columns instead of one long list. The buttons now carry their
-    # own labels, so this only has to say what each one does.
-    entries = [
-        f"{emojis[key]} **{labels.get(key) or label}** \N{EM DASH} {blurb}"
-        for key, _default, label, blurb in ACTIONS
-    ]
-    half = (len(entries) + 1) // 2
-    embed.add_field(name="\N{ZERO WIDTH SPACE}", value="\N{ZERO WIDTH SPACE}", inline=False)
-    embed.add_field(name="Your room", value="\n".join(entries[:half]), inline=True)
-    embed.add_field(name="\N{ZERO WIDTH SPACE}", value="\n".join(entries[half:]), inline=True)
+    # A full-width field forces a line break, so the legend below starts on a
+    # row of its own instead of being packed in beside the hubs.
+    embed.add_field(
+        name="\N{DOWNWARDS BLACK ARROW} Your room",
+        value=(
+            "Own a room and the buttons below manage it. **Claim** is the only "
+            "one that works on a room you do not own yet."
+        ),
+        inline=False,
+    )
+
+    # One column per row of buttons, in button order, so the legend reads as a
+    # key to the two rows sitting directly underneath it.
+    blurbs = {key: blurb for key, _default, _label, blurb in ACTIONS}
+    fallback_labels = {key: label for key, _default, label, _blurb in ACTIONS}
+    for heading, keys in ACTION_GROUPS:
+        embed.add_field(
+            name=heading,
+            value="\n".join(
+                f"{emojis[key]} **{labels.get(key) or fallback_labels[key]}**"
+                f" \N{EN DASH} {PANEL_BLURBS.get(key) or blurbs[key]}"
+                for key in keys
+            ),
+            inline=True,
+        )
 
     footer = settings.get("panel_footer") or (
-        "Rooms run at your server's maximum voice quality. "
-        "You must own a room to manage it \N{EM DASH} Claim is the exception."
+        f"Rooms run at this server's maximum voice quality "
+        f"\N{EM DASH} {guild.bitrate_limit // 1000} kbps."
     )
     embed.set_footer(text=footer)
     return embed
@@ -713,12 +758,37 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
         category = guild.get_channel(settings["category"]) if settings["category"] else None
         panel_channel = guild.get_channel(settings["panel_channel"]) if settings["panel_channel"] else None
 
-        embed = discord.Embed(title="Rooms — Settings", colour=discord.Colour.blurple())
-        embed.add_field(name="CREATE PUBLIC hub", value=hub_public.mention if hub_public else "Not set", inline=False)
-        embed.add_field(name="CREATE PRIVATE hub", value=hub_private.mention if hub_private else "Not set", inline=False)
-        embed.add_field(name="Category", value=category.name if category else "Same as hub", inline=False)
-        embed.add_field(name="Control panel channel", value=panel_channel.mention if panel_channel else "Not set", inline=False)
-        embed.add_field(name="Default user limit", value=str(settings["default_limit"]) or "Unlimited", inline=False)
-        embed.add_field(name="Voice quality", value=f"Always max — {guild.bitrate_limit // 1000} kbps on this server", inline=False)
-        embed.add_field(name="Active rooms", value=str(len(settings["rooms"])), inline=False)
+        def shown(channel, fallback: str) -> str:
+            return channel.mention if channel is not None else f"*{fallback}*"
+
+        limit = int(settings["default_limit"] or 0)
+        embed = discord.Embed(
+            title="\N{GEAR}\N{VARIATION SELECTOR-16} Rooms \N{EM DASH} settings",
+            colour=discord.Colour.blurple(),
+        )
+        # Seven stacked full-width fields made this a page of scrolling. The
+        # channels belong together and the three numbers fit on one row, so
+        # the whole thing now reads at a glance.
+        embed.add_field(
+            name="Channels",
+            value=(
+                f"**Public hub** {shown(hub_public, 'not set')}\n"
+                f"**Private hub** {shown(hub_private, 'not set')}\n"
+                f"**Control panel** {shown(panel_channel, 'not set')}\n"
+                f"**Category** {category.name if category else '*same as the hub*'}"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="Default limit",
+            value="Unlimited" if limit == 0 else f"{limit} people",
+            inline=True,
+        )
+        embed.add_field(
+            name="Voice quality",
+            value=f"{guild.bitrate_limit // 1000} kbps",
+            inline=True,
+        )
+        embed.add_field(name="Active rooms", value=str(len(settings["rooms"])), inline=True)
+        embed.set_footer(text="Rooms always run at this server's maximum bitrate.")
         await ctx.send(embed=embed)

@@ -124,6 +124,17 @@ BUTTON_STYLES = {
     "danger": discord.ButtonStyle.danger,
 }
 
+# Transparent unless the button deserves to stand out. Play is the one
+# affirmative action on the panel, and the bottom row ends the session one way
+# or another - colouring those three is what stops Stop being pressed when
+# Skip was meant. Every one of these is overridable from the dashboard.
+DEFAULT_STYLES = {
+    "resume_button": "success",
+    "stop_button": "danger",
+    "clear_queue_button": "danger",
+    "disconnect_button": "danger",
+}
+
 CUSTOM_EMOJI_RE = re.compile(r"^<(a?):([A-Za-z0-9_]{2,32}):(\d{15,25})>$")
 
 
@@ -712,7 +723,7 @@ class PersistentControllerView(discord.ui.View):
         self.__prepare_lock = asyncio.Lock()
         self.__show_help = False
 
-        # Row 0 - playback controls
+        # Row 0 - transport: everything that changes what is playing right now.
         self.previous_track_button = PreviousTrackButton(
             style=TRANSPARENT,
             row=0,
@@ -741,6 +752,8 @@ class PersistentControllerView(discord.ui.View):
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:skip_button:10",
         )
+        # Shuffle and repeat both decide what plays next, so they sit with the
+        # transport rather than being split across two rows.
         self.shuffle_button = ShuffleButton(
             style=TRANSPARENT,
             row=0,
@@ -748,15 +761,29 @@ class PersistentControllerView(discord.ui.View):
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:shuffle_button:11",
         )
-        self.stop_button = StopTrackButton(
+        self.repeat_queue_button_on = ToggleRepeatQueueButton(
             style=TRANSPARENT,
             row=0,
-            label=_("Stop"),
+            label=_("Repeat queue"),
             cog=cog,
-            custom_id="pylav__pylavcontroller_persistent_view:stop_button:12",
+            custom_id="pylav__pylavcontroller_persistent_view:repeat_queue_button_on:1",
+        )
+        self.repeat_button_on = ToggleRepeatButton(
+            style=TRANSPARENT,
+            row=0,
+            label=_("Repeat track"),
+            cog=cog,
+            custom_id="pylav__pylavcontroller_persistent_view:repeat_button_on:2",
+        )
+        self.repeat_button_off = ToggleRepeatButton(
+            style=TRANSPARENT,
+            row=0,
+            label=_("Repeat"),
+            cog=cog,
+            custom_id="pylav__pylavcontroller_persistent_view:repeat_button_off:3",
         )
 
-        # Row 1 - volume, repeat and queue
+        # Row 1 - volume and the read-only views. Nothing here is destructive.
         self.decrease_volume_button = DecreaseVolumeButton(
             style=TRANSPARENT,
             row=1,
@@ -770,27 +797,6 @@ class PersistentControllerView(discord.ui.View):
             label=_("Vol +"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:increase_volume_button:6",
-        )
-        self.repeat_queue_button_on = ToggleRepeatQueueButton(
-            style=TRANSPARENT,
-            row=1,
-            label=_("Repeat queue"),
-            cog=cog,
-            custom_id="pylav__pylavcontroller_persistent_view:repeat_queue_button_on:1",
-        )
-        self.repeat_button_on = ToggleRepeatButton(
-            style=TRANSPARENT,
-            row=1,
-            label=_("Repeat track"),
-            cog=cog,
-            custom_id="pylav__pylavcontroller_persistent_view:repeat_button_on:2",
-        )
-        self.repeat_button_off = ToggleRepeatButton(
-            style=TRANSPARENT,
-            row=1,
-            label=_("Repeat"),
-            cog=cog,
-            custom_id="pylav__pylavcontroller_persistent_view:repeat_button_off:3",
         )
         self.queue_button = QueueButton(
             style=TRANSPARENT,
@@ -806,8 +812,22 @@ class PersistentControllerView(discord.ui.View):
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:show_history_button:4",
         )
+        self.refresh_button = RefreshButton(
+            style=TRANSPARENT,
+            row=1,
+            label=_("Refresh"),
+            cog=cog,
+            custom_id="pylav__pylavcontroller_persistent_view:refresh_button:13",
+        )
 
-        # Row 2 - utility
+        # Row 2 - the three ways to end the session, kept well away from Skip.
+        self.stop_button = StopTrackButton(
+            style=TRANSPARENT,
+            row=2,
+            label=_("Stop"),
+            cog=cog,
+            custom_id="pylav__pylavcontroller_persistent_view:stop_button:12",
+        )
         self.clear_queue_button = ControllerClearQueueButton(
             style=TRANSPARENT,
             row=2,
@@ -821,13 +841,6 @@ class PersistentControllerView(discord.ui.View):
             label=_("Disconnect"),
             cog=cog,
             custom_id="pylav__pylavcontroller_persistent_view:disconnect_button:16",
-        )
-        self.refresh_button = RefreshButton(
-            style=TRANSPARENT,
-            row=2,
-            label=_("Refresh"),
-            cog=cog,
-            custom_id="pylav__pylavcontroller_persistent_view:refresh_button:13",
         )
 
     def set_message(self, message: discord.Message):
@@ -945,7 +958,8 @@ class PersistentControllerView(discord.ui.View):
                 applied += 1
             label = (labels.get(attribute) or "").strip()
             button.label = (label or default_label)[:80]
-            button.style = BUTTON_STYLES.get(styles.get(attribute) or "", TRANSPARENT)
+            wanted = styles.get(attribute) or DEFAULT_STYLES.get(attribute, "secondary")
+            button.style = BUTTON_STYLES.get(wanted, TRANSPARENT)
         # Says plainly whether the config reached the buttons, so "it did not
         # change" can be answered from the log instead of guessed at. The panel
         # redraws on every player event, so this only speaks up when the answer
@@ -979,7 +993,7 @@ class PersistentControllerView(discord.ui.View):
             self.shuffle_button.disabled = False
             self.stop_button.disabled = False
 
-            # Row 0 - playback controls
+            # Row 0 - transport
             self.add_item(self.previous_track_button)
             if player is not None and player.paused or player is None:
                 self.add_item(self.resume_button)
@@ -987,22 +1001,22 @@ class PersistentControllerView(discord.ui.View):
                 self.add_item(self.paused_button)
             self.add_item(self.skip_button)
             self.add_item(self.shuffle_button)
-            self.add_item(self.stop_button)
-
-            # Row 1 - volume, repeat and queue
-            self.add_item(self.decrease_volume_button)
-            self.add_item(self.increase_volume_button)
             if (player is not None) and (repeat_current := await player.config.fetch_repeat_current()):
                 self.add_item(self.repeat_button_on)
             elif (player is not None) and (not repeat_current) and (await player.config.fetch_repeat_queue()):
                 self.add_item(self.repeat_queue_button_on)
             else:
                 self.add_item(self.repeat_button_off)
+
+            # Row 1 - volume and the read-only views
+            self.add_item(self.decrease_volume_button)
+            self.add_item(self.increase_volume_button)
             self.add_item(self.queue_button)
             self.add_item(self.show_history_button)
-
-            # Row 2 - utility (queue-view controls merged into the main view)
             self.add_item(self.refresh_button)
+
+            # Row 2 - ending the session
+            self.add_item(self.stop_button)
             self.add_item(self.clear_queue_button)
             self.add_item(self.disconnect_button)
 
@@ -1097,24 +1111,53 @@ class PersistentControllerView(discord.ui.View):
             else:
                 footer_text = None
 
-            return {
-                "embed": await self.cog.pylav.construct_embed(
-                    description=_("I am not currently playing anything on this server."),
-                    messageable=self.channel,
-                    footer=footer_text,
+            embed = await self.cog.pylav.construct_embed(
+                description=_(
+                    "Nothing is playing right now.\n"
+                    "Send a song name or a link in this channel and I will queue it up."
+                ),
+                messageable=self.channel,
+                footer=footer_text,
+            )
+            # An idle card with no author line and no artwork collapses to two
+            # lines of grey, which reads as broken rather than as "ready". The
+            # header keeps the panel recognisable between tracks.
+            with contextlib.suppress(Exception):
+                embed.set_author(
+                    name=_("{guild} \N{EM DASH} music").format(guild=self.guild.name),
+                    icon_url=self.guild.icon.url if self.guild.icon else None,
                 )
-            }
+            if not self.__show_help:
+                with contextlib.suppress(Exception):
+                    embed.add_field(
+                        name=_("Search a specific service"),
+                        value=_(
+                            "Prefix your search with {prefixes_variable_do_not_translate}."
+                        ).format(
+                            prefixes_variable_do_not_translate=(
+                                "`spsearch:` `dzsearch:` `amsearch:` `ytmsearch:` `scsearch:`"
+                            )
+                        ),
+                        inline=False,
+                    )
+            return {"embed": embed}
         return {"embed": await self._build_now_playing_embed(player)}
 
     @staticmethod
-    def _progress_bar(position: float, duration: float, length: int = 18) -> str:
+    def _progress_bar(position: float, duration: float, length: int = 20) -> str:
+        """A filled/unfilled bar with the playhead sitting on the boundary.
+
+        Two different weights for the played and unplayed halves is what makes
+        progress readable at a glance; a single-weight line with a knob on it
+        reads as decoration until you stop and look at it.
+        """
         if not duration or duration <= 0:
-            return "\u25b6\ufe0f  " + ("\u2501" * length) + "  \U0001f507 LIVE"
+            return "\N{BLACK CIRCLE FOR RECORD}\N{VARIATION SELECTOR-16} " + ("━" * length)
         ratio = max(0.0, min(1.0, position / duration))
         # Clamp so the knob always fits inside the bar; otherwise a track at
         # exactly 100% renders one character wider than every other frame.
         filled = min(int(ratio * length), length - 1)
-        return "\u2501" * filled + "\U0001f518" + "\u2501" * (length - filled - 1)
+        return "━" * filled + "\N{RADIO BUTTON}" + "─" * (length - filled - 1)
 
     @staticmethod
     def _fmt(milliseconds: float | int | None) -> str:
@@ -1125,11 +1168,27 @@ class PersistentControllerView(discord.ui.View):
         minutes, seconds = divmod(rem, 60)
         return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
 
+    @staticmethod
+    def _volume_icon(volume: int) -> str:
+        """One glyph that says roughly how loud it is without reading the number."""
+        if volume <= 0:
+            return "\N{SPEAKER WITH CANCELLATION STROKE}"
+        if volume < 34:
+            return "\N{SPEAKER WITH ONE SOUND WAVE}"
+        if volume < 67:
+            return "\N{SPEAKER WITH THREE SOUND WAVES}"
+        return "\N{PUBLIC ADDRESS LOUDSPEAKER}"
+
     async def _build_now_playing_embed(self, player) -> discord.Embed:
         """Custom Now Playing card.
 
         Replaces PyLav's get_currently_playing_message(), which rendered a long
         block of search-prefix help and stacked every field vertically.
+
+        Three tiers, in reading order: the track and its progress in the
+        description, the player's state in two even rows of three fields, and
+        the queue underneath. Nothing is padded with a blank field to make a
+        row come out even.
         """
         track = player.current
 
@@ -1151,19 +1210,12 @@ class PersistentControllerView(discord.ui.View):
         except Exception:  # noqa: BLE001
             position = 0
 
-        heading = f"[{title}]({uri})" if uri else f"**{title}**"
-        description = [heading]
-        if author:
-            description.append(f"-# {author}")
-
-        bar = self._progress_bar(position, 0 if is_stream else duration)
-        if is_stream:
-            description.append(f"\n{bar}")
-        else:
-            description.append(f"\n`{self._fmt(position)}` {bar} `{self._fmt(duration)}`")
-
+        # The title carries the link, which gives it Discord's own heading
+        # weight and colour. A markdown link in the description renders at body
+        # size and gets lost against the artist line underneath it.
         embed = discord.Embed(
-            description="\n".join(description),
+            title=(title or _("Unknown title"))[:250],
+            url=uri or None,
             colour=await self.cog.bot.get_embed_colour(self.channel),
         )
         embed.set_author(
@@ -1173,13 +1225,15 @@ class PersistentControllerView(discord.ui.View):
         if artwork:
             embed.set_thumbnail(url=artwork)
 
-        requester = self.cog.bot.get_user(getattr(track, "requester_id", 0))
-        embed.add_field(
-            name=_("Requested by"),
-            value=requester.mention if requester else _("Unknown"),
-            inline=True,
-        )
-        embed.add_field(name=_("Volume"), value=f"{player.volume}%", inline=True)
+        lines = []
+        if author:
+            lines.append(f"-# \N{MICROPHONE} {author}")
+        bar = self._progress_bar(position, 0 if is_stream else duration)
+        if is_stream:
+            lines.append(f"{bar} `{_('LIVE')}`")
+        else:
+            lines.append(f"`{self._fmt(position)}` {bar} `{self._fmt(duration)}`")
+        embed.description = "\n".join(lines)
 
         try:
             repeat_current = await player.config.fetch_repeat_current()
@@ -1187,16 +1241,10 @@ class PersistentControllerView(discord.ui.View):
         except Exception:  # noqa: BLE001
             repeat_current = repeat_queue = False
         repeat = _("Track") if repeat_current else (_("Queue") if repeat_queue else _("Off"))
-        embed.add_field(name=_("Repeat"), value=repeat, inline=True)
-
-        # Autoplay / effects / total queue time round out the summary.
         try:
             autoplay = await player.autoplay_enabled()
         except Exception:  # noqa: BLE001
             autoplay = False
-        embed.add_field(
-            name=_("Autoplay"), value=_("On") if autoplay else _("Off"), inline=True
-        )
 
         raw = list(player.queue.raw_queue)
         remaining = 0
@@ -1205,27 +1253,63 @@ class PersistentControllerView(discord.ui.View):
                 remaining += await entry.duration() or 0
             except Exception:  # noqa: BLE001
                 continue
+
+        voice_channel = getattr(player, "channel", None)
+        listeners = sum(1 for member in getattr(voice_channel, "members", ()) if not member.bot)
+        requester = self.cog.bot.get_user(getattr(track, "requester_id", 0))
+
+        # Exactly three per row, twice over. Listeners takes the slot that used
+        # to hold a blank spacer field purely to pad the second row out.
         embed.add_field(
-            name=_("Queue length"),
-            value=_("{count} track(s) · {time}").format(count=len(raw), time=self._fmt(remaining)),
+            name=_("Requested by"),
+            value=requester.mention if requester else _("Unknown"),
             inline=True,
         )
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(
+            name=_("Volume"),
+            value=f"{self._volume_icon(player.volume)} {player.volume}%",
+            inline=True,
+        )
+        embed.add_field(name=_("Repeat"), value=repeat, inline=True)
+        embed.add_field(name=_("Autoplay"), value=_("On") if autoplay else _("Off"), inline=True)
+        embed.add_field(
+            name=_("Listeners"),
+            value=str(listeners) if voice_channel is not None else _("Unknown"),
+            inline=True,
+        )
+        embed.add_field(
+            name=_("Queue"),
+            value=(
+                _("Empty")
+                if not raw
+                else _("{count} \N{BULLET} {time}").format(count=len(raw), time=self._fmt(remaining))
+            ),
+            inline=True,
+        )
 
         if raw:
             upcoming = []
-            for nxt in raw[:3]:
+            for index, nxt in enumerate(raw[:3], start=1):
                 try:
-                    upcoming.append(f"- {await nxt.title()}")
+                    nxt_title = await nxt.title()
                 except Exception:  # noqa: BLE001
                     continue
+                try:
+                    length = self._fmt(await nxt.duration())
+                except Exception:  # noqa: BLE001
+                    length = ""
+                # Numbering makes "skip twice to reach it" readable, and the
+                # running time answers what a bare count cannot.
+                suffix = f" `{length}`" if length else ""
+                clipped = nxt_title if len(nxt_title) <= 70 else nxt_title[:69] + "\N{HORIZONTAL ELLIPSIS}"
+                upcoming.append(f"`{index}.` {clipped}{suffix}")
+            if len(raw) > 3:
+                upcoming.append(_("-# and {count} more").format(count=len(raw) - 3))
             embed.add_field(
-                name=_("Up next ({count} queued)").format(count=len(raw)),
+                name=_("Up next"),
                 value="\n".join(upcoming) or _("Nothing"),
                 inline=False,
             )
-        else:
-            embed.add_field(name=_("Up next"), value=_("Queue is empty"), inline=False)
 
         try:
             base_url = await self.cog._config.dashboard_url()
@@ -1239,9 +1323,11 @@ class PersistentControllerView(discord.ui.View):
                 inline=False,
             )
 
-        channel = getattr(player, "channel", None)
-        if channel is not None:
-            embed.set_footer(text=_("Connected to {channel}").format(channel=channel.name))
+        # A channel with no resolvable name used to render as "Connected to .",
+        # so the footer is only set once there is something to name.
+        name = getattr(voice_channel, "name", "") or ""
+        if name:
+            embed.set_footer(text=_("Connected to {channel}").format(channel=name))
         return embed
 
     async def update_view(self, forced: bool = False):
