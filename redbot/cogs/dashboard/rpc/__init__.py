@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import logging
 import pathlib
 import random
 import re
@@ -20,6 +21,8 @@ from .pagination import Pagination
 from .third_parties import DashboardRPC_ThirdParties
 from .utils import rpc_check
 from .webhooks import DashboardRPC_Webhooks
+
+log = logging.getLogger("red.dashboard.rpc")
 
 # Credits:
 # Thank you to NeuroAssassin for the original code.
@@ -266,15 +269,27 @@ class DashboardRPC:
                 "rank": rank,
                 "members": guild.member_count or len(guild.members),
                 "can_manage": bool(rank or is_owner),
-                "joined_at": member.joined_at.timestamp() if member.joined_at else None,
-                "top_role": member.top_role.name if member.top_role else "",
-                "top_role_colour": (
-                    str(member.top_role.colour) if member.top_role and member.top_role.value else ""
-                ),
+                "joined_at": None,
+                "top_role": "",
+                "top_role_colour": "",
                 "balance": None,
                 "currency": currency,
                 "level": self._levelup_profile(guild.id, user_id),
             }
+            # Cosmetic extras, each optional. One server with an odd shape must
+            # not take the whole profile down with it - which is exactly what
+            # happened when this read `top_role.value` (the int lives on the
+            # Colour, not on the Role) and every profile 404'd.
+            try:
+                if member.joined_at is not None:
+                    entry["joined_at"] = member.joined_at.timestamp()
+                top_role = member.top_role
+                if top_role is not None:
+                    entry["top_role"] = top_role.name
+                    if top_role.colour.value:
+                        entry["top_role_colour"] = str(top_role.colour)
+            except Exception:  # noqa: BLE001
+                log.debug("Could not read role details in %s", guild.id, exc_info=True)
             try:
                 if not bank_is_global:
                     entry["balance"] = await bank.get_balance(member)
