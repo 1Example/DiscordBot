@@ -14,6 +14,7 @@ from redbot.core.errors import BalanceTooHigh  # noqa: F401
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
+    NOTIFICATIONS,
     emoji_options,
     emoji_rejection,
     form_reader,
@@ -73,7 +74,9 @@ class DashboardIntegration:
     # rebuild, never correctness.
     _dash_fav_cache: dict[int, tuple] = {}
     _dash_staff_cache: dict[tuple[int, int], tuple[float, bool]] = {}
+    _dash_online_cache: dict[int, tuple[float, int | None]] = {}
     _DASH_STAFF_TTL = 20.0
+    _DASH_ONLINE_TTL = 15.0
 
     @commands.Cog.listener()
     async def on_dashboard_cog_add(self, dashboard_cog: commands.Cog) -> None:
@@ -131,6 +134,65 @@ class DashboardIntegration:
     def _dash_player(self, guild: discord.Guild):
         return self.pylav.get_player(guild)
 
+    def _dash_guild_card(self, guild: discord.Guild) -> dict[str, t.Any]:
+        """The handful of server facts the player page's own header shows.
+
+        This exists so the page can stand on its own: the dashboard's guild
+        banner is hidden on this page, and these are the parts of it that were
+        actually worth keeping.
+        """
+        members = getattr(guild, "member_count", None) or len(guild.members)
+
+        # Counting presences means walking the member list, which the page asks
+        # for on every poll. Cheap on a normal server, not on a huge one, so it
+        # is cached briefly and skipped entirely past the point where it would
+        # cost more than it tells anyone.
+        online = None
+        cached = self._dash_online_cache.get(guild.id)
+        now = time.monotonic()
+        if cached is not None and now - cached[0] < self._DASH_ONLINE_TTL:
+            online = cached[1]
+        elif members <= 25000:
+            try:
+                offline = discord.Status.offline
+                online = sum(1 for m in guild.members if not m.bot and m.status is not offline)
+            except Exception:  # noqa: BLE001 - presences may not be available
+                online = None
+            self._dash_online_cache[guild.id] = (now, online)
+
+        return {
+            "id": str(guild.id),
+            "name": guild.name,
+            "icon": guild.icon.url if guild.icon else "",
+            "members": members,
+            "online": online,
+            "channels": len(guild.channels),
+            "roles": len(guild.roles),
+        }
+
+    def _dash_guild_options(self, user: discord.User) -> list[dict[str, str]]:
+        """Every server this person and the bot are both in.
+
+        The switcher is what replaces the dashboard's own guild banner, so it
+        has to be able to reach anywhere that banner could.
+        """
+        out = []
+        for guild in self.bot.guilds:
+            try:
+                if guild.get_member(user.id) is None:
+                    continue
+            except Exception:  # noqa: BLE001
+                continue
+            out.append(
+                {
+                    "id": str(guild.id),
+                    "name": guild.name,
+                    "icon": guild.icon.url if guild.icon else "",
+                }
+            )
+        out.sort(key=lambda row: row["name"].lower())
+        return out[:250]
+
     # ---------- pages ----------
 
     @dashboard_page(
@@ -183,6 +245,7 @@ class DashboardIntegration:
                 # failing every action from then on.
                 "csrf": (kwargs.get("csrf_token") or ("", ""))[1],
                 "state": await self._dash_build_state(self._dash_player(guild)),
+                "guild": self._dash_guild_card(guild),
                 "is_staff": is_staff,
                 "favourites": await self._dash_fav_list(guild),
                 "wallet": await self._dash_wallet(member, guild),
@@ -249,8 +312,12 @@ class DashboardIntegration:
                     search_term=search_term,
                     search_source=source,
                 )
+            # The switcher list only changes when the bot joins or leaves a
+            # server, so it rides along with the first render rather than with
+            # every poll.
             data = await frame(
-                search_results=results, search_term=search_term, search_source=source
+                search_results=results, search_term=search_term, search_source=source,
+                guilds=self._dash_guild_options(user),
             )
             return {
                 "status": 0,
@@ -325,11 +392,21 @@ class DashboardIntegration:
                     # popindex() is PlayerQueue's supported positional removal.
                     player.queue.popindex(int(field("index")))
                 elif action == "move_top":
-                    # Pull it out and push it back at the front, so "play this
-                    # next" needs one click instead of a skip-and-hope.
+                    # "Play this next" in one click instead of skip-and-hope.
+                    #
+                    # PlayerQueue has no insert(): the deque behind it is not
+                    # meant to be written to directly, and doing so skips the
+                    # bookkeeping the player relies on. move_track is PyLav's
+                    # own reorder and is what the audio cog uses. The fallback
+                    # is for builds predating it - add(index=0) is the other
+                    # supported way in.
                     index = int(field("index"))
-                    track = player.queue.popindex(index)
-                    player.queue.insert(0, track)
+                    mover = getattr(player, "move_track", None)
+                    if mover is not None:
+                        await mover(index, member, 0)
+                    else:
+                        track = player.queue.popindex(index)
+                        await player.add(requester=member.id, track=track, index=0)
                 elif action == "repeat_cycle":
                     # One control that walks off -> track -> queue -> off, which
                     # is what the three separate buttons were really doing.
@@ -364,7 +441,10 @@ class DashboardIntegration:
             return await reply("" if api else "Done.", "success")
 
         # --- build the view ---
-        data = await frame(search_results=[], search_term="", search_source="ytsearch")
+        data = await frame(
+            search_results=[], search_term="", search_source="ytsearch",
+            guilds=self._dash_guild_options(user),
+        )
         return {
             "status": 0,
             "web_content": {
@@ -1362,7 +1442,7 @@ class DashboardIntegration:
 API_TEMPLATE = """<script type="application/json" id="plc-api-payload">{{ payload|safe }}</script>"""
 
 
-PLAYER_TEMPLATE = r"""
+PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 <style>
 /* ============================================================
    PyLav web player
@@ -1648,38 +1728,78 @@ PLAYER_TEMPLATE = r"""
   display:grid; place-items:center; font-size:.62rem; font-weight:800; color:var(--plc-dim);
 }
 
-/* ---------- toasts ---------- */
-.plc-toasts{
-  position:fixed; z-index:9999; right:18px; bottom:18px;
-  display:flex; flex-direction:column; gap:8px; max-width:min(360px,calc(100vw - 36px));
-  pointer-events:none;
-}
-.plc-toast{
-  display:flex; align-items:flex-start; gap:10px; padding:11px 14px; border-radius:12px;
-  background:#151a30; border:1px solid var(--plc-line-2); color:var(--plc-txt);
-  font-size:.84rem; box-shadow:0 12px 34px rgba(0,0,0,.55);
-  animation:plcToastIn .22s ease-out; pointer-events:auto;
-}
-.plc-toast.out{ animation:plcToastOut .2s ease-in forwards; }
-.plc-toast i{ margin-top:2px; }
-.plc-toast.success{ border-left:3px solid var(--plc-good); }
-.plc-toast.success i{ color:var(--plc-good); }
-.plc-toast.warning{ border-left:3px solid var(--plc-warn); }
-.plc-toast.warning i{ color:var(--plc-warn); }
-.plc-toast.danger{ border-left:3px solid var(--plc-bad); }
-.plc-toast.danger i{ color:var(--plc-bad); }
-@keyframes plcToastIn{ from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:none; } }
-@keyframes plcToastOut{ to{ opacity:0; transform:translateX(20px); } }
-
-/* ---------- wallet ---------- */
-.plc-wallet{
+/* ---------- server bar ---------- */
+.plc-serverbar{
   display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-  padding:12px 18px; border-radius:var(--plc-r);
-  background:linear-gradient(90deg, rgba(108,140,255,.14), rgba(160,108,255,.05));
-  border:1px solid rgba(108,140,255,.25);
+  padding:10px 14px; border-radius:var(--plc-r);
+  background:var(--plc-bg); border:1px solid var(--plc-line);
 }
-.plc-wallet b{ font-size:1.05rem; }
-.plc-prices{ display:flex; gap:6px; flex-wrap:wrap; margin-left:auto; }
+.plc-switch{ position:relative; flex:0 0 auto; }
+.plc-server{
+  display:flex; align-items:center; gap:10px; cursor:pointer;
+  height:44px; padding:0 13px; border-radius:12px; font:inherit; font-weight:700;
+  color:var(--plc-txt); background:rgba(255,255,255,.05);
+  border:1px solid var(--plc-line); max-width:min(340px, 60vw);
+  transition:background .14s, border-color .14s;
+}
+.plc-server:hover{ background:rgba(255,255,255,.12); border-color:var(--plc-line-2); }
+.plc-server[aria-expanded="true"]{ background:rgba(108,140,255,.18); border-color:rgba(108,140,255,.5); }
+.plc-server-icon, .plc-server-fallback{
+  width:26px; height:26px; border-radius:8px; object-fit:cover; flex:0 0 auto;
+  background:rgba(255,255,255,.09);
+}
+.plc-server-fallback{
+  display:grid; place-items:center; font-size:.8rem; font-weight:800; color:var(--plc-dim);
+}
+.plc-server-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.92rem; }
+.plc-server i{ opacity:.55; flex:0 0 auto; }
+.plc-server-menu{
+  position:absolute; top:calc(100% + 6px); left:0; z-index:60;
+  width:max(280px, 100%); max-width:min(380px, 90vw); padding:9px;
+  border-radius:14px; background:#12162a; border:1px solid var(--plc-line-2);
+  box-shadow:0 18px 44px rgba(0,0,0,.6);
+}
+.plc-server-search{
+  width:100%; height:36px; padding:0 11px; margin-bottom:7px; border-radius:9px;
+  background:rgba(0,0,0,.34); border:1px solid var(--plc-line);
+  color:var(--plc-txt); font:inherit; font-size:.85rem; outline:none;
+}
+.plc-server-search:focus{ border-color:rgba(108,140,255,.55); }
+.plc-server-list{ list-style:none; margin:0; padding:0; max-height:min(46vh,320px); overflow-y:auto; }
+.plc-server-list li{ margin:0; }
+.plc-server-opt{
+  display:flex; align-items:center; gap:9px; width:100%; padding:7px 9px;
+  border:none; border-radius:9px; background:transparent; cursor:pointer;
+  color:var(--plc-txt); font:inherit; font-size:.85rem; text-align:left;
+}
+.plc-server-opt:hover{ background:rgba(255,255,255,.08); }
+.plc-server-opt.here{ background:rgba(108,140,255,.18); font-weight:700; }
+.plc-server-opt img, .plc-server-opt .ph{
+  width:22px; height:22px; border-radius:7px; object-fit:cover; flex:0 0 auto;
+  background:rgba(255,255,255,.09); display:grid; place-items:center;
+  font-size:.66rem; font-weight:800; color:var(--plc-dim);
+}
+.plc-server-opt span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.plc-stats{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.plc-stat{
+  display:inline-flex; align-items:baseline; gap:6px;
+  padding:6px 11px; border-radius:10px;
+  background:rgba(255,255,255,.05); border:1px solid var(--plc-line);
+}
+.plc-stat b{ font-size:.92rem; font-weight:750; }
+.plc-stat span{ font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; color:var(--plc-dimmer); }
+.plc-stat.live b{ color:var(--plc-good); }
+
+.plc-balance{
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-left:auto;
+  padding:6px 13px; border-radius:12px;
+  background:linear-gradient(90deg, rgba(108,140,255,.16), rgba(160,108,255,.06));
+  border:1px solid rgba(108,140,255,.3);
+}
+.plc-balance > i{ color:#8ea6ff; }
+.plc-balance b{ font-size:1rem; }
+.plc-prices{ display:flex; gap:6px; flex-wrap:wrap; }
 .plc-price{
   font-size:.68rem; padding:3px 9px; border-radius:999px; color:var(--plc-dim);
   background:rgba(255,255,255,.05); border:1px solid var(--plc-line);
@@ -1805,11 +1925,32 @@ PLAYER_TEMPLATE = r"""
     </div>
   </div>
 
-  <div class="plc-wallet" id="plcWallet" hidden>
-    <span><i class="fa fa-diamond" style="color:#8ea6ff;"></i>
-      <b id="plcBal">0</b> <span id="plcCur">credits</span></span>
-    <span class="plc-sub" id="plcWalletNote"></span>
-    <div class="plc-prices" id="plcPrices"></div>
+  <!-- Server identity, a few stats, and the balance. This is what replaces
+       the dashboard's own guild banner on this page. -->
+  <div class="plc-serverbar">
+    <div class="plc-switch">
+      <button class="plc-server" id="plcServerBtn" type="button"
+              aria-haspopup="listbox" aria-expanded="false">
+        <img class="plc-server-icon" id="plcServerIcon" alt="" hidden />
+        <span class="plc-server-fallback" id="plcServerFallback">?</span>
+        <span class="plc-server-name" id="plcServerName">&mdash;</span>
+        <i class="fa fa-angle-down"></i>
+      </button>
+      <div class="plc-server-menu" id="plcServerMenu" hidden role="listbox">
+        <input class="plc-server-search" id="plcServerSearch" type="text"
+               autocomplete="off" placeholder="Find a server&hellip;" />
+        <ul class="plc-server-list" id="plcServerList"></ul>
+      </div>
+    </div>
+
+    <div class="plc-stats" id="plcStats"></div>
+
+    <div class="plc-balance" id="plcWallet" hidden>
+      <i class="fa fa-diamond"></i>
+      <span><b id="plcBal">0</b> <span id="plcCur">credits</span></span>
+      <span class="plc-sub" id="plcWalletNote"></span>
+      <div class="plc-prices" id="plcPrices"></div>
+    </div>
   </div>
 
   <!-- ============ SEARCH + QUEUE ============ -->
@@ -1887,7 +2028,6 @@ PLAYER_TEMPLATE = r"""
     <span id="plcRoleNote"></span>
   </p>
 
-  <div class="plc-toasts" id="plcToasts"></div>
 </div>
 
 <noscript>
@@ -1989,18 +2129,13 @@ PLAYER_TEMPLATE = r"""
   function show(el, on) { if (el) el.hidden = !on; }
 
   // ---------------------------------------------------------------- toasts
-  var toastBox = $("plcToasts");
-  var ICON = { success: "fa-check-circle", warning: "fa-exclamation-triangle", danger: "fa-times-circle" };
+  // One stack for the whole dashboard, top-right, defined in the shared
+  // helpers. Falling back to the console rather than defining a second
+  // implementation keeps every page's notifications looking the same.
   function toast(message, category) {
-    if (!message || !toastBox) return;
-    var el = document.createElement("div");
-    el.className = "plc-toast " + (category || "success");
-    el.innerHTML = '<i class="fa ' + (ICON[category] || ICON.success) + '"></i><span>' + esc(message) + "</span>";
-    toastBox.appendChild(el);
-    setTimeout(function () {
-      el.classList.add("out");
-      setTimeout(function () { el.remove(); }, 220);
-    }, category === "danger" ? 6500 : 3800);
+    if (!message) return;
+    if (window.dzToast) window.dzToast(message, category || "success");
+    else console.log("[" + (category || "info") + "] " + message);
   }
 
   // ---------------------------------------------------------------- transport
@@ -2088,6 +2223,8 @@ PLAYER_TEMPLATE = r"""
     if (S.state && data.state.stamp && S.state.stamp && data.state.stamp < S.state.stamp) return;
     S.state = data.state;
     if (data.is_staff !== undefined) isStaff = !!data.is_staff;
+    if (data.guild !== undefined) S.guild = data.guild;
+    if (data.guilds !== undefined) S.guilds = data.guilds;
     if (data.favourites !== undefined) S.favourites = data.favourites;
     if (data.wallet !== undefined) S.wallet = data.wallet;
     if (data.economy !== undefined) S.economy = data.economy;
@@ -2255,6 +2392,7 @@ PLAYER_TEMPLATE = r"""
       ? ""
       : ' &nbsp;&middot;&nbsp; <i class="fa fa-info-circle"></i> Stopping and disconnecting are moderator-only.';
 
+    renderServer();
     renderQueue();
     renderFavs();
     renderWallet();
@@ -2372,6 +2510,100 @@ PLAYER_TEMPLATE = r"""
         "</span></li>";
     }).join("");
   }
+
+  // ---- server bar --------------------------------------------------------
+  function renderServer() {
+    var g = S.guild || {};
+    $("plcServerName").textContent = g.name || "This server";
+    var icon = $("plcServerIcon"), fallback = $("plcServerFallback");
+    if (g.icon) {
+      if (icon.getAttribute("src") !== g.icon) icon.setAttribute("src", g.icon);
+      icon.hidden = false; fallback.hidden = true;
+    } else {
+      icon.hidden = true; fallback.hidden = false;
+      fallback.textContent = (g.name || "?").slice(0, 1).toUpperCase();
+    }
+
+    var st = S.state || {};
+    var stats = [];
+    var num = function (v) { return Number(v || 0).toLocaleString(); };
+    if (g.online != null) stats.push(['<span class="plc-stat live"><b>' + num(g.online) + "</b>", "online"]);
+    if (g.members != null) stats.push(['<span class="plc-stat"><b>' + num(g.members) + "</b>", "members"]);
+    if (g.channels != null) stats.push(['<span class="plc-stat"><b>' + num(g.channels) + "</b>", "channels"]);
+    if (g.roles != null) stats.push(['<span class="plc-stat"><b>' + num(g.roles) + "</b>", "roles"]);
+    // What the page is actually about goes last, where the eye lands.
+    if (st.connected) {
+      stats.push(['<span class="plc-stat"><b>' + (st.listeners || []).length + "</b>", "listening"]);
+    }
+    $("plcStats").innerHTML = stats.map(function (row) {
+      return row[0] + "<span>" + row[1] + "</span></span>";
+    }).join("");
+  }
+
+  // The switcher is what replaces the dashboard's guild banner, so it has to
+  // reach every server this account can open - hence the filter box.
+  var menuEl = $("plcServerMenu"), menuBtn = $("plcServerBtn"), menuSearch = $("plcServerSearch");
+
+  function renderServerList(filter) {
+    var guilds = S.guilds || [];
+    var here = (S.guild || {}).id;
+    var needle = (filter || "").toLowerCase();
+    var rows = guilds.filter(function (g) {
+      return !needle || g.name.toLowerCase().indexOf(needle) !== -1;
+    });
+    if (!rows.length) {
+      $("plcServerList").innerHTML =
+        '<li class="plc-empty" style="padding:16px;">No server matches that.</li>';
+      return;
+    }
+    $("plcServerList").innerHTML = rows.map(function (g) {
+      var art = g.icon
+        ? '<img src="' + esc(g.icon) + '" alt="" loading="lazy" />'
+        : '<span class="ph">' + esc(g.name.slice(0, 1).toUpperCase()) + "</span>";
+      return '<li><button type="button" class="plc-server-opt' + (g.id === here ? " here" : "") +
+        '" data-guild="' + esc(g.id) + '" role="option"' +
+        (g.id === here ? ' aria-selected="true"' : "") + ">" +
+        art + "<span>" + esc(g.name) + "</span>" +
+        (g.id === here ? ' <i class="fa fa-check" style="margin-left:auto;opacity:.7;"></i>' : "") +
+        "</button></li>";
+    }).join("");
+  }
+
+  function openMenu(open) {
+    menuEl.hidden = !open;
+    menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) {
+      renderServerList(menuSearch.value);
+      menuSearch.focus();
+      menuSearch.select();
+    }
+  }
+
+  menuBtn.addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    openMenu(menuEl.hidden);
+  });
+  menuSearch.addEventListener("input", function () { renderServerList(menuSearch.value); });
+  menuSearch.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") { openMenu(false); menuBtn.focus(); }
+    if (ev.key === "Enter") {
+      var first = $("plcServerList").querySelector(".plc-server-opt");
+      if (first) first.click();
+    }
+  });
+  document.addEventListener("click", function (ev) {
+    if (!menuEl.hidden && !menuEl.contains(ev.target) && ev.target !== menuBtn) openMenu(false);
+  });
+  $("plcServerList").addEventListener("click", function (ev) {
+    var opt = ev.target.closest("[data-guild]");
+    if (!opt) return;
+    var id = opt.dataset.guild;
+    var here = (S.guild || {}).id;
+    if (!here || id === here) { openMenu(false); return; }
+    // Same page, different server: the guild id is one path segment, so
+    // swapping it keeps whatever route the dashboard mounted this page at.
+    window.location.pathname = window.location.pathname.replace("/" + here, "/" + id);
+  });
 
   // ---- wallet ------------------------------------------------------------
   function renderWallet() {
@@ -2614,9 +2846,11 @@ PLAYER_TEMPLATE = r"""
     if (key !== lastKey) { lastKey = key; render(); }
   }, 500);
 
-  // The dashboard puts a "back to the third-party list" pill above every
-  // third-party page. This one is meant to read as a standalone player, so
-  // that pill goes - carefully, by matching the link rather than a position.
+  // This page is meant to read as a standalone player, so two bits of
+  // dashboard furniture go: the "back to the third-party list" pill, and the
+  // guild banner - the server bar above replaces the latter, switcher and all.
+  // Both are matched by what they contain rather than by position, and if
+  // neither matches, nothing is hidden and the page is merely as it was.
   function stripBackLink() {
     Array.prototype.forEach.call(document.querySelectorAll("a"), function (a) {
       if (ROOT.contains(a)) return;
@@ -2634,13 +2868,39 @@ PLAYER_TEMPLATE = r"""
     });
   }
 
+  function stripGuildBanner() {
+    var best = null;
+    var nodes = document.querySelectorAll("div,section,header,nav,aside");
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      // Never touch anything that wraps this page, or the page itself.
+      if (el === ROOT || el.contains(ROOT) || ROOT.contains(el)) continue;
+      var text = el.textContent || "";
+      if (text.length > 3000) continue;
+      // All four have to be present: the three counters plus one of the
+      // banner's own tabs. That combination is the banner and nothing else.
+      if (!/\bMembers\b/.test(text)) continue;
+      if (!/\bChannels\b/.test(text)) continue;
+      if (!/\bRoles\b/.test(text)) continue;
+      if (!/\b(Overview|Bot Settings|Modules)\b/.test(text)) continue;
+      // Keep narrowing: the smallest element that still holds all of it is
+      // the banner, not the column it happens to sit in.
+      if (!best || best.contains(el)) best = el;
+    }
+    if (best) best.classList.add("plc-hide");
+  }
+
   // ---- go ----------------------------------------------------------------
   renderSources();
   renderResults();
   reanchor();
   render();
   markField();
-  stripBackLink();
+  // Once now, and once more shortly after: some of the surrounding chrome is
+  // rendered by the dashboard's own scripts and may not exist yet.
+  function stripChrome() { stripBackLink(); stripGuildBanner(); }
+  stripChrome();
+  setTimeout(stripChrome, 700);
   schedule(1200);
 })();
 </script>
