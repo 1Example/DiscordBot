@@ -341,7 +341,15 @@ class DashboardRPC:
         total = 0
         for blob in blobs:
             value = blob.get(key)
-            if isinstance(value, (dict, list, tuple, set)):
+            if isinstance(value, dict):
+                # A dict of lists holds its entries one level down - MafiaGame
+                # stores achievements as {location: [name, ...]}, so counting
+                # the dict itself counted locations instead of achievements.
+                if value and all(isinstance(v, (list, tuple, set)) for v in value.values()):
+                    total += sum(len(v) for v in value.values())
+                else:
+                    total += len(value)
+            elif isinstance(value, (list, tuple, set)):
                 total += len(value)
         return total
 
@@ -394,9 +402,8 @@ class DashboardRPC:
                         {"label": "Wins", "value": self._total(blobs, "wins")},
                         {"label": "Achievements", "value": self._count(blobs, "achievements")}]
 
-            rows = [row for row in rows if row.get("value")]
             if not rows:
-                skipped.append(f"{name}: every value is zero")
+                skipped.append(f"{name}: nothing to report")
                 continue
             cards.append({
                 "cog": name,
