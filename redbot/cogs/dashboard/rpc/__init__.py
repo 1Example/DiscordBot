@@ -40,6 +40,7 @@ class DashboardRPC:
         # Initialize RPC handlers.
         self.bot.register_rpc_handler(self.check_version)
         self.bot.register_rpc_handler(self.get_user_profile)
+        self.bot.register_rpc_handler(self.get_user_access)
         self.bot.register_rpc_handler(self.get_data)
         self.bot.register_rpc_handler(self.get_variables)
         self.bot.register_rpc_handler(self.get_bot_variables)
@@ -69,6 +70,10 @@ class DashboardRPC:
         self.invite_url: str = None
         self.owner: str = None
         self.cogs_infos_cache: dict[str, dict[str, str]] = {}
+        # Short-lived, keyed by user: a REST fetch for the banner, and the
+        # nav's "can this person reach the Dashboard at all" answer.
+        self.user_fetch_cache: dict[int, tuple[float, typing.Any]] = {}
+        self.user_access_cache: dict[int, tuple[float, dict]] = {}
         self.guilds_cache: dict[
             int,
             dict[
@@ -95,76 +100,234 @@ class DashboardRPC:
         self.bot.unregister_rpc_handler(self.get_bot_settings)
         self.bot.unregister_rpc_handler(self.set_bot_settings)
         self.bot.unregister_rpc_handler(self.get_user_profile)
+        self.bot.unregister_rpc_handler(self.get_user_access)
         self.bot.unregister_rpc_handler(self.set_custom_pages)
         for handler in self.handlers.values():
             handler.unload()
 
+    # Discord's public-flag bitfield, as the badges a profile should show.
+    # discord.py exposes these as `PublicUserFlags` attributes; the icons are
+    # Font Awesome names so the page needs no extra assets.
+    USER_BADGES = (
+        ("staff", "Discord Staff", "fa-shield", "#5865f2"),
+        ("partner", "Discord Partner", "fa-handshake-o", "#5865f2"),
+        ("hypesquad", "HypeSquad Events", "fa-calendar", "#fbb848"),
+        ("hypesquad_bravery", "HypeSquad Bravery", "fa-bolt", "#9c84ef"),
+        ("hypesquad_brilliance", "HypeSquad Brilliance", "fa-diamond", "#f47b67"),
+        ("hypesquad_balance", "HypeSquad Balance", "fa-balance-scale", "#45ddc0"),
+        ("bug_hunter", "Bug Hunter", "fa-bug", "#3ba55d"),
+        ("bug_hunter_level_2", "Bug Hunter Gold", "fa-bug", "#fbb848"),
+        ("early_supporter", "Early Supporter", "fa-heart", "#ff73fa"),
+        ("verified_bot_developer", "Verified Bot Developer", "fa-code", "#5865f2"),
+        ("active_developer", "Active Developer", "fa-terminal", "#3ba55d"),
+        ("discord_certified_moderator", "Certified Moderator", "fa-gavel", "#5865f2"),
+    )
+
+    async def _fetch_user_full(self, user_id: int):
+        """A `User` with banner and accent colour on it.
+
+        `get_user` only ever returns the gateway's cached object, which carries
+        neither - they come back exclusively from a REST fetch. That is a real
+        HTTP call, so the result is held for a while: a banner does not change
+        between two page loads.
+        """
+        cached = self.user_fetch_cache.get(user_id)
+        if cached is not None and (cached[0] + 900) > time.time():
+            return cached[1]
+        try:
+            user = await self.bot.fetch_user(user_id)
+        except Exception:  # noqa: BLE001 - fall back to the cached object
+            user = None
+        self.user_fetch_cache[user_id] = (time.time(), user)
+        return user
+
+    def _levelup_profile(self, guild_id: int, user_id: int) -> dict | None:
+        """Level, XP and activity for one member, if LevelUp is loaded.
+
+        Reads the mapping directly rather than through `get_profile`, which is
+        a `setdefault` and would write an empty profile for every member whose
+        page happened to be looked at.
+        """
+        cog = self.bot.get_cog("LevelUp")
+        if cog is None:
+            return None
+        try:
+            conf = cog.db.configs.get(guild_id)
+            if conf is None:
+                return None
+            profile = conf.users.get(user_id)
+            if profile is None:
+                return None
+            return {
+                "level": int(profile.level),
+                "prestige": int(profile.prestige),
+                "xp": int(profile.xp),
+                "messages": int(profile.messages),
+                "voice_hours": round(profile.voice / 3600, 1),
+                "stars": int(profile.stars),
+            }
+        except Exception:  # noqa: BLE001 - a cog's internals are not a contract
+            return None
+
+    @rpc_check()
+    async def get_user_access(self, user_id: int) -> dict[str, typing.Any]:
+        """How much of the Dashboard this person can actually reach.
+
+        The nav uses this to decide whether to offer the Dashboard link at all,
+        so it runs on ordinary page loads and has to stay cheap: membership and
+        permission lookups only, no fetches, and cached briefly.
+        """
+        cached = self.user_access_cache.get(user_id)
+        if cached is not None and (cached[0] + 120) > time.time():
+            return cached[1]
+
+        result = {"status": 0, "shared": 0, "manageable": 0}
+        user = self.bot.get_user(user_id)
+        if user is not None:
+            is_owner = user_id in self.bot.owner_ids
+            for guild in self.bot.guilds:
+                member = guild.get_member(user_id)
+                if member is None:
+                    continue
+                result["shared"] += 1
+                if (
+                    is_owner
+                    or guild.owner_id == user_id
+                    or member.guild_permissions.administrator
+                    or member.guild_permissions.manage_guild
+                    or await self.bot.is_admin(member)
+                    or await self.bot.is_mod(member)
+                ):
+                    result["manageable"] += 1
+        self.user_access_cache[user_id] = (time.time(), result)
+        return result
+
     @rpc_check()
     async def get_user_profile(self, user_id: int) -> dict[str, typing.Any]:
-        """Profile data for the logged-in user: identity, economy balance and reach."""
+        """Everything the profile page shows: identity, reach, and per-server standing."""
         user = self.bot.get_user(user_id)
         if user is None:
             return {"status": 1}
 
-        shared_guilds = [g for g in self.bot.guilds if g.get_member(user_id) is not None]
-        owned = sum(1 for g in shared_guilds if g.owner_id == user_id)
-        admin_of = 0
-        mod_of = 0
-        for guild in shared_guilds:
+        full = await self._fetch_user_full(user_id) or user
+        is_owner = user_id in self.bot.owner_ids
+
+        badges = []
+        try:
+            flags = full.public_flags
+            for attribute, label, icon, colour in self.USER_BADGES:
+                if getattr(flags, attribute, False):
+                    badges.append({"label": label, "icon": icon, "colour": colour})
+        except Exception:  # noqa: BLE001
+            pass
+
+        # Nitro is not a public flag, but a member who has one of the things it
+        # pays for is a safe enough signal to show it.
+        try:
+            if full.banner is not None or (full.avatar is not None and full.avatar.is_animated()):
+                badges.append({"label": "Nitro", "icon": "fa-star", "colour": "#ff73fa"})
+        except Exception:  # noqa: BLE001
+            pass
+
+        bank_is_global = False
+        currency = "credits"
+        try:
+            bank_is_global = await bank.is_global()
+            if bank_is_global:
+                currency = await bank.get_currency_name()
+        except Exception:  # noqa: BLE001 - economy is optional
+            pass
+
+        guilds = []
+        owned = admin_of = mod_of = 0
+        total_balance = 0
+        for guild in sorted(self.bot.guilds, key=lambda g: g.name.lower()):
             member = guild.get_member(user_id)
             if member is None:
                 continue
-            if await self.bot.is_admin(member) or member.guild_permissions.manage_guild:
+
+            if guild.owner_id == user_id:
+                role, rank = "Owner", 3
+                owned += 1
+            elif member.guild_permissions.administrator or await self.bot.is_admin(member):
+                role, rank = "Admin", 2
                 admin_of += 1
             elif await self.bot.is_mod(member):
+                role, rank = "Moderator", 1
                 mod_of += 1
-
-        # Economy: global banks have a single balance, per-guild banks have one
-        # balance per server, so report both shapes correctly.
-        balances = []
-        currency = "credits"
-        is_global = False
-        try:
-            is_global = await bank.is_global()
-            if is_global:
-                currency = await bank.get_currency_name()
-                member = next((g.get_member(user_id) for g in shared_guilds if g.get_member(user_id)), None)
-                if member is not None:
-                    balances.append(
-                        {"guild": None, "balance": await bank.get_balance(member)}
-                    )
             else:
-                for guild in shared_guilds:
-                    member = guild.get_member(user_id)
-                    if member is None:
-                        continue
-                    balances.append(
-                        {
-                            "guild": guild.name,
-                            "guild_id": guild.id,
-                            "balance": await bank.get_balance(member),
-                            "currency": await bank.get_currency_name(guild),
-                        }
-                    )
-                balances.sort(key=lambda b: b["balance"], reverse=True)
-        except Exception:  # noqa: BLE001 - economy is optional
-            balances = []
+                role, rank = "Member", 0
+
+            entry = {
+                "id": str(guild.id),
+                "name": guild.name,
+                "icon": guild.icon.url if guild.icon else "",
+                "role": role,
+                "rank": rank,
+                "members": guild.member_count or len(guild.members),
+                "can_manage": bool(rank or is_owner),
+                "joined_at": member.joined_at.timestamp() if member.joined_at else None,
+                "top_role": member.top_role.name if member.top_role else "",
+                "top_role_colour": (
+                    str(member.top_role.colour) if member.top_role and member.top_role.value else ""
+                ),
+                "balance": None,
+                "currency": currency,
+                "level": self._levelup_profile(guild.id, user_id),
+            }
+            try:
+                if not bank_is_global:
+                    entry["balance"] = await bank.get_balance(member)
+                    entry["currency"] = await bank.get_currency_name(guild)
+                    total_balance += entry["balance"]
+            except Exception:  # noqa: BLE001
+                pass
+            guilds.append(entry)
+
+        # Owner first, then admin, then mod, then by name.
+        guilds.sort(key=lambda g: (-g["rank"], g["name"].lower()))
+
+        global_balance = None
+        if bank_is_global:
+            try:
+                member = next(
+                    (g.get_member(user_id) for g in self.bot.guilds if g.get_member(user_id)),
+                    None,
+                )
+                if member is not None:
+                    global_balance = await bank.get_balance(member)
+            except Exception:  # noqa: BLE001
+                pass
 
         return {
             "status": 0,
             "id": user.id,
             "name": user.display_name,
             "username": user.name,
+            "global_name": getattr(user, "global_name", None),
             "avatar_url": user.display_avatar.url,
+            "banner_url": (full.banner.url if getattr(full, "banner", None) else ""),
+            "accent_colour": (
+                str(full.accent_colour) if getattr(full, "accent_colour", None) else ""
+            ),
+            "decoration_url": (
+                full.avatar_decoration.url
+                if getattr(full, "avatar_decoration", None)
+                else ""
+            ),
             "created_at": user.created_at.timestamp(),
-            "is_owner": user_id in self.bot.owner_ids,
-            "shared_guilds": len(shared_guilds),
+            "is_owner": is_owner,
+            "badges": badges,
+            "shared_guilds": len(guilds),
             "owned_guilds": owned,
             "admin_guilds": admin_of,
             "mod_guilds": mod_of,
-            "bank_is_global": is_global,
+            "manageable_guilds": sum(1 for g in guilds if g["can_manage"]),
+            "bank_is_global": bank_is_global,
             "currency": currency,
-            "balances": balances[:25],
+            "global_balance": global_balance,
+            "total_balance": total_balance,
+            "guilds": guilds[:100],
         }
 
     @rpc_check()
@@ -184,12 +347,11 @@ class DashboardRPC:
         if data["ui"]["meta"]["icon"] is None:
             data["ui"]["meta"]["icon"] = self.bot.user.display_avatar.url
         if data["ui"]["meta"]["description"] is None:
+            # About this bot, not about the software it happens to run on.
+            # Set your own with `[p]setdashboard meta_description`.
             data["ui"]["meta"]["description"] = _(
-                "Hello, welcome to the **Red-DiscordBot web Dashboard** for {name}! "
-                "{name} is based off the popular bot **Red-DiscordBot**, an open "
-                "source, multifunctional bot. It has *tons of features* including moderation, "
-                "audio, economy, fun and more! Here, you can control and interact with "
-                "{name}'s settings. **So what are you waiting for? Invite it now!**",
+                "Manage **{name}** from anywhere. Configure modules, moderate your "
+                "servers and control the music player, all from one place.",
             ).format(name=self.bot.user.name)
         else:
             data["ui"]["meta"]["description"] = data["ui"]["meta"]["description"].replace(
