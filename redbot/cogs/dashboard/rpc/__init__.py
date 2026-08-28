@@ -271,6 +271,134 @@ class DashboardRPC:
         except Exception:  # noqa: BLE001 - a cog's internals are not a contract
             return None
 
+    # What to pull out of each cog, and how to show it. Every entry is read
+    # through the cog's own Config, scoped to this user, so nothing here
+    # depends on a cog's internals beyond the keys it registers.
+    #
+    #   (cog name, scope, icon, colour)
+    # `scope` is "member" for per-server data (summed across shared servers)
+    # and "user" for global data.
+    COG_STATS = (
+        ("Warnings", "member", "fa-exclamation-triangle", "#ffb454"),
+        ("Trivia", "member", "fa-question-circle", "#6c8cff"),
+        ("Tickets", "member", "fa-ticket", "#38d39f"),
+        ("SimpleCasino", "user", "fa-diamond", "#ff73fa"),
+        ("Hunting", "user", "fa-crosshairs", "#a78bfa"),
+        ("MafiaGame", "user", "fa-user-secret", "#ff6b6b"),
+    )
+
+    async def _read_config(self, cog, scope: str, user_id: int, guild_ids: list[int]) -> list[dict]:
+        """Every stored blob for this person, from one cog's Config."""
+        config = getattr(cog, "config", None)
+        if config is None:
+            return []
+        out = []
+        try:
+            if scope == "user":
+                out.append(await config.user_from_id(user_id).all())
+            else:
+                for guild_id in guild_ids:
+                    out.append(await config.member_from_ids(guild_id, user_id).all())
+        except Exception:  # noqa: BLE001 - a cog's storage is not a contract
+            log.debug("Could not read %s config", getattr(cog, "qualified_name", cog), exc_info=True)
+            return []
+        return [blob for blob in out if blob]
+
+    @staticmethod
+    def _total(blobs: list[dict], key: str) -> int:
+        """Sum a numeric field, or a mapping whose values are counts.
+
+        Some cogs key their counters by mode or difficulty, e.g. MafiaGame's
+        ``wins = {"villager": 3}``.
+        """
+        total = 0
+        for blob in blobs:
+            value = blob.get(key)
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, (int, float)):
+                total += int(value)
+            elif isinstance(value, dict):
+                total += sum(
+                    int(v) for v in value.values()
+                    if isinstance(v, (int, float)) and not isinstance(v, bool)
+                )
+        return total
+
+    @staticmethod
+    def _count(blobs: list[dict], key: str) -> int:
+        """Count the entries in a collection field.
+
+        The counterpart to `_total`: Warnings stores ``warnings`` as a mapping
+        of id to record, so what matters is how many there are, not the sum of
+        anything inside them - which is nothing, and is why summing produced a
+        flat zero and dropped the row entirely.
+        """
+        total = 0
+        for blob in blobs:
+            value = blob.get(key)
+            if isinstance(value, (dict, list, tuple, set)):
+                total += len(value)
+        return total
+
+    async def _cog_stats(self, user_id: int, guild_ids: list[int]) -> list[dict]:
+        """Per-cog activity for this person, as cards the page can just render.
+
+        Only cogs that are loaded *and* have something to say appear; a cog
+        that stores nothing but zeroes is not worth a card.
+        """
+        cards = []
+        for name, scope, icon, colour in self.COG_STATS:
+            cog = self.bot.get_cog(name)
+            if cog is None:
+                continue
+            blobs = await self._read_config(cog, scope, user_id, guild_ids)
+            if not blobs:
+                continue
+
+            rows: list[dict] = []
+            if name == "Warnings":
+                points = self._total(blobs, "total_points")
+                count = self._count(blobs, "warnings")
+                rows = [{"label": "Warnings", "value": count},
+                        {"label": "Points", "value": points}]
+            elif name == "Trivia":
+                games = self._total(blobs, "games")
+                wins = self._total(blobs, "wins")
+                rows = [{"label": "Games", "value": games},
+                        {"label": "Wins", "value": wins},
+                        {"label": "Score", "value": self._total(blobs, "total_score")}]
+            elif name == "Tickets":
+                rows = [{"label": "Opened", "value": self._total(blobs, "tickets_number")},
+                        {"label": "Closed", "value": self._total(blobs, "closed_tickets_number")}]
+            elif name == "SimpleCasino":
+                spins = self._total(blobs, "slotcount")
+                hands = self._total(blobs, "bjcount")
+                profit = self._total(blobs, "slotprofit")
+                rows = [{"label": "Slot spins", "value": spins},
+                        {"label": "Blackjack hands", "value": hands},
+                        {"label": "Jackpots", "value": self._total(blobs, "slotjackpotcount")},
+                        {"label": "Slot profit", "value": profit, "signed": True}]
+            elif name == "Hunting":
+                rows = [{"label": "Birds shot", "value": self._total(blobs, "total")},
+                        {"label": "Kinds", "value": self._count(blobs, "score")}]
+            elif name == "MafiaGame":
+                rows = [{"label": "Games", "value": self._total(blobs, "games")},
+                        {"label": "Wins", "value": self._total(blobs, "wins")},
+                        {"label": "Achievements", "value": self._count(blobs, "achievements")}]
+
+            rows = [row for row in rows if row.get("value")]
+            if not rows:
+                continue
+            cards.append({
+                "cog": name,
+                "label": {"SimpleCasino": "Casino", "MafiaGame": "Mafia"}.get(name, name),
+                "icon": icon,
+                "colour": colour,
+                "rows": rows,
+            })
+        return cards
+
     @rpc_check()
     async def get_user_access(self, user_id: int) -> dict[str, typing.Any]:
         """How much of the Dashboard this person can actually reach.
@@ -496,6 +624,9 @@ class DashboardRPC:
             "global_balance": global_balance,
             "total_balance": total_balance,
             "guilds": guilds[:100],
+            "cog_stats": await self._cog_stats(
+                user_id, [int(g["id"]) for g in guilds]
+            ),
         }
 
     @rpc_check()
