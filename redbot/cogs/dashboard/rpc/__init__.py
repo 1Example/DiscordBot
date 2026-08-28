@@ -276,13 +276,17 @@ class DashboardRPC:
     # depends on a cog's internals beyond the keys it registers.
     #
     #   (cog name, scope, icon, colour)
-    # `scope` is "member" for per-server data (summed across shared servers)
-    # and "user" for global data.
+    # `scope` is "member" for per-server data (summed across shared servers),
+    # "user" for global data, and "both" where the cog picks at runtime.
+    # SimpleCasino is the latter: it writes to the user scope on a global bank
+    # and to the member scope otherwise, so reading only one of them came back
+    # empty on any bot with per-server banks. Reading both is safe because only
+    # one is ever written to.
     COG_STATS = (
         ("Warnings", "member", "fa-exclamation-triangle", "#ffb454"),
         ("Trivia", "member", "fa-question-circle", "#6c8cff"),
         ("Tickets", "member", "fa-ticket", "#38d39f"),
-        ("SimpleCasino", "user", "fa-diamond", "#ff73fa"),
+        ("SimpleCasino", "both", "fa-diamond", "#ff73fa"),
         ("Hunting", "user", "fa-crosshairs", "#a78bfa"),
         ("MafiaGame", "user", "fa-user-secret", "#ff6b6b"),
     )
@@ -294,9 +298,9 @@ class DashboardRPC:
             return []
         out = []
         try:
-            if scope == "user":
+            if scope in ("user", "both"):
                 out.append(await config.user_from_id(user_id).all())
-            else:
+            if scope in ("member", "both"):
                 for guild_id in guild_ids:
                     out.append(await config.member_from_ids(guild_id, user_id).all())
         except Exception:  # noqa: BLE001 - a cog's storage is not a contract
@@ -348,12 +352,15 @@ class DashboardRPC:
         that stores nothing but zeroes is not worth a card.
         """
         cards = []
+        skipped = []
         for name, scope, icon, colour in self.COG_STATS:
             cog = self.bot.get_cog(name)
             if cog is None:
+                skipped.append(f"{name}: cog not loaded")
                 continue
             blobs = await self._read_config(cog, scope, user_id, guild_ids)
             if not blobs:
+                skipped.append(f"{name}: nothing stored for this user")
                 continue
 
             rows: list[dict] = []
@@ -389,6 +396,7 @@ class DashboardRPC:
 
             rows = [row for row in rows if row.get("value")]
             if not rows:
+                skipped.append(f"{name}: every value is zero")
                 continue
             cards.append({
                 "cog": name,
@@ -397,6 +405,10 @@ class DashboardRPC:
                 "colour": colour,
                 "rows": rows,
             })
+        # A card missing from the page is either a cog that is not loaded or a
+        # cog with nothing to report, and those look identical from outside.
+        if skipped:
+            log.debug("Profile activity for %s skipped - %s", user_id, "; ".join(skipped))
         return cards
 
     @rpc_check()
