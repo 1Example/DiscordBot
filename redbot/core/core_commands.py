@@ -2496,7 +2496,9 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 return
             group = bank._config.guild(ctx.guild)
         group_data = await group.all()
-        bank_name = group_data["bank_name"]
+        # Resolved, not raw: the stored value is unset until somebody renames
+        # the bank, and the resolver supplies the server's own name.
+        bank_name = await bank.get_bank_name(None if cur_setting else ctx.guild)
         bank_scope = _("Global") if cur_setting else _("Server")
         currency_name = group_data["currency"]
         default_balance = group_data["default_balance"]

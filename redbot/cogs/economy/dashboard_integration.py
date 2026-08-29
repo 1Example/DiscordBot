@@ -5,6 +5,7 @@ import typing as t
 
 import discord
 from redbot.core import bank, commands
+from redbot.core.utils.chat_formatting import humanize_list
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
@@ -66,6 +67,7 @@ class DashboardIntegration:
                     "error_title": "Forbidden",
                     "error_message": "Only server administrators can change economy settings.",
                 }
+            kwargs["_is_owner"] = await self.bot.is_owner(user)
             notifications = await self._eco_handle_post(guild, kwargs)
 
         # With a global bank, per-guild settings are ignored entirely - showing
@@ -92,6 +94,8 @@ class DashboardIntegration:
                 "currency": currency,
                 "max_balance": max_balance,
                 "bank_name": await bank.get_bank_name(guild),
+                "is_owner": await self.bot.is_owner(user),
+                "default_balance": await bank.get_default_balance(guild),
                 "fields": [
                     {
                         "key": key,
@@ -398,6 +402,128 @@ class DashboardIntegration:
 
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
 
+    async def _eco_bank_settings(
+        self, guild: discord.Guild, field, is_owner: bool
+    ) -> list[dict]:
+        """The bank's own settings, which live in core `bank`, not in Economy's
+        config: name, currency, and the balance limits.
+
+        Everything here writes through the `bank` helpers rather than poking
+        Config directly, so the same validation the commands get applies.
+        """
+        global_bank = await bank.is_global()
+        # A global bank is bot-wide, so only the owner may retune it, and the
+        # helpers take no guild in that mode.
+        if global_bank and not is_owner:
+            return [{"message": "The bank is global, so only the bot owner can change "
+                                "these settings.", "category": "warning"}]
+        scope_guild = None if global_bank else guild
+
+        notes: list[dict] = []
+        changed: list[str] = []
+
+        name = (field("bank_name") or "").strip()
+        if name:
+            try:
+                await bank.set_bank_name(name, scope_guild)
+                changed.append("name")
+            except Exception as exc:  # noqa: BLE001
+                notes.append({"message": f"Could not rename the bank: {exc}", "category": "danger"})
+
+        currency = (field("currency_name") or "").strip()
+        if currency:
+            try:
+                await bank.set_currency_name(currency, scope_guild)
+                changed.append("currency")
+            except Exception as exc:  # noqa: BLE001
+                notes.append({"message": f"Could not set the currency: {exc}", "category": "danger"})
+
+        for key, setter, label in (
+            ("max_balance", bank.set_max_balance, "maximum balance"),
+            ("default_balance", bank.set_default_balance, "starting balance"),
+        ):
+            raw = (field(key) or "").strip()
+            if not raw:
+                continue
+            try:
+                amount = int(raw)
+            except ValueError:
+                notes.append({"message": f"The {label} must be a whole number.",
+                              "category": "warning"})
+                continue
+            if amount < 0:
+                notes.append({"message": f"The {label} cannot be negative.",
+                              "category": "warning"})
+                continue
+            try:
+                await setter(amount, scope_guild)
+                changed.append(label)
+            except Exception as exc:  # noqa: BLE001
+                # set_default_balance refuses anything above the maximum, which
+                # is a real answer rather than a failure - pass it straight on.
+                notes.append({"message": f"Could not set the {label}: {exc}",
+                              "category": "warning"})
+
+        if changed:
+            notes.append({"message": "Updated the bank's " + humanize_list(changed) + ".",
+                          "category": "success"})
+        elif not notes:
+            notes.append({"message": "Nothing to change.", "category": "info"})
+        return notes
+
+    async def _eco_bank_danger(
+        self, action: str, guild: discord.Guild, field, is_owner: bool
+    ) -> list[dict]:
+        """Pruning, wiping, and switching the bank between global and per-server.
+
+        Each of these destroys balances, so each is gated and each is confirmed
+        by typing the exact word the page asks for.
+        """
+        global_bank = await bank.is_global()
+        confirm = (field("confirm") or "").strip().upper()
+
+        if action == "bank_prune":
+            if global_bank and not is_owner:
+                return [{"message": "Pruning a global bank is owner-only.", "category": "warning"}]
+            if confirm != "PRUNE":
+                return [{"message": 'Type PRUNE in the box to confirm.', "category": "warning"}]
+            try:
+                await bank.bank_prune(self.bot, guild=None if global_bank else guild)
+            except Exception as exc:  # noqa: BLE001
+                return [{"message": f"Could not prune: {exc}", "category": "danger"}]
+            return [{"message": "Pruned accounts belonging to people who have left.",
+                     "category": "success"}]
+
+        if action == "bank_wipe":
+            if global_bank and not is_owner:
+                return [{"message": "Wiping a global bank is owner-only.", "category": "warning"}]
+            if confirm != "WIPE":
+                return [{"message": 'Type WIPE in the box to confirm.', "category": "warning"}]
+            try:
+                await bank.wipe_bank(None if global_bank else guild)
+            except Exception as exc:  # noqa: BLE001
+                return [{"message": f"Could not wipe the bank: {exc}", "category": "danger"}]
+            return [{"message": "Deleted every account in this bank.", "category": "success"}]
+
+        if action == "bank_scope":
+            if not is_owner:
+                return [{"message": "Switching the bank between global and per-server is "
+                                    "owner-only.", "category": "warning"}]
+            if confirm != "SWITCH":
+                return [{"message": 'Type SWITCH in the box to confirm.', "category": "warning"}]
+            try:
+                new_mode = await bank.set_global(not global_bank)
+            except Exception as exc:  # noqa: BLE001
+                return [{"message": f"Could not switch the bank: {exc}", "category": "danger"}]
+            return [{
+                "message": ("The bank is now global; every server shares one balance."
+                            if new_mode else
+                            "The bank is now per-server; each server has its own balances."),
+                "category": "success",
+            }]
+
+        return [{"message": "Unknown action.", "category": "warning"}]
+
     async def _eco_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
         field = form_reader(kwargs)
         action = field("action")
@@ -407,6 +533,14 @@ class DashboardIntegration:
 
         if action == "save_autopayday":
             return await self._eco_save_autopayday(guild, field)
+
+        if action == "bank_settings":
+            return await self._eco_bank_settings(guild, field, kwargs.get("_is_owner", False))
+
+        if action in ("bank_prune", "bank_wipe", "bank_scope"):
+            return await self._eco_bank_danger(
+                action, guild, field, kwargs.get("_is_owner", False)
+            )
 
         if action == "run_payday":
             summary = await self.run_auto_payday(guild)
@@ -561,6 +695,124 @@ ECONOMY_TEMPLATE = (
           </div>
         </div>
       </form>
+    {% endif %}
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-bank"></i> Bank</h5>
+        <p class="dz-hint">
+          {% if global_bank %}
+            One bank shared by every server.
+            {% if not is_owner %}Only the bot owner can change these.{% endif %}
+          {% else %}
+            This server's own bank. Leave a box empty to keep what it has now.
+          {% endif %}
+        </p>
+        <div class="dz-grid two">
+          <div>
+            <div class="dz-label">Bank name</div>
+            <input class="dz-input" type="text" name="bank_name" maxlength="100"
+                   placeholder="{{ bank_name }}"
+                   {% if global_bank and not is_owner %}disabled{% endif %} />
+            <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+              Currently <b>{{ bank_name }}</b>.
+            </div>
+          </div>
+          <div>
+            <div class="dz-label">Currency name</div>
+            <input class="dz-input" type="text" name="currency_name" maxlength="100"
+                   placeholder="{{ currency }}"
+                   {% if global_bank and not is_owner %}disabled{% endif %} />
+            <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+              Currently <b>{{ currency }}</b>.
+            </div>
+          </div>
+          <div>
+            <div class="dz-label">Starting balance</div>
+            <input class="dz-input" type="number" min="0" name="default_balance"
+                   placeholder="{{ default_balance }}"
+                   {% if global_bank and not is_owner %}disabled{% endif %} />
+            <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+              What a brand new account opens with.
+            </div>
+          </div>
+          <div>
+            <div class="dz-label">Maximum balance</div>
+            <input class="dz-input" type="number" min="0" name="max_balance"
+                   placeholder="{{ max_balance }}"
+                   {% if global_bank and not is_owner %}disabled{% endif %} />
+            <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+              Nobody can hold more than this.
+            </div>
+          </div>
+        </div>
+        {% if not (global_bank and not is_owner) %}
+          <div style="margin-top:14px;">
+            <button class="dz-btn primary" name="action" value="bank_settings">
+              <i class="fa fa-save"></i> Save bank settings
+            </button>
+          </div>
+        {% endif %}
+      </div>
+    </form>
+
+    {% if is_owner or not global_bank %}
+      <div class="dz-panel">
+        <h5><i class="fa fa-exclamation-triangle" style="color:#f0aa3c;"></i> Danger zone</h5>
+        <p class="dz-hint">
+          Each of these destroys balances and cannot be undone, so each needs the
+          word typing out in full.
+        </p>
+
+        <div class="dz-grid two">
+          <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+            <div class="dz-label">Prune accounts</div>
+            <p class="dz-hint">
+              Deletes accounts belonging to people who are no longer
+              {% if global_bank %}known to the bot{% else %}in this server{% endif %}.
+            </p>
+            <div class="dz-row">
+              <input class="dz-input" type="text" name="confirm" placeholder="Type PRUNE" />
+              <button class="dz-btn" name="action" value="bank_prune">
+                <i class="fa fa-eraser"></i> Prune
+              </button>
+            </div>
+          </form>
+
+          <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+            <div class="dz-label">Wipe the bank</div>
+            <p class="dz-hint">Deletes every account and every balance in this bank.</p>
+            <div class="dz-row">
+              <input class="dz-input" type="text" name="confirm" placeholder="Type WIPE" />
+              <button class="dz-btn danger" name="action" value="bank_wipe">
+                <i class="fa fa-trash"></i> Wipe
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {% if is_owner %}
+          <form method="POST" style="margin-top:16px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+            <div class="dz-label">Bank scope</div>
+            <p class="dz-hint">
+              The bank is <b>{% if global_bank %}global{% else %}per-server{% endif %}</b>.
+              Switching to {% if global_bank %}per-server{% else %}global{% endif %}
+              <b>resets every account</b> — that is how the switch works, not a bug.
+            </p>
+            <div class="dz-row">
+              <input class="dz-input" type="text" name="confirm" placeholder="Type SWITCH" />
+              <button class="dz-btn danger" name="action" value="bank_scope">
+                <i class="fa fa-exchange"></i>
+                Switch to {% if global_bank %}per-server{% else %}global{% endif %}
+              </button>
+            </div>
+          </form>
+        {% endif %}
+      </div>
     {% endif %}
 
     <form method="POST">

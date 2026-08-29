@@ -55,14 +55,14 @@ _SCHEMA_VERSION = 1
 _DEFAULT_GLOBAL = {
     "schema_version": 0,
     "is_global": False,
-    "bank_name": "Twentysix bank",
+    "bank_name": None,
     "currency": "credits",
     "default_balance": 100,
     "max_balance": _MAX_BALANCE,
 }
 
 _DEFAULT_GUILD = {
-    "bank_name": "Twentysix bank",
+    "bank_name": None,
     "currency": "credits",
     "default_balance": 100,
     "max_balance": _MAX_BALANCE,
@@ -73,6 +73,7 @@ _DEFAULT_MEMBER = {"name": "", "balance": 0, "created_at": 0}
 _DEFAULT_USER = _DEFAULT_MEMBER
 
 _config: Config = None
+_bot = None
 
 log = logging.getLogger("red.core.bank")
 
@@ -82,8 +83,9 @@ _cache_is_global = None
 _cache = {"bank_name": None, "currency": None, "default_balance": None, "max_balance": None}
 
 
-async def _init():
-    global _config
+async def _init(bot=None):
+    global _config, _bot
+    _bot = bot
     _config = Config.get_conf(None, 384734293238749, cog_name="Bank", force_registration=True)
     _config.register_global(**_DEFAULT_GLOBAL)
     _config.register_guild(**_DEFAULT_GUILD)
@@ -732,6 +734,21 @@ async def set_global(global_: bool) -> bool:
     return global_
 
 
+def _default_bank_name(guild: discord.Guild = None) -> str:
+    """The name a bank carries when nobody has set one.
+
+    A server's bank is named after the server, which is what people expect to
+    see; a global bank falls back to the bot. Both beat the hardcoded personal
+    name this used to ship with.
+    """
+    if guild is not None:
+        return f"{guild.name} bank"
+    user = getattr(_bot, "user", None)
+    if user is not None and getattr(user, "name", None):
+        return f"{user.name} bank"
+    return "Bank"
+
+
 async def get_bank_name(guild: discord.Guild = None) -> str:
     """Get the current bank name.
 
@@ -756,9 +773,12 @@ async def get_bank_name(guild: discord.Guild = None) -> str:
         global _cache
         if _cache["bank_name"] is None:
             _cache["bank_name"] = await _config.bank_name()
-        return _cache["bank_name"]
+        # Only a name somebody actually set is cached. The derived one depends
+        # on the bot being logged in, so caching it during startup would pin
+        # the fallback in place for the rest of the run.
+        return _cache["bank_name"] or _default_bank_name()
     elif guild is not None:
-        return await _config.guild(guild).bank_name()
+        return await _config.guild(guild).bank_name() or _default_bank_name(guild)
     else:
         raise RuntimeError("Guild parameter is required and missing.")
 
