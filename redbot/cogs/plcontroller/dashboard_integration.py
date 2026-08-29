@@ -1454,12 +1454,12 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
    so it renders the same wherever it is embedded.
    ============================================================ */
 #plcRoot{
-  --plc-bg:rgba(12,16,28,.55);
+  --plc-bg:rgba(64,83,141,.19);
   --plc-line:rgba(255,255,255,.10);
   --plc-line-2:rgba(255,255,255,.16);
   --plc-txt:#eef2ff;
-  --plc-dim:rgba(238,242,255,.62);
-  --plc-dimmer:rgba(238,242,255,.40);
+/*  --plc-dim:rgba(238,242,255,.62);
+  --plc-dimmer:rgba(238,242,255,.40); */
   --plc-accent:#6c8cff;
   --plc-accent-2:#a06cff;
   --plc-good:#38d39f;
