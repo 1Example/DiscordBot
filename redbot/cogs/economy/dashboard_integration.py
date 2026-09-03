@@ -152,7 +152,56 @@ class DashboardIntegration:
             "auto_title_default": DEFAULT_PAYDAY_TITLE,
             "auto_message_default": DEFAULT_PAYDAY_MESSAGE,
             "eligible": sum(1 for m in guild.members if not m.bot),
+            "auto_mode": auto.get("AUTO_PAYDAY_MODE") or "fixed",
+            "auto_voice_rate": auto.get("AUTO_PAYDAY_VOICE_RATE", 100),
+            "auto_voice_min": auto.get("AUTO_PAYDAY_VOICE_MIN", 5),
+            "auto_voice_max": auto.get("AUTO_PAYDAY_VOICE_MAX", 0),
+            "auto_voice_afk": bool(auto.get("AUTO_PAYDAY_VOICE_AFK")),
+            "auto_voice_alone": bool(auto.get("AUTO_PAYDAY_VOICE_ALONE")),
+            "auto_voice_deaf": bool(auto.get("AUTO_PAYDAY_VOICE_DEAF")),
+            "auto_voice_preview": await self._eco_voice_preview(guild, auto),
+            "auto_voice_live": sum(
+                1
+                for m in guild.members
+                if not m.bot and m.voice is not None and m.voice.channel is not None
+            ),
+            "auto_last": auto.get("AUTO_PAYDAY_LAST") or 0,
         }
+
+    async def _eco_voice_preview(self, guild: discord.Guild, auto: dict) -> list[dict]:
+        """Who has banked the most voice time since the last payday.
+
+        This reads the same numbers the payday will, so a server owner can see
+        the tracking working before trusting it with anyone's balance.
+        """
+        try:
+            rate = max(0, int(auto.get("AUTO_PAYDAY_VOICE_RATE") or 0))
+            cap = max(0, int(auto.get("AUTO_PAYDAY_VOICE_MAX") or 0))
+            minimum = max(0, int(auto.get("AUTO_PAYDAY_VOICE_MIN") or 0)) * 60
+            rows = []
+            for member_id, data in (await self.config.all_members(guild)).items():
+                seconds = int((data or {}).get("voice_seconds", 0) or 0)
+                if seconds <= 0:
+                    continue
+                member = guild.get_member(member_id)
+                if member is None or member.bot:
+                    continue
+                amount = int(seconds * rate / 3600)
+                if cap:
+                    amount = min(amount, cap)
+                rows.append(
+                    {
+                        "name": member.display_name,
+                        "minutes": round(seconds / 60, 1),
+                        "amount": amount,
+                        "short": seconds < minimum,
+                    }
+                )
+            rows.sort(key=lambda row: row["minutes"], reverse=True)
+            return rows[:8]
+        except Exception:  # noqa: BLE001 - a preview is never worth a 500
+            log.exception("Could not build the voice payday preview for %s", guild.id)
+            return []
 
     async def _eco_save_autopayday(self, guild: discord.Guild, field) -> list[dict]:
         conf = self.config.guild(guild)
@@ -161,14 +210,15 @@ class DashboardIntegration:
         if message:
             try:
                 message.format(
-                    bot="", guild="", currency="", total="", members="", average=""
+                    bot="", guild="", currency="", total="", members="",
+                    average="", voice="",
                 )
             except (KeyError, IndexError, ValueError) as exc:
                 return [
                     {
                         "message": f"The message uses something I cannot fill in: {exc}. "
-                        "Stick to {bot}, {guild}, {currency}, {total}, {members} "
-                        "and {average}.",
+                        "Stick to {bot}, {guild}, {currency}, {total}, {members}, "
+                        "{average} and {voice}.",
                         "category": "warning",
                     }
                 ]
@@ -190,6 +240,22 @@ class DashboardIntegration:
                     "category": "warning",
                 }
             ]
+
+        mode = "voice" if (field("auto_mode") or "fixed") == "voice" else "fixed"
+        rate = field.integer("auto_voice_rate", 100)
+        minutes = field.integer("auto_voice_min", 0)
+        ceiling = field.integer("auto_voice_max", 0)
+        if mode == "voice":
+            if rate <= 0:
+                return [
+                    {"message": "An hour in voice has to be worth something; set a rate above 0.",
+                     "category": "warning"}
+                ]
+            if minutes < 0 or ceiling < 0:
+                return [
+                    {"message": "The minimum and the cap cannot be negative.",
+                     "category": "warning"}
+                ]
 
         enabled = field.checked("auto_enabled")
         channel = field.integer("auto_channel", 0) or 0
@@ -215,6 +281,16 @@ class DashboardIntegration:
         await conf.AUTO_PAYDAY_LEADERBOARD_SIZE.set(
             max(1, min(field.integer("auto_board_size", 5) or 5, board_max))
         )
+        await conf.AUTO_PAYDAY_MODE.set(mode)
+        await conf.AUTO_PAYDAY_VOICE_RATE.set(max(0, rate))
+        await conf.AUTO_PAYDAY_VOICE_MIN.set(max(0, minutes))
+        await conf.AUTO_PAYDAY_VOICE_MAX.set(max(0, ceiling))
+        await conf.AUTO_PAYDAY_VOICE_AFK.set(field.checked("auto_voice_afk"))
+        await conf.AUTO_PAYDAY_VOICE_ALONE.set(field.checked("auto_voice_alone"))
+        await conf.AUTO_PAYDAY_VOICE_DEAF.set(field.checked("auto_voice_deaf"))
+        # The clocks read these on every voice event, so drop what they have
+        # cached, and start counting whoever is already talking.
+        await self.resync_voice(guild)
 
         if not enabled:
             return [
@@ -225,10 +301,19 @@ class DashboardIntegration:
             self.config.PAYDAY_TIME() if await bank.is_global()
             else self.config.guild(guild).PAYDAY_TIME()
         )
+        window = f"{every // 60 or 1} minute(s)"
+        if mode == "voice":
+            return [
+                {
+                    "message": f"Automatic payday is on. Every {window} the whole "
+                    f"server is paid at once, {rate} per hour spent in voice.",
+                    "category": "success",
+                }
+            ]
         return [
             {
-                "message": f"Automatic payday is on. Everyone due is paid within a "
-                f"minute of their {every // 60 or 1}-minute timer.",
+                "message": f"Automatic payday is on. The whole server is paid at "
+                f"once every {window}.",
                 "category": "success",
             }
         ]
@@ -543,17 +628,26 @@ class DashboardIntegration:
             )
 
         if action == "run_payday":
-            summary = await self.run_auto_payday(guild)
+            # A button press is the ask; it should not wait on the server clock.
+            summary = await self.run_auto_payday(guild, force=True)
             if not summary["paid"]:
+                if summary.get("voice"):
+                    return [
+                        {"message": "Nobody has spent enough time in voice to earn "
+                         "anything yet.", "category": "info"}
+                    ]
                 return [
-                    {"message": "Nobody was due; everyone has been paid recently.",
+                    {"message": "Nobody was paid; check the amount and the required role.",
                      "category": "info"}
                 ]
             currency = await bank.get_currency_name(guild)
+            note = ""
+            if summary.get("voice"):
+                note = f" for {round(summary['voice_seconds'] / 3600, 1)} hours in voice"
             return [
                 {
                     "message": f"Paid {summary['total']} {currency} to "
-                    f"{summary['paid']} member(s).",
+                    f"{summary['paid']} member(s){note}.",
                     "category": "success",
                 }
             ]
@@ -849,8 +943,9 @@ ECONOMY_TEMPLATE = (
       <h5><i class="fa fa-clock-o"></i> Automatic payday</h5>
       <p class="dz-hint">
         Hand out the payday on its own timer so nobody has to run the command.
-        Everyone due is paid within a minute of their cooldown expiring, and the
-        <code>payday</code> command keeps working as a way to check the wait.
+        The whole server is paid together on one clock, so there is a single
+        payslip per run no matter when somebody joined. While this is on, the
+        <code>payday</code> command just tells members when the next one lands.
       </p>
 
       <label class="dz-toggle">
@@ -862,6 +957,93 @@ ECONOMY_TEMPLATE = (
 
       <div class="dz-label" style="margin-top:11px;">Only pay members with this role</div>
       {{ picker('auto_role', auto_roles, allow_none=true, none_label='everyone') }}
+
+      <div style="margin-top:16px; padding-top:13px;
+                  border-top:1px solid rgba(255,255,255,.07);">
+        <div class="dz-label">How much everyone gets</div>
+        <select class="dz-input" name="auto_mode" id="eco-mode"
+                style="max-width:280px;"
+                onchange="document.getElementById('eco-voice').style.display =
+                          this.value === 'voice' ? 'block' : 'none';">
+          <option value="fixed" {% if auto_mode != 'voice' %}selected{% endif %}>
+            The same amount for everyone
+          </option>
+          <option value="voice" {% if auto_mode == 'voice' %}selected{% endif %}>
+            Paid for time spent in voice
+          </option>
+        </select>
+        <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+          The fixed amount is the payday amount above. Voice pay counts only the
+          time since the last payslip, so it rewards the day just gone.
+        </div>
+
+        <div id="eco-voice"
+             style="display:{% if auto_mode == 'voice' %}block{% else %}none{% endif %};
+                    margin-top:13px;">
+          <div class="dz-grid two">
+            <div>
+              <div class="dz-label">{{ currency }} per hour in voice</div>
+              <input class="dz-input" type="number" min="1" name="auto_voice_rate"
+                     value="{{ auto_voice_rate }}" />
+            </div>
+            <div>
+              <div class="dz-label">Minutes needed to earn anything</div>
+              <input class="dz-input" type="number" min="0" name="auto_voice_min"
+                     value="{{ auto_voice_min }}" />
+            </div>
+          </div>
+
+          <div class="dz-label" style="margin-top:11px;">Most anyone can earn per payday</div>
+          <input class="dz-input" type="number" min="0" name="auto_voice_max"
+                 value="{{ auto_voice_max }}" style="max-width:200px;" />
+          <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+            0 for no cap. Per-role payday amounts act as per-hour rates in this
+            mode, so a role that pays more still pays more.
+          </div>
+
+          <div style="margin-top:12px;">
+            <label class="dz-toggle">
+              <input type="checkbox" name="auto_voice_alone"
+                     {% if auto_voice_alone %}checked{% endif %} />
+              <span>Count time spent alone in a channel</span>
+            </label>
+            <label class="dz-toggle">
+              <input type="checkbox" name="auto_voice_deaf"
+                     {% if auto_voice_deaf %}checked{% endif %} />
+              <span>Count time spent deafened</span>
+            </label>
+            <label class="dz-toggle">
+              <input type="checkbox" name="auto_voice_afk"
+                     {% if auto_voice_afk %}checked{% endif %} />
+              <span>Count time in the AFK channel</span>
+            </label>
+          </div>
+
+          <div class="eco-slip" style="border-left-color:{{ auto_colour }}; margin-top:13px;">
+            <div class="eco-slip-t">
+              Banked since the last payslip
+              {% if auto_voice_live %}
+                <span class="dz-tag">{{ auto_voice_live }} in voice now</span>
+              {% endif %}
+            </div>
+            {% if auto_voice_preview %}
+              {% for row in auto_voice_preview %}
+                <div class="eco-rank">
+                  <span class="eco-who">{{ row.name }}</span>
+                  <span class="eco-bal" {% if row.short %}style="opacity:.4;"{% endif %}>
+                    {{ row.minutes }} min &rarr; {{ "{:,}".format(row.amount) }}
+                    {%- if row.short %} (under the minimum){% endif %}
+                  </span>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="dz-empty" style="margin:0;">
+                Nothing banked yet. Time starts counting as soon as somebody talks.
+              </p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
 
       <div style="margin-top:16px; padding-top:13px;
                   border-top:1px solid rgba(255,255,255,.07);">
@@ -893,7 +1075,8 @@ ECONOMY_TEMPLATE = (
         <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
           Defaults to <code>{{ auto_message_default }}</code>. You can use
           <code>{bot}</code>, <code>{guild}</code>, <code>{currency}</code>,
-          <code>{total}</code>, <code>{members}</code> and <code>{average}</code>.
+          <code>{total}</code>, <code>{members}</code>, <code>{average}</code>
+          and <code>{voice}</code>.
         </div>
 
         <div style="margin-top:15px; padding-top:12px;
@@ -958,7 +1141,7 @@ ECONOMY_TEMPLATE = (
           <i class="fa fa-save"></i> Save
         </button>
         <button class="dz-btn" name="action" value="run_payday"
-                onclick="return confirm('Pay everyone who is due right now?');">
+                onclick="return confirm('Pay the whole server right now?');">
           <i class="fa fa-bolt"></i> Run one now
         </button>
       </div>

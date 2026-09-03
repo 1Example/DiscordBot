@@ -1,6 +1,7 @@
 import asyncio
 import calendar
 import logging
+import time
 from collections import namedtuple
 from datetime import datetime, timezone, timedelta
 from math import ceil
@@ -13,7 +14,7 @@ from redbot.core.commands.converter import TimedeltaConverter, positive_int
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils import AsyncIter
-from redbot.core.utils.chat_formatting import box, humanize_number
+from redbot.core.utils.chat_formatting import box, humanize_number, humanize_timedelta
 from redbot.core.utils.menus import menu
 from .dashboard_integration import DashboardIntegration
 
@@ -24,6 +25,16 @@ logger = logging.getLogger("red.economy")
 # How often the auto-payday loop wakes up. Paydays are configured in minutes at
 # the shortest, so a minute of granularity is plenty and costs almost nothing.
 AUTO_PAYDAY_INTERVAL = 60
+
+# A voice clock lives in memory while someone is talking. Banking it every few
+# passes means a restart costs a few minutes of their evening, not all of it.
+VOICE_FLUSH_EVERY = 5
+
+# How long the voice rules are trusted before being read again. Voice events
+# are frequent; guild settings barely ever change.
+VOICE_RULES_TTL = 60
+
+SECONDS_PER_HOUR = 3600
 
 # Discord renders at most 1024 characters per field, and a payslip nobody reads
 # is worse than a short one.
@@ -37,6 +48,10 @@ PAYSLIP_MEDALS = (
 
 DEFAULT_PAYDAY_TITLE = "\N{MONEY WITH WINGS} Payslip's here"
 DEFAULT_PAYDAY_MESSAGE = "**{bot}** pays **{total} {currency}** to **{members}** members."
+DEFAULT_VOICE_PAYDAY_MESSAGE = (
+    "**{bot}** pays **{total} {currency}** to **{members}** members "
+    "for **{voice}** in voice."
+)
 
 NUM_ENC = "\N{COMBINING ENCLOSING KEYCAP}"
 VARIATION_SELECTOR = "\N{VARIATION SELECTOR-16}"
@@ -112,11 +127,26 @@ class Economy(DashboardIntegration, commands.Cog):
         # Who is holding the most, listed under the payslip.
         "AUTO_PAYDAY_LEADERBOARD": True,
         "AUTO_PAYDAY_LEADERBOARD_SIZE": 5,
+        # One clock for the whole server. Without this each member drifts onto
+        # their own timer and a server ends up with a payslip per person.
+        "AUTO_PAYDAY_LAST": 0,
+        # "fixed" pays everyone the same; "voice" pays for time spent talking.
+        "AUTO_PAYDAY_MODE": "fixed",
+        # Credits per hour of voice, and the bounds around it.
+        "AUTO_PAYDAY_VOICE_RATE": 100,
+        "AUTO_PAYDAY_VOICE_MIN": 5,
+        "AUTO_PAYDAY_VOICE_MAX": 0,
+        # What still counts as being present.
+        "AUTO_PAYDAY_VOICE_AFK": False,
+        "AUTO_PAYDAY_VOICE_ALONE": False,
+        "AUTO_PAYDAY_VOICE_DEAF": False,
     }
 
     default_global_settings = default_guild_settings
 
-    default_member_settings = {"next_payday": 0, "last_slot": 0}
+    # voice_seconds is what has been earned since the last payday, so a voice
+    # payday pays for the day just gone rather than for all of history.
+    default_member_settings = {"next_payday": 0, "last_slot": 0, "voice_seconds": 0}
 
     default_role_settings = {"PAYDAY_CREDITS": 0}
 
@@ -132,6 +162,9 @@ class Economy(DashboardIntegration, commands.Cog):
         self.config.register_user(**self.default_user_settings)
         self.config.register_role(**self.default_role_settings)
         self._auto_payday_task: asyncio.Task | None = None
+        # guild id -> member id -> monotonic clock start
+        self._voice_open: dict[int, dict[int, float]] = {}
+        self._voice_rules_cache: dict[int, tuple[float, dict]] = {}
 
     async def cog_load(self) -> None:
         self._auto_payday_task = asyncio.create_task(self._auto_payday_loop())
@@ -139,15 +172,24 @@ class Economy(DashboardIntegration, commands.Cog):
     def cog_unload(self) -> None:
         if self._auto_payday_task is not None:
             self._auto_payday_task.cancel()
+        # Best effort: bank whatever is on the clock before we go. The periodic
+        # flush is what actually guarantees the time survives a restart.
+        if self._voice_open:
+            asyncio.create_task(self._voice_flush())
 
     # ------------------------------------------------------------ auto payday
 
     async def _auto_payday_loop(self) -> None:
         """Run a payday pass for every guild that wants one."""
         await self.bot.wait_until_red_ready()
+        await self._voice_seed()
+        tick = 0
         while True:
             try:
                 await asyncio.sleep(AUTO_PAYDAY_INTERVAL)
+                tick += 1
+                if tick % VOICE_FLUSH_EVERY == 0:
+                    await self._voice_flush()
                 for guild in list(self.bot.guilds):
                     if await self.bot.cog_disabled_in_guild(self, guild):
                         continue
@@ -162,8 +204,138 @@ class Economy(DashboardIntegration, commands.Cog):
             except Exception:  # noqa: BLE001 - the loop itself must never die
                 logger.exception("Auto payday loop error")
 
+    # ---------------------------------------------------------- voice clocks
+
+    async def _voice_rules(self, guild: discord.Guild) -> dict:
+        """What still counts as being present, cached so events stay cheap."""
+        now = time.monotonic()
+        cached = self._voice_rules_cache.get(guild.id)
+        if cached is not None and cached[0] > now:
+            return cached[1]
+        conf = await self.config.guild(guild).all()
+        rules = {
+            "voice": (conf.get("AUTO_PAYDAY_MODE") or "fixed") == "voice",
+            "afk": bool(conf.get("AUTO_PAYDAY_VOICE_AFK")),
+            "alone": bool(conf.get("AUTO_PAYDAY_VOICE_ALONE")),
+            "deaf": bool(conf.get("AUTO_PAYDAY_VOICE_DEAF")),
+        }
+        self._voice_rules_cache[guild.id] = (now + VOICE_RULES_TTL, rules)
+        return rules
+
+    def forget_voice_rules(self, guild: discord.Guild) -> None:
+        """Drop the cached rules after they have been edited."""
+        self._voice_rules_cache.pop(guild.id, None)
+
+    async def resync_voice(self, guild: discord.Guild) -> None:
+        """Re-check every clock in one server after its rules changed.
+
+        Turning voice pay on should start counting the people already talking,
+        not wait for them to move channel.
+        """
+        self.forget_voice_rules(guild)
+        for member in guild.members:
+            if member.bot:
+                continue
+            if member.voice is not None or member.id in self._voice_open.get(guild.id, {}):
+                try:
+                    await self._voice_sync(member)
+                except Exception:  # noqa: BLE001 - one member must not stop the rest
+                    logger.exception("Could not resync the voice clock for %s", member.id)
+
+    @staticmethod
+    def _voice_counts(member: discord.Member, state, rules: dict) -> bool:
+        """Whether this member's clock should be running right now."""
+        if member.bot or state is None or state.channel is None:
+            return False
+        afk = member.guild.afk_channel
+        if not rules["afk"] and afk is not None and state.channel.id == afk.id:
+            return False
+        if not rules["deaf"] and (state.self_deaf or state.deaf):
+            return False
+        if not rules["alone"]:
+            # Sitting alone in a channel is idling, not taking part.
+            if not any(m for m in state.channel.members if not m.bot and m.id != member.id):
+                return False
+        return True
+
+    async def _voice_bank(self, member: discord.Member, seconds: float) -> None:
+        if seconds < 1:
+            return
+        conf = self.config.member(member)
+        await conf.voice_seconds.set(int(await conf.voice_seconds()) + int(seconds))
+
+    async def _voice_sync(self, member: discord.Member, state=None) -> None:
+        """Start or stop one member's clock to match what they are doing."""
+        open_here = self._voice_open.setdefault(member.guild.id, {})
+        started = open_here.get(member.id)
+        rules = await self._voice_rules(member.guild)
+        counts = rules["voice"] and self._voice_counts(
+            member, state if state is not None else member.voice, rules
+        )
+        if counts:
+            if started is None:
+                open_here[member.id] = time.monotonic()
+        elif started is not None:
+            del open_here[member.id]
+            await self._voice_bank(member, time.monotonic() - started)
+
+    async def _voice_flush(self, guild: discord.Guild = None) -> None:
+        """Bank what is on the clock so far, leaving running clocks running."""
+        now = time.monotonic()
+        guild_ids = [guild.id] if guild is not None else list(self._voice_open)
+        for guild_id in guild_ids:
+            open_here = self._voice_open.get(guild_id)
+            if not open_here:
+                continue
+            found = self.bot.get_guild(guild_id)
+            if found is None:
+                self._voice_open.pop(guild_id, None)
+                continue
+            for member_id, started in list(open_here.items()):
+                member = found.get_member(member_id)
+                if member is None:
+                    del open_here[member_id]
+                    continue
+                open_here[member_id] = now
+                await self._voice_bank(member, now - started)
+
+    async def _voice_seed(self) -> None:
+        """Pick up whoever is already talking when the cog loads."""
+        for guild in list(self.bot.guilds):
+            for member in guild.members:
+                if member.voice is not None and member.voice.channel is not None:
+                    try:
+                        await self._voice_sync(member)
+                    except Exception:  # noqa: BLE001 - one member must not stop the rest
+                        logger.exception("Could not start the voice clock for %s", member.id)
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: discord.Member, before, after) -> None:
+        if member.bot:
+            return
+        guild = member.guild
+        try:
+            if await self.bot.cog_disabled_in_guild(self, guild):
+                return
+            # Anyone else in either channel may have just become alone, or
+            # stopped being alone, so their clock needs a look as well.
+            touched = {member.id: member}
+            for channel in (before.channel, after.channel):
+                if channel is not None:
+                    for other in channel.members:
+                        if not other.bot:
+                            touched[other.id] = other
+            for one in touched.values():
+                await self._voice_sync(one)
+        except Exception:  # noqa: BLE001 - never break the event for the rest of the bot
+            logger.exception("Voice clock update failed in %s", guild.id)
+
     async def _payday_amount_for(self, member: discord.Member, base: int, role_credits: dict) -> int:
-        """What this member earns, taking the best of their role payouts."""
+        """What this member earns, taking the best of their role payouts.
+
+        In voice mode the role amounts are read as per-hour rates instead, so a
+        role that pays more keeps paying more without a second set of settings.
+        """
         amount = base
         for role in member.roles:
             role_amount = (role_credits.get(role.id) or {}).get("PAYDAY_CREDITS", 0)
@@ -171,43 +343,81 @@ class Economy(DashboardIntegration, commands.Cog):
                 amount = role_amount
         return amount
 
-    async def run_auto_payday(self, guild: discord.Guild) -> dict:
-        """Pay everyone who is due, and announce it. Returns a summary."""
+    async def run_auto_payday(self, guild: discord.Guild, *, force: bool = False) -> dict:
+        """Pay everyone who is due, and announce it. Returns a summary.
+
+        The whole server shares one clock: a payday happens for everyone at
+        once or not at all. Paying people off their own timers is what leaves a
+        server with a second payslip for one member an hour after the real one.
+        """
         settings = await self.config.guild(guild).all()
         is_global = await bank.is_global()
         cur_time = calendar.timegm(datetime.now(timezone.utc).utctimetuple())
 
-        # A global bank keeps one timer per user; a per-guild bank keeps one per
-        # member. Reading them in bulk keeps a 500-member guild to two queries.
         if is_global:
             payday_time = await self.config.PAYDAY_TIME()
             base_credits = await self.config.PAYDAY_CREDITS()
-            timers = await self.config.all_users()
         else:
             payday_time = settings["PAYDAY_TIME"]
             base_credits = settings["PAYDAY_CREDITS"]
-            timers = await self.config.all_members(guild)
         role_credits = {} if is_global else await self.config.all_roles()
+
+        last_run = settings.get("AUTO_PAYDAY_LAST") or 0
+        if not force and cur_time < last_run + payday_time:
+            return {
+                "paid": 0,
+                "total": 0,
+                "capped": 0,
+                "next": last_run + payday_time,
+                "voice": False,
+                "voice_seconds": 0,
+                "top": [],
+                "skipped": True,
+            }
+
+        voice_mode = (settings.get("AUTO_PAYDAY_MODE") or "fixed") == "voice"
+        rate = max(0, int(settings.get("AUTO_PAYDAY_VOICE_RATE") or 0))
+        min_seconds = max(0, int(settings.get("AUTO_PAYDAY_VOICE_MIN") or 0)) * 60
+        cap = max(0, int(settings.get("AUTO_PAYDAY_VOICE_MAX") or 0))
+        earned: dict = {}
+        if voice_mode:
+            # Bank the live clocks first, so the payslip counts the minutes
+            # somebody is in the middle of right now.
+            await self._voice_flush(guild)
+            earned = await self.config.all_members(guild)
 
         required_role = settings.get("AUTO_PAYDAY_ROLE") or 0
         total = 0
         paid: list[discord.Member] = []
         capped = 0
+        voice_seconds = 0
+        top: list[tuple[str, int, int]] = []
 
         for member in guild.members:
             if member.bot:
                 continue
             if required_role and not member.get_role(required_role):
                 continue
-            last = (timers.get(member.id) or {}).get("next_payday", 0)
-            if cur_time < last + payday_time:
-                continue
 
-            amount = (
-                base_credits
-                if is_global
-                else await self._payday_amount_for(member, base_credits, role_credits)
-            )
+            seconds = 0
+            if voice_mode:
+                seconds = int((earned.get(member.id) or {}).get("voice_seconds", 0) or 0)
+                if seconds < min_seconds or rate <= 0:
+                    continue
+                member_rate = (
+                    rate
+                    if is_global
+                    else await self._payday_amount_for(member, rate, role_credits)
+                )
+                amount = int(seconds * member_rate / SECONDS_PER_HOUR)
+                if cap:
+                    amount = min(amount, cap)
+            else:
+                amount = (
+                    base_credits
+                    if is_global
+                    else await self._payday_amount_for(member, base_credits, role_credits)
+                )
             if amount <= 0:
                 continue
             try:
@@ -223,6 +433,8 @@ class Economy(DashboardIntegration, commands.Cog):
             else:
                 total += amount
                 paid.append(member)
+                voice_seconds += seconds
+                top.append((member.display_name, amount, seconds))
 
             if is_global:
                 await self.config.user(member).next_payday.set(cur_time)
@@ -231,11 +443,28 @@ class Economy(DashboardIntegration, commands.Cog):
             # Payroll is not urgent; let the rest of the bot breathe.
             await asyncio.sleep(0)
 
+        if voice_mode:
+            # The day is settled, so everyone starts the next one from zero,
+            # including the people who did not talk enough to earn anything.
+            for member_id, data in earned.items():
+                if data.get("voice_seconds"):
+                    await self.config.member_from_ids(guild.id, member_id).voice_seconds.set(0)
+            now = time.monotonic()
+            for member_id in self._voice_open.get(guild.id, {}):
+                self._voice_open[guild.id][member_id] = now
+
+        await self.config.guild(guild).AUTO_PAYDAY_LAST.set(cur_time)
+
+        top.sort(key=lambda row: row[1], reverse=True)
         summary = {
             "paid": len(paid),
             "total": total,
             "capped": capped,
             "next": cur_time + payday_time,
+            "voice": voice_mode,
+            "voice_seconds": voice_seconds,
+            "top": top,
+            "skipped": False,
         }
         if paid and settings.get("AUTO_PAYDAY_ANNOUNCE"):
             await self._announce_payday(guild, settings, summary)
@@ -305,6 +534,8 @@ class Economy(DashboardIntegration, commands.Cog):
         currency = await bank.get_currency_name(guild)
         members = summary["paid"]
         total = summary["total"]
+        voice_mode = summary.get("voice")
+        voice_time = humanize_timedelta(seconds=summary.get("voice_seconds", 0)) or _("none")
         fields = {
             "bot": me.display_name,
             "guild": guild.name,
@@ -312,14 +543,19 @@ class Economy(DashboardIntegration, commands.Cog):
             "total": humanize_number(total),
             "members": humanize_number(members),
             "average": humanize_number(total // members if members else 0),
+            "voice": voice_time,
         }
 
-        template = settings.get("AUTO_PAYDAY_MESSAGE") or DEFAULT_PAYDAY_MESSAGE
+        template = settings.get("AUTO_PAYDAY_MESSAGE") or (
+            DEFAULT_VOICE_PAYDAY_MESSAGE if voice_mode else DEFAULT_PAYDAY_MESSAGE
+        )
         try:
             description = template.format(**fields)
         except (KeyError, IndexError, ValueError):
             # A typo in the template is not worth losing the announcement over.
-            description = DEFAULT_PAYDAY_MESSAGE.format(**fields)
+            description = (
+                DEFAULT_VOICE_PAYDAY_MESSAGE if voice_mode else DEFAULT_PAYDAY_MESSAGE
+            ).format(**fields)
 
         colour_value = settings.get("AUTO_PAYDAY_COLOUR") or 0
         try:
@@ -335,6 +571,8 @@ class Economy(DashboardIntegration, commands.Cog):
         )
         embed.add_field(name=_("Members paid"), value=fields["members"])
         embed.add_field(name=_("Average"), value=f"{fields['average']} {currency}")
+        if voice_mode:
+            embed.add_field(name=_("Voice time"), value=voice_time)
         embed.add_field(
             name=_("Next payday"),
             value=discord.utils.format_dt(
@@ -349,6 +587,25 @@ class Economy(DashboardIntegration, commands.Cog):
                 ),
                 inline=False,
             )
+        if voice_mode and summary.get("top"):
+            # In voice mode who talked most is the news, so it goes above the
+            # standing leaderboard rather than replacing it.
+            lines = []
+            for position, (name, amount, seconds) in enumerate(summary["top"][:5], start=1):
+                rank = (
+                    PAYSLIP_MEDALS[position - 1]
+                    if position <= len(PAYSLIP_MEDALS)
+                    else f"`{position}.`"
+                )
+                spent = humanize_timedelta(seconds=seconds) or _("a moment")
+                lines.append(
+                    f"{rank} {discord.utils.escape_markdown(name)} — "
+                    f"**{humanize_number(amount)}** ({spent})"
+                )
+            embed.add_field(
+                name=_("Most time in voice"), value="\n".join(lines), inline=False
+            )
+
         if settings.get("AUTO_PAYDAY_LEADERBOARD", True):
             board = await self._payslip_leaderboard(
                 guild, settings.get("AUTO_PAYDAY_LEADERBOARD_SIZE", 5)
@@ -565,8 +822,8 @@ class Economy(DashboardIntegration, commands.Cog):
         """Explain the wait, and say so differently when payday is automatic."""
         if ctx.guild is not None and await self.config.guild(ctx.guild).AUTO_PAYDAY():
             return _(
-                "{author.mention} You do not need this command here — "
-                "your payday lands on its own. The next one is {relative_time}."
+                "{author.mention} You do not need this command here — the whole "
+                "server is paid together. The next payslip lands {relative_time}."
             ).format(author=ctx.author, relative_time=relative_time)
         return _("{author.mention} Too soon. Your next payday is {relative_time}.").format(
             author=ctx.author, relative_time=relative_time
@@ -584,6 +841,23 @@ class Economy(DashboardIntegration, commands.Cog):
 
         cur_time = calendar.timegm(ctx.message.created_at.utctimetuple())
         credits_name = await bank.get_currency_name(ctx.guild)
+
+        if guild is not None:
+            auto = await self.config.guild(guild).all()
+            if auto.get("AUTO_PAYDAY"):
+                # The server pays everybody together; claiming by hand on top of
+                # that is what puts members back on their own timers.
+                every = (
+                    await self.config.PAYDAY_TIME()
+                    if await bank.is_global()
+                    else auto["PAYDAY_TIME"]
+                )
+                due = (auto.get("AUTO_PAYDAY_LAST") or cur_time) + every
+                relative_time = discord.utils.format_dt(
+                    datetime.fromtimestamp(max(due, cur_time), tz=timezone.utc), "R"
+                )
+                await ctx.send(await self._too_soon(ctx, relative_time))
+                return
         if await bank.is_global():  # Role payouts will not be used
             # Gets the latest time the user used the command successfully and adds the global payday time
             next_payday = (
