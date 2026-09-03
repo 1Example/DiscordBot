@@ -8,6 +8,7 @@ import discord
 from redbot.core import commands, modlog
 from redbot.core.utils.mod import get_audit_reason
 
+from .dashboard_modlog import ModLogDashboardMixin
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -46,8 +47,11 @@ NUMERIC = (
 SPAM_ACTIONS = ("warn", "kick", "ban")
 
 
-class DashboardIntegration:
+class DashboardIntegration(ModLogDashboardMixin):
     """Moderation actions and settings.
+
+    The modlog is a second page of this module rather than a module of its own;
+    see ``dashboard_modlog.py``.
 
     Runs the moderation commands themselves - kick, ban, tempban, softban,
     massban, unban, the voice actions, rename and slowmode - alongside every
@@ -575,6 +579,9 @@ MOD_TEMPLATE = (
       {% if ignored %} &middot; <b>this server is currently ignored</b>{% endif %}
     </p>
   </div>
+
+  {{ subnav(name, [(none, 'Moderation', 'fa-gavel'),
+                   ('modlog', 'Modlog', 'fa-book')], none, guild) }}
 
   {% if lookup %}
     <div class="dz-panel">

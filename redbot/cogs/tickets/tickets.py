@@ -629,8 +629,17 @@ class Tickets(DashboardIntegration, Cog):
         profile: str,
         owner: discord.Member,
         reason: str | None = None,
+        skip_modal: bool = False,
         **kwargs,
-    ) -> None:
+    ) -> Ticket | None:
+        """Open a ticket.
+
+        `skip_modal` is for callers that already have everything the modal
+        would ask for - the Reports cog opens a ticket from a report the member
+        has already written out, and a DM context has nowhere to show a modal
+        anyway. The created ticket is returned so those callers can reference
+        it back to the member; None means the caller's modal timed out.
+        """
         guild = ctx_interaction.guild
 
         config = await self.config.guild(guild).profiles.get_raw(profile)
@@ -654,6 +663,8 @@ class Tickets(DashboardIntegration, Cog):
             ]
         else:
             final_modal = creating_modal
+        if skip_modal:
+            final_modal = None
         owner_answers = {}
         if final_modal is not None:
             modal: discord.ui.Modal = discord.ui.Modal(
@@ -750,6 +761,7 @@ class Tickets(DashboardIntegration, Cog):
                 ).format(channel=ticket.channel),
                 ephemeral=True,
             )
+        return ticket
 
     @commands.guild_only()
     @commands.hybrid_group(aliases=["tickets"])

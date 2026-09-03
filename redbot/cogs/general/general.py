@@ -19,7 +19,6 @@ from redbot.core.utils.chat_formatting import (
     pagify,
 )
 
-from .dashboard_integration import DashboardIntegration
 
 _ = T_ = Translator("General", __file__)
 
@@ -47,7 +46,7 @@ MAX_ROLL: Final[int] = 2**63 - 1
 
 
 @cog_i18n(_)
-class General(DashboardIntegration, commands.Cog):
+class General(commands.Cog):
     """General commands."""
 
     global _

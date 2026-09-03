@@ -86,6 +86,19 @@ class DashboardIntegration:
                         [{"message": "Nothing is playing right now.", "category": "info"}],
                         {},
                     )
+                # PyLav's `Player.get_lyrics` resolves a lyrics-capable node and
+                # then calls `node.fetch_current_lyrics(...)` on it without
+                # checking that it found one, so a bot with no lavalyrics node
+                # raises `'NoneType' object has no attribute
+                # 'fetch_current_lyrics'` from inside pylav. Check for the node
+                # here instead of letting that surface as a crash.
+                if await self.pylav.node_manager.find_best_node(feature="lavalyrics") is None:
+                    return (
+                        [{"message": "No node has the lyrics feature enabled, so the "
+                                     "playing track's lyrics can't be fetched.",
+                          "category": "warning"}],
+                        {},
+                    )
                 lyrics = await player.get_lyrics()
                 if not lyrics:
                     return (
@@ -170,8 +183,8 @@ PLLYRICS_TEMPLATE = (
     <h4><i class="fa fa-music"></i> Lyrics</h4>
     <p>
       {% if supported %}A node with the lyrics feature is available.
-      {% else %}No node currently offers the lyrics feature, so only the player's
-        own lyrics source can be used.{% endif %}
+      {% else %}No node currently offers the lyrics feature. Lyrics lookups need a
+        Lavalink node with the <code>lavalyrics</code> plugin enabled.{% endif %}
     </p>
   </div>
 
@@ -184,7 +197,8 @@ PLLYRICS_TEMPLATE = (
         {% else %}Nothing is playing in {{ guild_name }} right now.{% endif %}
       </p>
       <div class="dz-row">
-        <button class="dz-btn primary" name="action" value="current">
+        <button class="dz-btn primary" name="action" value="current"
+                {% if not supported %}disabled title="No node offers the lyrics feature."{% endif %}>
           <i class="fa fa-play"></i> Lyrics for the current track
         </button>
       </div>

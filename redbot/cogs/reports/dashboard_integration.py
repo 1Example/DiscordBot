@@ -20,7 +20,14 @@ log = logging.getLogger("red.reports.dashboard")
 
 
 class DashboardIntegration:
-    """Report intake: output channel, on/off, and ticket numbering."""
+    """Report intake.
+
+    A report either opens a real ticket through the Tickets cog - the normal
+    setup, so reports and tickets are one queue with one transcript and one
+    close flow - or, on servers without Tickets, is forwarded into an output
+    channel the way it always was. This page picks between the two and lists
+    whatever the legacy path has already collected.
+    """
 
     bot: t.Any
     config: t.Any
@@ -59,6 +66,20 @@ class DashboardIntegration:
 
         can_post = bool(channel and channel.permissions_for(guild.me).send_messages)
 
+        tickets_cog = self.bot.get_cog("Tickets")
+        profiles: list[dict] = []
+        if tickets_cog is not None:
+            raw = await tickets_cog.config.guild(guild).profiles()
+            profiles = [
+                {
+                    "id": name,
+                    "name": name,
+                    "enabled": bool((conf or {}).get("enabled")),
+                }
+                for name, conf in sorted(raw.items())
+            ]
+        profile = settings.get("ticket_profile")
+
         return {
             "status": 0,
             "notifications": notifications,
@@ -72,6 +93,14 @@ class DashboardIntegration:
                 "channel_name": f"#{channel.name}" if channel else None,
                 "channel_missing": bool(channel_id) and channel is None,
                 "can_post": can_post,
+                "tickets_available": tickets_cog is not None,
+                "profiles": profiles,
+                "profile": profile,
+                "profile_missing": bool(profile)
+                and profile not in [p["id"] for p in profiles],
+                "profile_disabled": any(
+                    p["id"] == profile and not p["enabled"] for p in profiles
+                ),
                 "tickets": await self._rep_tickets(guild),
             },
         }
@@ -156,14 +185,44 @@ class DashboardIntegration:
         raw = field("output_channel") or ""
         channel_id = int(raw) if raw.isdigit() else None
         active = field.checked("active")
+        destination = field("destination") or "channel"
+        profile = (field("ticket_profile") or "").strip() or None
+
+        if destination == "ticket":
+            tickets_cog = self.bot.get_cog("Tickets")
+            if tickets_cog is None:
+                return [
+                    {"message": "The Tickets cog is not loaded, so reports cannot "
+                                "open tickets.", "category": "danger"}
+                ]
+            if not profile:
+                return [{"message": "Pick a Tickets profile.", "category": "warning"}]
+            profiles = await tickets_cog.config.guild(guild).profiles()
+            if profile not in profiles:
+                return [
+                    {"message": f"No Tickets profile named '{profile}'.",
+                     "category": "danger"}
+                ]
+            if not (profiles[profile] or {}).get("enabled"):
+                warnings.append(
+                    {
+                        "message": f"The '{profile}' profile is disabled in Tickets, "
+                        f"so reports will fall back to the output channel.",
+                        "category": "warning",
+                    }
+                )
+            await conf.ticket_profile.set(profile)
+        else:
+            await conf.ticket_profile.clear()
+            profile = None
 
         # Reports with nowhere to go are silently dropped, so refuse the
         # combination rather than accepting it.
-        if active and channel_id is None:
+        if active and channel_id is None and profile is None:
             return [
                 {
-                    "message": "Pick an output channel before enabling reports, "
-                    "otherwise submissions go nowhere.",
+                    "message": "Pick an output channel or a Tickets profile before "
+                    "enabling reports, otherwise submissions go nowhere.",
                     "category": "warning",
                 }
             ]
@@ -172,7 +231,7 @@ class DashboardIntegration:
             channel = guild.get_channel(channel_id)
             if channel is None:
                 return [{"message": "That channel no longer exists.", "category": "danger"}]
-            if not channel.permissions_for(guild.me).send_messages:
+            if profile is None and not channel.permissions_for(guild.me).send_messages:
                 warnings.append(
                     {
                         "message": f"I cannot send messages in #{channel.name}, "
@@ -216,20 +275,41 @@ REPORTS_TEMPLATE = (
   <div class="dz-head">
     <h4><i class="fa fa-flag"></i> Reports in {{ guild_name }}</h4>
     <p>
-      {% if active %}Accepting reports{% if channel_name %} into {{ channel_name }}{% endif %}.
-      {% else %}Reports are currently disabled.{% endif %}
-      &middot; next ticket #{{ next_ticket }}
+      {% if not active %}Reports are currently disabled.
+      {% elif profile %}Accepting reports as tickets under the
+        <b>{{ profile }}</b> profile.
+      {% elif channel_name %}Accepting reports into {{ channel_name }}
+        &middot; next ticket #{{ next_ticket }}
+      {% else %}Accepting reports, but with nowhere to send them.{% endif %}
     </p>
   </div>
 
-  {% if channel_missing %}
+  {% if profile_missing %}
+    <div class="dz-panel" style="border-color:rgba(255,90,90,.35);">
+      <p style="margin:0; color:#ff8b8b;">
+        <i class="fa fa-exclamation-circle"></i>
+        The Tickets profile <b>{{ profile }}</b> no longer exists. Reports are
+        falling back to the output channel.
+      </p>
+    </div>
+  {% elif profile_disabled %}
+    <div class="dz-panel" style="border-color:rgba(240,170,60,.35);">
+      <p style="margin:0; color:#f0aa3c;">
+        <i class="fa fa-exclamation-triangle"></i>
+        The <b>{{ profile }}</b> profile is disabled in Tickets, so no ticket
+        will open.
+      </p>
+    </div>
+  {% endif %}
+
+  {% if channel_missing and not profile %}
     <div class="dz-panel" style="border-color:rgba(255,90,90,.35);">
       <p style="margin:0; color:#ff8b8b;">
         <i class="fa fa-exclamation-circle"></i>
         The configured output channel no longer exists. Pick another one.
       </p>
     </div>
-  {% elif active and not can_post %}
+  {% elif active and not profile and not can_post %}
     <div class="dz-panel" style="border-color:rgba(240,170,60,.35);">
       <p style="margin:0; color:#f0aa3c;">
         <i class="fa fa-exclamation-triangle"></i>
@@ -248,21 +328,60 @@ REPORTS_TEMPLATE = (
         <span>Accept reports from members</span>
       </label>
 
-      <div class="dz-label" style="margin-top:11px;">Output channel</div>
-      <select class="dz-select" name="output_channel">
-        <option value="">&mdash; none &mdash;</option>
-        {% for c in channels %}
-          <option value="{{ c.id }}" {% if c.selected %}selected{% endif %}>{{ c.name }}</option>
-        {% endfor %}
-      </select>
-      <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
-        Members submit with the report command; each one lands here as a ticket.
+      <div class="dz-label" style="margin-top:14px;">Where a report goes</div>
+      <label class="dz-toggle">
+        <input type="radio" name="destination" value="ticket"
+               {% if profile %}checked{% endif %}
+               {% if not tickets_available %}disabled{% endif %}
+               onchange="reportsDest(this)" />
+        <span>
+          Open a ticket
+          {% if not tickets_available %}
+            <span class="dz-tag warn">Tickets cog not loaded</span>
+          {% endif %}
+        </span>
+      </label>
+      <label class="dz-toggle">
+        <input type="radio" name="destination" value="channel"
+               {% if not profile %}checked{% endif %} onchange="reportsDest(this)" />
+        <span>Post into a channel</span>
+      </label>
+
+      <div id="rep-ticket" {% if not profile %}style="display:none;"{% endif %}>
+        <div class="dz-label" style="margin-top:11px;">Tickets profile</div>
+        <select class="dz-select" name="ticket_profile">
+          {% for p in profiles %}
+            <option value="{{ p.id }}" {% if p.id == profile %}selected{% endif %}>
+              {{ p.name }}{% if not p.enabled %} (disabled){% endif %}
+            </option>
+          {% else %}
+            <option value="">&mdash; no profiles configured &mdash;</option>
+          {% endfor %}
+        </select>
+        <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+          The report becomes the ticket's reason. It gets the profile's channel,
+          support roles, transcript and close flow, and shows up in Tickets with
+          everything else &mdash; one queue instead of two.
+        </div>
       </div>
 
-      <div class="dz-label" style="margin-top:11px;">Next ticket number</div>
-      <input class="dz-input" type="number" min="1" name="next_ticket" value="{{ next_ticket }}" />
-      <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
-        Change this only if you want to restart or skip the numbering.
+      <div id="rep-channel" {% if profile %}style="display:none;"{% endif %}>
+        <div class="dz-label" style="margin-top:11px;">Output channel</div>
+        <select class="dz-select" name="output_channel">
+          <option value="">&mdash; none &mdash;</option>
+          {% for c in channels %}
+            <option value="{{ c.id }}" {% if c.selected %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+          Also the fallback if the chosen ticket profile is missing or disabled.
+        </div>
+
+        <div class="dz-label" style="margin-top:11px;">Next ticket number</div>
+        <input class="dz-input" type="number" min="1" name="next_ticket" value="{{ next_ticket }}" />
+        <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+          Numbering for the channel path only. Tickets does its own.
+        </div>
       </div>
 
       <div style="margin-top:13px;">
@@ -274,9 +393,15 @@ REPORTS_TEMPLATE = (
   </form>
 
   <div class="dz-panel">
-    <h5><i class="fa fa-inbox"></i> Submitted reports</h5>
-    <p class="dz-hint">Reply here to DM the reporter, the way
-       <code>[p]report interact</code> opens a conversation in Discord.</p>
+    <h5><i class="fa fa-inbox"></i> Reports sent to a channel</h5>
+    <p class="dz-hint">
+      Reports collected by the channel path. Reply here to DM the reporter, the
+      way <code>[p]report interact</code> opens a conversation in Discord.
+      {% if profile %}
+        Reports now open tickets instead, so this list stops growing &mdash;
+        new ones are in the Tickets module.
+      {% endif %}
+    </p>
     {% if tickets %}
       {% for t in tickets %}
         <div style="padding:11px 0; border-bottom:1px solid rgba(255,255,255,.06);">
@@ -304,5 +429,12 @@ REPORTS_TEMPLATE = (
     {% endif %}
   </div>
 </div>
+<script>
+  function reportsDest(input) {
+    var ticket = input.value === "ticket";
+    document.getElementById("rep-ticket").style.display = ticket ? "" : "none";
+    document.getElementById("rep-channel").style.display = ticket ? "none" : "";
+  }
+</script>
 """
 )

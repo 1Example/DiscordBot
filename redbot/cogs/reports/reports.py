@@ -3,12 +3,13 @@ import asyncio
 from typing import Union, List, Literal
 from datetime import timedelta
 from copy import copy
+from types import SimpleNamespace
 import contextlib
 import discord
 
 from redbot.core import Config, commands
 from redbot.core.utils import AsyncIter
-from redbot.core.utils.chat_formatting import pagify, box
+from redbot.core.utils.chat_formatting import humanize_list, pagify, box
 from redbot.core.utils.antispam import AntiSpam
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n, set_contextual_locales_from_guild
@@ -31,7 +32,15 @@ class Reports(DashboardIntegration, commands.Cog):
     gets a DM. Both can be used to communicate.
     """
 
-    default_guild_settings = {"output_channel": None, "active": False, "next_ticket": 1}
+    default_guild_settings = {
+        "output_channel": None,
+        "active": False,
+        "next_ticket": 1,
+        # When set, a report opens a real ticket under this Tickets profile
+        # instead of being forwarded into `output_channel`. The channel path is
+        # kept as the fallback for servers that have not set up Tickets.
+        "ticket_profile": None,
+    }
 
     default_report = {"report": {}}
 
@@ -117,6 +126,38 @@ class Reports(DashboardIntegration, commands.Cog):
         await ctx.send(_("The report channel has been set."))
 
     @commands.admin_or_permissions(manage_guild=True)
+    @reportset.command(name="ticketprofile")
+    async def reportset_ticketprofile(self, ctx: commands.Context, profile: str = None):
+        """Open reports as tickets, using this Tickets profile.
+
+        Run without a profile to go back to forwarding reports into the output
+        channel.
+        """
+        if profile is None:
+            await self.config.guild(ctx.guild).ticket_profile.clear()
+            return await ctx.send(
+                _("Reports will be sent to the report channel again.")
+            )
+        tickets_cog = self.bot.get_cog("Tickets")
+        if tickets_cog is None:
+            return await ctx.send(_("The Tickets cog is not loaded."))
+        profiles = await tickets_cog.config.guild(ctx.guild).profiles()
+        if profile not in profiles:
+            return await ctx.send(
+                _("No Tickets profile named `{profile}` in this server. Available: {available}.")
+                .format(
+                    profile=profile,
+                    available=humanize_list([f"`{p}`" for p in profiles]) or _("none"),
+                )
+            )
+        await self.config.guild(ctx.guild).ticket_profile.set(profile)
+        await ctx.send(
+            _("Reports will now open a ticket under the `{profile}` profile.").format(
+                profile=profile
+            )
+        )
+
+    @commands.admin_or_permissions(manage_guild=True)
     @reportset.command(name="toggle", aliases=["toggleactive"])
     async def reportset_toggle(self, ctx: commands.Context):
         """Enable or disable reporting for this server."""
@@ -197,9 +238,69 @@ class Reports(DashboardIntegration, commands.Cog):
         else:
             return guild
 
+    async def open_ticket_for_report(
+        self, msg: discord.Message, guild: discord.Guild, profile: str
+    ):
+        """Open a Tickets ticket for a report, if that is how this server is set up.
+
+        Returns the ticket, or None if it could not be opened - unloaded cog,
+        deleted profile, a profile that is disabled or misconfigured. Every one
+        of those is a reason to fall through to the output channel rather than
+        to lose the report.
+        """
+        tickets_cog = self.bot.get_cog("Tickets")
+        if tickets_cog is None:
+            log.warning("Reports is set to open tickets but the Tickets cog is not loaded.")
+            return None
+        author = guild.get_member(msg.author.id)
+        if author is None:
+            return None
+        profiles = await tickets_cog.config.guild(guild).profiles()
+        if profile not in profiles:
+            log.warning(
+                "Reports is set to use the Tickets profile %r, which no longer exists in %s.",
+                profile,
+                guild.id,
+            )
+            return None
+
+        # `create_ticket` normally opens a modal to collect the reason. The
+        # member has already written the report, and a report can be filed from
+        # a DM where there is nothing to attach a modal to, so it is passed
+        # straight through with `skip_modal` instead.
+        #
+        # With the modal skipped, `create_ticket` reads only `.guild` off the
+        # context and checks that it is not an Interaction. A report from a DM
+        # has no Context and `msg.guild` is None, so it gets a stand-in that
+        # names the guild the report is *for*.
+        stand_in = SimpleNamespace(
+            guild=guild, author=author, channel=msg.channel, bot=self.bot
+        )
+        try:
+            return await tickets_cog.create_ticket(
+                stand_in,
+                profile=profile,
+                owner=author,
+                reason=msg.clean_content,
+                skip_modal=True,
+            )
+        except Exception:
+            log.exception("Could not open a ticket for a report in %s", guild.id)
+            return None
+
     async def send_report(self, ctx: commands.Context, msg: discord.Message, guild: discord.Guild):
         author = guild.get_member(msg.author.id)
         report = msg.clean_content
+
+        profile = await self.config.guild(guild).ticket_profile()
+        if profile:
+            ticket = await self.open_ticket_for_report(msg, guild, profile)
+            if ticket is not None:
+                # The conversation now lives in the ticket channel, so no
+                # tunnel is opened and nothing is stored in this cog's own
+                # report store. The Ticket comes back rather than a number so
+                # the caller can point the member at the channel.
+                return ticket
 
         channel_id = await self.config.guild(guild).output_channel()
         channel = guild.get_channel(channel_id)
@@ -308,7 +409,10 @@ class Reports(DashboardIntegration, commands.Cog):
 
         with contextlib.suppress(discord.Forbidden, discord.HTTPException):
             if val is None:
-                if await self.config.guild(guild).output_channel() is None:
+                if (
+                    await self.config.guild(guild).output_channel() is None
+                    and await self.config.guild(guild).ticket_profile() is None
+                ):
                     await author.send(
                         _(
                             "This server has no reports channel set up. Please contact a server admin."
@@ -318,8 +422,22 @@ class Reports(DashboardIntegration, commands.Cog):
                     await author.send(
                         _("There was an error sending your report, please contact a server admin.")
                     )
-            else:
+            elif isinstance(val, int):
                 await author.send(_("Your report was submitted. (Ticket #{})").format(val))
+                self.antispam[guild.id][author.id].stamp()
+            else:
+                # A Tickets ticket: the member can follow it in its channel.
+                channel = getattr(val, "channel", None)
+                if channel is not None:
+                    await author.send(
+                        _("Your report opened ticket #{id} in {channel}.").format(
+                            id=val.id, channel=channel.mention
+                        )
+                    )
+                else:
+                    await author.send(
+                        _("Your report opened ticket #{id}.").format(id=val.id)
+                    )
                 self.antispam[guild.id][author.id].stamp()
 
     @report.after_invoke

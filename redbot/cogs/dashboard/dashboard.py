@@ -13,6 +13,7 @@ from redbot.core import Config, commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 
+from .logs import DashboardLogHandler
 from .rpc import DashboardRPC
 
 # Credits:
@@ -279,12 +280,16 @@ class Dashboard(Cog):
         )
 
         self.app: typing.Any | None = None
+        # Feeds the owner-only log viewer. Constructed here but only attached
+        # to the root logger in `cog_load`, so an unloaded cog costs nothing.
+        self.log_handler: DashboardLogHandler = DashboardLogHandler()
         self.rpc: DashboardRPC = DashboardRPC(bot=self.bot, cog=self)
 
     async def cog_load(self) -> None:
         await super().cog_load()
         await self.edit_config_schema()
         await self.settings.add_commands()
+        self.log_handler.install()
         self.logger.info("Loading cog...")
         asyncio.create_task(self.create_app(flask_flags=await self.config.flask_flags()))
 
@@ -311,6 +316,7 @@ class Dashboard(Cog):
 
     async def cog_unload(self) -> None:
         self.logger.info("Unloading cog...")
+        self.log_handler.uninstall()
         if self.app is not None and self.app.server_thread is not None:
             await asyncio.to_thread(self.app.server_thread.shutdown)
             await asyncio.to_thread(self.app.tasks_manager.stop_tasks)

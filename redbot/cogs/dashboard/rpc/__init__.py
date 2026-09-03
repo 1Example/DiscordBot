@@ -19,6 +19,7 @@ from .cog_management import DashboardRPC_CogManagement
 from .default_cogs import DashboardRPC_DefaultCogs
 from .pagination import Pagination
 from .third_parties import DashboardRPC_ThirdParties
+from ..logs import LEVELS
 from .utils import rpc_check
 from .webhooks import DashboardRPC_Webhooks
 
@@ -60,6 +61,7 @@ class DashboardRPC:
         self.bot.register_rpc_handler(self.get_bot_settings)
         self.bot.register_rpc_handler(self.set_bot_settings)
         self.bot.register_rpc_handler(self.set_custom_pages)
+        self.bot.register_rpc_handler(self.get_logs)
 
         # Initialize handlers.
         self.handlers: dict[str, typing.Any] = {}
@@ -111,6 +113,7 @@ class DashboardRPC:
         self.bot.unregister_rpc_handler(self.get_home_guilds)
         self.bot.unregister_rpc_handler(self.set_guild_bot_profile)
         self.bot.unregister_rpc_handler(self.set_custom_pages)
+        self.bot.unregister_rpc_handler(self.get_logs)
         for handler in self.handlers.values():
             handler.unload()
 
@@ -1581,3 +1584,35 @@ class DashboardRPC:
             return {"status": 1}
         await self.cog.config.webserver.custom_pages.set(custom_pages)
         return {"status": 0}
+
+    @rpc_check()
+    async def get_logs(
+        self,
+        user_id: int,
+        after: int = 0,
+        limit: int = 500,
+        levels: list[str] | None = None,
+        query: str | None = None,
+    ) -> dict[str, typing.Any]:
+        """The bot's recent log output, for the owner-only log viewer.
+
+        Owner-only without exception: log lines carry channel names, member
+        names, command arguments and tracebacks from every server the bot is
+        in, so this is strictly more sensitive than anything else the dashboard
+        exposes. There is no guild-scoped version of it on purpose.
+
+        `after` is the sequence number the caller last saw; the page polls with
+        it to receive only what is new.
+        """
+        if user_id not in self.bot.owner_ids:
+            return {"status": 1}
+        handler = getattr(self.cog, "log_handler", None)
+        if handler is None:
+            return {"status": 1, "error": "Log capture is not running."}
+        # Bound what a caller can ask for: this crosses the RPC boundary as
+        # JSON, and the buffer is not large enough to be worth paging beyond.
+        limit = max(1, min(int(limit or 500), handler.capacity))
+        result = handler.read(after=int(after or 0), limit=limit, levels=levels, query=query)
+        result["status"] = 0
+        result["levels"] = list(LEVELS)
+        return result

@@ -414,6 +414,17 @@ BASE_CSS = """
   .dz-head p  { margin:0; opacity:.65; font-size:.85rem; }
   .dz-panel { padding:16px; border-radius:14px;
               background:rgba(90,130,220,.06); border:1px solid rgba(120,160,255,.12); }
+  /* Row of sibling pages for a module that has more than one. */
+  .dz-subnav { display:flex; flex-wrap:wrap; gap:6px; }
+  .dz-subnav-item { display:inline-flex; align-items:center; gap:7px;
+                    padding:7px 14px; border-radius:10px; font-size:.84rem;
+                    font-weight:600; text-decoration:none; color:inherit;
+                    opacity:.7; background:rgba(255,255,255,.04);
+                    border:1px solid rgba(255,255,255,.08); }
+  .dz-subnav-item:hover { opacity:1; background:rgba(255,255,255,.08); color:inherit; }
+  .dz-subnav-item.active { opacity:1; background:rgba(255,255,255,.11);
+                           border-color:rgba(130,175,255,.35); }
+  .dz-subnav-item i { opacity:.75; }
   .dz-panel h5 { margin:0 0 3px; font-size:.95rem; }
   .dz-hint { opacity:.6; font-size:.78rem; margin:0 0 11px; }
   .dz-grid { display:grid; gap:14px; grid-template-columns:1fr; }
@@ -579,6 +590,22 @@ MACROS = """
       {% endfor %}
     </select>
     {% if options|length > 8 %}<div class="dz-count">{{ options|length }} available</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+{# A module with several pages renders this at the top of each of them, so the
+   pages read as one thing instead of unrelated entries in the Modules list.
+   `pages` is a list of (slug, label, icon); slug None is the module's root. #}
+{% macro subnav(module, pages, current, guild=None) -%}
+  <div class="dz-subnav">
+    {% for slug, label, icon in pages %}
+      <a class="dz-subnav-item{% if slug == current %} active{% endif %}"
+         href="{{ url_for('third_parties_blueprint.third_party', name=module,
+                          page=slug if slug else none,
+                          guild_id=guild.id if guild else none) }}">
+        <i class="fa {{ icon }}"></i> {{ label }}
+      </a>
+    {% endfor %}
   </div>
 {%- endmacro %}
 

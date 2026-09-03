@@ -21,6 +21,68 @@ def dashboard_page(*args, **kwargs):
     return decorator
 
 
+# The editor is Glitchii's embed builder: a complete HTML document with ~2.5k
+# lines of its own CSS written against `html`/`body` and a fixed two-pane
+# viewport layout. Pasting that into a dashboard page would have the two
+# stylesheets fighting in both directions, so it stays a standalone document
+# and the dashboard page frames it. Same document either way - the wrapper only
+# decides whether the shell (topbar, guild hero, tabs, back button) is around
+# it.
+#
+# `?raw=1` on the page's own URL is what asks for the bare document, so both
+# forms live on one registered page instead of showing an extra button in the
+# Modules list that nobody should click directly.
+RAW_QUERY_KEY = "raw"
+
+FRAME_TEMPLATE = """
+<style>
+  .eu-frame-wrap { display:flex; flex-direction:column; gap:10px; }
+  .eu-frame-bar  { display:flex; align-items:center; justify-content:flex-end; gap:9px;
+                   font-size:.8rem; opacity:.7; }
+  .eu-frame-bar a { color:inherit; text-decoration:none; display:inline-flex;
+                    align-items:center; gap:6px; padding:5px 11px; border-radius:9px;
+                    background:rgba(255,255,255,.05);
+                    border:1px solid rgba(255,255,255,.10); }
+  .eu-frame-bar a:hover { background:rgba(255,255,255,.10); color:inherit; }
+  /* Tall enough to work in without being taller than the window; the editor
+     scrolls internally, so the page itself never grows a second scrollbar. */
+  .eu-frame { width:100%; height:min(1100px, calc(100vh - 210px)); min-height:620px;
+              border:1px solid rgba(130,175,255,.16); border-radius:14px;
+              background:#2f3136; display:block; }
+</style>
+<div class="eu-frame-wrap">
+  <div class="eu-frame-bar">
+    <a href="{{ raw_url }}" target="_blank" rel="noopener">
+      <i class="fa fa-external-link"></i> Open in a new tab
+    </a>
+  </div>
+  <iframe class="eu-frame" src="{{ raw_url }}" title="Embed editor"></iframe>
+</div>
+"""
+
+
+def _wants_raw(kwargs) -> bool:
+    """True when the request asked for the bare editor document."""
+    value = (kwargs.get("extra_kwargs") or {}).get(RAW_QUERY_KEY)
+    if isinstance(value, (list, tuple)):
+        value = value[-1] if value else None
+    return str(value) in ("1", "true", "yes")
+
+
+def _raw_url(kwargs) -> str:
+    """This page's own URL with `?raw=1` appended."""
+    url = kwargs.get("request_url") or ""
+    base = url.split("?", 1)[0]
+    return f"{base}?{RAW_QUERY_KEY}=1"
+
+
+def _frame(kwargs) -> dict:
+    return {
+        "status": 0,
+        "web_content": {"source": FRAME_TEMPLATE, "raw_url": _raw_url(kwargs)},
+    }
+
+
 class DashboardIntegration:
     bot: Red
 
@@ -28,12 +90,10 @@ class DashboardIntegration:
     async def on_dashboard_cog_add(self, dashboard_cog: commands.Cog) -> None:
         dashboard_cog.rpc.third_parties_handler.add_third_party(self)
 
-    # @dashboard_page(name=None, description="Create Embeds!")
-    # async def global_callback(self, **kwargs) -> None:
-    #     return {"status": 0, "web_content": {"source": '<iframe class="..." src="{{ url_for("third_parties_blueprint.third_party", name=name, page="editor") }}" style="width: 100%; height: 1000px; border: none;"></iframe>', "fullscreen": True}}
-
     @dashboard_page(name=None, description="Create rich Embeds!")
     async def dashboard_editor(self, **kwargs) -> None:
+        if not _wants_raw(kwargs):
+            return _frame(kwargs)
         file_path = os.path.join(os.path.dirname(__file__), "editor.html")
         with open(file_path, encoding="utf-8") as f:
             source = f.read()
@@ -65,6 +125,12 @@ class DashboardIntegration:
                     "I or you don't have permissions to send messages or embeds in any channel in this guild.",
                 ),
             }
+
+        # Both checks above run first, so a refusal is reported by the page
+        # rather than by the framed document, where it would be a 403 rendered
+        # inside a box on an otherwise normal-looking page.
+        if not _wants_raw(kwargs):
+            return _frame(kwargs)
 
         file_path = os.path.join(os.path.dirname(__file__), "editor.html")
         with open(file_path, encoding="utf-8") as f:

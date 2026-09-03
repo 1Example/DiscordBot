@@ -2,23 +2,41 @@
 
 /* Page container */
 .lu-settings {
-  max-width: 960px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
+}
+
+/* Sections stay full-width and in order - collapsing one must not reshuffle
+   the others - but the fields inside them get denser as the page gets wider,
+   so a 1900px screen is not two columns of 900px-wide number inputs. */
+@media (min-width: 1400px) {
+  .lu-settings .lu-section .card-body > .row > [class*="col-md-"] {
+    flex: 0 0 auto;
+    width: 33.3333%;
+  }
+}
+@media (min-width: 1900px) {
+  .lu-settings .lu-section .card-body > .row > [class*="col-md-"] {
+    width: 25%;
+  }
+}
+/* Full-width rows (dynamic tables, sub-headers) opt out of the above. */
+.lu-settings .lu-section .card-body > .row > .col-12 {
+  width: 100% !important;
+  flex: 0 0 auto;
 }
 
 /* Section cards */
 .lu-section {
   border: none;
   border-radius: 0.75rem;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, .08);
-  transition: box-shadow .2s ease;
+  box-shadow: none;
 }
-.lu-section:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
-}
+/* A black hairline is invisible on a dark surface; the divider has to be a
+   light one. Same for the shadows above, which only ever showed on white. */
 .lu-section .card-header {
   background: transparent;
-  border-bottom: 1px solid rgba(0, 0, 0, .06);
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
   user-select: none;
 }
 .lu-section .card-header h6 {
@@ -76,7 +94,6 @@
   font-size: .8125rem;
   border-radius: .5rem;
   padding: .5rem .75rem;
-  border: 1px solid #d2d6da;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 .lu-settings .form-control:focus,
@@ -114,7 +131,6 @@
 
 /* Placeholder styling */
 .lu-settings .form-control::placeholder {
-  color: #adb5bd;
   font-style: italic;
 }
 
@@ -141,19 +157,19 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .04em;
-  color: #8898aa;
+  color: var(--cx-text-dim, #8898aa);
   border-top: none;
-  border-bottom: 2px solid #e9ecef;
+  border-bottom: 2px solid rgba(255, 255, 255, .12);
   padding: .5rem .4rem;
 }
 .lu-dynamic-table tbody td {
   padding: .35rem .4rem;
   vertical-align: middle;
-  border-top: 1px solid #f0f0f5;
+  border-top: 1px solid rgba(255, 255, 255, .07);
 }
 .lu-dynamic-table tfoot td {
   padding: .5rem .4rem;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid rgba(255, 255, 255, .10);
 }
 .lu-dynamic-table .form-control-sm {
   font-size: .78rem;

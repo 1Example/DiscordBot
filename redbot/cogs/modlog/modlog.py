@@ -11,13 +11,12 @@ from redbot.core.utils.chat_formatting import bold, box, pagify
 from redbot.core.utils.menus import menu
 from redbot.core.utils.predicates import MessagePredicate
 
-from .dashboard_integration import DashboardIntegration
 
 _ = Translator("ModLog", __file__)
 
 
 @cog_i18n(_)
-class ModLog(DashboardIntegration, commands.Cog):
+class ModLog(commands.Cog):
     """Browse and manage modlog cases. To manage modlog settings, use `[p]modlogset`."""
 
     def __init__(self, bot: Red):

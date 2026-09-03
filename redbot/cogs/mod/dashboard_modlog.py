@@ -5,7 +5,7 @@ import typing as t
 from datetime import datetime, timezone
 
 import discord
-from redbot.core import commands, modlog
+from redbot.core import modlog
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
@@ -18,13 +18,19 @@ from redbot.core.utils.dashboard_helpers import (
     query_reader,
 )
 
-log = logging.getLogger("red.modlog.dashboard")
+log = logging.getLogger("red.mod.dashboard.modlog")
 
 PAGE_SIZE = 50
 
 
-class DashboardIntegration:
-    """Case browsing and modlog settings from the dashboard.
+class ModLogDashboardMixin:
+    """The modlog, as a page of the Mod module.
+
+    The ModLog cog used to register its own third party, which put a second
+    moderation card in the Modules list that only made sense next to the first
+    one. Everything here goes through ``redbot.core.modlog``, which is a core
+    API rather than the ModLog cog's own state, so it hosts perfectly well from
+    Mod and the two arrive together.
 
     Covers ``[p]case``, ``[p]casesfor``, ``[p]listcases`` and ``[p]reason``, plus
     the ``[p]modlogset`` settings: the modlog channel, which case types are
@@ -33,13 +39,8 @@ class DashboardIntegration:
 
     bot: t.Any
 
-    @commands.Cog.listener()
-    async def on_dashboard_cog_add(self, dashboard_cog) -> None:  # noqa: D401
-        log.info("Dashboard cog found, registering ModLog as a third party.")
-        dashboard_cog.rpc.third_parties_handler.add_third_party(self)
-
     @dashboard_page(
-        name=None,
+        name="modlog",
         description="Browse moderation cases and configure the modlog.",
         methods=("GET", "POST"),
         context_ids=["guild_id", "user_id"],
@@ -257,6 +258,9 @@ MODLOG_TEMPLATE = (
     <h4><i class="fa fa-book"></i> Modlog for {{ guild_name }}</h4>
     <p>Browse every case, correct a reason, and choose what gets logged where.</p>
   </div>
+
+  {{ subnav(name, [(none, 'Moderation', 'fa-gavel'),
+                   ('modlog', 'Modlog', 'fa-book')], 'modlog', guild) }}
 
   {{ stats([('Cases', all_total),
             ('Matching filter', total),
