@@ -44,6 +44,8 @@ class DashboardRPC:
         self.bot.register_rpc_handler(self.check_version)
         self.bot.register_rpc_handler(self.get_user_profile)
         self.bot.register_rpc_handler(self.get_user_access)
+        self.bot.register_rpc_handler(self.get_home_guilds)
+        self.bot.register_rpc_handler(self.set_guild_bot_profile)
         self.bot.register_rpc_handler(self.get_data)
         self.bot.register_rpc_handler(self.get_variables)
         self.bot.register_rpc_handler(self.get_bot_variables)
@@ -77,6 +79,8 @@ class DashboardRPC:
         # nav's "can this person reach the Dashboard at all" answer.
         self.user_fetch_cache: dict[int, tuple[float, typing.Any]] = {}
         self.user_access_cache: dict[int, tuple[float, dict]] = {}
+        self.home_guilds_cache: dict[int, tuple[float, dict]] = {}
+        self.guild_profile_cache: dict[int, tuple[float, dict]] = {}
         self.guilds_cache: dict[
             int,
             dict[
@@ -104,6 +108,8 @@ class DashboardRPC:
         self.bot.unregister_rpc_handler(self.set_bot_settings)
         self.bot.unregister_rpc_handler(self.get_user_profile)
         self.bot.unregister_rpc_handler(self.get_user_access)
+        self.bot.unregister_rpc_handler(self.get_home_guilds)
+        self.bot.unregister_rpc_handler(self.set_guild_bot_profile)
         self.bot.unregister_rpc_handler(self.set_custom_pages)
         for handler in self.handlers.values():
             handler.unload()
@@ -492,6 +498,83 @@ class DashboardRPC:
                 iter(playing_ids or manageable_ids or shared_ids), ""
             )
         self.user_access_cache[user_id] = (time.time(), result)
+        return result
+
+    @rpc_check()
+    async def get_home_guilds(self, user_id: int = None, limit: int = 24) -> dict[str, typing.Any]:
+        """The servers to show on the landing page, with a few figures each.
+
+        Deliberately scoped to servers this person is actually in: a bot's full
+        server list is not the visitor's business, and an anonymous visitor
+        gets nothing at all.
+
+        Kept cheap - attribute reads and cached member lists only, no fetches -
+        because it runs on the busiest page there is.
+        """
+        if not user_id:
+            return {"status": 0, "guilds": [], "total": 0}
+
+        user = self.bot.get_user(user_id)
+        if user is None:
+            return {"status": 0, "guilds": [], "total": 0}
+
+        cached = self.home_guilds_cache.get(user_id)
+        if cached is not None and (cached[0] + 60) > time.time():
+            return cached[1]
+
+        is_owner = user_id in self.bot.owner_ids
+        rows = []
+        for guild in self.bot.guilds:
+            member = guild.get_member(user_id)
+            if member is None:
+                continue
+
+            offline = discord.Status.offline
+            online = None
+            members = getattr(guild, "member_count", None) or len(guild.members)
+            # Walking the member list is fine on a normal server and pointless
+            # on a huge one, where the count is stale the moment it is read.
+            if members <= 25000:
+                try:
+                    online = sum(1 for m in guild.members if not m.bot and m.status is not offline)
+                except Exception:  # noqa: BLE001 - presences may be unavailable
+                    online = None
+
+            can_manage = bool(
+                is_owner
+                or guild.owner_id == user_id
+                or member.guild_permissions.administrator
+                or member.guild_permissions.manage_guild
+                or await self.bot.is_admin(member)
+                or await self.bot.is_mod(member)
+            )
+
+            rows.append(
+                {
+                    "id": str(guild.id),
+                    "name": guild.name,
+                    "icon": guild.icon.url if guild.icon else "",
+                    "members": members,
+                    "online": online,
+                    "bots": sum(1 for m in guild.members if m.bot),
+                    "text_channels": len(guild.text_channels),
+                    "voice_channels": len(guild.voice_channels),
+                    "roles": len(guild.roles),
+                    "emojis": len(guild.emojis),
+                    "boosts": guild.premium_subscription_count or 0,
+                    "tier": guild.premium_tier or 0,
+                    "owner": guild.owner.display_name if guild.owner else "",
+                    "is_owner": guild.owner_id == user_id,
+                    "can_manage": can_manage,
+                    "created_at": guild.created_at.timestamp() if guild.created_at else None,
+                }
+            )
+
+        # Biggest first: the servers somebody actually runs tend to be the ones
+        # they came here for.
+        rows.sort(key=lambda row: (-row["members"], row["name"].lower()))
+        result = {"status": 0, "guilds": rows[:limit], "total": len(rows)}
+        self.home_guilds_cache[user_id] = (time.time(), result)
         return result
 
     @rpc_check()
@@ -1086,6 +1169,7 @@ class DashboardRPC:
                 or member.guild_permissions.manage_guild,
                 # Base.
                 "bot_nickname": guild.me.nick,
+                "bot_profile": await self._guild_profile(guild),
                 "prefixes": await config_group.prefix(),
                 "admin_roles": admin_roles,
                 "mod_roles": mod_roles,
@@ -1183,6 +1267,137 @@ class DashboardRPC:
         i18n.set_contextual_regional_format(settings["regional_format"])
         await self.bot._i18n_cache.set_regional_format(guild, settings["regional_format"])
         return {"status": 0, "change_nickname_error": change_nickname_error}
+
+    # Discord's "modify current member" endpoint. It takes avatar, banner and
+    # bio as well as nick, which is how a bot gets a per-server look - the same
+    # route the `perserverbotprofile` commands use.
+    _GUILD_ME_ROUTE = "/guilds/{}/members/@me"
+    _BIO_LIMIT = 190
+
+    async def _guild_me(self, guild: discord.Guild) -> dict[str, typing.Any]:
+        """The bot's own member object in this guild, straight from the API.
+
+        The gateway's cached member carries no per-guild banner or bio, so the
+        page would have nothing to show without asking for it.
+        """
+        cached = self.guild_profile_cache.get(guild.id)
+        if cached is not None and (cached[0] + 300) > time.time():
+            return cached[1]
+        data = {}
+        try:
+            from discord.http import Route
+
+            data = await self.bot.http.request(
+                Route("GET", self._GUILD_ME_ROUTE.format(guild.id))
+            ) or {}
+        except Exception:  # noqa: BLE001 - the card degrades to the global look
+            log.debug("Could not read the bot's member profile in %s", guild.id, exc_info=True)
+            data = {}
+        self.guild_profile_cache[guild.id] = (time.time(), data)
+        return data
+
+    async def _guild_profile(self, guild: discord.Guild) -> dict[str, typing.Any]:
+        """What the bot currently looks like in one server."""
+        data = await self._guild_me(guild)
+        base = "https://cdn.discordapp.com"
+        avatar = data.get("avatar")
+        banner = data.get("banner")
+        return {
+            "nickname": guild.me.nick or "",
+            "bio": data.get("bio") or "",
+            # Per-guild assets live under a different CDN path to global ones.
+            "avatar_url": (
+                f"{base}/guilds/{guild.id}/users/{self.bot.user.id}/avatars/{avatar}.png?size=256"
+                if avatar else ""
+            ),
+            "banner_url": (
+                f"{base}/guilds/{guild.id}/users/{self.bot.user.id}/banners/{banner}.png?size=512"
+                if banner else ""
+            ),
+            "global_avatar_url": self.bot.user.display_avatar.url,
+            "bio_limit": self._BIO_LIMIT,
+        }
+
+    @rpc_check()
+    async def set_guild_bot_profile(
+        self, user_id: int, guild_id: int, settings: dict[str, typing.Any]
+    ) -> dict[str, typing.Any]:
+        """Set the bot's avatar, banner and bio for one server.
+
+        This only changes how the bot looks in that server, so it is open to
+        the people who administer it rather than to the bot owner alone.
+
+        Each field is optional: absent means leave it alone, the string
+        ``"reset"`` means fall back to the bot's global asset, and an empty
+        string clears it outright.
+        """
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            return {"status": 1, "message": "Unknown server."}
+        member = guild.get_member(user_id)
+        if member is None:
+            return {"status": 1, "message": "You are not in that server."}
+        if not (
+            user_id in self.bot.owner_ids
+            or guild.owner_id == user_id
+            or member.guild_permissions.administrator
+            or await self.bot.is_admin(member)
+        ):
+            return {"status": 1, "message": "You need to administer this server to change this."}
+
+        from discord.http import Route
+
+        route = Route("PATCH", self._GUILD_ME_ROUTE.format(guild_id))
+        payload: dict[str, typing.Any] = {}
+        changed: list[str] = []
+
+        for key, asset_name in (("avatar", "avatar"), ("banner", "banner")):
+            value = settings.get(key)
+            if value is None:
+                continue
+            if value == "reset":
+                # Falling back means re-uploading the global asset, because the
+                # endpoint has no "inherit" - only a value or nothing.
+                asset = getattr(self.bot.user, asset_name, None)
+                if asset is None:
+                    payload[key] = ""
+                else:
+                    try:
+                        raw = await asset.read()
+                        payload[key] = "data:image/png;base64," + base64.b64encode(raw).decode()
+                    except Exception:  # noqa: BLE001
+                        payload[key] = ""
+            else:
+                payload[key] = value
+            changed.append(key)
+
+        if "bio" in settings and settings["bio"] is not None:
+            bio = str(settings["bio"])
+            if len(bio) > self._BIO_LIMIT:
+                return {
+                    "status": 1,
+                    "message": f"The bio can be at most {self._BIO_LIMIT} characters.",
+                }
+            payload["bio"] = bio
+            changed.append("bio")
+
+        if not payload:
+            return {"status": 0, "message": "Nothing to change.", "changed": []}
+
+        try:
+            await self.bot.http.request(route, json=payload)
+        except discord.HTTPException as exc:
+            return {
+                "status": 1,
+                "message": f"Discord refused the change ({exc.status}): {exc.text}",
+            }
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Could not set the per-server bot profile in %s", guild_id)
+            return {"status": 1, "message": f"Could not apply the change: {exc}"}
+
+        # The look just changed, so anything cached about it is now wrong.
+        self.guild_profile_cache.pop(guild_id, None)
+        return {"status": 0, "changed": changed}
 
     @rpc_check()
     async def set_bot_profile(
