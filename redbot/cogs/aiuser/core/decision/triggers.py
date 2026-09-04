@@ -8,15 +8,15 @@ from typing import TYPE_CHECKING, Optional
 import discord
 from redbot.core import commands
 
-from aiuser.config.constants import (
+from ...config.constants import (
     GROK_MAX_WORDS,
     GROK_PRIMARY_TRIGGERS,
     GROK_SECONDARY_TRIGGERS,
 )
-from aiuser.core.decision.validators import is_bot_mentioned_or_replied
+from ...core.decision.validators import is_bot_mentioned_or_replied
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ...core.services import AIUserServices
 
 
 async def get_conversation_reply_settings(

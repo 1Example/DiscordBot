@@ -2,9 +2,9 @@ import pathlib
 
 import discord
 
-from aiuser.dashboard.decorator import dashboard_page
-from aiuser.providers.llm.registry import list_llm_models
-from aiuser.types.abc import MixinMeta
+from ..dashboard.decorator import dashboard_page
+from ..providers.llm.registry import list_llm_models
+from ..types.abc import MixinMeta
 
 TEMPLATES_PATH = pathlib.Path(__file__).parent / "templates"
 

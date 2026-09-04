@@ -1,10 +1,10 @@
 from typing import Any, Dict, Optional
 
-from aiuser.functions import names
-from aiuser.functions.context import ToolContext
-from aiuser.functions.tool_call import ToolCall
-from aiuser.functions.types import Function, Parameters, ToolCallSchema
-from aiuser.functions.wolframalpha.query import ask_wolfram_alpha
+from ...functions import names
+from ...functions.context import ToolContext
+from ...functions.tool_call import ToolCall
+from ...functions.types import Function, Parameters, ToolCallSchema
+from ...functions.wolframalpha.query import ask_wolfram_alpha
 
 
 class WolframAlphaFunctionCall(ToolCall):

@@ -10,8 +10,8 @@ from openai.types.chat import (
 )
 from redbot.core import Config
 
-from aiuser.providers.llm.base import ChatStepResult, LLMProvider
-from aiuser.providers.llm.openai_compatible.endpoints import (
+from ....providers.llm.base import ChatStepResult, LLMProvider
+from ....providers.llm.openai_compatible.endpoints import (
     CompatEndpointKind,
     get_openai_compat_kind,
 )

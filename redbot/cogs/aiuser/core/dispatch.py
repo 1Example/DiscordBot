@@ -8,18 +8,18 @@ from typing import TYPE_CHECKING
 import discord
 from redbot.core import commands
 
-from aiuser.core.decision import (
+from ..core.decision import (
     ResponseKind,
     decide_response,
     get_percentage,
     is_valid_message,
 )
-from aiuser.core.reply_queue import ResponseRequest, get_or_create_channel_reply_state
-from aiuser.response import build_and_respond
-from aiuser.utils.logging_context import with_discord_log_context
+from ..core.reply_queue import ResponseRequest, get_or_create_channel_reply_state
+from ..response import build_and_respond
+from ..utils.logging_context import with_discord_log_context
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

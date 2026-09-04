@@ -6,27 +6,27 @@ from typing import TYPE_CHECKING, List, Optional, Union
 from discord import Message
 from redbot.core import commands
 
-from aiuser.config.defaults import DEFAULT_AUDIO_UPLOAD_LIMIT
-from aiuser.context.converter.audio import (
+from ...config.defaults import DEFAULT_AUDIO_UPLOAD_LIMIT
+from ...context.converter.audio import (
     create_audio_transcript,
     format_audio,
     is_audio_attachment,
 )
-from aiuser.context.converter.embeds import (
+from ...context.converter.embeds import (
     format_embed_content,
     format_embed_message_content,
 )
-from aiuser.context.converter.formatters import (
+from ...context.converter.formatters import (
     format_image_placeholder,
     format_sticker_content,
     format_text_content,
 )
-from aiuser.context.converter.images import format_image
-from aiuser.context.entry import MessageEntry
-from aiuser.utils.utilities import contains_youtube_link, is_embed_valid
+from ...context.converter.images import format_image
+from ...context.entry import MessageEntry
+from ...utils.utilities import contains_youtube_link, is_embed_valid
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ...core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser.context")
 

@@ -1,10 +1,10 @@
 from typing import Any, Dict, Optional
 
-from aiuser.functions import names
-from aiuser.functions.context import ToolContext
-from aiuser.functions.tool_call import ToolCall
-from aiuser.functions.types import Function, Parameters, ToolCallSchema
-from aiuser.functions.weather import query
+from ...functions import names
+from ...functions.context import ToolContext
+from ...functions.tool_call import ToolCall
+from ...functions.types import Function, Parameters, ToolCallSchema
+from ...functions.weather import query
 
 location_weather_schema = ToolCallSchema(
     function=Function(

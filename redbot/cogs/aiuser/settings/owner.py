@@ -8,9 +8,9 @@ from openai import AuthenticationError
 from redbot.core import checks, commands
 from redbot.core.data_manager import cog_data_path
 
-from aiuser.config.constants import OPENROUTER_API_V1_URL
-from aiuser.config.defaults import DEFAULT_LLM_MODEL
-from aiuser.providers.llm.codex.oauth import (
+from ..config.constants import OPENROUTER_API_V1_URL
+from ..config.defaults import DEFAULT_LLM_MODEL
+from ..providers.llm.codex.oauth import (
     CODEX_DEFAULT_MODEL,
     CODEX_ENDPOINT_MODE,
     ensure_valid_codex_oauth,
@@ -20,21 +20,21 @@ from aiuser.providers.llm.codex.oauth import (
     set_codex_oauth,
     start_device_authorization,
 )
-from aiuser.providers.llm.openai_compatible.client import (
+from ..providers.llm.openai_compatible.client import (
     get_openai_client,
     invalidate_openai_client,
 )
-from aiuser.providers.llm.openai_compatible.endpoints import (
+from ..providers.llm.openai_compatible.endpoints import (
     CompatEndpointKind,
     get_openai_compat_api_token_name,
     get_openai_compat_kind,
 )
-from aiuser.settings.utilities import (
+from ..settings.utilities import (
     add_prompt_metrics_fields,
     confirm_pending,
     truncate_prompt,
 )
-from aiuser.types.abc import MixinMeta
+from ..types.abc import MixinMeta
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

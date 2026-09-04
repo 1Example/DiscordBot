@@ -1,11 +1,11 @@
 from typing import Any, Dict, Optional
 
-from aiuser.functions import names
-from aiuser.functions.context import ToolContext
-from aiuser.functions.discord.info import DISCORD_INFO_TYPES, get_discord_info
-from aiuser.functions.discord.reaction import add_reaction
-from aiuser.functions.tool_call import ToolCall
-from aiuser.functions.types import Function, Parameters, ToolCallSchema
+from ...functions import names
+from ...functions.context import ToolContext
+from ...functions.discord.info import DISCORD_INFO_TYPES, get_discord_info
+from ...functions.discord.reaction import add_reaction
+from ...functions.tool_call import ToolCall
+from ...functions.types import Function, Parameters, ToolCallSchema
 
 
 class AddReactionToolCall(ToolCall):

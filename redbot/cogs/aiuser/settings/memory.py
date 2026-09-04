@@ -4,9 +4,9 @@ import discord
 from redbot.core import commands
 from redbot.core.utils.menus import SimpleMenu
 
-from aiuser.settings._groups import aiuser
-from aiuser.types.abc import MixinMeta
-from aiuser.utils.utilities import encode_text_to_tokens
+from ..settings._groups import aiuser
+from ..types.abc import MixinMeta
+from ..utils.utilities import encode_text_to_tokens
 
 logger = logging.getLogger("red.bz_cogs.aiuser.memory")
 

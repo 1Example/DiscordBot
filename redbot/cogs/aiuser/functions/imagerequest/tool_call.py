@@ -4,12 +4,12 @@ from typing import Any, Dict, Optional
 
 import discord
 
-from aiuser.functions import names
-from aiuser.functions.context import ToolContext
-from aiuser.functions.tool_call import ToolCall
-from aiuser.functions.types import Function, Parameters, ToolCallSchema
-from aiuser.providers.llm.codex.oauth import CODEX_ENDPOINT_MODE
-from aiuser.utils.utilities import format_variables
+from ...functions import names
+from ...functions.context import ToolContext
+from ...functions.tool_call import ToolCall
+from ...functions.types import Function, Parameters, ToolCallSchema
+from ...providers.llm.codex.oauth import CODEX_ENDPOINT_MODE
+from ...utils.utilities import format_variables
 
 from .providers.factory import PROVIDERS, detect_image_provider
 

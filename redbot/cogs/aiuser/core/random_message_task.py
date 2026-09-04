@@ -11,16 +11,16 @@ import discord
 from discord.ext import tasks
 from redbot.core import commands
 
-from aiuser.config.constants import RANDOM_MESSAGE_TASK_RETRY_SECONDS
-from aiuser.context.assembler import ConversationAssembler
-from aiuser.core.reply_queue import get_or_create_channel_reply_state
-from aiuser.providers.llm.registry import get_llm_provider
-from aiuser.response import generate_and_send
-from aiuser.utils.adapters import ensure_member_like
-from aiuser.utils.utilities import format_variables
+from ..config.constants import RANDOM_MESSAGE_TASK_RETRY_SECONDS
+from ..context.assembler import ConversationAssembler
+from ..core.reply_queue import get_or_create_channel_reply_state
+from ..providers.llm.registry import get_llm_provider
+from ..response import generate_and_send
+from ..utils.adapters import ensure_member_like
+from ..utils.utilities import format_variables
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

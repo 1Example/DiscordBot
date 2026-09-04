@@ -7,7 +7,7 @@ from redbot.core import Config, commands
 from redbot.core.bot import Red
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 
 class CompositeMetaClass(type(commands.Cog), type(ABC)):

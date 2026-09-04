@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, List, Set
 import discord
 from redbot.core import commands
 
-from aiuser.context.converter.converter import MessageConverter
-from aiuser.providers.llm.registry import get_llm_provider
+from ...context.converter.converter import MessageConverter
+from ...providers.llm.registry import get_llm_provider
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ...core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

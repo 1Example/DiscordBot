@@ -5,7 +5,7 @@ import httpx
 from openai.types.chat import ChatCompletionMessageToolCall
 from redbot.core import Config
 
-from aiuser.providers.llm.codex.oauth import (
+from ....providers.llm.codex.oauth import (
     CODEX_RESPONSES_URL,
     ensure_valid_codex_oauth,
 )

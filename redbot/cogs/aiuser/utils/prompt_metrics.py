@@ -4,15 +4,15 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from aiuser.config.models import OPENROUTER_MODEL_PROMPT_PRICES
-from aiuser.utils.utilities import (
+from ..config.models import OPENROUTER_MODEL_PROMPT_PRICES
+from ..utils.utilities import (
     encode_text_to_tokens,
     format_variables,
     get_tokenizer_encoding,
 )
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 
 @dataclass

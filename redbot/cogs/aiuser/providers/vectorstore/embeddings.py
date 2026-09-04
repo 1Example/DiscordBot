@@ -8,12 +8,12 @@ import tiktoken
 from fastembed import TextEmbedding
 from fastembed.common.types import NumpyArray
 
-from aiuser.config.constants import (
+from ...config.constants import (
     EMBEDDING_CACHE_DIR_NAME,
     EMBEDDING_MODEL,
     FALLBACK_TOKENIZER,
 )
-from aiuser.utils.utilities import encode_text_to_tokens, to_thread
+from ...utils.utilities import encode_text_to_tokens, to_thread
 
 # loading the ONNX model takes seconds, so keep one instance per cache folder
 _models: Dict[str, TextEmbedding] = {}

@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Tuple
 import discord
 from redbot.core import commands
 
-from aiuser.config.constants import SINGULAR_MENTION_PATTERN
-from aiuser.utils.adapters import ensure_member_like
+from ...config.constants import SINGULAR_MENTION_PATTERN
+from ...utils.adapters import ensure_member_like
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ...core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

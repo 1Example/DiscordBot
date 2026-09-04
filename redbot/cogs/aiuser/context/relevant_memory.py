@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Optional
 
 from redbot.core import commands
 
-from aiuser.config.defaults import DEFAULT_MEMORY_RETRIEVAL_PREFIX
+from ..config.defaults import DEFAULT_MEMORY_RETRIEVAL_PREFIX
 
 if TYPE_CHECKING:
-    from aiuser.providers.vectorstore import VectorStore
+    from ..providers.vectorstore import VectorStore
 
 logger = logging.getLogger("red.bz_cogs.aiuser.memory")
 

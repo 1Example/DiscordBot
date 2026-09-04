@@ -12,15 +12,15 @@ from openai import AsyncOpenAI
 from redbot.core import Config, commands
 from redbot.core.bot import Red
 
-from aiuser.config.resolver import ScopedConfigResolver
-from aiuser.consent import ConsentService
-from aiuser.context.compaction import CompactionManager, CompactionStore
-from aiuser.utils.cache import Cache
-from aiuser.providers.vectorstore import VectorStore
-from aiuser.providers.vectorstore.schema import ensure_sqlite_db
+from ..config.resolver import ScopedConfigResolver
+from ..consent import ConsentService
+from ..context.compaction import CompactionManager, CompactionStore
+from ..utils.cache import Cache
+from ..providers.vectorstore import VectorStore
+from ..providers.vectorstore.schema import ensure_sqlite_db
 
 if TYPE_CHECKING:
-    from aiuser.core.reply_queue import ChannelReplyState
+    from ..core.reply_queue import ChannelReplyState
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

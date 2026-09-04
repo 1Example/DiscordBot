@@ -3,8 +3,8 @@ from typing import Optional, Union
 
 import aiosqlite
 
-from aiuser.config.constants import COMPACTION_DB_NAME
-from aiuser.context.compaction.schema import ensure_compaction_db
+from ...config.constants import COMPACTION_DB_NAME
+from ...context.compaction.schema import ensure_compaction_db
 
 
 class CompactionStore:

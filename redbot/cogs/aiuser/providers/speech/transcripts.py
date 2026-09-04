@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ...core.services import AIUserServices
 
 AUDIO_TRANSCRIPT_CACHE_NAMESPACE = "audio_transcript"
 

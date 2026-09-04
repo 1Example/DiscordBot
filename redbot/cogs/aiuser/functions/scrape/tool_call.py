@@ -1,14 +1,14 @@
 import logging
 from typing import Any, Dict, Optional
 
-from aiuser.functions import names
-from aiuser.functions.context import ToolContext
-from aiuser.functions.scrape.providers import (
+from ...functions import names
+from ...functions.context import ToolContext
+from ...functions.scrape.providers import (
     MAX_SCRAPED_CHARS,
     configured_scrape_provider,
 )
-from aiuser.functions.tool_call import ToolCall
-from aiuser.functions.types import Function, Parameters, ToolCallSchema
+from ...functions.tool_call import ToolCall
+from ...functions.types import Function, Parameters, ToolCallSchema
 
 logger = logging.getLogger("red.bz_cogs.aiuser.tools")
 

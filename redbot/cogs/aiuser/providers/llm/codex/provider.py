@@ -2,9 +2,9 @@ from typing import Any, Dict, List
 
 from openai.types.chat import ChatCompletionMessageParam
 
-from aiuser.providers.llm.base import ChatStepResult, LLMProvider
-from aiuser.providers.llm.codex.oauth import CODEX_ALLOWED_MODELS
-from aiuser.providers.llm.codex.responses import create_codex_response
+from ....providers.llm.base import ChatStepResult, LLMProvider
+from ....providers.llm.codex.oauth import CODEX_ALLOWED_MODELS
+from ....providers.llm.codex.responses import create_codex_response
 
 
 class CodexProvider(LLMProvider):

@@ -9,9 +9,9 @@ from typing import Any, Dict, List, Optional
 from openai.types.chat import ChatCompletionMessageToolCall
 from redbot.core import Config, commands
 
-from aiuser.functions.context import ToolContext
-from aiuser.functions.registry import get_enabled_tools
-from aiuser.functions.tool_call import ToolCall
+from ..functions.context import ToolContext
+from ..functions.registry import get_enabled_tools
+from ..functions.tool_call import ToolCall
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

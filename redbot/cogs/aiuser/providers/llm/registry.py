@@ -1,14 +1,14 @@
 from typing import TYPE_CHECKING, Optional
 
-from aiuser.providers.llm.codex.oauth import is_codex_endpoint_mode
-from aiuser.providers.llm.codex.provider import CodexProvider
-from aiuser.providers.llm.openai_compatible.client import get_openai_client
-from aiuser.providers.llm.openai_compatible.provider import OpenAICompatibleProvider
+from ...providers.llm.codex.oauth import is_codex_endpoint_mode
+from ...providers.llm.codex.provider import CodexProvider
+from ...providers.llm.openai_compatible.client import get_openai_client
+from ...providers.llm.openai_compatible.provider import OpenAICompatibleProvider
 
 from .base import LLMProvider
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ...core.services import AIUserServices
 
 
 async def get_llm_provider(services: "AIUserServices") -> Optional[LLMProvider]:

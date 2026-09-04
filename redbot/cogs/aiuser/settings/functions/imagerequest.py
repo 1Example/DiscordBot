@@ -3,14 +3,14 @@ from typing import Optional
 import discord
 from redbot.core import commands
 
-from aiuser.functions import names
-from aiuser.settings.scope import (
+from ...functions import names
+from ...settings.scope import (
     get_effective_scoped_setting_for_target,
     get_settings_target_scope,
 )
-from aiuser.settings.functions.utilities import FunctionToggleHelperMixin, functions
-from aiuser.settings.utilities import add_prompt_metrics_fields, truncate_prompt
-from aiuser.types.types import COMPATIBLE_MENTIONS
+from ...settings.functions.utilities import FunctionToggleHelperMixin, functions
+from ...settings.utilities import add_prompt_metrics_fields, truncate_prompt
+from ...types.types import COMPATIBLE_MENTIONS
 
 
 class ImageRequestFunctionSettings(FunctionToggleHelperMixin):

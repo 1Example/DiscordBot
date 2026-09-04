@@ -7,7 +7,7 @@ from discord import Attachment, Message
 from PIL import Image
 from redbot.core import Config
 
-from aiuser.context.converter.formatters import format_text_content
+from ...context.converter.formatters import format_text_content
 
 logger = logging.getLogger("red.bz_cogs.aiuser.context")
 

@@ -6,7 +6,7 @@ then register it in PROVIDERS here (plus PROVIDER_KEY_SERVICES if it
 needs a shared API token).
 """
 
-from aiuser.functions.search.providers import exa, searxng
+from ....functions.search.providers import exa, searxng
 
 EXA = "exa"
 SEARXNG = "searxng"

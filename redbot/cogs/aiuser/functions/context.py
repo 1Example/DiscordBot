@@ -7,7 +7,7 @@ import discord
 from redbot.core import commands
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 
 @dataclass

@@ -1,21 +1,21 @@
 import discord
 from redbot.core import commands
 
-from aiuser.config.defaults import DEFAULT_TOOL_CALL_ROUNDS
-from aiuser.functions import names
-from aiuser.providers.speech.tts import DEFAULT_MODELS, DEFAULT_VOICES
-from aiuser.config.model_info import get_model_info
-from aiuser.settings.functions.imagerequest import ImageRequestFunctionSettings
-from aiuser.settings.functions.memory import MemoryFunctionSettings
-from aiuser.settings.functions.scrape import ScrapeFunctionSettings
-from aiuser.settings.functions.search import SearchFunctionSettings
-from aiuser.settings.functions.utilities import (
+from ...config.defaults import DEFAULT_TOOL_CALL_ROUNDS
+from ...functions import names
+from ...providers.speech.tts import DEFAULT_MODELS, DEFAULT_VOICES
+from ...config.model_info import get_model_info
+from ...settings.functions.imagerequest import ImageRequestFunctionSettings
+from ...settings.functions.memory import MemoryFunctionSettings
+from ...settings.functions.scrape import ScrapeFunctionSettings
+from ...settings.functions.search import SearchFunctionSettings
+from ...settings.functions.utilities import (
     FunctionsGroupMixin,
     functions,
     provider_key_error,
 )
-from aiuser.settings.functions.voice import VoiceFunctionSettings
-from aiuser.settings.functions.weather import WeatherFunctionSettings
+from ...settings.functions.voice import VoiceFunctionSettings
+from ...settings.functions.weather import WeatherFunctionSettings
 
 
 class FunctionCallingSettings(

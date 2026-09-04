@@ -10,17 +10,17 @@ from typing import TYPE_CHECKING, Optional
 import discord
 from redbot.core import commands
 
-from aiuser.config.constants import URL_PATTERN
-from aiuser.config.defaults import (
+from ..config.constants import URL_PATTERN
+from ..config.defaults import (
     DEFAULT_MESSAGE_BURST_IDLE_SECONDS,
     DEFAULT_MESSAGE_BURST_MAX_SECONDS,
 )
-from aiuser.core.decision import BurstMode, ResponseKind, is_valid_message
-from aiuser.response import build_and_respond
-from aiuser.utils.utilities import wait_for_embed
+from ..core.decision import BurstMode, ResponseKind, is_valid_message
+from ..response import build_and_respond
+from ..utils.utilities import wait_for_embed
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

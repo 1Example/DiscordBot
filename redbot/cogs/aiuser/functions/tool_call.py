@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
-from aiuser.functions.context import ToolContext
-from aiuser.functions.types import ToolCallSchema
+from ..functions.context import ToolContext
+from ..functions.types import ToolCallSchema
 
 
 class ToolCall:

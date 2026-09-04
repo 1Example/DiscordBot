@@ -6,8 +6,8 @@ import discord
 from redbot.core import checks, commands
 from redbot.core.bot import Red
 
-from aiuser.settings._groups import aiuser
-from aiuser.types.abc import MixinMeta
+from ...settings._groups import aiuser
+from ...types.abc import MixinMeta
 
 
 async def provider_key_error(

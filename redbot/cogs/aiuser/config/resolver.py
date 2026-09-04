@@ -6,7 +6,7 @@ from typing import Any, Optional
 import discord
 from redbot.core import Config, commands
 
-from aiuser.config.defaults import DEFAULT_PROMPT
+from ..config.defaults import DEFAULT_PROMPT
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

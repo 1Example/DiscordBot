@@ -7,17 +7,17 @@ from redbot.core import checks, commands
 from redbot.core.utils.chat_formatting import pagify
 from redbot.core.utils.menus import SimpleMenu
 
-from aiuser.config.defaults import DEFAULT_PROMPT
-from aiuser.settings._groups import aiuser
-from aiuser.settings.scope import get_settings_target_scope
-from aiuser.settings.utilities import (
+from ..config.defaults import DEFAULT_PROMPT
+from ..settings._groups import aiuser
+from ..settings.scope import get_settings_target_scope
+from ..settings.utilities import (
     add_prompt_metrics_fields,
     confirm_pending,
     truncate_prompt,
 )
-from aiuser.types.abc import MixinMeta
-from aiuser.types.enums import MentionType
-from aiuser.types.types import COMPATIBLE_MENTIONS
+from ..types.abc import MixinMeta
+from ..types.enums import MentionType
+from ..types.types import COMPATIBLE_MENTIONS
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

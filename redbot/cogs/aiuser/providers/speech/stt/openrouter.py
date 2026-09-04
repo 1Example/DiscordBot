@@ -6,7 +6,7 @@ import httpx
 from redbot.core import Config
 from redbot.core.bot import Red
 
-from aiuser.config.constants import OPENROUTER_API_V1_URL
+from ....config.constants import OPENROUTER_API_V1_URL
 
 TRANSCRIPTION_TIMEOUT = 30
 DEFAULT_MODEL = "openai/whisper-large-v3"

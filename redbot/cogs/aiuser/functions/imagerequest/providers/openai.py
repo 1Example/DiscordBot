@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from aiuser.functions.imagerequest.providers.util import fetch_image_bytes
-from aiuser.providers.llm.openai_compatible.client import setup_openai_client
+from ....functions.imagerequest.providers.util import fetch_image_bytes
+from ....providers.llm.openai_compatible.client import setup_openai_client
 
 if TYPE_CHECKING:
-    from aiuser.functions.context import ToolContext
+    from ....functions.context import ToolContext
 
 
 async def generate(description: str, request: "ToolContext", endpoint: str) -> bytes:

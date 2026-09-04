@@ -2,7 +2,7 @@ import random
 
 import discord
 
-from aiuser.functions.discord.reaction import message_preview
+from ...functions.discord.reaction import message_preview
 
 DISCORD_INFO_TYPES = ("channel", "server", "author", "server_emojis")
 

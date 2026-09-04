@@ -5,11 +5,11 @@ from typing import Optional, Tuple
 import discord
 from redbot.core import commands
 
-from aiuser.config.resolver import ScopedConfigResolver
-from aiuser.settings.utilities import get_config_attribute, get_mention_type
-from aiuser.types.abc import MixinMeta
-from aiuser.types.enums import MentionType
-from aiuser.types.types import COMPATIBLE_MENTIONS
+from ..config.resolver import ScopedConfigResolver
+from ..settings.utilities import get_config_attribute, get_mention_type
+from ..types.abc import MixinMeta
+from ..types.enums import MentionType
+from ..types.types import COMPATIBLE_MENTIONS
 
 SCOPED_TARGET_TYPES = (
     discord.Member,

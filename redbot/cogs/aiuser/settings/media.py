@@ -3,13 +3,13 @@ from __future__ import annotations
 import discord
 from redbot.core import checks, commands
 
-from aiuser.config.defaults import DEFAULT_STT_PROVIDER
-from aiuser.config.model_info import get_model_info
-from aiuser.providers.llm.registry import list_llm_models
-from aiuser.settings._groups import aiuser
-from aiuser.settings.functions.utilities import provider_key_error
-from aiuser.providers.speech.stt import DEFAULT_MODELS, PROVIDERS
-from aiuser.types.abc import MixinMeta
+from ..config.defaults import DEFAULT_STT_PROVIDER
+from ..config.model_info import get_model_info
+from ..providers.llm.registry import list_llm_models
+from ..settings._groups import aiuser
+from ..settings.functions.utilities import provider_key_error
+from ..providers.speech.stt import DEFAULT_MODELS, PROVIDERS
+from ..types.abc import MixinMeta
 
 
 class MediaSettings(MixinMeta):

@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from aiuser.config.constants import GEMINI_IMAGE_MODEL
+from ....config.constants import GEMINI_IMAGE_MODEL
 
 if TYPE_CHECKING:
-    from aiuser.functions.context import ToolContext
+    from ....functions.context import ToolContext
 
 
 async def generate(description: str, request: "ToolContext", endpoint: str) -> bytes:

@@ -5,14 +5,14 @@ from typing import Any, Dict, Optional
 
 import discord
 
-from aiuser.functions import names
-from aiuser.functions.context import ToolContext
-from aiuser.functions.tool_call import ToolCall
-from aiuser.functions.types import Function, Parameters, ToolCallSchema
-from aiuser.functions.voice.native import send_voice_message
-from aiuser.providers.speech.constants import MAX_VOICE_WORDS
-from aiuser.providers.speech.transcripts import cache_audio_transcript
-from aiuser.providers.speech.tts import PROVIDERS, voice_settings
+from ...functions import names
+from ...functions.context import ToolContext
+from ...functions.tool_call import ToolCall
+from ...functions.types import Function, Parameters, ToolCallSchema
+from ...functions.voice.native import send_voice_message
+from ...providers.speech.constants import MAX_VOICE_WORDS
+from ...providers.speech.transcripts import cache_audio_transcript
+from ...providers.speech.tts import PROVIDERS, voice_settings
 
 logger = logging.getLogger("red.bz_cogs.aiuser.tools")
 

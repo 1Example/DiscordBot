@@ -6,7 +6,7 @@ import httpx
 from redbot.core import Config
 from redbot.core.bot import Red
 
-from aiuser.providers.speech.constants import (
+from ....providers.speech.constants import (
     ELEVENLAB_INLINE_TAG_MODELS,
     TTS_PROVIDER_TIMEOUT,
     strip_inline_tags,

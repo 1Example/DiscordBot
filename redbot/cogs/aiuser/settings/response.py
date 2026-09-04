@@ -8,10 +8,10 @@ from redbot.core import checks, commands
 from redbot.core.utils.chat_formatting import box, pagify
 from redbot.core.utils.menus import SimpleMenu
 
-from aiuser.config.defaults import DEFAULT_REMOVE_PATTERNS
-from aiuser.settings._groups import aiuser
-from aiuser.settings.utilities import confirm_pending
-from aiuser.types.abc import MixinMeta
+from ..config.defaults import DEFAULT_REMOVE_PATTERNS
+from ..settings._groups import aiuser
+from ..settings.utilities import confirm_pending
+from ..types.abc import MixinMeta
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

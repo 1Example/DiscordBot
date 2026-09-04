@@ -6,12 +6,12 @@ from typing import Awaitable, Callable
 
 import aiohttp
 
-from aiuser.functions.context import ToolContext
-from aiuser.functions.scrape.providers import (
+from ....functions.context import ToolContext
+from ....functions.scrape.providers import (
     MAX_SCRAPED_CHARS,
     configured_scrape_provider,
 )
-from aiuser.utils.utilities import contains_youtube_link
+from ....utils.utilities import contains_youtube_link
 
 logger = logging.getLogger("red.bz_cogs.aiuser.tools")
 

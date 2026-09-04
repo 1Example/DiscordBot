@@ -4,13 +4,13 @@ from typing import Optional
 import discord
 from redbot.core import checks, commands
 
-from aiuser.settings._groups import aiuser
-from aiuser.settings.scope import (
+from ..settings._groups import aiuser
+from ..settings.scope import (
     get_effective_scoped_setting_for_target,
     get_settings_target_scope,
 )
-from aiuser.types.abc import MixinMeta
-from aiuser.types.types import COMPATIBLE_MENTIONS
+from ..types.abc import MixinMeta
+from ..types.types import COMPATIBLE_MENTIONS
 
 
 class ReplySettings(MixinMeta):

@@ -1,4 +1,4 @@
-from aiuser.dashboard.decorator import dashboard_page
+from ..dashboard.decorator import dashboard_page
 
 
 @dashboard_page(name=None, methods=("GET",), is_owner=True, hidden=True)

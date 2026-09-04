@@ -5,9 +5,9 @@ import pathlib
 
 import discord
 
-from aiuser.dashboard.decorator import dashboard_page
-from aiuser.types.abc import MixinMeta
-from aiuser.utils.prompt_metrics import (
+from ..dashboard.decorator import dashboard_page
+from ..types.abc import MixinMeta
+from ..utils.prompt_metrics import (
     get_prompt_metrics,
 )
 

@@ -9,14 +9,14 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from discord import Message
 
-from aiuser.providers.speech.stt import PROVIDERS, transcription_settings
-from aiuser.providers.speech.transcripts import (
+from ...providers.speech.stt import PROVIDERS, transcription_settings
+from ...providers.speech.transcripts import (
     AUDIO_TRANSCRIPT_CACHE_NAMESPACE,
     cached_audio_transcript,
 )
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ...core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser.context")
 

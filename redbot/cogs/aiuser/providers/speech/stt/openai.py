@@ -3,8 +3,8 @@ from __future__ import annotations
 from redbot.core import Config
 from redbot.core.bot import Red
 
-from aiuser.providers.llm.openai_compatible.client import setup_openai_client
-from aiuser.providers.speech.constants import OPENAI_API_V1_URL
+from ....providers.llm.openai_compatible.client import setup_openai_client
+from ....providers.speech.constants import OPENAI_API_V1_URL
 
 DEFAULT_MODEL = "gpt-4o-transcribe"
 

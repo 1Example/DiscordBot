@@ -1882,6 +1882,9 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   .plc-vol{ margin-left:0 !important; width:100%; }
 }
 </style>
+{{ subnav(name, [(none, 'Player', 'fa-play-circle'),
+                 ('settings', 'Settings', 'fa-sliders')], none, guild) }}
+
 <div id="plcRoot"
      data-csrf="{{ csrf_token_value }}"
      data-staff="{% if is_staff %}1{% else %}0{% endif %}">
@@ -2977,6 +2980,9 @@ SETTINGS_TEMPLATE = (
       {% else %}No controller has been posted yet.{% endif %}
     </p>
   </div>
+  {{ subnav(name, [(none, 'Player', 'fa-play-circle'),
+                   ('settings', 'Settings', 'fa-sliders')], 'settings', guild) }}
+
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />

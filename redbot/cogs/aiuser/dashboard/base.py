@@ -1,7 +1,7 @@
 from redbot.core import commands
 from redbot.core.bot import Red
 
-from aiuser.types.abc import MixinMeta
+from ..types.abc import MixinMeta
 
 from .consent_page import opt_consent
 from .main_page import main

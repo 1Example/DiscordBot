@@ -2,7 +2,7 @@ import pathlib
 
 import discord
 
-from aiuser.dashboard.decorator import dashboard_page
+from ..dashboard.decorator import dashboard_page
 
 TEMPLATES_PATH = pathlib.Path(__file__).parent / "templates"
 

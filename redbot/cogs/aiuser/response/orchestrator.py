@@ -8,18 +8,18 @@ from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from redbot.core import commands
 
-from aiuser.consent import maybe_send_consent_embed
-from aiuser.context.assembler import ConversationAssembler
-from aiuser.context.conversation import Conversation
-from aiuser.providers.speech.transcripts import cache_audio_transcript
-from aiuser.response.pipeline import LLMPipeline, PipelineError
-from aiuser.response.sender import deliver
-from aiuser.utils.cache import memory_cache_key, tool_calls_cache_key
+from ..consent import maybe_send_consent_embed
+from ..context.assembler import ConversationAssembler
+from ..context.conversation import Conversation
+from ..providers.speech.transcripts import cache_audio_transcript
+from ..response.pipeline import LLMPipeline, PipelineError
+from ..response.sender import deliver
+from ..utils.cache import memory_cache_key, tool_calls_cache_key
 
 if TYPE_CHECKING:
     import discord
 
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

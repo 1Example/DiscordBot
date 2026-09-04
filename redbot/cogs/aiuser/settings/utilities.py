@@ -7,13 +7,13 @@ import discord
 from redbot.core import commands
 from redbot.core.utils.views import ConfirmView
 
-from aiuser.types.enums import MentionType
-from aiuser.utils.prompt_metrics import (
+from ..types.enums import MentionType
+from ..utils.prompt_metrics import (
     get_prompt_metrics_for_context,
 )
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 
 async def confirm_pending(

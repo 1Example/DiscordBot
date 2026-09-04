@@ -2,8 +2,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from aiuser.context.entry import MessageEntry
-from aiuser.utils.utilities import encode_text_to_tokens
+from ..context.entry import MessageEntry
+from ..utils.utilities import encode_text_to_tokens
 
 logger = logging.getLogger("red.bz_cogs.aiuser.context")
 

@@ -10,13 +10,13 @@ import tiktoken
 from discord import Message
 from redbot.core import commands
 
-from aiuser.config.constants import (
+from ..config.constants import (
     FALLBACK_TOKENIZER,
     YOUTUBE_URL_PATTERN,
 )
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

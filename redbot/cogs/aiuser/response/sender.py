@@ -15,12 +15,12 @@ import discord
 from discord.utils import MISSING
 from redbot.core import commands
 
-from aiuser.config.constants import REGEX_RUN_TIMEOUT
-from aiuser.utils.utilities import to_thread
+from ..config.constants import REGEX_RUN_TIMEOUT
+from ..utils.utilities import to_thread
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
-    from aiuser.response.pipeline import PipelineResult
+    from ..core.services import AIUserServices
+    from ..response.pipeline import PipelineResult
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

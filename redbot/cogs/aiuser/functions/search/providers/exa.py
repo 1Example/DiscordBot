@@ -5,8 +5,8 @@ import logging
 
 import aiohttp
 
-from aiuser.functions.context import ToolContext
-from aiuser.utils.utilities import contains_youtube_link
+from ....functions.context import ToolContext
+from ....utils.utilities import contains_youtube_link
 
 logger = logging.getLogger("red.bz_cogs.aiuser.tools")
 

@@ -1,8 +1,8 @@
 import discord
 from redbot.core import commands
 
-from aiuser.functions import names
-from aiuser.settings.functions.utilities import FunctionToggleHelperMixin, functions
+from ...functions import names
+from ...settings.functions.utilities import FunctionToggleHelperMixin, functions
 
 
 class WeatherFunctionSettings(FunctionToggleHelperMixin):

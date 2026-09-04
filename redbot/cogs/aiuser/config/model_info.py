@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from aiuser.config.models import (
+from ..config.models import (
     OTHER_MODELS_LIMITS,
     TOOLS_SUPPORTED_MODELS,
     UNSUPPORTED_LOGIT_BIAS_MODELS,

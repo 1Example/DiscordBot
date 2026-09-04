@@ -11,10 +11,10 @@ from redbot.core import Config
 from redbot.core.bot import Red
 from tenacity import retry, stop_after_attempt, wait_random
 
-from aiuser.config.constants import URL_PATTERN, YOUTUBE_VIDEO_ID_PATTERN
-from aiuser.context.converter.formatters import format_text_content
-from aiuser.functions.names import OPEN_URL
-from aiuser.utils.utilities import contains_youtube_link
+from ...config.constants import URL_PATTERN, YOUTUBE_VIDEO_ID_PATTERN
+from ...context.converter.formatters import format_text_content
+from ...functions.names import OPEN_URL
+from ...utils.utilities import contains_youtube_link
 
 logger = logging.getLogger("red.bz_cogs.aiuser.context")
 

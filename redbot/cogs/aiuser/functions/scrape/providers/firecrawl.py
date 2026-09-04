@@ -2,7 +2,7 @@ import logging
 
 import aiohttp
 
-from aiuser.utils.restricted_http import RestrictedHTTP
+from ....utils.restricted_http import RestrictedHTTP
 
 logger = logging.getLogger("red.bz_cogs.aiuser.tools")
 

@@ -3,7 +3,7 @@ from typing import Optional
 
 from discord import Message, MessageType
 
-from aiuser.utils.utilities import mention_to_text
+from ...utils.utilities import mention_to_text
 
 logger = logging.getLogger("red.bz_cogs.aiuser.context")
 

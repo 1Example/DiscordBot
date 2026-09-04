@@ -3,9 +3,9 @@ from typing import Optional
 import discord
 from redbot.core import commands
 
-from aiuser.functions import names
-from aiuser.providers.speech.tts import DEFAULT_MODELS, DEFAULT_VOICES, PROVIDERS
-from aiuser.settings.functions.utilities import (
+from ...functions import names
+from ...providers.speech.tts import DEFAULT_MODELS, DEFAULT_VOICES, PROVIDERS
+from ...settings.functions.utilities import (
     FunctionToggleHelperMixin,
     functions,
     provider_key_error,

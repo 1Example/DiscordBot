@@ -4,8 +4,8 @@ from typing import List, Optional, Tuple, Union
 import aiosqlite
 import numpy as np
 
-from aiuser.config.constants import EMBEDDING_CACHE_DIR_NAME, EMBEDDING_DB_NAME
-from aiuser.providers.vectorstore.embeddings import embed_text
+from ...config.constants import EMBEDDING_CACHE_DIR_NAME, EMBEDDING_DB_NAME
+from ...providers.vectorstore.embeddings import embed_text
 
 
 class VectorStore:

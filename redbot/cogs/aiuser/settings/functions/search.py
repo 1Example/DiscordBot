@@ -1,9 +1,9 @@
 import discord
 from redbot.core import commands
 
-from aiuser.functions import names
-from aiuser.functions.search.providers import PROVIDER_KEY_SERVICES, PROVIDERS, SEARXNG
-from aiuser.settings.functions.utilities import (
+from ...functions import names
+from ...functions.search.providers import PROVIDER_KEY_SERVICES, PROVIDERS, SEARXNG
+from ...settings.functions.utilities import (
     FunctionToggleHelperMixin,
     functions,
     provider_key_error,

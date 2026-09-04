@@ -1,9 +1,9 @@
 import discord
 from redbot.core import commands
 
-from aiuser.functions import names
-from aiuser.functions.scrape.providers import FIRECRAWL, PROVIDERS
-from aiuser.settings.functions.utilities import (
+from ...functions import names
+from ...functions.scrape.providers import FIRECRAWL, PROVIDERS
+from ...settings.functions.utilities import (
     FunctionToggleHelperMixin,
     functions,
     provider_key_error,

@@ -4,10 +4,10 @@ import base64
 from typing import TYPE_CHECKING
 
 import httpx
-from aiuser.functions.imagerequest.providers.util import fetch_image_bytes
+from ....functions.imagerequest.providers.util import fetch_image_bytes
 
 if TYPE_CHECKING:
-    from aiuser.functions.context import ToolContext
+    from ....functions.context import ToolContext
 
 
 async def generate(description: str, _: "ToolContext", endpoint: str) -> bytes:

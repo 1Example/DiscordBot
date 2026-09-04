@@ -1,13 +1,13 @@
 from urllib.parse import urlparse
 
-from aiuser.functions.imagerequest.providers import (
+from ....functions.imagerequest.providers import (
     automatic1111,
     custom_http,
     gemini,
     openai,
     openrouter,
 )
-from aiuser.providers.llm.openai_compatible.endpoints import (
+from ....providers.llm.openai_compatible.endpoints import (
     CompatEndpointKind,
     get_openai_compat_kind,
 )

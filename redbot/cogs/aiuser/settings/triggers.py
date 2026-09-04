@@ -4,15 +4,15 @@ from typing import Optional, Union
 import discord
 from redbot.core import checks, commands
 
-from aiuser.settings.scope import (
+from ..settings.scope import (
     get_effective_scoped_setting_for_target,
     get_settings_target_scope,
     parse_target_or_text,
 )
-from aiuser.settings.utilities import get_mention_type
-from aiuser.settings._groups import aiuser
-from aiuser.types.abc import MixinMeta
-from aiuser.types.types import COMPATIBLE_MENTIONS
+from ..settings.utilities import get_mention_type
+from ..settings._groups import aiuser
+from ..types.abc import MixinMeta
+from ..types.types import COMPATIBLE_MENTIONS
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

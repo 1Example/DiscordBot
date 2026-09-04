@@ -2,8 +2,8 @@
 
 from typing import Awaitable, Callable
 
-from aiuser.functions.context import ToolContext
-from aiuser.functions.scrape.providers import firecrawl, local
+from ....functions.context import ToolContext
+from ....functions.scrape.providers import firecrawl, local
 
 LOCAL = "local"
 FIRECRAWL = "firecrawl"

@@ -15,19 +15,19 @@ from openai.types.chat import (
 )
 from redbot.core import commands
 
-from aiuser.config.defaults import DEFAULT_TOOL_CALL_ROUNDS
-from aiuser.config.model_info import get_model_info
-from aiuser.context.conversation import Conversation
-from aiuser.context.entry import MessageEntry
-from aiuser.functions.context import ToolContext
-from aiuser.functions.executor import ToolExecutor
-from aiuser.providers.llm.base import ChatStepResult, LLMProvider
-from aiuser.providers.llm.debug_log import log_chat_request, log_chat_step_result
-from aiuser.providers.llm.openai_compatible.endpoints import is_openrouter_endpoint
-from aiuser.providers.llm.registry import get_llm_provider
+from ..config.defaults import DEFAULT_TOOL_CALL_ROUNDS
+from ..config.model_info import get_model_info
+from ..context.conversation import Conversation
+from ..context.entry import MessageEntry
+from ..functions.context import ToolContext
+from ..functions.executor import ToolExecutor
+from ..providers.llm.base import ChatStepResult, LLMProvider
+from ..providers.llm.debug_log import log_chat_request, log_chat_step_result
+from ..providers.llm.openai_compatible.endpoints import is_openrouter_endpoint
+from ..providers.llm.registry import get_llm_provider
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 

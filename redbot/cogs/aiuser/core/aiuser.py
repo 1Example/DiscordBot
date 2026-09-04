@@ -8,24 +8,24 @@ from redbot.core import Config, app_commands, commands
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 
-from aiuser.config.defaults import (
+from ..config.defaults import (
     DEFAULT_CHANNEL,
     DEFAULT_GLOBAL,
     DEFAULT_GUILD,
     DEFAULT_MEMBER,
     DEFAULT_ROLE,
 )
-from aiuser.core.dispatch import handle_message, handle_slash_command
-from aiuser.core.random_message_task import RandomMessageTask
-from aiuser.core.reply_queue import cancel_reply_state_tasks
-from aiuser.core.services import AIUserServices
-from aiuser.dashboard.base import DashboardIntegration
-from aiuser.providers.llm.openai_compatible.client import (
+from ..core.dispatch import handle_message, handle_slash_command
+from ..core.random_message_task import RandomMessageTask
+from ..core.reply_queue import cancel_reply_state_tasks
+from ..core.services import AIUserServices
+from ..dashboard.base import DashboardIntegration
+from ..providers.llm.openai_compatible.client import (
     get_openai_client,
     invalidate_openai_client,
 )
-from aiuser.settings.base import Settings
-from aiuser.types.abc import CompositeMetaClass
+from ..settings.base import Settings
+from ..types.abc import CompositeMetaClass
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 logging.getLogger("httpcore").setLevel(logging.WARNING)

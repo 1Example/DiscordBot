@@ -6,8 +6,8 @@ from typing import Optional
 import discord
 from redbot.core import Config
 
-from aiuser.providers.speech.constants import ELEVENLAB, FINEVOICE, OPENAI, OPENROUTER
-from aiuser.providers.speech.tts import elevenlab, finevoice, openai, openrouter
+from ....providers.speech.constants import ELEVENLAB, FINEVOICE, OPENAI, OPENROUTER
+from ....providers.speech.tts import elevenlab, finevoice, openai, openrouter
 
 PROVIDERS = {
     ELEVENLAB: elevenlab.generate,

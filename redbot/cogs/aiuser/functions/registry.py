@@ -7,24 +7,24 @@ from typing import List
 
 from redbot.core import Config, commands
 
-from aiuser.functions import names
-from aiuser.functions.coderunner.tool_call import CodeRunnerToolCall
-from aiuser.functions.discord.tool_call import (
+from ..functions import names
+from ..functions.coderunner.tool_call import CodeRunnerToolCall
+from ..functions.discord.tool_call import (
     AddReactionToolCall,
     GetDiscordInfoToolCall,
 )
-from aiuser.functions.imagerequest.tool_call import ImageRequestToolCall
-from aiuser.functions.memory.tool_call import ReadMemoryToolCall, SaveMemoryToolCall
-from aiuser.functions.noresponse.tool_call import NoResponseToolCall
-from aiuser.functions.scrape.tool_call import ScrapeToolCall
-from aiuser.functions.search.tool_call import SearchToolCall
-from aiuser.functions.tool_call import ToolCall
-from aiuser.functions.voice.tool_call import VoiceRequestToolCall
-from aiuser.functions.weather.tool_call import (
+from ..functions.imagerequest.tool_call import ImageRequestToolCall
+from ..functions.memory.tool_call import ReadMemoryToolCall, SaveMemoryToolCall
+from ..functions.noresponse.tool_call import NoResponseToolCall
+from ..functions.scrape.tool_call import ScrapeToolCall
+from ..functions.search.tool_call import SearchToolCall
+from ..functions.tool_call import ToolCall
+from ..functions.voice.tool_call import VoiceRequestToolCall
+from ..functions.weather.tool_call import (
     IsDaytimeToolCall,
     LocationWeatherToolCall,
 )
-from aiuser.functions.wolframalpha.tool_call import WolframAlphaFunctionCall
+from ..functions.wolframalpha.tool_call import WolframAlphaFunctionCall
 
 ALL_TOOLS = [
     NoResponseToolCall,

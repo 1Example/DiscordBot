@@ -9,15 +9,15 @@ from typing import TYPE_CHECKING, Optional
 import discord
 from redbot.core import commands
 
-from aiuser.config.defaults import DEFAULT_REPLY_PERCENT
-from aiuser.core.decision.triggers import (
+from ...config.defaults import DEFAULT_REPLY_PERCENT
+from ...core.decision.triggers import (
     check_direct_triggers,
     get_conversation_reply_chance,
 )
-from aiuser.core.decision.validators import is_valid_message
+from ...core.decision.validators import is_valid_message
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ...core.services import AIUserServices
 
 
 class BurstMode(IntEnum):

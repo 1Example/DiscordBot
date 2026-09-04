@@ -5,12 +5,12 @@ from dataclasses import dataclass
 import discord
 from redbot.core import Config
 
-from aiuser.config.defaults import (
+from ....config.defaults import (
     DEFAULT_AUDIO_DURATION_LIMIT,
     DEFAULT_STT_PROVIDER,
 )
-from aiuser.providers.speech.constants import OPENAI, OPENROUTER
-from aiuser.providers.speech.stt import openai, openrouter
+from ....providers.speech.constants import OPENAI, OPENROUTER
+from ....providers.speech.stt import openai, openrouter
 
 PROVIDERS = {
     OPENAI: openai.transcribe,

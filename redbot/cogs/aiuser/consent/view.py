@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Set
 import discord
 
 if TYPE_CHECKING:
-    from aiuser.consent.service import ConsentService
+    from ..consent.service import ConsentService
 
 CONSENT_EMBED_TITLE = ":information_source: AI User Opt-In / Opt-Out"
 

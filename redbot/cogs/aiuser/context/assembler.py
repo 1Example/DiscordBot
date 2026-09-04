@@ -7,17 +7,17 @@ from typing import TYPE_CHECKING, List, Optional, Set
 import discord
 from redbot.core import commands
 
-from aiuser.config.model_info import get_model_info
-from aiuser.consent import CONSENT_EMBED_TITLE
-from aiuser.context.conversation import Conversation
-from aiuser.context.converter.converter import MessageConverter
-from aiuser.context.entry import MessageEntry
-from aiuser.context.relevant_memory import fetch_relevant_memory
-from aiuser.utils.cache import memory_cache_key, tool_calls_cache_key
-from aiuser.utils.utilities import format_variables, mention_to_text
+from ..config.model_info import get_model_info
+from ..consent import CONSENT_EMBED_TITLE
+from ..context.conversation import Conversation
+from ..context.converter.converter import MessageConverter
+from ..context.entry import MessageEntry
+from ..context.relevant_memory import fetch_relevant_memory
+from ..utils.cache import memory_cache_key, tool_calls_cache_key
+from ..utils.utilities import format_variables, mention_to_text
 
 if TYPE_CHECKING:
-    from aiuser.core.services import AIUserServices
+    from ..core.services import AIUserServices
 
 logger = logging.getLogger("red.bz_cogs.aiuser.context")
 

@@ -61,9 +61,24 @@ dtable(label, desc, html) %}
 {% endmacro %}
 
 <div class="container-fluid lu-settings">
-  <div class="d-flex align-items-center mb-4">
-    <h4 class="mb-0 me-3">LevelUp Settings</h4>
-  </div>
+<div class="dz-subnav">
+  <a class="dz-subnav-item"
+     href="{{ url_for('third_parties_blueprint.third_party', name=name,
+                        page='leaderboard', guild_id=guild.id if guild else none) }}">
+    <i class="fa fa-list-ol"></i> Leaderboard
+  </a>
+  <a class="dz-subnav-item"
+     href="{{ url_for('third_parties_blueprint.third_party', name=name,
+                        page='weekly', guild_id=guild.id if guild else none) }}">
+    <i class="fa fa-calendar"></i> Weekly
+  </a>
+  <a class="dz-subnav-item active"
+     href="{{ url_for('third_parties_blueprint.third_party', name=name,
+                        page='settings', guild_id=guild.id if guild else none) }}">
+    <i class="fa fa-sliders"></i> Settings
+  </a>
+</div>
+
 
   <form method="POST">
     {{ settings_form.hidden_tag() }} {# ════════════════ General
