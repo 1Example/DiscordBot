@@ -1,0 +1,88 @@
+{# AIUser server settings.
+
+   Rendered dashboard-side, so `url_for` and friends are available here. The
+   sections and their field names come from SECTIONS in settings_page.py, and
+   the fields are pulled off the form by name - so a field added there appears
+   here with no template change. #}
+
+<style>
+  .ai-set { --ai-line: var(--cx-panel-2-bd, rgba(120, 160, 255, .10)); }
+  .ai-set .ai-sec {
+    background: var(--cx-panel-2, rgba(90, 130, 220, .07));
+    border: 1px solid var(--ai-line);
+    border-radius: 12px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .ai-set .ai-sec > h5 {
+    display: flex; align-items: center; gap: 9px;
+    margin: 0; padding: 12px 16px;
+    border-bottom: 1px solid var(--ai-line);
+    font-size: .78rem; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase;
+    color: var(--cx-text-dim, #93a1bd);
+  }
+  .ai-set .ai-sec > h5 i { opacity: .7; }
+  .ai-set .ai-body { padding: 16px; display: grid; gap: 14px;
+                     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .ai-set .ai-f label { display: block; margin-bottom: 5px;
+                        font-size: .82rem; font-weight: 600;
+                        color: var(--cx-text, #e6e9ef); }
+  .ai-set .ai-f .ai-help { font-size: .72rem; opacity: .5; margin-top: 4px; }
+  .ai-set .ai-f input[type=text], .ai-set .ai-f input[type=number],
+  .ai-set .ai-f textarea, .ai-set .ai-f select {
+    width: 100%; padding: 8px 11px; border-radius: 8px;
+    background: rgba(4, 10, 32, .45);
+    border: 1px solid var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+    color: var(--cx-text, #e6e9ef); font-size: .85rem;
+  }
+  .ai-set .ai-f textarea { font-family: ui-monospace, Consolas, monospace;
+                           font-size: .78rem; line-height: 1.5; resize: vertical; }
+  .ai-set .ai-f select[multiple] { min-height: 120px; }
+  .ai-set .ai-f.ai-bool { display: flex; align-items: flex-start; gap: 10px; }
+  .ai-set .ai-f.ai-bool label { margin: 0; }
+  .ai-set .ai-save { display: flex; justify-content: flex-end; margin: 18px 0 6px; }
+</style>
+
+<div class="ai-set">
+  <form method="POST">
+    {{ settings_form.hidden_tag() }}
+
+    {% for section in sections %}
+      <div class="ai-sec">
+        <h5><i class="fa {{ section.icon }}"></i> {{ section.title }}</h5>
+        <div class="ai-body">
+          {% for name in section.fields %}
+            {% set f = settings_form[name] %}
+            {% if f.type == 'BooleanField' %}
+              <div class="ai-f ai-bool">
+                {{ f() }}
+                <div>
+                  <label for="{{ f.id }}">{{ f.label.text }}</label>
+                  {% if f.render_kw and f.render_kw.get('title') %}
+                    <div class="ai-help">{{ f.render_kw.get('title') }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            {% else %}
+              <div class="ai-f">
+                <label for="{{ f.id }}">{{ f.label.text }}</label>
+                {{ f() }}
+                {% if f.render_kw and f.render_kw.get('title') %}
+                  <div class="ai-help">{{ f.render_kw.get('title') }}</div>
+                {% endif %}
+                {% for err in f.errors %}
+                  <div class="ai-help" style="color:#ff6b6b;">{{ err }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+
+    <div class="ai-save">
+      {{ settings_form.submit(class="btn bg-gradient-primary btn-lg px-5") }}
+    </div>
+  </form>
+</div>
