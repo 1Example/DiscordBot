@@ -1,22 +1,20 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Union
+from typing import Optional
 
 import discord
-from dateutil.relativedelta import relativedelta
 from discord import Interaction
 from discord.ext import tasks
 from red_commons.logging import getLogger
-from redbot.core import commands
+from redbot.core import app_commands, commands
 from redbot.core.commands import Context
 from redbot.core.commands.converter import RelativedeltaConverter
 from redbot.core.i18n import Translator
-from redbot.core.utils.chat_formatting import humanize_timedelta, pagify
+from redbot.core.utils.chat_formatting import pagify
 from redbot.core.utils.views import SimpleMenu
 
 from .abc import RoleToolsMixin
-from .converter import RoleHierarchyConverter
 
 RELATIVE_CONVERTER = RelativedeltaConverter(
     allowed_units=["years", "months", "weeks", "days", "hours", "minutes", "seconds"]
@@ -59,56 +57,17 @@ class TempRole:
 class RoleToolsTemporary(RoleToolsMixin):
     """This class handles temporary role removal and setup."""
 
-    @roletools.group(name="temporary", aliases=["temp"])
-    async def temporary_roles(self, ctx: Union[Context, Interaction]):
-        """
-        Setup temporary roles
-        """
+    temporary_roles = app_commands.Group(
+        name="temporary",
+        description="Roles that expire on their own.",
+        parent=roletools,
+    )
 
-    @temporary_roles.command(name="set")
-    @commands.admin_or_permissions(manage_roles=True)
-    async def temporary_roles_set(
-        self,
-        ctx: Union[Context, Interaction],
-        role: RoleHierarchyConverter,
-        *,
-        duration: Optional[relativedelta] = commands.parameter(
-            converter=RELATIVE_CONVERTER, default=None
-        ),
-    ):
-        """
-        Set the duration the role will last before being removed.
-
-        `<role>` The role you want to apply temporary duration for.
-        `[duration]` How long you want the role to be applied for.
-        If no duration is given then the role will not be automatically removed.
-        Note: The loop will check temporary role removal every 5 minutes.
-        It is recommended to have a duration longer than 5 minutes to work effectively.
-
-        Example:
-        `[p]roletools temp set @role 2 months`
-        This will remove `@role` 2 months after the user has received it via roletools.
-        """
-
-        if duration is not None:
-            new_time = ctx.message.created_at + duration
-            # convert relativedelta into a new datetime object
-            td = new_time - ctx.message.created_at
-            # convert back into normalized timedelta for future calculation
-            # relativedelta doesn't have some of the niceties of timedeltas
-            await self.config.role(role).duration.set(int(td.total_seconds()))
-            await ctx.send(
-                _(
-                    "Role {role} will automatically be removed after {duration} when applied by roletools."
-                ).format(role=role.mention, duration=humanize_timedelta(timedelta=td))
-            )
-        else:
-            await self.config.role(role).duration.clear()
-            await ctx.send(_("Role {role} will not be automatically removed after being applied."))
 
     @temporary_roles.command(name="list")
+    @app_commands.describe(member="Only show this member's temporary roles.")
     async def temporary_roles_list(
-        self, ctx: commands.Context, *, member: Optional[discord.Member] = None
+        self, interaction: discord.Interaction, member: Optional[discord.Member] = None
     ):
         """
         List the currently pending temporary roles and when they expire.
@@ -117,6 +76,7 @@ class RoleToolsTemporary(RoleToolsMixin):
         If not provided will show all temporary role members for moderators with `manage_roles` permission.
         If not provided by a member with `manage_roles` it will only show their own temporary roles if they have any.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         msg = ""
         temp_roles = []
 

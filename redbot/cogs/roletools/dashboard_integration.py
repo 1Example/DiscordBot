@@ -456,6 +456,13 @@ class DashboardIntegration:
         if action in ("give", "remove", "force", "force_remove", "view"):
             return await self._rt_role_action(action, guild, field)
 
+        if action in ("button_create", "button_delete", "menu_create", "menu_delete",
+                      "option_create", "option_delete", "temp_set"):
+            return await self._rt_component_action(action, guild, field)
+
+        if action in ("post_menu", "edit_menu"):
+            return await self._rt_post_action(action, guild, field)
+
         raw_role = field("role") or ""
         if not raw_role.isdigit():
             return [{"message": "Pick a role.", "category": "warning"}]
@@ -890,6 +897,361 @@ class DashboardIntegration:
         return out
 
     # ------------------------------------------------------------- behaviour --
+
+    # ---- posting a built menu --------------------------------------------
+
+    # Discord allows 25 component slots on a message; a select menu occupies a
+    # whole row of five, a button one.
+    MAX_SLOTS = 25
+    MENU_SLOTS = 5
+
+    async def _rt_build_view(self, guild, button_names, menu_names):
+        """(view, problems) for the named components, or (None, problems)."""
+        from .components import (
+            ButtonRole,
+            RoleToolsView,
+            SelectRole,
+            SelectRoleOption as SelectOptionRole,
+        )
+
+        data = await self._rt_cache(guild)
+        problems = []
+        view = RoleToolsView(self, timeout=None)
+
+        used = len(button_names) + len(menu_names) * self.MENU_SLOTS
+        if used > self.MAX_SLOTS:
+            problems.append(
+                "That is %d of %d component slots - a menu uses %d, a button 1."
+                % (used, self.MAX_SLOTS, self.MENU_SLOTS)
+            )
+            return None, problems
+
+        for name in menu_names:
+            cfg = (data.get("select_menus") or {}).get(name)
+            if cfg is None:
+                problems.append("No select menu called '%s'." % name)
+                continue
+            options = []
+            for opt_name in cfg.get("options") or []:
+                opt = (data.get("select_options") or {}).get(opt_name)
+                if opt is None:
+                    problems.append(
+                        "Menu '%s' lists an option '%s' that no longer exists."
+                        % (name, opt_name)
+                    )
+                    continue
+                role = guild.get_role(int(opt.get("role_id") or 0))
+                if role is None:
+                    problems.append(
+                        "Option '%s' points at a role that was deleted." % opt_name
+                    )
+                    continue
+                options.append(SelectOptionRole(
+                    name=opt_name,
+                    label=opt.get("label") or opt_name,
+                    value=f"{opt_name}-{role.id}",
+                    description=opt.get("description") or None,
+                    emoji=(
+                        discord.PartialEmoji.from_str(opt["emoji"])
+                        if opt.get("emoji") else None
+                    ),
+                    role_id=role.id,
+                ))
+            if not options:
+                problems.append("Menu '%s' has no usable options." % name)
+                continue
+            view.add_item(SelectRole(
+                name=name,
+                custom_id=f"{name}-{guild.id}",
+                placeholder=cfg.get("placeholder") or None,
+                min_values=cfg.get("min_values", 0),
+                max_values=min(cfg.get("max_values", 1), len(options)),
+                options=options,
+            ))
+
+        for name in button_names:
+            cfg = (data.get("buttons") or {}).get(name)
+            if cfg is None:
+                problems.append("No button called '%s'." % name)
+                continue
+            role = guild.get_role(int(cfg.get("role_id") or 0))
+            if role is None:
+                problems.append("Button '%s' points at a role that was deleted." % name)
+                continue
+            button = ButtonRole(
+                style=cfg.get("style") or 1,
+                label=cfg.get("label") or name,
+                emoji=(
+                    discord.PartialEmoji.from_str(cfg["emoji"])
+                    if cfg.get("emoji") else None
+                ),
+                custom_id=f"{name}-{role.id}",
+                role_id=role.id,
+                name=name,
+            )
+            button.replace_label(guild)
+            view.add_item(button)
+
+        if not view.children:
+            problems.append("Nothing to post - pick at least one button or menu.")
+            return None, problems
+        return view, problems
+
+    async def _rt_remember(self, guild, button_names, menu_names, message):
+        """Record which message each component now lives on."""
+        conf = self.config.guild(guild)
+        ref = "%d-%d" % (message.channel.id, message.id)
+        if button_names:
+            async with conf.buttons() as buttons:
+                for name in button_names:
+                    if name in buttons:
+                        buttons[name].setdefault("messages", [])
+                        if ref not in buttons[name]["messages"]:
+                            buttons[name]["messages"].append(ref)
+        if menu_names:
+            async with conf.select_menus() as menus:
+                for name in menu_names:
+                    if name in menus:
+                        menus[name].setdefault("messages", [])
+                        if ref not in menus[name]["messages"]:
+                            menus[name]["messages"].append(ref)
+
+    async def _rt_post_action(self, action, guild, field):
+        button_names = [b.strip().lower() for b in field.many("post_buttons")]
+        menu_names = [m.strip().lower() for m in field.many("post_menus")]
+
+        view, problems = await self._rt_build_view(guild, button_names, menu_names)
+        notes = [{"message": p, "category": "warning"} for p in problems]
+        if view is None:
+            return notes
+
+        if action == "post_menu":
+            raw = field("post_channel") or ""
+            channel = guild.get_channel(int(raw)) if raw.isdigit() else None
+            if channel is None:
+                return notes + [{"message": "Pick a channel.", "category": "warning"}]
+            me = guild.me
+            if me is None or not channel.permissions_for(me).send_messages:
+                return notes + [{
+                    "message": "I cannot send messages in %s." % channel.mention,
+                    "category": "danger",
+                }]
+            try:
+                message = await channel.send(
+                    content=(field("post_text") or None), view=view
+                )
+            except discord.HTTPException as exc:
+                return notes + [{
+                    "message": "Discord refused the message: %s" % exc,
+                    "category": "danger",
+                }]
+            await self._rt_remember(guild, button_names, menu_names, message)
+            self.views[guild.id] = getattr(self, "views", {}).get(guild.id, {})
+            return notes + [{
+                "message": "Posted to %s." % channel.mention, "category": "success"
+            }]
+
+        # edit_menu: put the components onto a message the bot already sent
+        link = (field("post_message") or "").strip()
+        message = await self._rt_fetch_message(guild, link)
+        if message is None:
+            return notes + [{
+                "message": "Could not find that message. Paste its link or channel-message ID.",
+                "category": "warning",
+            }]
+        if message.author.id != (guild.me.id if guild.me else 0):
+            return notes + [{
+                "message": "I can only edit my own messages.", "category": "warning"
+            }]
+        try:
+            await message.edit(view=view)
+        except discord.HTTPException as exc:
+            return notes + [{
+                "message": "Discord refused the edit: %s" % exc, "category": "danger"
+            }]
+        await self._rt_remember(guild, button_names, menu_names, message)
+        return notes + [{"message": "Message updated.", "category": "success"}]
+
+    async def _rt_fetch_message(self, guild, raw):
+        """A message from a link, a channel-message pair, or None."""
+        import re as _re
+
+        ids = _re.findall(r"\d{15,25}", raw or "")
+        if len(ids) < 2:
+            return None
+        channel_id, message_id = int(ids[-2]), int(ids[-1])
+        channel = guild.get_channel(channel_id)
+        if channel is None:
+            return None
+        try:
+            return await channel.fetch_message(message_id)
+        except discord.HTTPException:
+            return None
+
+    # ---- role menu definitions -------------------------------------------
+    # Buttons, select menus and their options used to be built only from
+    # Discord; the page could show them but not change them. Posting a built
+    # menu into a channel stays a command - that needs a channel and puts a
+    # message in it, which is not a settings page's job.
+
+    # discord.ButtonStyle values, which is what ButtonRole is constructed with.
+    BUTTON_STYLES = {
+        "primary": 1, "secondary": 2, "success": 3, "danger": 4,
+    }
+
+    @staticmethod
+    def _rt_component_name(raw: str) -> tuple:
+        """A component name, lowercased, or the reason it will not do."""
+        name = (raw or "").strip().lower()
+        if not name:
+            return "", "Give it a name."
+        if len(name) > 100:
+            return "", "That name is too long (100 characters at most)."
+        if " " in name:
+            return "", "Names cannot contain spaces."
+        return name, ""
+
+    def _rt_pick_role(self, guild, raw):
+        """The role behind a form value, or None."""
+        raw = (raw or "").strip()
+        return guild.get_role(int(raw)) if raw.isdigit() else None
+
+    async def _rt_component_action(self, action, guild, field):
+        conf = self.config.guild(guild)
+
+        if action == "button_create":
+            name, why = self._rt_component_name(field("button_name"))
+            if why:
+                return [{"message": why, "category": "warning"}]
+            role = self._rt_pick_role(guild, field("button_role"))
+            if role is None:
+                return [{"message": "Pick a role for the button.", "category": "warning"}]
+            style = self.BUTTON_STYLES.get(
+                (field("button_style") or "primary").lower(), 1
+            )
+            async with conf.buttons() as buttons:
+                existed = name in buttons
+                buttons[name] = {
+                    "role_id": role.id,
+                    "label": (field("button_label") or name)[:80],
+                    "emoji": (field("button_emoji") or "").strip() or None,
+                    "style": style,
+                    # Keep the messages this button is already posted into, so
+                    # editing one does not orphan the messages showing it.
+                    "messages": (buttons.get(name) or {}).get("messages", []),
+                }
+            await self._rt_cache(guild)
+            verb = "updated" if existed else "created"
+            return [{"message": "Button '%s' %s." % (name, verb), "category": "success"}]
+
+        if action == "button_delete":
+            name = (field("button_name") or "").strip().lower()
+            async with conf.buttons() as buttons:
+                if name not in buttons:
+                    return [{"message": "No button by that name.", "category": "warning"}]
+                posted = len(buttons[name].get("messages") or [])
+                del buttons[name]
+            await self._rt_cache(guild)
+            note = (" It was on %d message(s), which will stop working." % posted
+                    if posted else "")
+            return [{"message": "Button '%s' deleted.%s" % (name, note),
+                     "category": "warning" if posted else "success"}]
+
+        if action == "menu_create":
+            name, why = self._rt_component_name(field("menu_name"))
+            if why:
+                return [{"message": why, "category": "warning"}]
+            low = max(0, field.integer("menu_min", 0) or 0)
+            high = max(1, field.integer("menu_max", 1) or 1)
+            if low > high:
+                return [{"message": "The minimum cannot exceed the maximum.",
+                         "category": "warning"}]
+            async with conf.select_menus() as menus:
+                existed = name in menus
+                menus[name] = {
+                    "placeholder": (field("menu_placeholder") or "")[:150],
+                    "min_values": low,
+                    "max_values": high,
+                    "options": (menus.get(name) or {}).get("options", []),
+                    "messages": (menus.get(name) or {}).get("messages", []),
+                }
+            await self._rt_cache(guild)
+            verb = "updated" if existed else "created"
+            return [{"message": "Select menu '%s' %s." % (name, verb), "category": "success"}]
+
+        if action == "menu_delete":
+            name = (field("menu_name") or "").strip().lower()
+            async with conf.select_menus() as menus:
+                if name not in menus:
+                    return [{"message": "No select menu by that name.", "category": "warning"}]
+                posted = len(menus[name].get("messages") or [])
+                del menus[name]
+            await self._rt_cache(guild)
+            note = (" It was on %d message(s), which will stop working." % posted
+                    if posted else "")
+            return [{"message": "Select menu '%s' deleted.%s" % (name, note),
+                     "category": "warning" if posted else "success"}]
+
+        if action == "option_create":
+            name, why = self._rt_component_name(field("option_name"))
+            if why:
+                return [{"message": why, "category": "warning"}]
+            role = self._rt_pick_role(guild, field("option_role"))
+            if role is None:
+                return [{"message": "Pick a role for the option.", "category": "warning"}]
+            async with conf.select_options() as options:
+                options[name] = {
+                    "role_id": role.id,
+                    "label": (field("option_label") or name)[:100],
+                    "description": (field("option_description") or "")[:100],
+                    "emoji": (field("option_emoji") or "").strip() or None,
+                }
+            menu = (field("option_menu") or "").strip().lower()
+            attached = ""
+            if menu:
+                async with conf.select_menus() as menus:
+                    if menu in menus:
+                        opts = menus[menu].setdefault("options", [])
+                        if name not in opts:
+                            opts.append(name)
+                        attached = " Added to '%s'." % menu
+                    else:
+                        attached = " No menu called '%s', so it was not attached." % menu
+            await self._rt_cache(guild)
+            return [{"message": "Option '%s' saved.%s" % (name, attached),
+                     "category": "success"}]
+
+        if action == "option_delete":
+            name = (field("option_name") or "").strip().lower()
+            async with conf.select_options() as options:
+                if name not in options:
+                    return [{"message": "No option by that name.", "category": "warning"}]
+                del options[name]
+            # An option that no longer exists must not stay listed on a menu.
+            async with conf.select_menus() as menus:
+                for cfg in menus.values():
+                    if name in (cfg.get("options") or []):
+                        cfg["options"].remove(name)
+            await self._rt_cache(guild)
+            return [{"message": "Option '%s' deleted." % name, "category": "success"}]
+
+        if action == "temp_set":
+            role = self._rt_pick_role(guild, field("temp_role"))
+            if role is None:
+                return [{"message": "Pick a role.", "category": "warning"}]
+            seconds = field.integer("temp_seconds", 0) or 0
+            if seconds < 0:
+                return [{"message": "A duration cannot be negative.", "category": "warning"}]
+            if seconds:
+                await self.config.role(role).duration.set(seconds)
+                msg = "%s now lasts %s." % (role.name, self._rt_duration_text(seconds))
+            else:
+                await self.config.role(role).duration.clear()
+                msg = "%s is no longer temporary." % role.name
+            await self._rt_cache(guild)
+            return [{"message": msg, "category": "success"}]
+
+        return [{"message": "Unknown action.", "category": "warning"}]
 
     async def _rt_settings_action(
         self, action: str, guild: discord.Guild, field
@@ -1354,8 +1716,8 @@ ROLETOOLS_TEMPLATE = (
     <div class="dz-panel">
       <h5><i class="fa fa-hand-pointer-o"></i> Button sets</h5>
       <p class="dz-hint">
-        Built with the <code>roletools buttons</code> commands. Listed here so you
-        can see what exists and which point at a deleted role.
+        A button assigns one role. Naming an existing button replaces it, keeping
+        the messages it is already posted into.
       </p>
       {% if components.buttons %}
         <table class="dz-t">
@@ -1374,6 +1736,34 @@ ROLETOOLS_TEMPLATE = (
       {% else %}
         <p class="dz-empty">No button sets.</p>
       {% endif %}
+      <form method="POST" class="dz-sub">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+        <div class="dz-row">
+          <input class="dz-input" name="button_name" placeholder="name"
+                 style="max-width:150px;" />
+          <input class="dz-input" name="button_label" placeholder="label shown on it"
+                 style="max-width:190px;" />
+          <input class="dz-input" name="button_emoji" placeholder="emoji"
+                 style="max-width:90px;" />
+          <select class="dz-select" name="button_style" style="max-width:130px;">
+            <option value="primary">Blurple</option>
+            <option value="secondary">Grey</option>
+            <option value="success">Green</option>
+            <option value="danger">Red</option>
+          </select>
+          <select class="dz-select" name="button_role" style="max-width:190px;">
+            <option value="">Role...</option>
+            {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+          </select>
+          <button class="dz-btn primary" name="action" value="button_create">
+            <i class="fa fa-save"></i> Save button
+          </button>
+          <button class="dz-btn" name="action" value="button_delete">
+            <i class="fa fa-trash"></i> Delete by name
+          </button>
+        </div>
+      </form>
+
     </div>
 
     <div class="dz-panel">
@@ -1401,6 +1791,46 @@ ROLETOOLS_TEMPLATE = (
       {% else %}
         <p class="dz-empty">No select menus.</p>
       {% endif %}
+      <form method="POST" class="dz-sub">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+        <div class="dz-row">
+          <input class="dz-input" name="menu_name" placeholder="menu name"
+                 style="max-width:150px;" />
+          <input class="dz-input" name="menu_placeholder" placeholder="placeholder text"
+                 style="max-width:210px;" />
+          <input class="dz-input" type="number" name="menu_min" placeholder="min" min="0"
+                 style="max-width:80px;" />
+          <input class="dz-input" type="number" name="menu_max" placeholder="max" min="1"
+                 style="max-width:80px;" />
+          <button class="dz-btn primary" name="action" value="menu_create">
+            <i class="fa fa-save"></i> Save menu
+          </button>
+          <button class="dz-btn" name="action" value="menu_delete">
+            <i class="fa fa-trash"></i> Delete by name
+          </button>
+        </div>
+        <div class="dz-row" style="margin-top:8px;">
+          <input class="dz-input" name="option_name" placeholder="option name"
+                 style="max-width:150px;" />
+          <input class="dz-input" name="option_label" placeholder="label"
+                 style="max-width:160px;" />
+          <input class="dz-input" name="option_emoji" placeholder="emoji"
+                 style="max-width:90px;" />
+          <select class="dz-select" name="option_role" style="max-width:180px;">
+            <option value="">Role...</option>
+            {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+          </select>
+          <input class="dz-input" name="option_menu" placeholder="attach to menu"
+                 style="max-width:150px;" />
+          <button class="dz-btn primary" name="action" value="option_create">
+            <i class="fa fa-plus"></i> Save option
+          </button>
+          <button class="dz-btn" name="action" value="option_delete">
+            <i class="fa fa-trash"></i> Delete option
+          </button>
+        </div>
+      </form>
+
     </div>
   </div>
 

@@ -4,7 +4,8 @@ from typing import Any, Dict, List, Optional, Union
 
 import discord
 from red_commons.logging import getLogger
-from redbot.core import Config, commands
+from redbot.core import Config, app_commands, commands
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.commands import Context
 from redbot.core.i18n import Translator, cog_i18n
@@ -17,14 +18,9 @@ from .abc import RoleToolsMixin
 from .buttons import RoleToolsButtons
 from .converter import RawUserIds, RoleHierarchyConverter, SelfRoleConverter
 from .events import RoleToolsEvents
-from .exclusive import RoleToolsExclusive
-from .inclusive import RoleToolsInclusive
 from .menus import BaseMenu, ConfirmView, RolePages
 from .messages import RoleToolsMessages
-from .reactions import RoleToolsReactions
-from .requires import RoleToolsRequires
 from .select import RoleToolsSelect
-from .settings import RoleToolsSettings
 from .temprole import RoleToolsTemporary
 from .dashboard_integration import DashboardIntegration
 
@@ -75,12 +71,7 @@ class RoleTools(
     DashboardIntegration,
     RoleToolsEvents,
     RoleToolsButtons,
-    RoleToolsExclusive,
-    RoleToolsInclusive,
     RoleToolsMessages,
-    RoleToolsReactions,
-    RoleToolsRequires,
-    RoleToolsSettings,
     RoleToolsSelect,
     RoleToolsTemporary,
     commands.Cog,
@@ -99,7 +90,6 @@ class RoleTools(
         self.config.register_global(
             version="0.0.0",
             atomic=True,
-            enable_slash=False,
         )
         self.config.register_guild(
             reaction_roles={},
@@ -286,16 +276,72 @@ class RoleTools(
                     )
                 )
 
-    @roletools.command()
-    @commands.guild_only()
-    @commands.bot_has_permissions(manage_roles=True)
-    async def selfrole(self, ctx: Context, *, role: SelfRoleConverter) -> None:
+
+    WHO_KEYWORDS = ("everyone", "here", "bots", "humans")
+
+    async def _rt_parse_who(self, ctx, raw: str):
+        """The entities `who` used to arrive as, from one string.
+
+        Order matters: a role and a channel can share a name, and the original
+        Union tried roles first, so this does too.
+        """
+        found, bad = [], []
+        for token in (raw or "").split():
+            if token.lower() in self.WHO_KEYWORDS:
+                found.append(token.lower())
+                continue
+            for converter in (
+                commands.RoleConverter,
+                commands.TextChannelConverter,
+                commands.ThreadConverter,
+                commands.MemberConverter,
+            ):
+                try:
+                    found.append(await converter().convert(ctx, token))
+                    break
+                except commands.BadArgument:
+                    continue
+            else:
+                bad.append(token)
+        return found, bad
+
+    async def _rt_hierarchy_role(self, ctx, role: discord.Role):
+        """Run the role through RoleHierarchyConverter's checks.
+
+        The converter takes a string, so the id goes back through it - every
+        check it performs (bot permissions, integration roles, hierarchy) still
+        runs, and none of them is duplicated here.
+        """
+        return await RoleHierarchyConverter().convert(ctx, str(role.id))
+
+    async def _rt_parse_users(self, ctx, raw: str):
+        """Members and raw user ids from one space-separated string.
+
+        Replaces Greedy[Union[Member, RawUserIds]], which is prefix-only.
+        """
+        found, bad = [], []
+        for token in (raw or "").split():
+            try:
+                found.append(await commands.MemberConverter().convert(ctx, token))
+                continue
+            except commands.BadArgument:
+                pass
+            try:
+                found.append(await RawUserIds().convert(ctx, token))
+            except commands.BadArgument:
+                bad.append(token)
+        return found, bad
+
+    @roletools.command(name="selfrole")
+    @app_checks.bot_has_permissions(manage_roles=True)
+    async def selfrole(self, interaction: discord.Interaction, *, role: SelfRoleConverter) -> None:
         """
         Add or remove a defined selfrole
 
         `<role>` The role you want to add or remove.
         If you already have the role it will be removed.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if role not in ctx.author.roles:
             await self.selfrole_add(ctx, role=role)
         else:
@@ -341,16 +387,14 @@ class RoleTools(
         msg = _("The {role} role has been removed from you.").format(role=role.mention)
         await ctx.send(msg)
 
-    @roletools.command(cooldown_after_parsing=True, with_app_command=False)
-    @commands.bot_has_permissions(manage_roles=True)
-    @commands.admin_or_permissions(manage_roles=True)
-    @commands.max_concurrency(1, commands.BucketType.guild)
-    @commands.dynamic_cooldown(custom_cooldown, commands.BucketType.guild)
+    @roletools.command(name="giverole")
+    @app_checks.bot_has_permissions(manage_roles=True)
+    @app_checks.admin_or_permissions(manage_roles=True)
     async def giverole(
         self,
-        ctx: Context,
-        role: RoleHierarchyConverter,
-        *who: Union[discord.Role, discord.TextChannel, discord.Thread, discord.Member, str],
+        interaction: discord.Interaction,
+        role: discord.Role,
+        who: str,
     ) -> None:
         """
         Gives a role to designated members.
@@ -375,11 +419,21 @@ class RoleTools(
         **This command is on a cooldown of 10 seconds per member who receives
         a role up to a maximum of 1 hour.**
         """
+        ctx = await commands.Context.from_interaction(interaction)
         await ctx.typing()
+
+        who, unknown = await self._rt_parse_who(ctx, who)
+        if unknown:
+            await ctx.send(
+                _("I could not work out what these are: {items}").format(
+                    items=humanize_list(unknown)
+                )
+            )
+            return
+        role = await self._rt_hierarchy_role(ctx, role)
 
         if len(who) == 0:
             await ctx.send_help()
-            ctx.command.reset_cooldown(ctx)
             return
         async with ctx.typing():
             members = []
@@ -401,7 +455,6 @@ class RoleTools(
                     if entity not in ["everyone", "here", "bots", "humans"]:
                         msg = _("`{who}` cannot have roles assigned to them.").format(who=entity)
                         await ctx.send(msg)
-                        ctx.command.reset_cooldown(ctx)
                         return
                     elif entity == "everyone":
                         members = ctx.guild.members
@@ -436,16 +489,14 @@ class RoleTools(
         msg = _("Added {role} to {added}.").format(role=role.mention, added=added_to)
         await ctx.send(msg)
 
-    @roletools.command(with_app_command=False)
-    @commands.bot_has_permissions(manage_roles=True)
-    @commands.admin_or_permissions(manage_roles=True)
-    @commands.max_concurrency(1, commands.BucketType.guild)
-    @commands.dynamic_cooldown(custom_cooldown, commands.BucketType.guild)
+    @roletools.command(name="removerole")
+    @app_checks.bot_has_permissions(manage_roles=True)
+    @app_checks.admin_or_permissions(manage_roles=True)
     async def removerole(
         self,
-        ctx: Context,
-        role: RoleHierarchyConverter,
-        *who: Union[discord.Role, discord.TextChannel, discord.Member, str],
+        interaction: discord.Interaction,
+        role: discord.Role,
+        who: str,
     ) -> None:
         """
         Removes a role from the designated members.
@@ -470,7 +521,18 @@ class RoleTools(
         **This command is on a cooldown of 10 seconds per member who receives
         a role up to a maximum of 1 hour.**
         """
+        ctx = await commands.Context.from_interaction(interaction)
         await ctx.typing()
+
+        who, unknown = await self._rt_parse_who(ctx, who)
+        if unknown:
+            await ctx.send(
+                _("I could not work out what these are: {items}").format(
+                    items=humanize_list(unknown)
+                )
+            )
+            return
+        role = await self._rt_hierarchy_role(ctx, role)
 
         if len(who) == 0:
             return await ctx.send_help()
@@ -485,7 +547,6 @@ class RoleTools(
                     if entity not in ["everyone", "here", "bots", "humans"]:
                         msg = _("`{who}` cannot have roles removed from them.").format(who=entity)
                         await ctx.send(msg)
-                        ctx.command.reset_cooldown(ctx)
                         return
                     elif entity == "everyone":
                         members = ctx.guild.members
@@ -520,12 +581,13 @@ class RoleTools(
         )
         await ctx.send(msg)
 
-    @roletools.command()
-    @commands.admin_or_permissions(manage_roles=True)
+    @roletools.command(name="forcerole")
+    @app_checks.admin_or_permissions(manage_roles=True)
+    @app_commands.describe(users="Members or user IDs, separated by spaces.")
     async def forcerole(
         self,
-        ctx: Context,
-        users: commands.Greedy[Union[discord.Member, RawUserIds]],
+        interaction: discord.Interaction,
+        users: str,
         *,
         role: RoleHierarchyConverter,
     ) -> None:
@@ -538,6 +600,7 @@ class RoleTools(
         Note: The only way to remove this would be to manually remove the role from
         the user.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         await ctx.typing()
         errors = []
         for user in users:
@@ -566,12 +629,13 @@ class RoleTools(
         if errors:
             await ctx.channel.send("".join([e for e in errors]))
 
-    @roletools.command()
-    @commands.admin_or_permissions(manage_roles=True)
+    @roletools.command(name="forceroleremove")
+    @app_checks.admin_or_permissions(manage_roles=True)
+    @app_commands.describe(users="Members or user IDs, separated by spaces.")
     async def forceroleremove(
         self,
-        ctx: Context,
-        users: commands.Greedy[Union[discord.Member, RawUserIds]],
+        interaction: discord.Interaction,
+        users: str,
         *,
         role: RoleHierarchyConverter,
     ) -> None:
@@ -583,6 +647,7 @@ class RoleTools(
 
         Note: This is generally only useful for users who have left the server.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         await ctx.typing()
 
         errors = []
@@ -612,14 +677,17 @@ class RoleTools(
         if errors:
             await ctx.channel.send("".join([e for e in errors]))
 
-    @roletools.command(aliases=["viewrole"])
-    @commands.bot_has_permissions(read_message_history=True, add_reactions=True, embed_links=True)
-    async def viewroles(self, ctx: Context, *, role: Optional[discord.Role] = None) -> None:
+    @roletools.command(name="viewroles")
+    @app_checks.bot_has_permissions(
+        read_message_history=True, add_reactions=True, embed_links=True
+    )
+    async def viewroles(self, interaction: discord.Interaction, *, role: Optional[discord.Role] = None) -> None:
         """
         View current roletools setup for each role in the server
 
         `[role]` The role you want to see settings for.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         page_start = 0
         if role:
             page_start = ctx.guild.roles.index(role)
@@ -634,23 +702,4 @@ class RoleTools(
             page_start=page_start,
         ).start(ctx=ctx)
 
-    # @roletools.group(name="slash")
-    # @commands.admin_or_permissions(manage_guild=True)
-    async def roletools_slash(self, ctx: Context) -> None:
-        """
-        Slash command toggling for roletools
-        """
-        pass
 
-    # @roletools_slash.command(name="global")
-    # @commands.is_owner()
-    async def roletools_global_slash(self, ctx: Context) -> None:
-        """Toggle this cog to register slash commands"""
-        current = await self.config.enable_slash()
-        await self.config.enable_slash.set(not current)
-        verb = _("enabled") if not current else _("disabled")
-        await ctx.send(_("Slash commands are {verb}.").format(verb=verb))
-        if not current:
-            self.bot.tree.add_command(self, override=True)
-        else:
-            self.bot.tree.remove_command("role-tools")
