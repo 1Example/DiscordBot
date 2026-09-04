@@ -904,7 +904,9 @@ class EmbedUtils(DashboardIntegration, Cog):
             raise commands.UserFeedbackCheckFailure(
                 _("This third party is disabled on the Dashboard."),
             )
-        url = f"{dashboard_url[0]}/dashboard/{ctx.guild.id}/third-party/{self.qualified_name}/guild"
+        # Kept in step with the `name="create"` dashboard page; this link used
+        # to point at "/guild" and would 404 after the rename.
+        url = f"{dashboard_url[0]}/dashboard/{ctx.guild.id}/third-party/{self.qualified_name}/create"
 
         if conversion_type is not None:
             if conversion_type in ("json", "fromjson", "fromdata"):

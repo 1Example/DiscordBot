@@ -1,0 +1,85 @@
+# ./.venv/bin/python -m pytest aiuser/tests/test_image_request.py -q -s
+
+
+from unittest.mock import patch
+
+import pytest
+from discord.ext.test import backend, get_message
+
+
+@pytest.mark.asyncio
+async def test_image_request(
+    bot,
+    mock_services,
+    build_conversation,
+    test_guild,
+    test_channel,
+    test_member,
+    mock_generate_and_send,
+    fake_llm,
+):
+    from aiuser.tests.conftest import text_step, tool_call_step
+
+    # Set preprompt with variables
+    preprompt_template = "Create a safe-for-work image requested by {authorname} watermarked with {botname} "
+    await mock_services.config.guild(test_guild).function_calling_image_preprompt.set(
+        preprompt_template
+    )
+
+    # Enable function calling and specific tool
+    await mock_services.config.guild(test_guild).function_calling.set(True)
+    await mock_services.config.guild(test_guild).function_calling_functions.set(
+        ["generate_image"]
+    )
+
+    user_message = backend.make_message(
+        "yo bot, make me a pic of a cat wearing sunglasses 😎",
+        test_member,
+        test_channel,
+    )
+    ctx = await bot.get_context(user_message)
+    thread = await build_conversation(init_message=user_message)
+
+    image_description = "a high-quality image of a fluffy orange cat wearing cool sunglasses, cinematic lighting"
+    fake_llm(
+        tool_call_step(
+            "generate_image",
+            f'{{"description": "{image_description}"}}',
+            call_id="call_image_123",
+        ),
+        text_step("Here's your cool cat! 🔥"),
+    )
+
+    captured_descriptions = []
+
+    # Mock the image provider to capture the description it receives
+    async def mock_provider(description, request, endpoint):
+        captured_descriptions.append(description)
+        # Return minimal valid PNG bytes
+        return b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+
+    with (
+        patch(
+            "aiuser.functions.imagerequest.tool_call.PROVIDERS", {"mock": mock_provider}
+        ),
+        patch(
+            "aiuser.functions.imagerequest.tool_call.detect_image_provider",
+            return_value="mock",
+        ),
+    ):
+        await mock_generate_and_send(mock_services, ctx, thread)
+
+    sent_message = get_message()
+    assert sent_message.attachments
+    assert sent_message.attachments[0].filename == "image.png"
+
+    assert len(captured_descriptions) == 1
+    final_description = captured_descriptions[0]
+
+    assert "{authorname}" not in final_description
+    assert "{botname}" not in final_description
+
+    assert "Create a safe-for-work image" in final_description
+    assert f"requested by {test_member.display_name}" in final_description
+    assert "watermarked with" in final_description
+    assert image_description in final_description

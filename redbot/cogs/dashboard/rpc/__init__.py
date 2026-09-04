@@ -63,6 +63,7 @@ class DashboardRPC:
         self.bot.register_rpc_handler(self.set_bot_settings)
         self.bot.register_rpc_handler(self.set_custom_pages)
         self.bot.register_rpc_handler(self.get_logs)
+        self.bot.register_rpc_handler(self.bump_session_epoch)
 
         # Initialize handlers.
         self.handlers: dict[str, typing.Any] = {}
@@ -86,6 +87,9 @@ class DashboardRPC:
         # Keyed by viewer (0 = anonymous), because the same list is
         # annotated differently depending on who is looking at it.
         self.server_list_cache: dict[int, tuple[float, dict]] = {}
+        # Invites change rarely and cost an API call each, so they outlive
+        # the directory's own 60-second cache.
+        self.server_invite_cache: dict[int, tuple[float, str]] = {}
         self.guild_profile_cache: dict[int, tuple[float, dict]] = {}
         self.guilds_cache: dict[
             int,
@@ -119,6 +123,7 @@ class DashboardRPC:
         self.bot.unregister_rpc_handler(self.set_guild_bot_profile)
         self.bot.unregister_rpc_handler(self.set_custom_pages)
         self.bot.unregister_rpc_handler(self.get_logs)
+        self.bot.unregister_rpc_handler(self.bump_session_epoch)
         for handler in self.handlers.values():
             handler.unload()
 
@@ -647,14 +652,7 @@ class DashboardRPC:
                     "boosts": guild.premium_subscription_count or 0,
                     "tier": guild.premium_tier or 0,
                     "created_at": guild.created_at.timestamp() if guild.created_at else None,
-                    # Only a vanity URL the server has already published. A real
-                    # invite would have to be created, which is both intrusive
-                    # and something the server owner did not ask for.
-                    "invite": (
-                        f"https://discord.gg/{guild.vanity_url_code}"
-                        if getattr(guild, "vanity_url_code", None)
-                        else ""
-                    ),
+                    "invite": await self._server_invite(guild),
                     "shared": member is not None,
                     "can_manage": can_manage,
                 }
@@ -673,6 +671,43 @@ class DashboardRPC:
         }
         self.server_list_cache[cache_key] = (time.time(), result)
         return result
+
+    async def _server_invite(self, guild: discord.Guild) -> str:
+        """A link people can actually join with, or "" if there is not one.
+
+        Preference order: the server's vanity URL, then an existing permanent
+        invite it has already created. Nothing is ever created here - making an
+        invite is a change to someone's server, and the directory only
+        advertises what a server has already chosen to publish, which is why
+        most entries have no button.
+
+        Cached separately from the directory itself: listing invites is an API
+        call per guild, and the answer changes far more slowly than member
+        counts do.
+        """
+        if getattr(guild, "vanity_url_code", None):
+            return f"https://discord.gg/{guild.vanity_url_code}"
+
+        cached = self.server_invite_cache.get(guild.id)
+        if cached is not None and (cached[0] + 900) > time.time():
+            return cached[1]
+
+        invite = ""
+        # Listing invites needs Manage Server; without it this is simply a
+        # server the directory cannot offer a link to.
+        if guild.me is not None and guild.me.guild_permissions.manage_guild:
+            try:
+                for candidate in await guild.invites():
+                    # Permanent and unlimited only: a link that expires or runs
+                    # out of uses would be a dead button a week from now.
+                    if not candidate.max_age and not candidate.max_uses:
+                        invite = candidate.url
+                        break
+            except (discord.HTTPException, discord.Forbidden):
+                log.debug("Could not list invites for %s", guild.id, exc_info=True)
+
+        self.server_invite_cache[guild.id] = (time.time(), invite)
+        return invite
 
     @rpc_check()
     async def get_user_profile(self, user_id: int) -> dict[str, typing.Any]:
@@ -1678,6 +1713,36 @@ class DashboardRPC:
             return {"status": 1}
         await self.cog.config.webserver.custom_pages.set(custom_pages)
         return {"status": 0}
+
+    @rpc_check()
+    async def bump_session_epoch(
+        self, user_id: int, scope: str = "user", target_id: int = None
+    ) -> dict[str, typing.Any]:
+        """Revoke dashboard logins by moving the cut-off they are checked against.
+
+        `scope` is "user" (that person's own sessions, which is what logging
+        out does) or "global" (everyone, which is the Admin page's "Refresh
+        sessions"). Only an owner may revoke globally or on someone else's
+        behalf; anyone may revoke their own.
+
+        Stored rather than kept in memory, so revoking outlives a restart -
+        and, just as importantly, so a restart on its own no longer revokes
+        every session as a side effect.
+        """
+        is_owner = user_id in self.bot.owner_ids
+        if scope == "global":
+            if not is_owner:
+                return {"status": 1}
+            key = "global"
+        else:
+            key = str(target_id if target_id is not None else user_id)
+            if key != str(user_id) and not is_owner:
+                return {"status": 1}
+
+        now = int(time.time())
+        async with self.cog.config.webserver.core.session_epochs() as epochs:
+            epochs[key] = now
+        return {"status": 0, "epoch": now, "key": key}
 
     @rpc_check()
     async def get_logs(

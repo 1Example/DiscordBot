@@ -1,0 +1,68 @@
+from typing import Any, Dict, Optional
+
+from aiuser.functions import names
+from aiuser.functions.context import ToolContext
+from aiuser.functions.discord.info import DISCORD_INFO_TYPES, get_discord_info
+from aiuser.functions.discord.reaction import add_reaction
+from aiuser.functions.tool_call import ToolCall
+from aiuser.functions.types import Function, Parameters, ToolCallSchema
+
+
+class AddReactionToolCall(ToolCall):
+    schema = ToolCallSchema(
+        function=Function(
+            name=names.ADD_REACTION,
+            description=(
+                "Adds one reaction emoji to the Discord message that invoked a response."
+            ),
+            parameters=Parameters(
+                properties={
+                    "emoji": {
+                        "type": "string",
+                        "description": (
+                            "Exactly one Unicode emoji, or one raw custom Discord "
+                            "emoji such as <:name:id> or <a:name:id>."
+                        ),
+                    },
+                },
+                required=["emoji"],
+            ),
+        )
+    )
+    function_name = schema.function.name
+
+    async def _handle(
+        self, tool_context: ToolContext, arguments: Dict[str, Any]
+    ) -> Optional[str]:
+        return await add_reaction(tool_context, arguments.get("emoji", ""))
+
+
+class GetDiscordInfoToolCall(ToolCall):
+    schema = ToolCallSchema(
+        function=Function(
+            name=names.GET_DISCORD_INFO,
+            description=(
+                "Surface information about certain Discord entities in the current context. "
+            ),
+            parameters=Parameters(
+                properties={
+                    "info": {
+                        "type": "string",
+                        "enum": list(DISCORD_INFO_TYPES),
+                        "description": (
+                            "The Discord info to fetch. One of: channel, server, "
+                            "author, server_emojis."
+                        ),
+                    },
+                },
+                required=["info"],
+            ),
+        )
+    )
+    function_name = schema.function.name
+    parallel_safe = True
+
+    async def _handle(
+        self, tool_context: ToolContext, arguments: Dict[str, Any]
+    ) -> Optional[str]:
+        return await get_discord_info(tool_context, arguments.get("info", ""))

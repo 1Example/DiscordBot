@@ -1,0 +1,135 @@
+import json
+
+DEFAULT_PROMPT = "You are {botname}. You are in a Discord text channel. \
+Respond to anything, including URLs, unhelpfully and cynically in a short message. \
+Fulfill your persona and don't speak in third person. \
+You are forbidden from saying you're an AI or a bot."
+DEFAULT_PRESETS = {
+    "cynical": DEFAULT_PROMPT,
+    "neutral": "You are {botname}. You are in a Discord text channel. Respond to anything, including URLs. Fulfill your persona and don't speak in third person. You are forbidden from saying you're an AI or a bot.",
+    "tsundere": "You are {botname}. You are in a Discord text channel. Respond to anything, including URLs. Be a tsundere when responding. Use text emojis. Fulfill your persona and don't speak in third person. You are forbidden from saying you're an AI or a bot.",
+}
+DEFAULT_RANDOM_PROMPTS = [
+    "Talk about how today is {currentweekday}. You must state that today is {currentweekday}.",
+    "Talk about how empty the Discord channel is",
+    "Talk about how you are currently ordering takeout. State the specific cuisine ordered, and any other details you'd like to the Discord channel.",
+    "Make up a topic in the news. State that you just read about it in the news. Talk about that topic.",
+]
+DEFAULT_MEMORY_RETRIEVAL_PREFIX = (
+    "Looking into your memory, the following relevant memory was found that could be "
+    "used in the response:"
+)
+DEFAULT_REMOVE_PATTERNS = [
+    r"<think>[\s\S]*?<\/think>",  # for thinking LLMs
+    r"^As an AI language model,?",
+    r'^(User )?"?{botname}"? (said|says|respond(ed|s)|replie[ds])( to [^":]+)?:?',
+    r'^As "?{botname}"?, (I|you)( might| would| could)? (respond|reply|say)( with)?( something like)?:?',
+    r'^You respond as "?{botname}"?:',
+    r"^[<({{\[]{botname}[>)}}\]]",  # [name], {name}, <name>, (name)
+    r"^{botname}:",
+    r'^(User )?"?{authorname}"? (said|says|respond(ed|s)|replie[ds])( to [^":]+)?:?',
+    r'^As "?{authorname}"?, (I|you)( might| would| could)? (respond|reply|say)( with)?( something like)?:?',
+    r'^You respond as "?{authorname}"?:',
+    r"^[<({{\[]{authorname}[>)}}\]]",  # [name], {name}, <name>, (name)
+    r"^{authorname}:",
+    r"\n*\[Image[^\]]+\]",
+]
+
+DEFAULT_REPLY_PERCENT = 0.5
+DEFAULT_MESSAGE_BURST_IDLE_SECONDS = 2
+DEFAULT_MESSAGE_BURST_MAX_SECONDS = 8
+DEFAULT_MIN_MESSAGE_LENGTH = 2
+DEFAULT_IMAGE_UPLOAD_LIMIT = 10 * (1024 * 1024)  # 10 MB
+DEFAULT_IMAGE_DETAIL = "low"
+DEFAULT_AUDIO_UPLOAD_LIMIT = 25 * (1024 * 1024)  # 25 MB
+DEFAULT_AUDIO_DURATION_LIMIT = 60
+DEFAULT_STT_PROVIDER = "openai"
+DEFAULT_LLM_MODEL = "gpt-5.4-mini"
+DEFAULT_TOOL_CALL_ROUNDS = 10
+
+DEFAULT_GLOBAL = {
+    "custom_openai_endpoint": None,
+    "openai_endpoint_request_timeout": 60,
+    "optout": [],
+    "optin": [],
+    "max_random_prompt_length": 200,
+    "max_prompt_length": 200,
+    "custom_text_prompt": None,
+    "endpoint_model_history": {},
+}
+
+DEFAULT_GUILD = {
+    "optin_by_default": False,
+    "optin_disable_embed": False,
+    "reply_percent": DEFAULT_REPLY_PERCENT,
+    "messages_backread": 25,
+    "messages_backread_seconds": 60 * 120,
+    "messages_min_length": DEFAULT_MIN_MESSAGE_LENGTH,
+    "reply_to_mentions_replies": True,
+    "scan_images": False,
+    "scan_images_model": None,
+    "max_image_size": DEFAULT_IMAGE_UPLOAD_LIMIT,
+    "scan_images_detail": DEFAULT_IMAGE_DETAIL,
+    "scan_audio": False,
+    "scan_audio_provider": DEFAULT_STT_PROVIDER,
+    "scan_audio_model": None,
+    "scan_audio_provider_history": {},
+    "max_audio_duration": DEFAULT_AUDIO_DURATION_LIMIT,
+    "model": DEFAULT_LLM_MODEL,
+    "custom_text_prompt": None,
+    "channels_whitelist": [],
+    "roles_whitelist": [],
+    "members_whitelist": [],
+    "public_forget": False,
+    "ignore_regex": None,
+    "removelist_regexes": DEFAULT_REMOVE_PATTERNS,
+    "parameters": None,
+    "weights": None,
+    "random_messages_enabled": False,
+    "random_messages_percent": 0.012,
+    "random_messages_prompts": DEFAULT_RANDOM_PROMPTS,
+    "presets": json.dumps(DEFAULT_PRESETS),
+    "function_calling": False,
+    "function_calling_functions": ["do_not_respond", "add_reaction"],
+    "function_calling_tool_call_rounds": DEFAULT_TOOL_CALL_ROUNDS,
+    "function_calling_image_custom_endpoint": None,
+    "function_calling_image_model": None,
+    "function_calling_image_preprompt": None,
+    "function_calling_voice_provider": "openai",
+    "function_calling_voice_model": None,
+    "function_calling_voice": None,
+    "function_calling_voice_provider_history": {},
+    "function_calling_search_provider": "exa",
+    "function_calling_search_endpoint": None,
+    "function_calling_search_max_results": 5,
+    "function_calling_scrape_provider": "local",
+    "conversation_reply_percent": 0,
+    "conversation_reply_time": 20,
+    "message_burst_idle_seconds": DEFAULT_MESSAGE_BURST_IDLE_SECONDS,
+    "message_burst_max_seconds": DEFAULT_MESSAGE_BURST_MAX_SECONDS,
+    "grok_trigger": False,
+    "custom_model_tokens_limit": None,
+    "always_reply_on_words": [],
+    "query_memories": False,
+    "reply_to_webhooks": False,
+    "webhook_whitelist_enabled": False,
+    "webhook_user_whitelist": [],
+    "compaction_enabled": False,
+    "custom_compaction_prompt": None,
+}
+
+DEFAULT_SCOPED = {
+    "custom_text_prompt": None,
+    "reply_percent": None,
+    "messages_min_length": None,
+    "reply_to_mentions_replies": None,
+    "conversation_reply_percent": None,
+    "conversation_reply_time": None,
+    "always_reply_on_words": None,
+    "reply_to_webhooks": None,
+    "function_calling_image_preprompt": None,
+}
+
+DEFAULT_CHANNEL = dict(DEFAULT_SCOPED)
+DEFAULT_ROLE = dict(DEFAULT_SCOPED)
+DEFAULT_MEMBER = dict(DEFAULT_SCOPED)

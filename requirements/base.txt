@@ -151,3 +151,17 @@ dataclasses-json
 chat-exporter
 py-cpuinfo
 speedtest-cli>=2.1.3
+# aiuser
+# `pydantic`, `emoji`, `tenacity`, `requests` and `aiohttp` are already pulled
+# in above and cover this cog too; aiuser's own pin for pydantic is the same
+# range levelup asks for, so there is nothing to reconcile.
+openai>=2,<2.29
+authlib>=1.6,<2
+tiktoken>=0.9.0
+trafilatura==2.0.0
+fastembed
+aiosqlite
+Pillow
+# Used by the cog's image generation path only, but it is imported at module
+# import time, so the cog will not load without it.
+modal~=1.2.5

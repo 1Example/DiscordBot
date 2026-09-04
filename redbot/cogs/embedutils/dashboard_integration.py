@@ -68,9 +68,12 @@ class DashboardIntegration:
         # with the topbar, breadcrumb and back button around it.
         return {"status": 0, "web_content": {"source": _editor_fragment()}}
 
+    # The page slug is what the Modules card labels its button with, and
+    # "Guild" described the scope rather than what the page does. "Create" is
+    # the verb; the guild it applies to is already named in the breadcrumb.
     @dashboard_page(
-        name="guild",
-        description="Create rich Embeds and send them to a guild!",
+        name="create",
+        description="Build an embed and send it to a channel in this server.",
         methods=("GET", "POST"),
     )
     async def dashboard_guild(self, member: discord.Member, guild: discord.Guild, **kwargs) -> None:

@@ -78,6 +78,14 @@ class Dashboard(Cog):
                     "redirect_uri": None,
                     "allow_unsecure_http_requests": False,
                     "blacklisted_ips": [],
+                    # Revocation for dashboard logins, as unix timestamps: a
+                    # login token issued before the timestamp that applies to
+                    # it is refused. "global" covers everyone (the Admin page's
+                    # "Refresh sessions"), and a user id covers one person.
+                    # Persisted so that revoking a session actually outlives a
+                    # restart - and so a restart on its own stops being a
+                    # revocation, which is what used to sign everybody out.
+                    "session_epochs": {},
                 },
                 "ui": {
                     "meta": {

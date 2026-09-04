@@ -1,0 +1,475 @@
+from types import SimpleNamespace
+
+import discord
+import pytest
+from discord.ext.test import backend
+
+from aiuser.core.decision import get_percentage
+from aiuser.core.decision.triggers import (
+    get_conversation_reply_chance,
+    is_always_reply_on_words_triggered,
+)
+from aiuser.core.decision.validators import (
+    check_message_content,
+    check_user_status,
+    is_bot_mentioned_or_replied,
+)
+from aiuser.core.dispatch import handle_message
+from aiuser.core.reply_queue import get_or_create_channel_reply_state
+
+
+async def _get_conversation_reply_chance(
+    bot, mock_services, test_channel, test_member, text
+):
+    """Record a recent aiuser response, then evaluate a conversation follow-up."""
+    bot_message = backend.make_message("recent bot message", bot.user, test_channel)
+    state = get_or_create_channel_reply_state(mock_services, test_channel.id)
+    state.last_bot_reply_at = bot_message.created_at
+    trigger = backend.make_message(text, test_member, test_channel)
+    ctx = await bot.get_context(trigger)
+    return await get_conversation_reply_chance(mock_services, ctx)
+
+
+@pytest.mark.asyncio
+async def test_conversation_reply_hierarchy_percent(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    """Higher-specificity percent settings should override broader levels."""
+    role = backend.make_role("ConversationTester", test_guild)
+    backend.update_member(test_member, roles=[role])
+
+    # Register role config so it appears in config.all_roles()
+    await mock_services.config.role(role).conversation_reply_percent.set(None)
+    await mock_services.config.role(role).conversation_reply_time.set(None)
+
+    # Baseline via guild
+    await mock_services.config.guild(test_guild).conversation_reply_percent.set(0.9)
+    await mock_services.config.guild(test_guild).conversation_reply_time.set(300)
+
+    # Clear narrower custom values
+    await mock_services.config.channel(test_channel).conversation_reply_percent.set(
+        None
+    )
+    await mock_services.config.member(test_member).conversation_reply_percent.set(None)
+    await mock_services.config.role(role).conversation_reply_percent.set(None)
+
+    assert (
+        await _get_conversation_reply_chance(
+            bot, mock_services, test_channel, test_member, "guild baseline"
+        )
+        == 0.9
+    )
+
+    # Channel overrides guild
+    await mock_services.config.channel(test_channel).conversation_reply_percent.set(0.0)
+    assert (
+        await _get_conversation_reply_chance(
+            bot, mock_services, test_channel, test_member, "channel override"
+        )
+        is None
+    )
+
+    # Role overrides channel
+    await mock_services.config.role(role).conversation_reply_percent.set(0.9)
+    assert (
+        await _get_conversation_reply_chance(
+            bot, mock_services, test_channel, test_member, "role override"
+        )
+        == 0.9
+    )
+
+    # Member overrides role
+    await mock_services.config.member(test_member).conversation_reply_percent.set(0.0)
+    assert (
+        await _get_conversation_reply_chance(
+            bot, mock_services, test_channel, test_member, "member override"
+        )
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_conversation_reply_hierarchy_time(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    """Higher-specificity time settings should override broader levels."""
+    role = backend.make_role("ConversationTimer", test_guild)
+    backend.update_member(test_member, roles=[role])
+
+    # Register role config so it appears in config.all_roles()
+    await mock_services.config.role(role).conversation_reply_percent.set(None)
+    await mock_services.config.role(role).conversation_reply_time.set(None)
+
+    # Percent always allows, so time window controls behavior
+    await mock_services.config.guild(test_guild).conversation_reply_percent.set(0.9)
+    await mock_services.config.guild(test_guild).conversation_reply_time.set(300)
+
+    # Clear narrower custom values
+    await mock_services.config.channel(test_channel).conversation_reply_time.set(None)
+    await mock_services.config.member(test_member).conversation_reply_time.set(None)
+    await mock_services.config.role(role).conversation_reply_time.set(None)
+
+    assert (
+        await _get_conversation_reply_chance(
+            bot, mock_services, test_channel, test_member, "guild time baseline"
+        )
+        == 0.9
+    )
+
+    # Channel overrides guild (0 disables conversation continuation)
+    await mock_services.config.channel(test_channel).conversation_reply_time.set(0)
+    assert (
+        await _get_conversation_reply_chance(
+            bot, mock_services, test_channel, test_member, "channel time override"
+        )
+        is None
+    )
+
+    # Role overrides channel
+    await mock_services.config.role(role).conversation_reply_time.set(300)
+    assert (
+        await _get_conversation_reply_chance(
+            bot, mock_services, test_channel, test_member, "role time override"
+        )
+        == 0.9
+    )
+
+    # Member overrides role
+    await mock_services.config.member(test_member).conversation_reply_time.set(0)
+    assert (
+        await _get_conversation_reply_chance(
+            bot, mock_services, test_channel, test_member, "member time override"
+        )
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_trigger_words_hierarchy(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    role = backend.make_role("TriggerWordsRole", test_guild)
+    backend.update_member(test_member, roles=[role])
+
+    await mock_services.config.role(role).always_reply_on_words.set(None)
+    await mock_services.config.channel(test_channel).always_reply_on_words.set(None)
+    await mock_services.config.member(test_member).always_reply_on_words.set(None)
+
+    await mock_services.config.guild(test_guild).always_reply_on_words.set(
+        ["guildword"]
+    )
+
+    msg = backend.make_message("hello guildword", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await is_always_reply_on_words_triggered(mock_services, ctx) is True
+
+    await mock_services.config.channel(test_channel).always_reply_on_words.set([])
+    msg = backend.make_message("hello guildword", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await is_always_reply_on_words_triggered(mock_services, ctx) is False
+
+    await mock_services.config.channel(test_channel).always_reply_on_words.set(
+        ["channelword"]
+    )
+    msg = backend.make_message("hello guildword", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await is_always_reply_on_words_triggered(mock_services, ctx) is False
+    msg = backend.make_message("hello channelword", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await is_always_reply_on_words_triggered(mock_services, ctx) is True
+
+    await mock_services.config.role(role).always_reply_on_words.set(["roleword"])
+    msg = backend.make_message("hello channelword", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await is_always_reply_on_words_triggered(mock_services, ctx) is False
+    msg = backend.make_message("hello roleword", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await is_always_reply_on_words_triggered(mock_services, ctx) is True
+
+    await mock_services.config.member(test_member).always_reply_on_words.set(
+        ["memberword"]
+    )
+    msg = backend.make_message("hello roleword", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await is_always_reply_on_words_triggered(mock_services, ctx) is False
+    msg = backend.make_message("hello memberword", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await is_always_reply_on_words_triggered(mock_services, ctx) is True
+
+
+@pytest.mark.asyncio
+async def test_trigger_words_clear_inherits_broader_words(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    """An unset scoped value should use the broader trigger-word setting."""
+    await mock_services.config.guild(test_guild).always_reply_on_words.set(
+        ["guildword"]
+    )
+    await mock_services.config.channel(test_channel).always_reply_on_words.set(None)
+
+    msg = backend.make_message("hello guildword", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await is_always_reply_on_words_triggered(mock_services, ctx) is True
+
+
+@pytest.mark.asyncio
+async def test_conversation_reply_uses_highest_role_override(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    """Conversation follow-up should use the highest-role override."""
+    low_role = backend.make_role("ConversationLow", test_guild)
+    high_role = backend.make_role("ConversationHigh", test_guild)
+    low_role.position = 1
+    high_role.position = 10
+    backend.update_member(test_member, roles=[low_role, high_role])
+
+    await mock_services.config.guild(test_guild).conversation_reply_percent.set(0.9)
+    await mock_services.config.guild(test_guild).conversation_reply_time.set(300)
+    await mock_services.config.channel(test_channel).conversation_reply_percent.set(
+        None
+    )
+    await mock_services.config.member(test_member).conversation_reply_percent.set(None)
+
+    await mock_services.config.role(low_role).conversation_reply_percent.set(0.9)
+    await mock_services.config.role(low_role).conversation_reply_time.set(None)
+    await mock_services.config.role(high_role).conversation_reply_percent.set(0.0)
+    await mock_services.config.role(high_role).conversation_reply_time.set(None)
+
+    assert (
+        await _get_conversation_reply_chance(
+            bot,
+            mock_services,
+            test_channel,
+            test_member,
+            "highest role percent override",
+        )
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_conversation_reply_requires_recorded_aiuser_response(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    """Conversation continuation should ignore unrelated bot-authored messages."""
+    await mock_services.config.guild(test_guild).conversation_reply_percent.set(0.9)
+    await mock_services.config.guild(test_guild).conversation_reply_time.set(300)
+
+    embed = discord.Embed(title="Status")
+    embed_message = backend.make_message(
+        "embedded status message",
+        bot.user,
+        test_channel,
+        embeds=[embed],
+    )
+    await handle_message(mock_services, embed_message)
+    trigger = backend.make_message("does embed count?", test_member, test_channel)
+    ctx = await bot.get_context(trigger)
+    assert await get_conversation_reply_chance(mock_services, ctx) is None
+
+    plain_message = backend.make_message("plain follow-up", bot.user, test_channel)
+    await handle_message(mock_services, plain_message)
+    trigger = backend.make_message("how about now?", test_member, test_channel)
+    ctx = await bot.get_context(trigger)
+    assert await get_conversation_reply_chance(mock_services, ctx) is None
+
+    state = get_or_create_channel_reply_state(mock_services, test_channel.id)
+    state.last_bot_reply_at = plain_message.created_at
+    trigger = backend.make_message(
+        "after an aiuser response?", test_member, test_channel
+    )
+    ctx = await bot.get_context(trigger)
+    assert await get_conversation_reply_chance(mock_services, ctx) == 0.9
+
+
+@pytest.mark.asyncio
+async def test_conversation_reply_without_recent_bot_message_is_false(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    """Conversation continuation should not trigger from user-only history."""
+    other_member = backend.make_member(
+        backend.make_user("ConversationPeer", "4444"), test_guild
+    )
+
+    await mock_services.config.guild(test_guild).conversation_reply_percent.set(0.9)
+    await mock_services.config.guild(test_guild).conversation_reply_time.set(300)
+
+    _ = backend.make_message("just another user message", other_member, test_channel)
+    trigger = backend.make_message("should not continue", test_member, test_channel)
+    ctx = await bot.get_context(trigger)
+
+    assert await get_conversation_reply_chance(mock_services, ctx) is None
+
+
+@pytest.mark.asyncio
+async def test_min_length_hierarchy_in_validator(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    role = backend.make_role("MinLengthRole", test_guild)
+    backend.update_member(test_member, roles=[role])
+
+    await mock_services.config.role(role).messages_min_length.set(None)
+    await mock_services.config.channel(test_channel).messages_min_length.set(None)
+    await mock_services.config.member(test_member).messages_min_length.set(None)
+
+    await mock_services.config.guild(test_guild).messages_min_length.set(5)
+
+    msg = backend.make_message("hey", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    ok, _ = await check_message_content(mock_services, ctx)
+    assert ok is False
+
+    await mock_services.config.channel(test_channel).messages_min_length.set(2)
+    ok, _ = await check_message_content(mock_services, ctx)
+    assert ok is True
+
+    await mock_services.config.role(role).messages_min_length.set(6)
+    ok, _ = await check_message_content(mock_services, ctx)
+    assert ok is False
+
+    await mock_services.config.member(test_member).messages_min_length.set(1)
+    ok, _ = await check_message_content(mock_services, ctx)
+    assert ok is True
+
+
+@pytest.mark.asyncio
+async def test_reply_to_mentions_hierarchy(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    role = backend.make_role("MentionsRole", test_guild)
+    backend.update_member(test_member, roles=[role])
+
+    await mock_services.config.role(role).reply_to_mentions_replies.set(None)
+    await mock_services.config.channel(test_channel).reply_to_mentions_replies.set(None)
+    await mock_services.config.member(test_member).reply_to_mentions_replies.set(None)
+
+    await mock_services.config.guild(test_guild).reply_to_mentions_replies.set(True)
+
+    msg = backend.make_message(f"<@{bot.user.id}> hi", test_member, test_channel)
+    assert await is_bot_mentioned_or_replied(mock_services, msg) is True
+
+    await mock_services.config.channel(test_channel).reply_to_mentions_replies.set(
+        False
+    )
+    msg = backend.make_message(f"<@{bot.user.id}> hi", test_member, test_channel)
+    assert await is_bot_mentioned_or_replied(mock_services, msg) is False
+
+    await mock_services.config.role(role).reply_to_mentions_replies.set(True)
+    msg = backend.make_message(f"<@{bot.user.id}> hi", test_member, test_channel)
+    assert await is_bot_mentioned_or_replied(mock_services, msg) is True
+
+    await mock_services.config.member(test_member).reply_to_mentions_replies.set(False)
+    msg = backend.make_message(f"<@{bot.user.id}> hi", test_member, test_channel)
+    assert await is_bot_mentioned_or_replied(mock_services, msg) is False
+
+
+@pytest.mark.asyncio
+async def test_reply_to_mentions_uses_highest_role_override(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    """Mention/reply trigger should honor highest-role boolean override."""
+    low_role = backend.make_role("MentionsLow", test_guild)
+    high_role = backend.make_role("MentionsHigh", test_guild)
+    low_role.position = 1
+    high_role.position = 10
+    backend.update_member(test_member, roles=[low_role, high_role])
+
+    await mock_services.config.guild(test_guild).reply_to_mentions_replies.set(True)
+    await mock_services.config.channel(test_channel).reply_to_mentions_replies.set(None)
+    await mock_services.config.member(test_member).reply_to_mentions_replies.set(None)
+    await mock_services.config.role(low_role).reply_to_mentions_replies.set(True)
+    await mock_services.config.role(high_role).reply_to_mentions_replies.set(False)
+
+    msg = backend.make_message(f"<@{bot.user.id}> hi", test_member, test_channel)
+    assert await is_bot_mentioned_or_replied(mock_services, msg) is False
+
+
+@pytest.mark.asyncio
+async def test_reply_percent_uses_highest_role_override(
+    bot,
+    mock_services,
+    test_guild,
+    test_channel,
+    test_member,
+):
+    """Main reply percentage lookup should use the highest-role override."""
+    low_role = backend.make_role("PercentLow", test_guild)
+    high_role = backend.make_role("PercentHigh", test_guild)
+    low_role.position = 1
+    high_role.position = 10
+    backend.update_member(test_member, roles=[low_role, high_role])
+
+    await mock_services.config.guild(test_guild).reply_percent.set(0.9)
+    await mock_services.config.channel(test_channel).reply_percent.set(None)
+    await mock_services.config.member(test_member).reply_percent.set(None)
+    await mock_services.config.role(low_role).reply_percent.set(0.9)
+    await mock_services.config.role(high_role).reply_percent.set(0.0)
+
+    msg = backend.make_message("hello", test_member, test_channel)
+    ctx = await bot.get_context(msg)
+    assert await get_percentage(mock_services, ctx) == 0.0
+
+
+@pytest.mark.asyncio
+async def test_reply_to_webhooks_channel_override_in_validator(
+    mock_services,
+    test_guild,
+    test_channel,
+):
+    await mock_services.config.guild(test_guild).reply_to_webhooks.set(True)
+    await mock_services.config.channel(test_channel).reply_to_webhooks.set(None)
+
+    webhook_like_ctx = SimpleNamespace(
+        guild=test_guild,
+        channel=test_channel,
+        interaction=None,
+        message=SimpleNamespace(webhook_id=123456),
+        author=SimpleNamespace(bot=False, id=999999),
+    )
+
+    ok, _ = await check_user_status(mock_services, webhook_like_ctx)
+    assert ok is True
+
+    await mock_services.config.channel(test_channel).reply_to_webhooks.set(False)
+    ok, _ = await check_user_status(mock_services, webhook_like_ctx)
+    assert ok is False

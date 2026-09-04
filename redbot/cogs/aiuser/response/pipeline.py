@@ -1,0 +1,234 @@
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from uuid import uuid4
+
+import discord
+import httpx
+import openai
+from openai.types.chat import (
+    ChatCompletionMessageParam,
+)
+from redbot.core import commands
+
+from aiuser.config.defaults import DEFAULT_TOOL_CALL_ROUNDS
+from aiuser.config.model_info import get_model_info
+from aiuser.context.conversation import Conversation
+from aiuser.context.entry import MessageEntry
+from aiuser.functions.context import ToolContext
+from aiuser.functions.executor import ToolExecutor
+from aiuser.providers.llm.base import ChatStepResult, LLMProvider
+from aiuser.providers.llm.debug_log import log_chat_request, log_chat_step_result
+from aiuser.providers.llm.openai_compatible.endpoints import is_openrouter_endpoint
+from aiuser.providers.llm.registry import get_llm_provider
+
+if TYPE_CHECKING:
+    from aiuser.core.services import AIUserServices
+
+logger = logging.getLogger("red.bz_cogs.aiuser")
+
+
+class PipelineError(Enum):
+    NO_PROVIDER = auto()
+    TIMED_OUT = auto()
+    RATE_LIMITED = auto()
+    REQUEST_FAILED = auto()
+
+
+@dataclass(frozen=True)
+class PipelineResult:
+    completion: Optional[str] = None
+    files_to_send: List[discord.File] = field(default_factory=list)
+    audio_transcripts_to_cache: List[str] = field(default_factory=list)
+    tool_call_entries: List[MessageEntry] = field(default_factory=list)
+    error: Optional[PipelineError] = None
+    session_id: Optional[str] = None
+
+
+class LLMPipeline:
+    def __init__(
+        self,
+        services: "AIUserServices",
+        ctx: commands.Context,
+        conversation: Conversation,
+    ):
+        self.services = services
+        self.ctx: commands.Context = ctx
+
+        self.conversation = conversation
+        self.model: str = conversation.model
+
+        self.provider: Optional[LLMProvider] = None
+        self.tool_context = ToolContext(services=services, ctx=ctx)
+        self.tool_executor = ToolExecutor(services.config, ctx, self.tool_context)
+        self.tool_call_entries: List[MessageEntry] = []
+        self.session_id: Optional[str] = None
+        self.request_id = (
+            str(self.ctx.message.id)
+            if self.conversation.from_message_context
+            else uuid4().hex
+        )
+
+    async def run(self) -> PipelineResult:
+        base_kwargs = await self._build_base_parameters()
+        self.provider = await get_llm_provider(self.services)
+        if self.provider is None:
+            logger.error("No LLM backend available while starting response pipeline")
+            return self._build_result(None, error=PipelineError.NO_PROVIDER)
+        await self.tool_executor.setup()
+        tool_call_rounds = (
+            await self.services.config.guild(
+                self.ctx.guild
+            ).function_calling_tool_call_rounds()
+            or DEFAULT_TOOL_CALL_ROUNDS
+        )
+        tools_kwargs = self.tool_executor.get_tools_kwargs()
+        exhausted_tool_call_rounds = False
+        completion: Optional[str] = None
+
+        for round_idx in range(tool_call_rounds):
+            kwargs = {**base_kwargs, **tools_kwargs}
+            step = await self._create_chat_step(kwargs)
+            if isinstance(step, PipelineError):
+                return self._build_result(None, error=step)
+
+            if step.content:
+                completion = step.content
+                break
+            if step.tool_calls:
+                await self._append_tool_round(step)
+                if self.tool_context.suppress_response:
+                    break
+                continue
+
+            logger.warning(
+                "No content or tool calls received during round %s for message %s "
+                "(finish_reason=%s)",
+                round_idx,
+                self.ctx.message.id,
+                step.finish_reason,
+            )
+            break
+        else:
+            exhausted_tool_call_rounds = True
+
+        if exhausted_tool_call_rounds and self.tool_call_entries:
+            logger.debug(
+                f"Tool call round limit reached for message {self.ctx.message.id}; requesting final response without tools"
+            )
+            step = await self._create_chat_step(base_kwargs)
+            if isinstance(step, PipelineError):
+                return self._build_result(None, error=step)
+            if step.content:
+                completion = step.content
+
+        return self._build_result(completion)
+
+    async def _append_tool_round(self, step: ChatStepResult) -> None:
+        """Record the assistant's tool calls and everything they returned."""
+        self.tool_call_entries.append(
+            await self.conversation.append_assistant(
+                tool_calls=step.tool_calls,
+                assistant_extra_fields=step.assistant_extra_fields,
+            )
+        )
+        for result in await self.tool_executor.run_tool_calls(step.tool_calls):
+            self.tool_call_entries.append(
+                await self.conversation.append_tool_result(
+                    result.content, result.tool_call_id
+                )
+            )
+
+    def _build_result(
+        self, completion: Optional[str], error: Optional[PipelineError] = None
+    ) -> PipelineResult:
+        return PipelineResult(
+            completion=completion,
+            files_to_send=self.tool_context.files_to_send,
+            audio_transcripts_to_cache=self.tool_context.audio_transcripts_to_cache,
+            tool_call_entries=self.tool_call_entries,
+            error=error,
+            session_id=self.session_id,
+        )
+
+    async def _create_chat_step(
+        self, kwargs: Dict[str, Any]
+    ) -> Union[ChatStepResult, PipelineError]:
+        try:
+            context: List[ChatCompletionMessageParam] = (
+                self.conversation.to_chat_payload()
+            )
+            log_chat_request(context)
+            step = await self.provider.create_chat_step(self.model, context, kwargs)
+            log_chat_step_result(
+                step.content,
+                step.tool_calls,
+            )
+            return step
+        except httpx.ReadTimeout:
+            logger.error("Failed request to LLM endpoint. Timed out.")
+            return PipelineError.TIMED_OUT
+        except openai.RateLimitError:
+            return PipelineError.RATE_LIMITED
+        except httpx.HTTPStatusError:
+            logger.exception("Failed HTTP request(s) to LLM endpoint")
+            return PipelineError.REQUEST_FAILED
+        except Exception:
+            logger.exception("Failed request(s) to LLM endpoint")
+            return PipelineError.REQUEST_FAILED
+
+    async def _build_base_parameters(self) -> Dict[str, Any]:
+        """
+        Build a base kwargs dict for the OpenAI call, including logit_bias handling.
+        """
+        params = await self.services.config.guild(self.ctx.guild).parameters()
+        kwargs: Dict[str, Any] = json.loads(params) if params else {}
+
+        if "logit_bias" not in kwargs:
+            weights = await self.services.config.guild(self.ctx.guild).weights()
+            weights_dict = json.loads(weights or "{}")
+            if weights_dict:
+                kwargs["logit_bias"] = weights_dict
+
+        if (
+            kwargs.get("logit_bias", False)
+            and not get_model_info(self.model).supports_logit_bias
+        ):
+            logger.warning(
+                f"logit_bias is not supported for model {self.model}, removing..."
+            )
+            kwargs.pop("logit_bias", None)
+
+        if is_openrouter_endpoint(await self.services.config.custom_openai_endpoint()):
+            self.session_id = await self._session_id()
+            extra_body = kwargs.setdefault("extra_body", {})
+            self.session_id = extra_body.setdefault("session_id", self.session_id)
+            trace = extra_body.setdefault("trace", {})
+            self.request_id = trace.setdefault("trace_id", self.request_id)
+            self.tool_context.llm_session_id = self.session_id
+            self.tool_context.llm_trace_id = self.request_id
+
+        return kwargs
+
+    async def _session_id(self) -> str:
+        state = self.services.reply_channel_states.get(self.ctx.channel.id)
+        if (
+            self.conversation.from_message_context
+            and state
+            and state.llm_session_id
+            and state.last_bot_reply_at
+        ):
+            max_history_gap = await self.services.config.guild(
+                self.ctx.guild
+            ).messages_backread_seconds()
+            elapsed = abs(
+                (self.ctx.message.created_at - state.last_bot_reply_at).total_seconds()
+            )
+            if max_history_gap and elapsed <= max_history_gap:
+                return state.llm_session_id
+
+        return self.request_id
