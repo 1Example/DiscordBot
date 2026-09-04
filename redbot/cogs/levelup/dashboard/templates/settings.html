@@ -200,7 +200,34 @@ dtable(label, desc, html) %}
     {{ dtable("Message XP", "Extra XP while using a specific app (e.g.
     Spotify).", appbonus_msg_html) }} {{ dtable("Voice XP", "Extra voice XP
     while using a specific app.", appbonus_voice_html) }} {% endcall %} {#
+
     ════════════════ Submit ════════════════ #}
+
+    {% if show_global %}
+    {% call section("sec-global", "ni-world-2", "Bot-Wide (Owner)") %}
+    <div class="col-12">
+      <p class="text-xs text-muted mb-3">
+        These apply to every server this bot is in, not just this one.
+      </p>
+    </div>
+    {{ field(settings_form.g_ignore_bots) }}
+    {{ field(settings_form.g_force_embeds) }}
+    {{ field(settings_form.g_render_gifs) }}
+    {{ field(settings_form.g_auto_cleanup) }}
+    {{ field(settings_form.g_cache_seconds) }}
+    {{ field(settings_form.g_ignored_guilds) }}
+    <div class="col-12">
+      <h6 class="text-xs text-uppercase text-muted fw-bold mt-2 mb-3">
+        Image Generation
+      </h6>
+    </div>
+    {{ field(settings_form.g_external_api_url) }}
+    {{ field(settings_form.g_managed_api) }}
+    {{ field(settings_form.g_managed_api_port) }}
+    {{ field(settings_form.g_managed_api_workers) }}
+    {% endcall %}
+    {% endif %}
+
     <div class="d-flex justify-content-end mt-2 mb-4">
       {{ settings_form.submit(class="btn bg-gradient-primary btn-lg px-5") }}
     </div>

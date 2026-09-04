@@ -467,8 +467,12 @@ async def handle_settings_page(
             "error_title": _("Member not found"),
             "error_message": _("You are not a member of this guild."),
         }
+    # `DB` settings are bot-wide, so only the owner gets that section - an
+    # admin of one server editing them would be changing every other server's
+    # behaviour too.
+    is_owner = await cog.bot.is_owner(user)
     is_privileged = (
-        await cog.bot.is_owner(user)
+        is_owner
         or member.id == guild.owner_id
         or member.guild_permissions.administrator
         or await cog.bot.is_admin(member)
@@ -904,6 +908,84 @@ async def handle_settings_page(
             render_kw=select_kw(_("Roles that accumulate XP as a group from all members with the role.")),
         )
 
+        # ── Bot-wide (owner only) ──
+        # These live on `DB` rather than on the guild config, so they change
+        # behaviour everywhere. Defined inside the `if` so a non-owner's form
+        # has no such fields at all, rather than hidden ones a crafted POST
+        # could reach.
+        if is_owner:
+            g_ignore_bots = wtforms.BooleanField(
+                _("Ignore Bots"),
+                default=cog.db.ignore_bots,
+                render_kw=bool_kw(_("Never award XP to bot accounts. Bot-wide.")),
+            )
+            g_force_embeds = wtforms.BooleanField(
+                _("Force Embeds Everywhere"),
+                default=cog.db.force_embeds,
+                render_kw=bool_kw(
+                    _("Use embeds instead of generated images in every server, "
+                      "overriding each server's own choice.")
+                ),
+            )
+            g_render_gifs = wtforms.BooleanField(
+                _("Render Animated Profiles"),
+                default=cog.db.render_gifs,
+                render_kw=bool_kw(
+                    _("Allow animated profile cards. Considerably more expensive to generate.")
+                ),
+            )
+            g_auto_cleanup = wtforms.BooleanField(
+                _("Auto-Clean Old Guild Data"),
+                default=cog.db.auto_cleanup,
+                render_kw=bool_kw(
+                    _("Discard stored settings for servers the bot is no longer in.")
+                ),
+            )
+            g_cache_seconds = wtforms.IntegerField(
+                _("Profile Image Cache (seconds)"),
+                default=cog.db.cache_seconds,
+                render_kw=kw(
+                    placeholder="0",
+                    tooltip=_("How long to reuse a generated profile image. 0 disables caching."),
+                ),
+            )
+            g_external_api_url = wtforms.StringField(
+                _("External Image API URL"),
+                default=cog.db.external_api_url,
+                render_kw=kw(
+                    placeholder="https://...",
+                    tooltip=_("Generate profile images on another host. Blank uses this bot."),
+                ),
+            )
+            g_managed_api = wtforms.BooleanField(
+                _("Run a Local Image API"),
+                default=cog.db.managed_api,
+                render_kw=bool_kw(
+                    _("Let the cog start and supervise its own local image-generation process.")
+                ),
+            )
+            g_managed_api_port = wtforms.IntegerField(
+                _("Local API Port"),
+                default=cog.db.managed_api_port,
+                render_kw=kw(placeholder="6789", tooltip=_("Port for the managed local API.")),
+            )
+            g_managed_api_workers = wtforms.IntegerField(
+                _("Local API Workers"),
+                default=cog.db.managed_api_workers,
+                render_kw=kw(
+                    placeholder="0",
+                    tooltip=_("Worker processes for the managed API. 0 picks half the CPU count."),
+                ),
+            )
+            g_ignored_guilds = wtforms.StringField(
+                _("Ignored Servers"),
+                default=list_to_text(cog.db.ignored_guilds),
+                render_kw=kw(
+                    placeholder="123456789012345678, ...",
+                    tooltip=_("Server IDs where leveling is disabled entirely, comma separated."),
+                ),
+            )
+
         submit = wtforms.SubmitField(_("Save Settings"))
 
     form = SettingsForm()
@@ -1111,15 +1193,50 @@ async def handle_settings_page(
                         appbonus_voice_html=appbonus_voice_html,
                         cmd_requirements_html=cmd_requirements_html,
                         cmd_cooldowns_html=cmd_cooldowns_html,
+                        show_global=is_owner,
                     ),
                 },
             }
 
         cog.db.configs[guild.id] = validated
+        extra_notifications: list[dict] = []
+
+        # Bot-wide settings, written straight to `DB`. Guarded again here
+        # rather than trusting that the fields only exist for owners, so a
+        # crafted POST cannot reach them.
+        if is_owner:
+            cog.db.ignore_bots = form.g_ignore_bots.data
+            cog.db.force_embeds = form.g_force_embeds.data
+            cog.db.render_gifs = form.g_render_gifs.data
+            cog.db.auto_cleanup = form.g_auto_cleanup.data
+            cog.db.managed_api = form.g_managed_api.data
+            cog.db.external_api_url = (form.g_external_api_url.data or "").strip()
+            cog.db.cache_seconds = max(0, int(form.g_cache_seconds.data or 0))
+            # 1-65535 is the whole valid port range; anything else would leave
+            # the managed API unable to bind and the cog silently imageless.
+            port = int(form.g_managed_api_port.data or 6789)
+            cog.db.managed_api_port = port if 1 <= port <= 65535 else 6789
+            cog.db.managed_api_workers = max(0, int(form.g_managed_api_workers.data or 0))
+            # A typo here would otherwise raise straight out of the handler and
+            # lose every other change on the page along with it.
+            try:
+                cog.db.ignored_guilds = int_list_from_text(form.g_ignored_guilds.data or "")
+            except ValueError:
+                extra_notifications.append(
+                    {
+                        "message": _("Ignored Servers must be server IDs (numbers only) - "
+                                     "that field was left unchanged."),
+                        "category": "warning",
+                    }
+                )
+
         cog.save(force=True)
         return {
             "status": 0,
-            "notifications": [{"message": _("Settings saved"), "category": "success"}],
+            "notifications": [
+                {"message": _("Settings saved"), "category": "success"},
+                *extra_notifications,
+            ],
             "redirect_url": kwargs["request_url"],
         }
 
@@ -1141,6 +1258,7 @@ async def handle_settings_page(
                 appbonus_voice_html=appbonus_voice_html,
                 cmd_requirements_html=cmd_requirements_html,
                 cmd_cooldowns_html=cmd_cooldowns_html,
+                        show_global=is_owner,
             ),
         },
     }
