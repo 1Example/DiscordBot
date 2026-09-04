@@ -30,8 +30,22 @@ TOGGLES = (
     ("sloteasy", "Easier slot odds", "Raises the chance of a winning combination."),
 )
 
+# The slot machine reads its limits from the Economy cog rather than from this
+# one - see `SimpleCasino.slot`, which pulls SLOT_MIN/SLOT_MAX/SLOT_TIME off
+# `economy.config`. Economy still registers them ("kept registered so old saved
+# values are not orphaned") but no longer owns the game, so neither cog's page
+# was showing them and the 100-credit default looked hardcoded. They are edited
+# here, beside the other game limits, and written back to Economy's config.
+SLOT_LIMITS = (
+    ("SLOT_MIN", "Slot minimum bet", "Smallest allowed slot bet.", 1, 10_000_000),
+    ("SLOT_MAX", "Slot maximum bet", "Largest allowed slot bet.", 1, 10_000_000),
+    ("SLOT_TIME", "Slot cooldown (s)",
+     "Wait between spins. Values under 3 are treated as 3.", 0, 3600),
+)
+
 # Bet pairs that must not be inverted.
 PAIRS = (("bjmin", "bjmax", "Blackjack"), ("pokermin", "pokermax", "Poker"))
+SLOT_PAIR = ("SLOT_MIN", "SLOT_MAX", "Slots")
 
 # Table markers. These are interpolated straight into the embed text - see
 # `poker.get_suit_emojis` - so a plain string like "(D)" is as valid as an
@@ -94,6 +108,9 @@ class DashboardIntegration:
         settings = await scope.all()
         marker_values = await self.config.all() if owner else {}
 
+        eco = self._sc_economy_scope(guild, global_bank)
+        slot_settings = await eco.all() if eco is not None else {}
+
         return {
             "status": 0,
             "notifications": notifications,
@@ -121,6 +138,18 @@ class DashboardIntegration:
                     }
                     for k, lbl, h, lo, hi in LIMITS
                 ],
+                "slot_limits": [
+                    {
+                        "key": k,
+                        "label": lbl,
+                        "help": h,
+                        "min": lo,
+                        "max": hi,
+                        "value": slot_settings.get(k, lo),
+                    }
+                    for k, lbl, h, lo, hi in SLOT_LIMITS
+                ] if eco is not None else [],
+                "economy_missing": eco is None,
                 "toggles": [
                     {"key": k, "label": lbl, "help": h, "on": bool(settings.get(k))}
                     for k, lbl, h in TOGGLES
@@ -129,6 +158,18 @@ class DashboardIntegration:
                 "you": await self._sc_member_stats(guild, member),
             },
         }
+
+    def _sc_economy_scope(self, guild: discord.Guild, global_bank: bool):
+        """Economy's config at the scope the slot machine actually reads.
+
+        Returns None when the Economy cog is not loaded - the slot command is
+        already unusable in that state, so the page hides the fields rather
+        than offering edits that would go nowhere.
+        """
+        economy = self.bot.get_cog("Economy")
+        if economy is None or getattr(economy, "config", None) is None:
+            return None
+        return economy.config if global_bank else economy.config.guild(guild)
 
     async def _sc_global_bank(self) -> bool:
         try:
@@ -231,6 +272,46 @@ class DashboardIntegration:
         for key, _lbl, _h in TOGGLES:
             await scope.get_attr(key).set(field.checked(f"t_{key}"))
 
+        # Slot limits live on the Economy cog; same validation, different home.
+        slot_saved = 0
+        eco = self._sc_economy_scope(guild, global_bank)
+        if eco is not None:
+            slot_values: dict[str, int] = {}
+            for key, label, _h, low, high in SLOT_LIMITS:
+                raw = (field(f"f_{key}") or "").strip()
+                if raw == "":
+                    continue
+                try:
+                    value = int(raw)
+                except ValueError:
+                    errors.append(
+                        {"message": f"{label}: '{raw}' is not a number.", "category": "danger"}
+                    )
+                    continue
+                if not low <= value <= high:
+                    errors.append(
+                        {"message": f"{label}: must be between {low} and {high}.",
+                         "category": "danger"}
+                    )
+                    continue
+                slot_values[key] = value
+
+            eco_current = await eco.all()
+            low_key, high_key, game = SLOT_PAIR
+            low = slot_values.get(low_key, eco_current.get(low_key))
+            high = slot_values.get(high_key, eco_current.get(high_key))
+            if low is not None and high is not None and low > high:
+                errors.append(
+                    {"message": f"{game}: minimum bet cannot exceed the maximum.",
+                     "category": "danger"}
+                )
+                slot_values.pop(low_key, None)
+                slot_values.pop(high_key, None)
+
+            for key, value in slot_values.items():
+                await eco.get_attr(key).set(value)
+            slot_saved = len(slot_values)
+
         # Markers are global and owner-only. A non-owner posting `m_*` fields by
         # hand is ignored rather than refused, so a stale form cannot lock an
         # admin out of saving the limits they are allowed to change.
@@ -259,7 +340,7 @@ class DashboardIntegration:
                     await self.config.get_attr(key).set(raw)
                     saved_markers += 1
 
-        saved = [f"{len(values)} limit(s)"]
+        saved = [f"{len(values) + slot_saved} limit(s)"]
         if saved_markers:
             saved.append(f"{saved_markers} marker(s)")
         return errors + [
@@ -299,6 +380,29 @@ CASINO_TEMPLATE = (
               <div style="font-size:.72rem; opacity:.45; margin-top:4px;">{{ f.help }}</div>
             </div>
           {% endfor %}
+
+          {% if slot_limits %}
+            <div style="margin:16px 0 11px; padding-top:13px;
+                        border-top:1px solid var(--cx-panel-3-bd, rgba(255,255,255,.08));">
+              <div class="dz-label" style="opacity:.8;">Slots</div>
+              <div style="font-size:.72rem; opacity:.45; margin-top:2px;">
+                Stored by the Economy cog, which the slot machine reads at spin time.
+              </div>
+            </div>
+            {% for f in slot_limits %}
+              <div style="margin-bottom:11px;">
+                <div class="dz-label">{{ f.label }}</div>
+                <input class="dz-input" type="number" min="{{ f.min }}" max="{{ f.max }}"
+                       name="f_{{ f.key }}" value="{{ f.value }}" />
+                <div style="font-size:.72rem; opacity:.45; margin-top:4px;">{{ f.help }}</div>
+              </div>
+            {% endfor %}
+          {% elif economy_missing %}
+            <p class="dz-hint" style="margin-top:14px;">
+              Slot limits are stored by the Economy cog, which is not loaded, so
+              the slot machine is unavailable and its limits cannot be edited.
+            </p>
+          {% endif %}
         </div>
 
         <div class="dz-panel">
