@@ -40,8 +40,9 @@ PAYOUTS = (
 
 # Table capacity.
 CAPS = (
-    ("max_concurrent_slots", "Concurrent slot players", 
-     "Prefix-command spins allowed at once; /slot is not limited.", 1, 100),
+    ("max_concurrent_slots", "Simultaneous spins",
+     "Slot spins that may animate at once. Each holds a task for a few seconds.",
+     1, 100),
     ("poker_max_players", "Poker seats", "Players allowed per table.", 2, 20),
 )
 

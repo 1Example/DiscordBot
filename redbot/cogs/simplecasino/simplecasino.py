@@ -12,11 +12,11 @@ from redbot.cogs.economy.economy import Economy
 from redbot.core.utils.chat_formatting import humanize_number
 from redbot.core.utils.chat_formatting import humanize_timedelta
 
-from .base import BaseCasinoCog
+from .base import EMOJI_DEFAULTS, BaseCasinoCog
 from .slots import slots
 from .poker import PokerGame
 from .blackjack import Blackjack
-from .utils import DISCORD_RED, POKER_MAX_PLAYERS, POKER_MINIMUM_BET, POKER_RULES
+from .utils import DISCORD_RED, POKER_MAX_PLAYERS, POKER_RULES
 from .views.again_view import AgainView
 from .views.replace_view import ReplaceView
 from .dashboard_integration import DashboardIntegration
@@ -25,13 +25,13 @@ log = logging.getLogger("red.crab-cogs.simplecasino")
 
 old_slot: Optional[commands.Command] = None
 old_payouts: Optional[commands.Command] = None
-old_blackjack: Optional[commands.Command] = None
 
-# Fallback only; the live cap is read from config per guild.
-MAX_CONCURRENT_SLOTS = 3
 MAX_APP_EMOJIS = 2000
 POKER_AFK_LIMIT = 10  # minutes
 STARTING = "Starting game..."
+
+# Fallback only; the live cap is read from config per guild.
+MAX_CONCURRENT_SLOTS = 3
 
 
 class SimpleCasino(DashboardIntegration, BaseCasinoCog):
@@ -39,6 +39,11 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
 
     def __init__(self, bot: Red):
         super().__init__(bot)
+        # Spins currently animating. A spin holds a task for a few seconds
+        # while it sleeps between reel reveals and edits its response, so this
+        # counts every one of them - the check this feeds used to exempt slash
+        # interactions, which made it dead once the cog stopped taking prefix
+        # commands, even though the work it guards against is unchanged.
         self.concurrent_slots = 0
 
     async def cog_load(self) -> None:
@@ -63,16 +68,25 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
             except Exception:
                 log.error(f"Loading game in {cid}", exc_info=True)
 
-        # Load custom emojis into config, creating them if necessary
+        # Upload the bundled marker emojis once and point the config at them.
+        #
+        # This only fills in markers still holding their shipped default. It
+        # used to write unconditionally, which meant every reload overwrote
+        # whatever the owner had chosen - making the markers effectively
+        # uneditable, since the next restart put them back.
         all_emojis = await self.bot.fetch_application_emojis()
         for emoji_name in ("dealer", "smallblind", "bigblind", "spades", "clubs"):
+            key = "emoji_" + emoji_name
+            stored = await self.config.__getattr__(key)()
+            if stored != EMOJI_DEFAULTS.get(key):
+                continue  # customised - leave it alone
             emoji = next((emoji for emoji in all_emojis if emoji.name == emoji_name), None)
             if not emoji and len(all_emojis) < MAX_APP_EMOJIS:
                 async with aiofiles.open(bundled_data_path(self) / f"{emoji_name}.png", "rb") as fp:
                     image = await fp.read()
                 emoji = await self.bot.create_application_emoji(name=emoji_name, image=image)
             if emoji:
-                await self.config.__getattr__("emoji_" + emoji_name).set(str(emoji))
+                await self.config.__getattr__(key).set(str(emoji))
 
     def cog_unload(self):
         global old_slot, old_payouts
@@ -87,9 +101,6 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         if old_payouts:
             self.bot.remove_command(old_payouts.name)
             self.bot.add_command(old_payouts)
-        if old_blackjack:
-            self.bot.remove_command(old_blackjack.name)
-            self.bot.add_command(old_blackjack)
 
     async def get_economy_cog(self, ctx: Union[discord.Interaction, commands.Context]) -> Optional[Economy]:
         cog: Optional[Economy] = self.bot.get_cog("Economy")  # type: ignore
@@ -99,12 +110,12 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         await reply("Economy cog not loaded! Contact the bot owner for more information.", ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
     
 
-    @commands.hybrid_command(name="blackjack", aliases=["bj"])
+    @app_commands.command(name="blackjack", extras={"red_force_enable": True})
     @app_commands.describe(bet="How much currency to bet.")
-    @commands.guild_only()
-    async def blackjack_cmd(self, ctx: commands.Context, bet: int):
+    @app_commands.guild_only()
+    async def blackjack_app(self, interaction: discord.Interaction, bet: int):
         """Play Blackjack against the bot. Get as close to 21 as possible!"""
-        await self.blackjack(ctx, bet)
+        await self.blackjack(interaction, bet)
 
     async def blackjack(self, ctx: Union[discord.Interaction, commands.Context], bet: int):
         author = ctx.author if isinstance(ctx, commands.Context) else ctx.user
@@ -131,18 +142,32 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
             view.message = message if isinstance(ctx, commands.Context) else await ctx.original_response()  # type: ignore
 
 
-    @commands.hybrid_command(name="slot", aliases=["slots"])
-    @commands.guild_only()
+    @app_commands.command(name="slot", extras={"red_force_enable": True})
+    @app_commands.guild_only()
     @app_commands.describe(bet="How much currency to put in the slot machine.")
-    async def slot_cmd(self, ctx: commands.Context, bet: int):
+    async def slot_app(self, interaction: discord.Interaction, bet: int):
         """Play the slot machine."""
+        max_concurrent = MAX_CONCURRENT_SLOTS
+        if interaction.guild is not None:
+            scope = (
+                self.config if await bank.is_global()
+                else self.config.guild(interaction.guild)
+            )
+            configured = await scope.max_concurrent_slots()
+            if configured is not None:
+                max_concurrent = configured
+
+        if self.concurrent_slots >= max_concurrent:
+            return await interaction.response.send_message(
+                "The slot machine is busy right now - try again in a few seconds.",
+                ephemeral=True,
+            )
+
+        self.concurrent_slots += 1
         try:
-            if not ctx.interaction:
-                self.concurrent_slots += 1
-            await self.slot(ctx, bet)
+            await self.slot(interaction, bet)
         finally:
-            if not ctx.interaction:
-                self.concurrent_slots -= 1
+            self.concurrent_slots -= 1
 
     async def slot(self, ctx: Union[discord.Interaction, commands.Context], bet: int):
         author = ctx.author if isinstance(ctx, commands.Context) else ctx.user
@@ -154,19 +179,9 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
 
         is_global = await bank.is_global()
 
-        max_concurrent = await (
-            self.config if is_global else self.config.guild(ctx.guild)
-        ).max_concurrent_slots()
-        if max_concurrent is None:
-            max_concurrent = MAX_CONCURRENT_SLOTS
-
-        if self.concurrent_slots > max_concurrent and isinstance(ctx, commands.Context) and not ctx.interaction:
-            content = f"Too many people are using the slot machine right now. "
-            if self.bot.tree.get_command("slot") is None:
-                content += "The bot owner could enable the `/slot` slash command, which would allow more people to use it at the same time."
-            else:
-                content += "Consider using the `/slot` slash command instead, which allows more people to use it at the same time."
-            return await reply(content)
+        # The old concurrency cap lived here. It throttled prefix spins only -
+        # slash interactions were always exempt, since each gets its own
+        # response - so with the cog slash-only it could never fire.
 
         if is_global:
             min_bid = await economy.config.SLOT_MIN()
@@ -204,14 +219,12 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         await slots(self, ctx, bet)
 
 
-    @commands.command(name="poker")
-    @commands.guild_only()
-    async def poker_cmd(self, ctx: commands.Context, starting_bet: Optional[int]):
-        """Start a new game of Poker with no players."""
-        assert isinstance(ctx.author, discord.Member)
-        await self.poker(ctx, [ctx.author], starting_bet)
-
-    poker_app = app_commands.Group(name="poker", description="Play Texas Hold'em Poker with up to 8 people!", guild_only=True)
+    poker_app = app_commands.Group(
+        name="poker",
+        description="Play Texas Hold'em Poker with up to 8 people!",
+        guild_only=True,
+        extras={"red_force_enable": True},
+    )
 
     @poker_app.command(name="new")
     @app_commands.describe(starting_bet="This bet may increase during the game.")
@@ -316,8 +329,6 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         return True
 
 
-    @commands.command(name="blackjackstats", aliases=["bjstats"])
-    @commands.guild_only()
     async def blackjackstats(self, ctx: commands.Context, member: Optional[discord.Member]):
         """View your own or someone else's stats in Blackjack."""
         assert isinstance(ctx.author, discord.Member)
@@ -336,8 +347,6 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         embed.add_field(name="Blackjacks gotten", value=humanize_number(stats["bjnatural21count"]))
         await ctx.send(embed=embed)
 
-    @commands.command(name="slotstats", aliases=["slotsstats"])
-    @commands.guild_only()
     async def slotstats(self, ctx: commands.Context, member: Optional[discord.Member]):
         """View your own or someone else's stats in the Slot machine."""
         assert ctx.guild and isinstance(ctx.author, discord.Member)
@@ -360,7 +369,12 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         await ctx.send(embed=embed)
 
 
-    casinostats_app = app_commands.Group(name="casinostats", description="View your stats in Blackjack and Slots.", guild_only=True)
+    casinostats_app = app_commands.Group(
+        name="casinostats",
+        description="View your stats in Blackjack and Slots.",
+        guild_only=True,
+        extras={"red_force_enable": True},
+    )
 
     @casinostats_app.command(name="blackjack")
     @app_commands.describe(member="The user to view stats for. Views your own stats by default.")
@@ -377,127 +391,22 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         await self.slotstats(ctx, member)
 
 
-    @commands.group(name="simplecasinoset", aliases=["setcasino"], invoke_without_command=True)  # type: ignore
-    @commands.admin_or_permissions(manage_guild=True)
-    @bank.is_owner_if_bank_global()
-    async def simplecasinoset(self, ctx: commands.Context):
-        """Settings for the SimpleCasino cog."""
-        await ctx.send_help()
-
-    @simplecasinoset.command(name="bjmin", aliases=["blackjackmin"])
-    async def casinoset_bjmin(self, ctx: commands.Context, bid: Optional[int]):
-        """The minimum bid for blackjack."""
-        assert ctx.guild
-        is_global = await bank.is_global()
-        config_bjmin = self.config.bjmin if is_global else self.config.guild(ctx.guild).bjmin
-        currency = await bank.get_currency_name(None if is_global else ctx.guild)
-        if bid is None:
-            bid = await config_bjmin()
-            return await ctx.send(f"Current minimum bid for Blackjack is {bid} {currency}.")
-        if bid < 1:
-            return await ctx.send("Bid must be a positive number.")
-        await config_bjmin.set(bid)
-        await ctx.send(f"New minimum bid for Blackjack is {bid} {currency}.")
-
-    @simplecasinoset.command(name="bjmax", aliases=["blackjackmax"])
-    async def casinoset_bjmax(self, ctx: commands.Context, bid: Optional[int]):
-        """The maximum bid for blackjack."""
-        assert ctx.guild
-        is_global = await bank.is_global()
-        config_bjmax = self.config.bjmax if is_global else self.config.guild(ctx.guild).bjmax
-        currency = await bank.get_currency_name(None if is_global else ctx.guild)
-        if bid is None:
-            bid = await config_bjmax()
-            return await ctx.send(f"Current maximum bid for Blackjack is {bid} {currency}.")
-        if bid < 1:
-            return await ctx.send("Bid must be a positive number.")
-        await config_bjmax.set(bid)
-        await ctx.send(f"New maximum bid for Blackjack is {bid} {currency}.")
-
-    @simplecasinoset.command(name="pokermin")
-    async def casinoset_pokermin(self, ctx: commands.Context, bet: Optional[int]):
-        """The minimum starting bet for Poker."""
-        assert ctx.guild
-        is_global = await bank.is_global()
-        config_pokermin = self.config.pokermin if is_global else self.config.guild(ctx.guild).pokermin
-        config_pokermax = self.config.pokermax if is_global else self.config.guild(ctx.guild).pokermax
-        currency = await bank.get_currency_name(None if is_global else ctx.guild)
-        if bet is None:
-            min_bet = await config_pokermin()
-            return await ctx.send(f"Current minimum **starting bet** in Poker is {humanize_number(min_bet)} {currency}.\n"
-                                  f"The maximum bet with this starting bet will be 100x, so {humanize_number(min_bet * 100)} {currency}.")
-        if bet < POKER_MINIMUM_BET:
-            return await ctx.send(f"You cannot set a minimum starting bet for Poker lower than {POKER_MINIMUM_BET} {currency}.")
-        await config_pokermin.set(bet)
-        if await config_pokermax() < bet:  # maximum bet can't be lower than the minimum bet
-            await config_pokermax.set(bet)
-        await ctx.send(f"New minimum **starting bet** in Poker is {humanize_number(bet)} {currency}.\n"
-                       f"The maximum bet with this starting bet will be 100x, so {humanize_number(bet * 100)} {currency}.")
-        
-    @simplecasinoset.command(name="pokermax")
-    async def casinoset_pokermax(self, ctx: commands.Context, bet: Optional[int]):
-        """The maximum starting bet for Poker."""
-        assert ctx.guild
-        is_global = await bank.is_global()
-        config_pokermax = self.config.pokermax if is_global else self.config.guild(ctx.guild).pokermax
-        config_pokermin = self.config.pokermin if is_global else self.config.guild(ctx.guild).pokermin
-        currency = await bank.get_currency_name(None if is_global else ctx.guild)
-        if bet is None:
-            max_bet: int = await config_pokermax()
-            return await ctx.send(f"Current maximum **starting bet** in Poker is {humanize_number(max_bet)} {currency}.\n"
-                                  f"The maximum bet with this starting bet will be 100x, so {humanize_number(max_bet * 100)} {currency}.")
-        min_bet: int = await config_pokermin()
-        if bet < min_bet:
-            return await ctx.send(f"The maximum starting bet cannot be lower than the minimum starting bet, which is currently {humanize_number(min_bet)} {currency}.")
-        await config_pokermax.set(bet)
-        await ctx.send(f"New maximum **starting bet** in Poker is {humanize_number(bet)} {currency}.\n"
-                       f"The maximum bet with this starting bet will be 100x, so {humanize_number(bet * 100)} {currency}.")
-
-    @simplecasinoset.command(name="coinfreespin")
-    @bank.is_owner_if_bank_global()
-    async def casinoset_coinfreespin(self, ctx: commands.Context):
-        """
-        Toggles whether a coin in the slot machine will give a free spin.
-        This increases the expected player returns to be similar to real slot machines.
-        """
-        assert ctx.guild
-        is_global = await bank.is_global()
-        config_value = self.config.coinfreespin if is_global else self.config.guild(ctx.guild).coinfreespin
-        value = await config_value()
-        await config_value.set(not value)
-        if not value:
-            await ctx.send(f"Coins will give free spins in the slot machine.")
-        else:
-            await ctx.send(f"Coins won't give free spins in the slot machine.")
-
-    @simplecasinoset.command(name="sloteasy")
-    @bank.is_owner_if_bank_global()
-    async def casinoset_sloteasy(self, ctx: commands.Context):
-        """
-        Removes one of the symbols from the slot machine, further increasing the expected player returns into a very slightly net positive.
-        """
-        assert ctx.guild
-        is_global = await bank.is_global()
-        config_value = self.config.sloteasy if is_global else self.config.guild(ctx.guild).sloteasy
-        value = await config_value()
-        await config_value.set(not value)
-        if not value:
-            await ctx.send(f"Removed the 10th symbol from the slot machine.")
-        else:
-            await ctx.send(f"Added back the 10th symbol to the slot machine.")
-
-
 async def setup(bot: Red):
     async def add_cog():
-        global old_slot, old_payouts, old_blackjack
+        global old_slot, old_payouts
         await asyncio.sleep(1)  # hopefully economy cog has finished loading
 
+        # Economy's own slot machine is a different game with different
+        # settings, and its `payouts` command describes that other machine, so
+        # both are taken down while this cog owns slots - otherwise `[p]slot`
+        # and `/slot` would quietly be two different games.
         if old_slot := bot.get_command("slot"):
             bot.remove_command(old_slot.name)
         if old_payouts := bot.get_command("payouts"):
             bot.remove_command(old_payouts.name)
-        if old_blackjack := bot.get_command("blackjack"):  # so we can load this cog alongside jumper-plugins's casino
-            bot.remove_command(old_blackjack.name)
+        # jumper-plugins' `[p]blackjack` used to collide with this cog's own
+        # prefix command. This cog is slash-only now, so there is nothing to
+        # collide with and theirs is left alone.
 
         await bot.add_cog(SimpleCasino(bot))
         await bot.tree.red_check_enabled()  # type: ignore  # register slash commands

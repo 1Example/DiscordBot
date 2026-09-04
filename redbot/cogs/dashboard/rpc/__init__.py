@@ -31,6 +31,14 @@ log = logging.getLogger("red.dashboard.rpc")
 _: Translator = Translator("Dashboard", __file__)
 
 
+# `PrivilegeLevel` is an ordered IntEnum, but it travels over RPC as a name.
+# These keep the ordering usable on both sides of that wire.
+PRIVILEGE_RANK: dict[str, int] = {
+    "NONE": 0, "MOD": 1, "ADMIN": 2, "GUILD_OWNER": 3, "BOT_OWNER": 4,
+}
+PRIVILEGE_NAME: dict[int, str] = {v: k for k, v in PRIVILEGE_RANK.items()}
+
+
 class DashboardRPC:
     """RPC server handlers for the dashboard to get special things from the bot."""
 
@@ -451,6 +459,11 @@ class DashboardRPC:
 
         result = {
             "status": 0, "shared": 0, "manageable": 0,
+            # The highest privilege this person holds in any server they share
+            # with the bot, as a `PrivilegeLevel` name. The commands page uses
+            # it to hide commands they could never run; the guild loop below
+            # already works all of this out, so reporting it costs nothing.
+            "max_privilege": "NONE",
             "avatar_url": "", "decoration_url": "",
             "presence": "offline", "presence_colour": "#80848e",
             # A server to land on when a page needs one and the URL has none -
@@ -481,22 +494,29 @@ class DashboardRPC:
             result["presence"] = presence["status"]
             result["presence_colour"] = presence["status_colour"]
             is_owner = user_id in self.bot.owner_ids
+            highest = PRIVILEGE_RANK["BOT_OWNER"] if is_owner else PRIVILEGE_RANK["NONE"]
             for guild in self.bot.guilds:
                 member = guild.get_member(user_id)
                 if member is None:
                     continue
                 result["shared"] += 1
                 shared_ids.append(str(guild.id))
-                if (
-                    is_owner
-                    or guild.owner_id == user_id
-                    or member.guild_permissions.administrator
+                is_guild_owner = guild.owner_id == user_id
+                is_admin = (
+                    member.guild_permissions.administrator
                     or member.guild_permissions.manage_guild
                     or await self.bot.is_admin(member)
-                    or await self.bot.is_mod(member)
-                ):
+                )
+                is_mod = is_admin or await self.bot.is_mod(member)
+                if is_owner or is_guild_owner or is_admin or is_mod:
                     result["manageable"] += 1
                     manageable_ids.append(str(guild.id))
+                if is_guild_owner:
+                    highest = max(highest, PRIVILEGE_RANK["GUILD_OWNER"])
+                elif is_admin:
+                    highest = max(highest, PRIVILEGE_RANK["ADMIN"])
+                elif is_mod:
+                    highest = max(highest, PRIVILEGE_RANK["MOD"])
                 if pylav is not None:
                     try:
                         player = pylav.get_player(guild.id)
@@ -510,6 +530,7 @@ class DashboardRPC:
             result["default_guild"] = next(
                 iter(playing_ids or manageable_ids or shared_ids), ""
             )
+            result["max_privilege"] = PRIVILEGE_NAME[highest]
         self.user_access_cache[user_id] = (time.time(), result)
         return result
 

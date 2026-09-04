@@ -10,6 +10,20 @@ from .card import Card, make_deck
 from .utils import POKER_MAX_PLAYERS, POKER_MINIMUM_BET, PokerState
 
 
+# Shipped values for the table markers. Kept at module scope because
+# `cog_load` needs to tell an untouched marker from one somebody has set, so it
+# can auto-provision the former without clobbering the latter.
+EMOJI_DEFAULTS = {
+    "emoji_dealer": "(D)",
+    "emoji_smallblind": "(SB)",
+    "emoji_bigblind": "(BB)",
+    "emoji_spades": "♠️",
+    "emoji_hearts": "♥️",
+    "emoji_diamonds": "♦️",
+    "emoji_clubs": "♣️",
+}
+
+
 class BaseCasinoCog(commands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
@@ -38,15 +52,7 @@ class BaseCasinoCog(commands.Cog):
             "max_concurrent_slots": 3,
             "poker_max_players": POKER_MAX_PLAYERS,
         }
-        emojis_config = {
-            "emoji_dealer": "(D)",
-            "emoji_smallblind": "(SB)",
-            "emoji_bigblind": "(BB)",
-            "emoji_spades": "♠️",
-            "emoji_hearts": "♥️",
-            "emoji_diamonds": "♦️",
-            "emoji_clubs": "♣️",
-        }
+        emojis_config = dict(EMOJI_DEFAULTS)
         channel_config = {
             "game": {},  # poker
         }
