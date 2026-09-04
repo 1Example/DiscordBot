@@ -1,29 +1,13 @@
+"""What is left of VrtUtils' command modules.
+
+The commands themselves are gone - the dashboard page covers the diagnostics,
+lookups and reports they used to provide, and this cog now contributes no
+top-level slash commands at all. Two things here were never commands and stay:
+the "Edit Message" context menu, and the Downloader patch applied at load.
+"""
+
 from ..abc import CompositeMetaClass
-from .bot import BotInfo
-from .botemojis import EmojiManager
-from .chatexport import ChatExport
-from .dcord import Dcord
-from .disk import DiskBench
-from .guildprofiles import GuildProfiles
-from .logs import Logs
-from .misc import Misc
-from .todo import ToDo
-from .updates import Updates
-from .zipper import Zipper
 
 
-class Utils(
-    BotInfo,
-    EmojiManager,
-    ChatExport,
-    Dcord,
-    DiskBench,
-    GuildProfiles,
-    Logs,
-    Misc,
-    ToDo,
-    Updates,
-    Zipper,
-    metaclass=CompositeMetaClass,
-):
-    """Subclass all commands"""
+class Utils(metaclass=CompositeMetaClass):
+    """No command mixins remain; kept so the cog's bases stay stable."""

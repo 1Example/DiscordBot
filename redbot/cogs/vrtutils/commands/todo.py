@@ -3,10 +3,8 @@ from contextlib import suppress
 
 import discord
 from discord import app_commands
-from redbot.core import commands
 from redbot.core.bot import Red
 
-from ..abc import MixinMeta
 
 log = logging.getLogger("red.vrt.vrtutils")
 
@@ -247,76 +245,3 @@ async def mock_edit_message(interaction: discord.Interaction, message: discord.M
         await interaction.followup.send("Message edited.", ephemeral=True)
     log.info(f"{interaction.user} edited message {message.id} in {message.guild}.")
 
-
-class ToDo(MixinMeta):
-    @commands.command(aliases=["refreshtodo"])
-    @commands.mod_or_permissions(manage_messages=True)
-    async def todorefresh(self, ctx: commands.Context, confirm: bool):
-        """
-        Refresh a todo list channel.
-
-        Bring all messages without a ✅ or ❌ to the front of the channel.
-
-        **WARNING**: DO NOT USE THIS COMMAND IN A BUSY CHANNEL.
-        """
-        if not confirm:
-            return await ctx.send("Not refreshing.")
-        if not ctx.channel.permissions_for(ctx.guild.me).manage_messages:
-            return await ctx.send("I require manage messages permission to refresh the todo list.")
-        if not ctx.channel.permissions_for(ctx.guild.me).read_message_history:
-            return await ctx.send("I require read message history permission to refresh the todo list.")
-        if not ctx.channel.permissions_for(ctx.guild.me).add_reactions:
-            return await ctx.send("I require add reactions permission to refresh the todo list.")
-        if not ctx.channel.permissions_for(ctx.guild.me).attach_files:
-            return await ctx.send("I require attach files permission to refresh the todo list.")
-        if not ctx.channel.permissions_for(ctx.guild.me).manage_webhooks:
-            return await ctx.send("I require manage webhooks permission to refresh the todo list.")
-
-        # Get a webhook to use for moving messages
-        webhooks = await ctx.channel.webhooks()
-        if not webhooks:
-            webhook = await ctx.channel.create_webhook(name="ToDo Refresh", reason="VrtUtils ToDo Refresh")
-        else:
-            webhook = webhooks[0]
-
-        def _has_reaction(message: discord.Message):
-            return any(
-                [
-                    any([str(r.emoji) in checks for r in message.reactions]),
-                    any([str(r.emoji) in cross for r in message.reactions]),
-                ]
-            )
-
-        # We want to bring old incomplete tasks to the front of the channel
-        # Skip the first 5 messages since they can likely already be seen
-        async with ctx.typing():
-            skipped = 0
-            first_checked = False
-            async for message in ctx.channel.history(limit=None, oldest_first=False):
-                if skipped < 5:
-                    skipped += 1
-                    continue
-                if message.author.bot:
-                    # Only continue if it is NOT a webhook message
-                    if not message.webhook_id:
-                        print(f"Bot message: {message.content}")
-                        continue
-                # We only want to move incomplete tasks
-                if _has_reaction(message):
-                    first_checked = True
-                    continue
-                if not first_checked:
-                    continue
-                # We want to move this message to the front
-                await webhook.send(
-                    content=message.content,
-                    username=message.author.display_name,
-                    avatar_url=message.author.display_avatar.url,
-                    files=[await a.to_file() for a in message.attachments],
-                )
-                # Now we can delete the original message
-                await message.delete(delay=10)
-
-        with suppress(discord.HTTPException):
-            await ctx.send("ToDo list refreshed.", delete_after=10)
-            await ctx.message.delete()
