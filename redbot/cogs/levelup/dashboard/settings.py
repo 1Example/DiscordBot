@@ -1273,4 +1273,15 @@ def _render_settings(form: t.Any, **extra_context: str) -> str:
     env.globals["_"] = _
     tmpl = env.from_string(template_text)
     rendered = tmpl.render(settings_form=form, **extra_context)
+    # The dashboard renders this string as a template again. The subnav above
+    # the sentinel needs that pass - it is where `url_for` exists - but
+    # everything below it is finished HTML carrying live setting values, and a
+    # message containing "{{" would be read as an expression and break the
+    # page. So only the part that still needs Jinja is left exposed to it.
+    head, sentinel, body = rendered.partition("<!--PRERENDERED-->")
+    if sentinel:
+        body = ("{% raw %}"
+                + body.replace("{% endraw %}", "{% endraw %}{% raw %}")
+                + "{% endraw %}")
+        rendered = head + body
     return f"<style>\n{css_text}\n</style>\n\n{rendered}\n\n<script>\n{js_text}\n</script>"

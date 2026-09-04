@@ -314,4 +314,13 @@ def _render(form: t.Any, sections: list) -> str:
 
     template = (TEMPLATES_PATH / "settings_page.html").read_text(encoding="utf-8")
     env = jinja2.Environment(autoescape=True)
-    return env.from_string(template).render(settings_form=form, sections=sections)
+    html = env.from_string(template).render(settings_form=form, sections=sections)
+
+    # The dashboard runs the returned string through Jinja again, and by now it
+    # holds live setting values - one of the shipped strip-patterns is
+    #     ^[<({{\[]{botname}[>)}}\]]
+    # whose "{{" the second pass reads as an expression and then fails on. None
+    # of this output needs that pass, so it is held back from it entirely.
+    # A literal end-marker in the content would close the block early, so any
+    # is split across two blocks where it cannot be recognised.
+    return "{% raw %}" + html.replace("{% endraw %}", "{% endraw %}{% raw %}") + "{% endraw %}"
