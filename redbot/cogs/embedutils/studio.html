@@ -1,0 +1,1088 @@
+<!-- Embed Studio - the EmbedUtils dashboard page.
+
+     Everything is scoped under #eus so nothing leaks into the shell, and the
+     surfaces are the dashboard's own tokens (with literal fallbacks) so the
+     page is made of the same translucent glass as every other card.
+
+     Rendered by `render_template_string`, so the only Jinja in here is the
+     data island below; the script never uses `{`+`{`. -->
+
+<script type="application/json" id="eus-boot">
+{
+  "csrf": {{ csrf_token_value|tojson }},
+  "action": {{ action_url|tojson }},
+  "channels": {{ studio_channels|tojson }},
+  "saved": {{ studio_saved|tojson }},
+  "limits": {{ studio_limits|tojson }},
+  "bot": {{ studio_bot|tojson }},
+  "guild": {{ studio_guild|tojson }}
+}
+</script>
+
+<style>
+#eus {
+  --eus-panel:  var(--cx-panel-2, rgba(90, 130, 220, .07));
+  --eus-raise:  var(--cx-panel-3, rgba(255, 255, 255, .045));
+  --eus-raise2: rgba(255, 255, 255, .09);
+  --eus-well:   rgba(4, 10, 32, .45);
+  --eus-line:   var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
+  --eus-line2:  var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+  --eus-text:   var(--cx-text, #e6e9ef);
+  --eus-dim:    var(--cx-text-dim, #93a1bd);
+  --eus-faint:  rgba(148, 163, 189, .62);
+  --eus-accent: #6c8cff;
+  --eus-live:   #5aa9ff;
+  --eus-ok:     #38d39f;
+  --eus-warn:   #f0aa3c;
+  --eus-bad:    #ff6b6b;
+  color: var(--eus-text);
+  font-size: 14px;
+}
+#eus *, #eus *::before, #eus *::after { box-sizing: border-box; }
+
+/* ---------- toolbar ---------- */
+#eus .bar {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 9px 11px; margin-bottom: 13px;
+  background: var(--eus-panel); border: 1px solid var(--eus-line); border-radius: 12px;
+}
+#eus .seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--eus-well);
+            border: 1px solid var(--eus-line2); border-radius: 9px; }
+#eus .seg button { padding: 6px 14px; border: 0; border-radius: 7px; cursor: pointer;
+  background: transparent; color: var(--eus-dim);
+  font: 700 .76rem/1 inherit; letter-spacing: .05em; }
+#eus .seg button[aria-pressed="true"] { background: var(--eus-raise2); color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(130,175,255,.3); }
+#eus .tbtn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+  border-radius: 9px; cursor: pointer; font: 600 .79rem inherit;
+  background: var(--eus-raise); border: 1px solid var(--eus-line2); color: var(--eus-dim); }
+#eus .tbtn:hover:not(:disabled) { color: var(--eus-text); border-color: rgba(130,175,255,.4); }
+#eus .tbtn:disabled { opacity: .38; cursor: not-allowed; }
+#eus .grow { flex: 1 1 auto; }
+#eus .budget { display: flex; align-items: center; gap: 8px;
+  font: 500 .75rem ui-monospace, Consolas, monospace; color: var(--eus-dim);
+  font-variant-numeric: tabular-nums; }
+#eus .meter { width: 116px; height: 6px; border-radius: 99px; overflow: hidden;
+  background: var(--eus-well); border: 1px solid var(--eus-line2); }
+#eus .meter i { display: block; height: 100%; width: 0; background: var(--eus-ok);
+  transition: width .16s linear, background .16s linear; }
+#eus .primary { padding: 9px 18px; border: 0; border-radius: 9px; cursor: pointer;
+  font: 700 .84rem inherit; background: var(--eus-accent); color: #08102a; }
+#eus .primary:disabled { background: var(--eus-raise); color: var(--eus-faint);
+  border: 1px solid var(--eus-line2); cursor: not-allowed; }
+
+/* ---------- workspace ---------- */
+#eus .work { display: grid; gap: 13px; align-items: start;
+  grid-template-columns: 216px minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 1240px) { #eus .work { grid-template-columns: 1fr; } }
+#eus .pane { background: var(--eus-panel); border: 1px solid var(--eus-line);
+  border-radius: 12px; min-width: 0; }
+#eus .pane > h3 { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 0; padding: 11px 14px; border-bottom: 1px solid var(--eus-line2);
+  font: 700 .69rem inherit; letter-spacing: .1em; text-transform: uppercase; color: var(--eus-faint); }
+#eus .pane > .in { padding: 13px 14px 16px; }
+@media (min-width: 1241px) { #eus .preview { position: sticky; top: 14px; } }
+
+/* ---------- rail ---------- */
+#eus .rail { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
+#eus .node { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 9px;
+  width: 100%; text-align: left; cursor: pointer; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid transparent; background: transparent; color: var(--eus-dim);
+  font: 600 .82rem inherit; }
+#eus .node:hover { background: var(--eus-raise); color: var(--eus-text); }
+#eus .node[aria-current="true"] { background: var(--eus-raise2); color: #fff;
+  border-color: rgba(130,175,255,.32); }
+#eus .node .dot { width: 7px; height: 7px; border-radius: 50%; justify-self: center;
+  background: var(--eus-line2); }
+#eus .node.on .dot { background: var(--eus-ok); }
+#eus .node.bad .dot { background: var(--eus-bad); }
+#eus .node.sub { padding-left: 25px; font-weight: 500; font-size: .8rem; }
+#eus .node .n { font: 500 .68rem ui-monospace, Consolas, monospace; color: var(--eus-faint); }
+#eus .rail hr { border: 0; border-top: 1px solid var(--eus-line2); margin: 7px 4px; width: auto; }
+#eus .rail .add { justify-content: center; color: var(--eus-accent); }
+
+/* ---------- fields ---------- */
+#eus .f { margin-bottom: 14px; }
+#eus .f:last-child { margin-bottom: 0; }
+#eus .fl { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin-bottom: 5px; }
+#eus .fl > span:first-child { font: 700 .66rem inherit; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--eus-faint); }
+#eus .ct { font: 500 .67rem ui-monospace, Consolas, monospace; color: var(--eus-faint);
+  font-variant-numeric: tabular-nums; }
+#eus .ct.warn { color: var(--eus-warn); }
+#eus .ct.over { color: var(--eus-bad); }
+#eus input[type=text], #eus textarea, #eus input[type=url] {
+  width: 100%; padding: 9px 11px; border-radius: 8px; background: var(--eus-well);
+  border: 1px solid var(--eus-line2); color: var(--eus-text);
+  font: 400 .85rem inherit; outline: none; }
+#eus textarea { resize: vertical; min-height: 82px; line-height: 1.55;
+  font-family: ui-monospace, Consolas, monospace; font-size: .8rem; }
+#eus input:focus, #eus textarea:focus { border-color: var(--eus-accent); }
+#eus .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 620px) { #eus .two { grid-template-columns: 1fr; } }
+
+/* colour picker */
+#eus .cols { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+#eus .sw { width: 26px; height: 26px; padding: 0; border-radius: 7px; cursor: pointer;
+  border: 2px solid transparent; }
+#eus .sw[aria-pressed="true"] { border-color: #fff; }
+#eus .pick { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px;
+  border-radius: 8px; background: var(--eus-raise); border: 1px solid var(--eus-line2); }
+#eus .pick input[type=color] { width: 30px; height: 26px; padding: 0; border: 0;
+  border-radius: 6px; background: none; cursor: pointer; }
+#eus .pick input[type=text] { width: 92px; padding: 5px 8px; font: 500 .76rem ui-monospace,
+  Consolas, monospace; text-transform: uppercase; }
+
+/* field rows */
+#eus .frow { display: grid; grid-template-columns: 20px 1fr; gap: 10px; padding: 10px;
+  margin-bottom: 9px; border-radius: 9px; background: var(--eus-raise);
+  border: 1px solid var(--eus-line2); }
+#eus .frow .ix { font: 500 .72rem ui-monospace, Consolas, monospace; color: var(--eus-faint);
+  padding-top: 9px; }
+#eus .facts { display: flex; align-items: center; gap: 13px; margin-top: 8px;
+  font-size: .76rem; color: var(--eus-dim); flex-wrap: wrap; }
+#eus .facts label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+#eus .link { background: none; border: 0; padding: 0; cursor: pointer;
+  font: 600 .76rem inherit; color: var(--eus-accent); }
+#eus .link.danger { color: var(--eus-bad); }
+#eus .muted { color: var(--eus-faint); font-size: .82rem; font-style: italic; margin: 0; }
+
+/* ---------- preview ---------- */
+#eus .stage { padding: 15px; border-radius: 10px; background: var(--eus-well); }
+#eus .msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 13px; }
+#eus .msg > img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+#eus .who { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; flex-wrap: wrap; }
+#eus .who b { font-size: .92rem; }
+#eus .tag { padding: 2px 5px; border-radius: 4px; background: var(--eus-accent); color: #08102a;
+  font: 700 .56rem inherit; letter-spacing: .06em; text-transform: uppercase; }
+#eus .when { font-size: .7rem; color: var(--eus-faint); }
+#eus .body { font-size: .87rem; white-space: pre-wrap; word-break: break-word; margin-bottom: 8px; }
+#eus .emb { display: grid; grid-template-columns: 4px minmax(0, 1fr); border-radius: 6px;
+  overflow: hidden; background: var(--eus-raise); max-width: 520px; margin-bottom: 8px; }
+#eus .emb .inner { padding: 12px 15px 13px; min-width: 0; }
+#eus .eauth { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .79rem;
+  margin-bottom: 6px; }
+#eus .eauth img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+#eus .etitle { color: var(--eus-live); font-weight: 600; font-size: .94rem; margin-bottom: 6px;
+  word-break: break-word; }
+#eus .edesc { font-size: .84rem; white-space: pre-wrap; word-break: break-word; margin-bottom: 9px; }
+#eus .eflds { display: grid; gap: 9px; margin-bottom: 9px; grid-template-columns: repeat(3, minmax(0,1fr)); }
+#eus .efld b { display: block; font-size: .78rem; margin-bottom: 2px; }
+#eus .efld span { font-size: .81rem; color: var(--eus-dim); }
+#eus .eimg { width: 100%; border-radius: 5px; display: block; margin-bottom: 4px; }
+#eus .ethumb { float: right; width: 74px; height: 74px; border-radius: 5px; object-fit: cover;
+  margin: 0 0 8px 12px; }
+#eus .efoot { display: flex; align-items: center; gap: 8px; font-size: .71rem;
+  color: var(--eus-faint); margin-top: 9px; }
+#eus .efoot img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
+
+/* ---------- checks ---------- */
+#eus .checks { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+#eus .chk { display: grid; grid-template-columns: 15px 1fr; gap: 8px; align-items: start;
+  padding: 7px 9px; border-radius: 8px; font-size: .79rem; }
+#eus .chk.ok { color: var(--eus-dim); }
+#eus .chk.ok b { color: var(--eus-ok); }
+#eus .chk.no { color: #ffd9d9; background: rgba(255,107,107,.09);
+  border: 1px solid rgba(255,107,107,.26); }
+#eus .chk.no b { color: var(--eus-bad); }
+
+/* ---------- json ---------- */
+#eus .jsonbox { width: 100%; min-height: 460px; font-size: .79rem; }
+#eus .jsonmsg { margin-top: 9px; font-size: .78rem; }
+#eus .jsonmsg.bad { color: var(--eus-bad); }
+#eus .jsonmsg.ok { color: var(--eus-ok); }
+
+/* ---------- drawer ---------- */
+#eus dialog { width: min(600px, 94vw); padding: 0; color: var(--eus-text);
+  background: #0d1526; border: 1px solid var(--eus-line); border-radius: 14px; }
+#eus dialog::backdrop { background: rgba(2, 6, 16, .72); }
+#eus dialog h4 { margin: 0; font: 700 .95rem inherit; }
+#eus dialog .dh, #eus dialog .df { display: flex; align-items: center; gap: 9px;
+  padding: 13px 17px; }
+#eus dialog .dh { justify-content: space-between; border-bottom: 1px solid var(--eus-line2); }
+#eus dialog .df { justify-content: flex-end; border-top: 1px solid var(--eus-line2); }
+#eus dialog .db { padding: 15px 17px; display: flex; flex-direction: column; gap: 14px;
+  max-height: 62vh; overflow: auto; }
+#eus .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+#eus .chip { padding: 6px 11px; border-radius: 99px; cursor: pointer;
+  font: 500 .79rem ui-monospace, Consolas, monospace;
+  background: var(--eus-raise); border: 1px solid var(--eus-line2); color: var(--eus-dim); }
+#eus .chip[aria-pressed="true"] { background: rgba(108,140,255,.22);
+  border-color: var(--eus-accent); color: #fff; }
+#eus .cat { font: 700 .64rem inherit; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--eus-faint); margin: 10px 0 5px; }
+#eus .cat:first-child { margin-top: 0; }
+#eus .ghost { padding: 8px 15px; border-radius: 9px; cursor: pointer; font: 600 .82rem inherit;
+  background: var(--eus-raise); border: 1px solid var(--eus-line2); color: var(--eus-text); }
+#eus .report { display: flex; flex-direction: column; gap: 6px; }
+#eus .rrow { display: grid; grid-template-columns: 15px 1fr auto; gap: 9px; align-items: center;
+  padding: 8px 10px; border-radius: 8px; background: var(--eus-raise); font-size: .81rem; }
+#eus .rrow.no { background: rgba(255,107,107,.09); }
+#eus .rrow b { font: 500 .8rem ui-monospace, Consolas, monospace; }
+#eus .rrow .why { color: var(--eus-dim); font-size: .76rem; }
+#eus .rrow a { color: var(--eus-live); text-decoration: none; font-size: .76rem; }
+
+/* ---------- saved templates ---------- */
+#eus .tpl { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 11px; border-radius: 9px; background: var(--eus-raise);
+  border: 1px solid var(--eus-line2); margin-bottom: 7px; }
+#eus .tpl b { font: 600 .84rem inherit; }
+#eus .tpl .meta { font: 500 .7rem ui-monospace, Consolas, monospace; color: var(--eus-faint); }
+#eus .tpl .acts { display: flex; gap: 11px; }
+#eus .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  padding: 10px 18px; border-radius: 10px; z-index: 9999; font-size: .84rem;
+  background: #0d1526; border: 1px solid var(--eus-line); color: var(--eus-text); }
+#eus .toast.bad { border-color: rgba(255,107,107,.5); }
+#eus :focus-visible { outline: 2px solid var(--eus-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { #eus * { transition: none !important; } }
+</style>
+
+<div id="eus">
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Editor mode">
+      <button type="button" id="eusBuild" aria-pressed="true">Build</button>
+      <button type="button" id="eusJson" aria-pressed="false">JSON</button>
+    </div>
+    <button type="button" class="tbtn" id="eusUndo" title="Undo (Ctrl+Z)" disabled>Undo</button>
+    <button type="button" class="tbtn" id="eusRedo" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
+    <button type="button" class="tbtn" id="eusTpl">Templates</button>
+    <button type="button" class="tbtn" id="eusLoad">Load a message</button>
+    <button type="button" class="tbtn" id="eusCopy">Copy</button>
+    <button type="button" class="tbtn" id="eusDl">Download</button>
+    <span class="grow"></span>
+    <div class="budget" title="Discord caps one message at 6000 characters across all embeds">
+      <span id="eusBudgetTxt">0 / 6000</span>
+      <span class="meter"><i id="eusBudgetBar"></i></span>
+    </div>
+    <button type="button" class="primary" id="eusSend">Send&hellip;</button>
+  </div>
+
+  <div class="work">
+    <nav class="pane" aria-label="Message structure">
+      <h3>Structure</h3>
+      <div class="rail" id="eusRail"></div>
+    </nav>
+
+    <section class="pane">
+      <h3><span id="eusInspName">Message content</span><span class="ct" id="eusInspNote"></span></h3>
+      <div class="in" id="eusInsp"></div>
+      <div class="in" id="eusJsonPane" hidden>
+        <textarea class="jsonbox" id="eusJsonText" spellcheck="false"></textarea>
+        <div class="jsonmsg" id="eusJsonMsg"></div>
+      </div>
+    </section>
+
+    <section class="pane preview">
+      <h3>Preview<span class="ct">as it will post</span></h3>
+      <div class="in">
+        <div class="stage">
+          <div class="msg">
+            <img id="eusPvAvatar" alt="" />
+            <div style="min-width:0">
+              <div class="who">
+                <b id="eusPvName"></b><span class="tag">App</span>
+                <span class="when" id="eusPvWhen"></span>
+              </div>
+              <div class="body" id="eusPvBody"></div>
+              <div id="eusPvEmbeds"></div>
+            </div>
+          </div>
+        </div>
+        <div class="checks" id="eusChecks"></div>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="eusSendDlg">
+    <div class="dh"><h4>Send message</h4>
+      <button type="button" class="ghost" data-close>Close</button></div>
+    <div class="db">
+      <div>
+        <div class="fl"><span>Channels</span><span class="ct" id="eusChCount">0 selected</span></div>
+        <div id="eusChips"></div>
+      </div>
+      <div id="eusReportWrap" hidden>
+        <div class="fl"><span>Result</span></div>
+        <div class="report" id="eusReport"></div>
+      </div>
+    </div>
+    <div class="df">
+      <button type="button" class="ghost" data-close>Cancel</button>
+      <button type="button" class="primary" id="eusDoSend">Send</button>
+    </div>
+  </dialog>
+
+  <dialog id="eusTplDlg">
+    <div class="dh"><h4>Templates</h4>
+      <button type="button" class="ghost" data-close>Close</button></div>
+    <div class="db">
+      <div>
+        <div class="fl"><span>Save the current embed</span></div>
+        <div class="two">
+          <input type="text" id="eusTplName" placeholder="name" maxlength="32" />
+          <button type="button" class="ghost" id="eusTplSave">Save template</button>
+        </div>
+      </div>
+      <div>
+        <div class="fl"><span>Saved in this server</span></div>
+        <div id="eusTplList"></div>
+      </div>
+    </div>
+    <div class="df"><button type="button" class="ghost" data-close>Done</button></div>
+  </dialog>
+
+  <dialog id="eusLoadDlg">
+    <div class="dh"><h4>Load a message</h4>
+      <button type="button" class="ghost" data-close>Close</button></div>
+    <div class="db">
+      <div>
+        <div class="fl"><span>Message link</span></div>
+        <input type="text" id="eusLoadRef"
+               placeholder="https://discord.com/channels/..." />
+        <p class="muted" style="margin-top:8px">
+          Right-click a message in Discord and choose Copy Message Link. Its content and
+          embeds are loaded here so you can edit and repost them.
+        </p>
+      </div>
+    </div>
+    <div class="df">
+      <button type="button" class="ghost" data-close>Cancel</button>
+      <button type="button" class="primary" id="eusDoLoad">Load</button>
+    </div>
+  </dialog>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var boot = JSON.parse(document.getElementById("eus-boot").textContent);
+  var L = boot.limits;
+  var DRAFT = "eus-draft-" + boot.guild.id;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;";
+    });
+  };
+
+  function blankEmbed() {
+    return { color: "#6c8cff", author: { name: "", icon_url: "" }, title: "", url: "",
+             description: "", fields: [], image: "", thumbnail: "",
+             footer: { text: "", icon_url: "" } };
+  }
+
+  function starter() {
+    var e = blankEmbed();
+    e.color = "#38d39f";
+    e.title = "Hello world";
+    e.description = "Write anything here. **Bold**, *italics* and [links](https://discord.com) all work.";
+    return { content: "", embeds: [e] };
+  }
+
+  var state, sel = { part: "content", embed: 0 }, mode = "build";
+  var undo = [], redo = [], picked = [];
+
+  /* ---------------- persistence ---------------- */
+  function loadDraft() {
+    try {
+      var raw = window.localStorage.getItem(DRAFT);
+      if (raw) return JSON.parse(raw);
+    } catch (err) { /* private mode, cleared storage - fall through */ }
+    return null;
+  }
+  function saveDraft() {
+    try { window.localStorage.setItem(DRAFT, JSON.stringify(state)); } catch (err) {}
+  }
+
+  function snapshot() {
+    undo.push(JSON.stringify(state));
+    if (undo.length > 60) undo.shift();
+    redo.length = 0;
+    refreshHistory();
+  }
+  function refreshHistory() {
+    $("eusUndo").disabled = undo.length === 0;
+    $("eusRedo").disabled = redo.length === 0;
+  }
+  function doUndo() {
+    if (!undo.length) return;
+    redo.push(JSON.stringify(state));
+    state = JSON.parse(undo.pop());
+    clampSel(); renderAll(); refreshHistory();
+  }
+  function doRedo() {
+    if (!redo.length) return;
+    undo.push(JSON.stringify(state));
+    state = JSON.parse(redo.pop());
+    clampSel(); renderAll(); refreshHistory();
+  }
+  function clampSel() {
+    if (sel.embed >= state.embeds.length) sel = { part: "content", embed: 0 };
+  }
+
+  /* ---------------- measuring ---------------- */
+  function total() {
+    var n = (state.content || "").length;
+    state.embeds.forEach(function (e) {
+      n += (e.title || "").length + (e.description || "").length +
+           (e.author.name || "").length + (e.footer.text || "").length;
+      e.fields.forEach(function (f) { n += (f.name || "").length + (f.value || "").length; });
+    });
+    return n;
+  }
+
+  function problems() {
+    var out = [];
+    if ((state.content || "").length > L.content)
+      out.push("Message content is over " + L.content + " characters.");
+    if (total() > L.total)
+      out.push("The message is over Discord's " + L.total + "-character total.");
+    if (!(state.content || "").trim() && !state.embeds.length)
+      out.push("There is nothing to send.");
+    state.embeds.forEach(function (e, i) {
+      var label = "Embed " + (i + 1);
+      if (!e.title && !e.description && !e.fields.length && !e.image && !e.author.name)
+        out.push(label + " is empty - it would not post.");
+      if ((e.title || "").length > L.title)
+        out.push(label + " title is over " + L.title + " characters.");
+      if ((e.description || "").length > L.description)
+        out.push(label + " description is over " + L.description + " characters.");
+      if (e.fields.length > L.fields)
+        out.push(label + " has more than " + L.fields + " fields.");
+      e.fields.forEach(function (f, j) {
+        if (!(f.name || "").trim() || !(f.value || "").trim())
+          out.push(label + " field " + (j + 1) + " needs both a name and a value.");
+      });
+    });
+    return out;
+  }
+
+  function embedProblem(i) {
+    var tag = "Embed " + (i + 1);
+    return problems().some(function (p) { return p.indexOf(tag) === 0; });
+  }
+
+  /* ---------------- payload ---------------- */
+  function toPayload() {
+    var out = { embeds: [] };
+    if (state.content) out.content = state.content;
+    state.embeds.forEach(function (e) {
+      var o = {};
+      if (e.title) o.title = e.title;
+      if (e.url) o.url = e.url;
+      if (e.description) o.description = e.description;
+      o.color = parseInt(String(e.color || "#6c8cff").slice(1), 16);
+      if (e.author.name) {
+        o.author = { name: e.author.name };
+        if (e.author.icon_url) o.author.icon_url = e.author.icon_url;
+      }
+      if (e.fields.length) o.fields = e.fields.map(function (f) {
+        return { name: f.name, value: f.value, inline: !!f.inline };
+      });
+      if (e.image) o.image = { url: e.image };
+      if (e.thumbnail) o.thumbnail = { url: e.thumbnail };
+      if (e.footer.text) {
+        o.footer = { text: e.footer.text };
+        if (e.footer.icon_url) o.footer.icon_url = e.footer.icon_url;
+      }
+      out.embeds.push(o);
+    });
+    return out;
+  }
+
+  function fromPayload(p) {
+    var next = { content: p.content || "", embeds: [] };
+    (p.embeds || []).forEach(function (o) {
+      var e = blankEmbed();
+      e.title = o.title || "";
+      e.url = o.url || "";
+      e.description = o.description || "";
+      if (typeof o.color === "number")
+        e.color = "#" + ("000000" + o.color.toString(16)).slice(-6);
+      if (o.author) { e.author.name = o.author.name || ""; e.author.icon_url = o.author.icon_url || ""; }
+      if (o.footer) { e.footer.text = o.footer.text || ""; e.footer.icon_url = o.footer.icon_url || ""; }
+      if (o.image) e.image = o.image.url || "";
+      if (o.thumbnail) e.thumbnail = o.thumbnail.url || "";
+      e.fields = (o.fields || []).map(function (f) {
+        return { name: f.name || "", value: f.value || "", inline: !!f.inline };
+      });
+      next.embeds.push(e);
+    });
+    if (!next.embeds.length) next.embeds.push(blankEmbed());
+    return next;
+  }
+
+  /* ---------------- rail ---------------- */
+  function railNode(part, idx, label, filled, sub, badge, bad) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "node" + (sub ? " sub" : "") + (filled ? " on" : "") + (bad ? " bad" : "");
+    var current = sel.part === part && (idx == null || sel.embed === idx);
+    b.setAttribute("aria-current", current ? "true" : "false");
+    b.innerHTML = '<span class="dot"></span><span>' + esc(label) + "</span>" +
+      (badge ? '<span class="n">' + esc(badge) + "</span>" : "<span></span>");
+    b.onclick = function () {
+      sel = { part: part, embed: idx == null ? sel.embed : idx };
+      renderInspector(); renderRail();
+    };
+    return b;
+  }
+
+  function renderRail() {
+    var r = $("eusRail");
+    r.innerHTML = "";
+    r.appendChild(railNode("content", null, "Message content", !!state.content, false, "", false));
+    state.embeds.forEach(function (e, i) {
+      r.appendChild(document.createElement("hr"));
+      r.appendChild(railNode("embed", i, "Embed " + (i + 1), true, false, String(i + 1), embedProblem(i)));
+      r.appendChild(railNode("author", i, "Author", !!e.author.name, true, "", false));
+      r.appendChild(railNode("title", i, "Title", !!e.title, true, "", false));
+      r.appendChild(railNode("description", i, "Description", !!e.description, true, "", false));
+      r.appendChild(railNode("fields", i, "Fields", !!e.fields.length, true,
+        e.fields.length ? String(e.fields.length) : "", false));
+      r.appendChild(railNode("media", i, "Images", !!(e.image || e.thumbnail), true, "", false));
+      r.appendChild(railNode("footer", i, "Footer", !!e.footer.text, true, "", false));
+    });
+    if (state.embeds.length < L.embeds) {
+      var add = document.createElement("button");
+      add.type = "button";
+      add.className = "node add";
+      add.innerHTML = "<span></span><span>+ Add embed</span><span></span>";
+      add.onclick = function () {
+        snapshot();
+        state.embeds.push(blankEmbed());
+        sel = { part: "title", embed: state.embeds.length - 1 };
+        renderAll();
+      };
+      r.appendChild(add);
+    }
+  }
+
+  /* ---------------- inspector ---------------- */
+  function counter(len, max) {
+    var cls = len > max ? " over" : (len > max * 0.9 ? " warn" : "");
+    return '<span class="ct' + cls + '">' + len + " / " + max + "</span>";
+  }
+  function fieldHtml(label, control, len, max) {
+    return '<div class="f"><div class="fl"><span>' + label + "</span>" +
+      (max ? counter(len, max) : "") + "</div>" + control + "</div>";
+  }
+
+  var TITLES = { content: "Message content", embed: "Embed", author: "Author", title: "Title",
+    description: "Description", fields: "Fields", media: "Images", footer: "Footer" };
+
+  function renderInspector() {
+    if (mode !== "build") return;
+    var e = state.embeds[sel.embed] || state.embeds[0];
+    var html = "";
+    $("eusInspName").textContent = sel.part === "embed"
+      ? "Embed " + (sel.embed + 1) : TITLES[sel.part] || "Message content";
+    $("eusInspNote").textContent = sel.part === "content"
+      ? "shown above the embed" : "Embed " + (sel.embed + 1);
+
+    if (sel.part === "content") {
+      html = fieldHtml("Text",
+        '<textarea id="eusI_content" placeholder="Optional text above the embed">' +
+        esc(state.content) + "</textarea>", (state.content || "").length, L.content);
+    } else if (sel.part === "embed") {
+      html = fieldHtml("Accent colour",
+        '<div class="cols" id="eusCols"></div>', 0, 0) +
+        '<p class="muted">The stripe down the left of the embed. Pick a preset or choose any colour.</p>' +
+        (state.embeds.length > 1
+          ? '<div style="margin-top:12px"><button type="button" class="link danger" id="eusDelEmb">Remove embed ' +
+            (sel.embed + 1) + "</button></div>"
+          : "");
+    } else if (sel.part === "author") {
+      html = fieldHtml("Name", '<input type="text" id="eusI_aname" value="' +
+          esc(e.author.name) + '" placeholder="Shown above the title" />',
+          (e.author.name || "").length, L.author) +
+        fieldHtml("Icon URL", '<input type="text" id="eusI_aicon" value="' +
+          esc(e.author.icon_url) + '" placeholder="https://" />', 0, 0);
+    } else if (sel.part === "title") {
+      html = fieldHtml("Title", '<input type="text" id="eusI_title" value="' +
+          esc(e.title) + '" placeholder="Embed title" />', (e.title || "").length, L.title) +
+        fieldHtml("Link URL", '<input type="text" id="eusI_url" value="' +
+          esc(e.url) + '" placeholder="Makes the title clickable" />', 0, 0);
+    } else if (sel.part === "description") {
+      html = fieldHtml("Description",
+        '<textarea id="eusI_desc" placeholder="Markdown supported">' +
+        esc(e.description) + "</textarea>", (e.description || "").length, L.description);
+    } else if (sel.part === "fields") {
+      e.fields.forEach(function (f, j) {
+        html += '<div class="frow"><div class="ix">' + (j + 1) + "</div><div>" +
+          fieldHtml("Name", '<input type="text" data-fi="' + j + '" data-fk="name" value="' +
+            esc(f.name) + '" />', (f.name || "").length, L.field_name) +
+          fieldHtml("Value", '<textarea data-fi="' + j + '" data-fk="value" style="min-height:54px">' +
+            esc(f.value) + "</textarea>", (f.value || "").length, L.field_value) +
+          '<div class="facts"><label><input type="checkbox" data-fi="' + j +
+          '" data-fk="inline"' + (f.inline ? " checked" : "") + " /> Inline</label>" +
+          (j > 0 ? '<button type="button" class="link" data-mv="' + j + '" data-dir="-1">Move up</button>' : "") +
+          (j < e.fields.length - 1 ? '<button type="button" class="link" data-mv="' + j + '" data-dir="1">Move down</button>' : "") +
+          '<button type="button" class="link danger" data-fdel="' + j + '">Remove</button>' +
+          "</div></div></div>";
+      });
+      if (!e.fields.length) html += '<p class="muted">No fields yet.</p>';
+      if (e.fields.length < L.fields)
+        html += '<button type="button" class="tbtn" id="eusAddField" style="margin-top:5px">+ Add field</button>';
+    } else if (sel.part === "media") {
+      html = fieldHtml("Image URL", '<input type="text" id="eusI_img" value="' +
+          esc(e.image) + '" placeholder="Large image below the content" />', 0, 0) +
+        fieldHtml("Thumbnail URL", '<input type="text" id="eusI_thumb" value="' +
+          esc(e.thumbnail) + '" placeholder="Small image, top right" />', 0, 0);
+    } else if (sel.part === "footer") {
+      html = fieldHtml("Footer text", '<input type="text" id="eusI_ftext" value="' +
+          esc(e.footer.text) + '" />', (e.footer.text || "").length, L.footer) +
+        fieldHtml("Footer icon URL", '<input type="text" id="eusI_ficon" value="' +
+          esc(e.footer.icon_url) + '" placeholder="https://" />', 0, 0);
+    }
+
+    $("eusInsp").innerHTML = html;
+    wireInspector(e);
+  }
+
+  var typing = null;
+  function edited() {
+    // One snapshot per burst of typing, not per keystroke.
+    if (typing) clearTimeout(typing);
+    typing = setTimeout(snapshot, 600);
+    sync();
+  }
+
+  function wireInspector(e) {
+    function bind(id, apply) {
+      var el = $(id);
+      if (!el) return;
+      el.oninput = function () { apply(el.value); edited(); };
+    }
+    bind("eusI_content", function (v) { state.content = v; });
+    bind("eusI_aname", function (v) { e.author.name = v; });
+    bind("eusI_aicon", function (v) { e.author.icon_url = v; });
+    bind("eusI_title", function (v) { e.title = v; });
+    bind("eusI_url", function (v) { e.url = v; });
+    bind("eusI_desc", function (v) { e.description = v; });
+    bind("eusI_img", function (v) { e.image = v; });
+    bind("eusI_thumb", function (v) { e.thumbnail = v; });
+    bind("eusI_ftext", function (v) { e.footer.text = v; });
+    bind("eusI_ficon", function (v) { e.footer.icon_url = v; });
+
+    var cols = $("eusCols");
+    if (cols) {
+      ["#38d39f", "#6c8cff", "#5aa9ff", "#f0aa3c", "#ff6b6b", "#c084fc", "#eab308", "#94a3bd"]
+        .forEach(function (c) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "sw";
+          b.style.background = c;
+          b.setAttribute("aria-label", "Accent " + c);
+          b.setAttribute("aria-pressed", e.color.toLowerCase() === c ? "true" : "false");
+          b.onclick = function () { snapshot(); e.color = c; renderInspector(); sync(); };
+          cols.appendChild(b);
+        });
+      var pick = document.createElement("span");
+      pick.className = "pick";
+      pick.innerHTML = '<input type="color" id="eusColPick" value="' + esc(e.color) +
+        '" aria-label="Custom accent colour" />' +
+        '<input type="text" id="eusColHex" value="' + esc(e.color.toUpperCase()) +
+        '" maxlength="7" aria-label="Accent colour hex" />';
+      cols.appendChild(pick);
+
+      $("eusColPick").oninput = function () {
+        e.color = this.value;
+        $("eusColHex").value = this.value.toUpperCase();
+        markSwatches(e.color);
+        edited();
+      };
+      $("eusColHex").oninput = function () {
+        var v = this.value.trim();
+        if (v && v.charAt(0) !== "#") v = "#" + v;
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+          e.color = v.toLowerCase();
+          $("eusColPick").value = e.color;
+          markSwatches(e.color);
+          edited();
+        }
+      };
+    }
+
+    var del = $("eusDelEmb");
+    if (del) del.onclick = function () {
+      snapshot();
+      state.embeds.splice(sel.embed, 1);
+      sel = { part: "content", embed: 0 };
+      renderAll();
+    };
+    var addF = $("eusAddField");
+    if (addF) addF.onclick = function () {
+      snapshot();
+      e.fields.push({ name: "New field", value: "Value", inline: false });
+      renderInspector(); sync();
+    };
+
+    Array.prototype.forEach.call($("eusInsp").querySelectorAll("[data-fi]"), function (el) {
+      var i = parseInt(el.getAttribute("data-fi"), 10), k = el.getAttribute("data-fk");
+      if (k === "inline") el.onchange = function () { snapshot(); e.fields[i].inline = el.checked; sync(); };
+      else el.oninput = function () { e.fields[i][k] = el.value; edited(); };
+    });
+    Array.prototype.forEach.call($("eusInsp").querySelectorAll("[data-fdel]"), function (el) {
+      el.onclick = function () {
+        snapshot();
+        e.fields.splice(parseInt(el.getAttribute("data-fdel"), 10), 1);
+        renderInspector(); sync();
+      };
+    });
+    Array.prototype.forEach.call($("eusInsp").querySelectorAll("[data-mv]"), function (el) {
+      el.onclick = function () {
+        var i = parseInt(el.getAttribute("data-mv"), 10);
+        var to = i + parseInt(el.getAttribute("data-dir"), 10);
+        if (to < 0 || to >= e.fields.length) return;
+        snapshot();
+        var moved = e.fields.splice(i, 1)[0];
+        e.fields.splice(to, 0, moved);
+        renderInspector(); sync();
+      };
+    });
+  }
+
+  function markSwatches(colour) {
+    Array.prototype.forEach.call(document.querySelectorAll("#eusCols .sw"), function (b) {
+      b.setAttribute("aria-pressed",
+        b.style.backgroundColor && rgbToHex(b.style.backgroundColor) === colour.toLowerCase()
+          ? "true" : "false");
+    });
+  }
+  function rgbToHex(rgb) {
+    var m = rgb.match(/(\d+), *(\d+), *(\d+)/);
+    if (!m) return rgb;
+    return "#" + [1, 2, 3].map(function (i) {
+      return ("0" + parseInt(m[i], 10).toString(16)).slice(-2);
+    }).join("");
+  }
+
+  /* ---------------- preview ---------------- */
+  function md(s) {
+    return esc(s)
+      .replace(/```([\s\S]+?)```/g, '<code style="display:block;padding:8px 10px;border-radius:5px;background:rgba(4,10,32,.5);margin:5px 0">$1</code>')
+      .replace(/`([^`]+)`/g, '<code style="padding:2px 5px;border-radius:4px;background:rgba(4,10,32,.5)">$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/\*([^*]+)\*/g, "<i>$1</i>")
+      .replace(/~~([^~]+)~~/g, "<s>$1</s>")
+      .replace(/^&gt; (.*)$/gm, '<span style="display:block;border-left:3px solid rgba(255,255,255,.2);padding-left:9px">$1</span>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#5aa9ff;text-decoration:none">$1</a>');
+  }
+
+  function renderPreview() {
+    $("eusPvBody").innerHTML = state.content
+      ? md(state.content) : '<span class="muted">No message text</span>';
+    var box = $("eusPvEmbeds");
+    box.innerHTML = "";
+    state.embeds.forEach(function (e) {
+      var wrap = document.createElement("div");
+      wrap.className = "emb";
+      var inlineCount = e.fields.filter(function (f) { return f.inline; }).length;
+      var fields = "";
+      if (e.fields.length) {
+        fields = '<div class="eflds">' + e.fields.map(function (f) {
+          return '<div class="efld" style="grid-column:' +
+            (f.inline && inlineCount > 1 ? "auto" : "1 / -1") + '"><b>' +
+            md(f.name) + "</b><span>" + md(f.value) + "</span></div>";
+        }).join("") + "</div>";
+      }
+      wrap.innerHTML = '<span style="background:' + esc(e.color) + '"></span><div class="inner">' +
+        (e.thumbnail ? '<img class="ethumb" src="' + esc(e.thumbnail) + '" alt="" ' +
+           'onerror="this.style.display=\'none\'" />' : "") +
+        (e.author.name ? '<div class="eauth">' +
+           (e.author.icon_url ? '<img src="' + esc(e.author.icon_url) + '" alt="" ' +
+             'onerror="this.style.display=\'none\'" />' : "") +
+           esc(e.author.name) + "</div>" : "") +
+        (e.title ? '<div class="etitle">' + md(e.title) + "</div>" : "") +
+        (e.description ? '<div class="edesc">' + md(e.description) + "</div>" : "") +
+        fields +
+        (e.image ? '<img class="eimg" src="' + esc(e.image) + '" alt="" ' +
+           'onerror="this.style.display=\'none\'" />' : "") +
+        (e.footer.text ? '<div class="efoot">' +
+           (e.footer.icon_url ? '<img src="' + esc(e.footer.icon_url) + '" alt="" ' +
+             'onerror="this.style.display=\'none\'" />' : "") +
+           esc(e.footer.text) + "</div>" : "") +
+        "</div>";
+      box.appendChild(wrap);
+    });
+  }
+
+  /* ---------------- checks + budget ---------------- */
+  function renderChecks() {
+    var probs = problems(), box = $("eusChecks");
+    if (probs.length) {
+      box.innerHTML = probs.map(function (p) {
+        return '<div class="chk no"><b>!</b><span>' + esc(p) + "</span></div>";
+      }).join("");
+    } else {
+      box.innerHTML = '<div class="chk ok"><b>&#10003;</b><span>Ready to send &mdash; ' +
+        state.embeds.length + " embed" + (state.embeds.length === 1 ? "" : "s") +
+        ", " + total() + " characters.</span></div>";
+    }
+    $("eusSend").disabled = probs.length > 0;
+
+    var t = total(), pct = Math.min(100, t / L.total * 100);
+    $("eusBudgetTxt").textContent = t + " / " + L.total;
+    var bar = $("eusBudgetBar");
+    bar.style.width = pct + "%";
+    bar.style.background = t > L.total ? "var(--eus-bad)"
+      : (pct > 85 ? "var(--eus-warn)" : "var(--eus-ok)");
+  }
+
+  function sync() {
+    renderPreview(); renderChecks(); renderRail(); saveDraft();
+    if (mode === "json") $("eusJsonText").value = JSON.stringify(toPayload(), null, 2);
+  }
+  function renderAll() { renderRail(); renderInspector(); sync(); }
+
+  /* ---------------- server calls ---------------- */
+  function toast(text, bad) {
+    var t = document.createElement("div");
+    t.className = "toast" + (bad ? " bad" : "");
+    t.textContent = text;
+    $("eus").appendChild(t);
+    setTimeout(function () { t.remove(); }, 3200);
+  }
+
+  function call(action, extra) {
+    var body = new FormData();
+    body.append("csrf_token", boot.csrf);
+    body.append("action", action);
+    body.append("payload", JSON.stringify(toPayload()));
+    Object.keys(extra || {}).forEach(function (k) {
+      var v = extra[k];
+      if (Array.isArray(v)) v.forEach(function (one) { body.append(k, one); });
+      else body.append(k, v);
+    });
+    return fetch(boot.action, { method: "POST", body: body, credentials: "same-origin" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("The server returned " + r.status + ".");
+        return r.json();
+      });
+  }
+
+  /* ---------------- send ---------------- */
+  function renderChips() {
+    var host = $("eusChips");
+    host.innerHTML = "";
+    var groups = {};
+    boot.channels.forEach(function (c) {
+      var key = c.category || "No category";
+      (groups[key] = groups[key] || []).push(c);
+    });
+    Object.keys(groups).forEach(function (cat) {
+      var h = document.createElement("div");
+      h.className = "cat";
+      h.textContent = cat;
+      host.appendChild(h);
+      var row = document.createElement("div");
+      row.className = "chips";
+      groups[cat].forEach(function (c) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "chip";
+        b.textContent = "#" + c.name;
+        b.setAttribute("aria-pressed", picked.indexOf(c.id) > -1 ? "true" : "false");
+        b.onclick = function () {
+          var at = picked.indexOf(c.id);
+          if (at > -1) picked.splice(at, 1); else picked.push(c.id);
+          b.setAttribute("aria-pressed", at > -1 ? "false" : "true");
+          updateSendBtn();
+        };
+        row.appendChild(b);
+      });
+      host.appendChild(row);
+    });
+    updateSendBtn();
+  }
+  function updateSendBtn() {
+    $("eusChCount").textContent = picked.length + " selected";
+    $("eusDoSend").disabled = picked.length === 0;
+    $("eusDoSend").textContent = picked.length
+      ? "Send to " + picked.length + " channel" + (picked.length === 1 ? "" : "s") : "Send";
+  }
+
+  $("eusDoSend").onclick = function () {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    call("send", { channels: picked }).then(function (res) {
+      var wrap = $("eusReportWrap"), list = $("eusReport");
+      wrap.hidden = false;
+      if (!res.results) {
+        list.innerHTML = '<div class="rrow no"><b>!</b><span class="why">' +
+          esc(res.error || "Nothing was sent.") + "</span><span></span></div>";
+      } else {
+        list.innerHTML = res.results.map(function (r) {
+          return '<div class="rrow' + (r.ok ? "" : " no") + '"><b>' +
+            (r.ok ? "&#10003;" : "!") + "</b><b>" + esc(r.channel) + "</b>" +
+            (r.ok ? '<a href="' + esc(r.link) + '" target="_blank" rel="noopener">Open</a>'
+                  : '<span class="why">' + esc(r.why) + "</span>") + "</div>";
+        }).join("");
+        toast(res.sent + " of " + res.total + " delivered", res.sent !== res.total);
+      }
+      updateSendBtn();
+    }).catch(function (err) {
+      toast(err.message, true);
+      updateSendBtn();
+    });
+  };
+
+  /* ---------------- templates ---------------- */
+  function renderTemplates() {
+    var host = $("eusTplList");
+    if (!boot.saved.length) {
+      host.innerHTML = '<p class="muted">Nothing saved yet. Templates are shared with ' +
+        "<code>[p]embed store</code>.</p>";
+      return;
+    }
+    host.innerHTML = "";
+    boot.saved.forEach(function (t) {
+      var row = document.createElement("div");
+      row.className = "tpl";
+      row.innerHTML = "<div><b>" + esc(t.name) + "</b> " +
+        '<span class="meta">' + t.uses + " use" + (t.uses === 1 ? "" : "s") +
+        (t.locked ? " &middot; locked" : "") + "</span></div>";
+      var acts = document.createElement("div");
+      acts.className = "acts";
+      var load = document.createElement("button");
+      load.type = "button"; load.className = "link"; load.textContent = "Load";
+      load.onclick = function () {
+        snapshot();
+        state = fromPayload({ content: state.content, embeds: [t.embed] });
+        sel = { part: "title", embed: 0 };
+        renderAll();
+        $("eusTplDlg").close();
+        toast("Loaded " + t.name);
+      };
+      acts.appendChild(load);
+      if (!t.locked) {
+        var del = document.createElement("button");
+        del.type = "button"; del.className = "link danger"; del.textContent = "Delete";
+        del.onclick = function () {
+          call("delete", { name: t.name }).then(function (res) {
+            if (!res.ok) return toast(res.error, true);
+            boot.saved = res.list; renderTemplates(); toast("Deleted " + t.name);
+          }).catch(function (e) { toast(e.message, true); });
+        };
+        acts.appendChild(del);
+      }
+      row.appendChild(acts);
+      host.appendChild(row);
+    });
+  }
+
+  $("eusTplSave").onclick = function () {
+    var name = $("eusTplName").value.trim();
+    if (!name) return toast("Give the template a name.", true);
+    call("save", { name: name }).then(function (res) {
+      if (!res.ok) return toast(res.error, true);
+      boot.saved = res.list;
+      $("eusTplName").value = "";
+      renderTemplates();
+      toast("Saved as " + res.saved);
+    }).catch(function (e) { toast(e.message, true); });
+  };
+
+  /* ---------------- load a message ---------------- */
+  $("eusDoLoad").onclick = function () {
+    var ref = $("eusLoadRef").value.trim();
+    if (!ref) return toast("Paste a message link first.", true);
+    call("load_message", { reference: ref }).then(function (res) {
+      if (!res.ok) return toast(res.error, true);
+      snapshot();
+      state = fromPayload(res.payload);
+      sel = { part: "content", embed: 0 };
+      renderAll();
+      $("eusLoadDlg").close();
+      toast("Loaded the message");
+    }).catch(function (e) { toast(e.message, true); });
+  };
+
+  /* ---------------- chrome ---------------- */
+  function setMode(next) {
+    mode = next;
+    $("eusBuild").setAttribute("aria-pressed", next === "build" ? "true" : "false");
+    $("eusJson").setAttribute("aria-pressed", next === "json" ? "true" : "false");
+    $("eusInsp").hidden = next !== "build";
+    $("eusJsonPane").hidden = next !== "json";
+    if (next === "json") {
+      $("eusInspName").textContent = "Payload";
+      $("eusInspNote").textContent = "edits apply live";
+      $("eusJsonText").value = JSON.stringify(toPayload(), null, 2);
+      $("eusJsonMsg").textContent = "";
+    } else {
+      renderInspector();
+    }
+  }
+  $("eusBuild").onclick = function () { setMode("build"); };
+  $("eusJson").onclick = function () { setMode("json"); };
+
+  $("eusJsonText").oninput = function () {
+    var msg = $("eusJsonMsg");
+    try {
+      var parsed = JSON.parse(this.value);
+      state = fromPayload(parsed);
+      clampSel();
+      msg.className = "jsonmsg ok";
+      msg.textContent = "Valid — preview updated.";
+      renderPreview(); renderChecks(); renderRail(); saveDraft();
+    } catch (err) {
+      msg.className = "jsonmsg bad";
+      msg.textContent = String(err.message || err);
+    }
+  };
+
+  $("eusUndo").onclick = doUndo;
+  $("eusRedo").onclick = doRedo;
+  document.addEventListener("keydown", function (ev) {
+    if (!(ev.ctrlKey || ev.metaKey) || ev.key.toLowerCase() !== "z") return;
+    var host = $("eus");
+    if (!host.contains(document.activeElement) && document.activeElement !== document.body) return;
+    ev.preventDefault();
+    if (ev.shiftKey) doRedo(); else doUndo();
+  });
+
+  $("eusCopy").onclick = function () {
+    var text = JSON.stringify(toPayload(), null, 2);
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () {
+      toast("JSON copied");
+    }, function () { toast("Could not reach the clipboard", true); });
+  };
+  $("eusDl").onclick = function () {
+    var blob = new Blob([JSON.stringify(toPayload(), null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "embed.json";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  };
+
+  $("eusSend").onclick = function () {
+    $("eusReportWrap").hidden = true;
+    renderChips();
+    $("eusSendDlg").showModal();
+  };
+  $("eusTpl").onclick = function () { renderTemplates(); $("eusTplDlg").showModal(); };
+  $("eusLoad").onclick = function () { $("eusLoadDlg").showModal(); };
+  Array.prototype.forEach.call(document.querySelectorAll("#eus dialog [data-close]"), function (b) {
+    b.onclick = function () { b.closest("dialog").close(); };
+  });
+
+  /* ---------------- boot ---------------- */
+  $("eusPvName").textContent = boot.bot.name;
+  $("eusPvAvatar").src = boot.bot.avatar;
+  $("eusPvWhen").textContent = "Today at " +
+    new Date().toTimeString().slice(0, 5);
+
+  var draft = loadDraft();
+  state = draft && draft.embeds ? draft : starter();
+  if (draft) setTimeout(function () { toast("Draft restored"); }, 300);
+  renderAll();
+  refreshHistory();
+})();
+</script>
