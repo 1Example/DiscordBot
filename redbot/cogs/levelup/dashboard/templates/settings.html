@@ -61,6 +61,12 @@ dtable(label, desc, html) %}
 {% endmacro %}
 
 <div class="container-fluid lu-settings">
+{# This page is pre-rendered on the bot side by `_render_settings`, where
+   `url_for` does not exist - it is a Flask global, and the bot has no
+   request context. The dashboard renders the returned HTML a second time
+   with `render_template_string`, which does have it, so the subnav is held
+   back from the first pass and resolved by the second. #}
+{% raw %}
 <div class="dz-subnav">
   <a class="dz-subnav-item"
      href="{{ url_for('third_parties_blueprint.third_party', name=name,
@@ -78,6 +84,7 @@ dtable(label, desc, html) %}
     <i class="fa fa-sliders"></i> Settings
   </a>
 </div>
+{% endraw %}
 
 
   <form method="POST">
