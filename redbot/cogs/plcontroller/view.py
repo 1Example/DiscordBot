@@ -1348,6 +1348,22 @@ class PersistentControllerView(discord.ui.View):
                 try:
                     await self.message.edit(view=self, **kwargs)
                     return
+                except discord.DiscordServerError as exc:
+                    # Discord itself is unavailable (5xx). Nothing here can fix
+                    # that, and the next track change redraws the controller
+                    # anyway - so this is noted and dropped rather than raised
+                    # out of the event handler that called us.
+                    LOGGER.warning(
+                        "Discord could not accept the controller redraw in %s (%s); "
+                        "it will be redrawn on the next update.",
+                        self.guild.id, exc.status,
+                    )
+                    return
+                except discord.NotFound:
+                    # The controller message was deleted while we were drawing
+                    # it; there is nothing left to edit.
+                    LOGGER.debug("Controller message in %s is gone.", self.guild.id)
+                    return
                 except discord.HTTPException as exc:
                     if not await self._drop_rejected_emoji(exc):
                         raise
