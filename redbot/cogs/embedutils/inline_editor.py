@@ -48,107 +48,405 @@ _NESTED_AT_RULES = (
     "@scope",
 )
 
-# Appended after the scoped stylesheet. These are the four things that only
-# break once the document becomes an element, and they are kept here rather
-# than special-cased inside the scoper so it stays a plain mechanical rewrite.
+# Appended after the scoped stylesheet.
+#
+# The editor was written to own a browser window: it positions against the
+# viewport, sizes panes in percentages, and pins a few things with hard-coded
+# pixel offsets that only line up at the width it was designed for. Inside a
+# dashboard card none of that holds, so this layer rebuilds the layout in terms
+# of the space it is actually given, and moves the chrome onto the shell's
+# palette. Grouped by what it is fixing.
 _INLINE_ADJUSTMENTS = f"""
-/* The editor's layout is built on `height: 100%` all the way down from `body`.
-   In a page it has no viewport to resolve against, so the container is given a
-   concrete workspace height instead. `position: relative` matters just as
-   much: `.main` is absolutely positioned, and without a positioned ancestor it
-   would escape the editor and lay itself out against the page. */
+/* ---- 1. the container ---------------------------------------------------
+   `.main` is `position: absolute; height: 100%`, and everything below it is a
+   percentage of that, so the editor needs a positioned ancestor with a real
+   height or the whole thing collapses. */
 {ROOT_SELECTOR} {{
+  /* `position: relative` stays: `.notification` and `.done` are absolutely
+     positioned and need this as their containing block. The fixed height is
+     gone - the card has room, so the editor grows to fit its content and the
+     page scrolls, rather than becoming a short box with its own scrollbars. */
   position: relative;
-  height: min(1040px, calc(100vh - 250px));
-  min-height: 600px;
+  height: auto;
+  min-height: 0;
+  border-radius: 14px;
+  overflow: visible;
+  background: transparent;
+  --fullEmbedBackground: transparent;
+  --side1Background: transparent;
+  --background-tertiary: rgba(255, 255, 255, .08);
+}}
+/* `.main` was `position: absolute; height: 100%`, which is what forced every
+   pane below it to be a percentage of a fixed box. */
+{ROOT_SELECTOR} .main {{
+  position: relative;
+  inset: auto;
+  width: auto;
+  height: auto;
+  gap: 14px;
+  align-items: stretch;
+}}
+/* Two even columns. The original 45/55 split was chosen against a full window;
+   at card widths the editor column needs the same room as the preview. */
+{ROOT_SELECTOR}:not(.no-preview):not(.no-editor) .main {{
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}}
+@media (max-width: 1100px) {{
+  /* Side by side stops working long before the card does; stack instead. */
+  {ROOT_SELECTOR}:not(.no-preview):not(.no-editor) .main {{
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }}
+}}
+
+/* ---- 2. the editor column ----------------------------------------------
+   A column that fills its height, so the parts inside can be sized by how much
+   room is left rather than by a percentage of the window. */
+{ROOT_SELECTOR} .main .side1 {{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
+  border-right: 1px solid var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
   border-radius: 12px;
-  overflow: hidden;
+  background: var(--cx-panel-2, rgba(90, 130, 220, .07));
+  height: auto;
+  overflow: visible;
 }}
 
-/* `.notification` and `.done` were fixed to the viewport, which was right for a
-   full-screen document and wrong here: they floated over the dashboard instead
-   of over the editor. Anchored to the container, they land where they did. */
+/* The toolbar was a fixed 100px box holding seven controls, so they spilled
+   out of it and scattered across the top of the page. */
+{ROOT_SELECTOR} .chooser {{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  width: auto;
+  height: auto;
+  min-height: 38px;
+  margin: 0;
+  padding: 5px 6px;
+  border-radius: 10px;
+  background: var(--cx-panel-3, rgba(255, 255, 255, .045));
+  border: 1px solid var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+  box-shadow: none;
+}}
+/* The overflow menu belongs at the far end of the strip. */
+{ROOT_SELECTOR} .chooser > .top-btn.menu {{ margin-left: auto; }}
+{ROOT_SELECTOR} .chooser > .top-btn,
+{ROOT_SELECTOR} .chooser > .pickerToggle {{
+  position: static;
+  flex: none;
+  margin: 0;
+}}
+
+/* `height: 55%` left the editing area a fixed slab with dead space under it.
+   It should take whatever the toolbar and the send bar do not. */
+{ROOT_SELECTOR} .top {{
+  flex: 1 1 auto;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  /* No surface of its own: `.side1` already draws one, and the accordion rows
+     inside carry theirs. Two nested frames read as a box in a box. */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  /* Nothing clips here any more, so the accordion is fully visible instead of
+     being a scroll region inside a scroll region. */
+  overflow: visible;
+}}
+/* The inner pane kept Discord's #292b2f, which was the last grey slab left in
+   the editor column. */
+{ROOT_SELECTOR} .top > .gui {{
+  background: transparent;
+  min-height: 0;
+  padding: 2px 0 8px;
+}}
+{ROOT_SELECTOR} .editorHolder {{ min-height: 0; }}
+/* JSON mode: a code surface should be the darkest thing in the column, but in
+   the shell's blue rather than a flat near-black. */
+{ROOT_SELECTOR} .CodeMirror {{
+  background: rgba(4, 10, 32, .45);
+  border-radius: 10px;
+}}
+{ROOT_SELECTOR} .CodeMirror-gutters {{
+  background: transparent;
+  border-right-color: var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+}}
+
+/* ---- 3. the send bar ----------------------------------------------------
+   The colour picker and the send form are `position: absolute` pinned with
+   hard-coded offsets (`top: 90px; left: 20px; width: 250px; height: 130px`),
+   re-pinned again per editor mode. In a window that put them along the bottom;
+   in a card it dropped them on top of the fields. They go back into flow as a
+   footer row.
+
+   `!important` is warranted here: the source pins them from several
+   mode-specific selectors (`body.no-preview.gui .bottom .colors` and friends)
+   that outrank anything reasonable to write, and they all need to lose. */
+{ROOT_SELECTOR} .side1 > .bottom {{
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  flex: none;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}}
+{ROOT_SELECTOR} .side1 > .bottom > .colors,
+{ROOT_SELECTOR} .side1 > .bottom > .sending {{
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--cx-panel-3, rgba(255, 255, 255, .045));
+  border: 1px solid var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+}}
+{ROOT_SELECTOR} .side1 > .bottom > .colors {{ flex: 0 0 auto; }}
+{ROOT_SELECTOR} .side1 > .bottom > .sending {{
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}}
+/* The send button carried its own 105px inline offset for the same reason. */
+{ROOT_SELECTOR} .side1 > .bottom .sending input[type="submit"],
+{ROOT_SELECTOR} .side1 > .bottom .sending button {{
+  margin-left: auto !important;
+  flex: none;
+}}
+{ROOT_SELECTOR} .side1 > .bottom .sending form {{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}}
+{ROOT_SELECTOR} .side1 > .bottom .sending .choices,
+{ROOT_SELECTOR} .side1 > .bottom .sending select {{
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}}
+
+/* ---- 4. the preview column ---------------------------------------------
+   `.msgEmbed` is absolutely positioned and `.side2` was never a positioned
+   element, so the preview escaped its column and anchored to the editor root -
+   which is why it floated at a fixed spot with a gulf beside it. */
+{ROOT_SELECTOR} .main .side2 {{
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
+  border: 1px solid var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
+  border-radius: 12px;
+  background: rgba(4, 10, 32, .35);
+  height: auto;
+  overflow: visible;
+}}
+{ROOT_SELECTOR} .msgEmbed {{
+  position: relative;
+  width: auto;
+  margin: 0;
+  /* Keeps the gutter the avatar is absolutely positioned into. */
+  padding: 4px 8px 8px 64px;
+}}
+{ROOT_SELECTOR} .side2 .bottomSide {{ position: relative; }}
+
+/* ---- 5. palette ---------------------------------------------------------
+   The chrome moves onto the shell's surfaces. The embed preview deliberately
+   does not: its job is to show what the embed will look like once posted, so
+   it keeps Discord's own background and text colours. */
+{ROOT_SELECTOR} .side1 .item.top,
+{ROOT_SELECTOR} .top > .gui .item,
+{ROOT_SELECTOR} .top > .gui .item ~ .edit,
+{ROOT_SELECTOR} .side1 .bottom .box {{
+  background-color: rgba(255, 255, 255, .04);
+  border-color: var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+}}
+{ROOT_SELECTOR} .top > .gui .item:not(.inlineField):not(.guiEmbedName).active {{
+  background-color: rgba(108, 140, 255, .18);
+}}
+/* The preview too. Keeping it Discord-grey made it a truthful mock-up of the
+   posted result, but a grey slab in a blue card is the wrong trade here - the
+   embed's own accent bar, fields and layout still show what you are building.
+   Colours in the preview are no longer pixel-accurate to Discord. */
+{ROOT_SELECTOR} .embed {{
+  background: var(--cx-panel-2, rgba(90, 130, 220, .07));
+  border-left-color: rgba(130, 175, 255, .45);
+}}
+{ROOT_SELECTOR} .msgEmbed .markup code,
+{ROOT_SELECTOR} .embed code,
+{ROOT_SELECTOR} .markup pre,
+{ROOT_SELECTOR} .markup blockquote {{
+  background: rgba(4, 10, 32, .5);
+  border-color: var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+}}
+/* The message row above the embed sat on Discord's channel grey. */
+{ROOT_SELECTOR} .msgEmbed,
+{ROOT_SELECTOR} .msgEmbed > .contents,
+{ROOT_SELECTOR} .side2 .bottomSide {{
+  background: transparent;
+}}
+
+/* ---- 5b. the rest of Discord's greys ------------------------------------
+   Enumerated by walking the rendered editor and collecting every element whose
+   background was near-neutral, rather than by guessing at selectors. Four
+   source greys, mapped onto the shell's three surfaces:
+
+     #202225 (deepest)          -> the dark well
+     #27282e #292b2f #212226    -> panel-3
+     #2d2e33 #2d2f34 #35363e    -> a lift above panel-3
+     #41444a                    -> the lightest chip
+*/
 {ROOT_SELECTOR} .notification,
-{ROOT_SELECTOR} .done {{
-  position: absolute;
+{ROOT_SELECTOR} .CodeMirror-lint-tooltip {{
+  background: rgba(4, 10, 32, .5);
+}}
+{ROOT_SELECTOR} .top-btn,
+{ROOT_SELECTOR} .top-btn.menu > .box,
+{ROOT_SELECTOR} .gui.opt,
+{ROOT_SELECTOR} .json.opt,
+{ROOT_SELECTOR} .guiEmbed,
+{ROOT_SELECTOR} .fieldInner,
+{ROOT_SELECTOR} .colLeft .picker,
+{ROOT_SELECTOR} .CodeMirror-gutters {{
+  background: var(--cx-panel-3, rgba(255, 255, 255, .045));
+}}
+{ROOT_SELECTOR} .designerFieldName,
+{ROOT_SELECTOR} .item.pointer,
+{ROOT_SELECTOR} .spinner-container,
+{ROOT_SELECTOR} .item.toggle .inner .toggles .item,
+{ROOT_SELECTOR} .top-btn.menu > .box .item.normal:hover {{
+  background: rgba(255, 255, 255, .07);
+}}
+{ROOT_SELECTOR} .chooser > .back {{ background: rgba(255, 255, 255, .10); }}
+
+/* The active GUI/JSON tab needs to read as selected against the new surface. */
+{ROOT_SELECTOR} .chooser > .opt.selected,
+{ROOT_SELECTOR} .chooser > .opt.active {{
+  background: rgba(108, 140, 255, .28);
 }}
 
-/* The dashboard's own controls stop at the editor's edge. Its inputs and
-   buttons are styled by the stylesheet above, and the shell's form rules would
-   otherwise repaint them mid-layout. */
+/* CodeMirror ships white filler corners where its scrollbars meet. */
+{ROOT_SELECTOR} .CodeMirror-scrollbar-filler,
+{ROOT_SELECTOR} .CodeMirror-gutter-filler {{
+  background: transparent;
+}}
+
+/* A bare <select> is white until Choices.js upgrades it, and stays white if
+   Choices never runs. */
+{ROOT_SELECTOR} select,
+{ROOT_SELECTOR} .sending select {{
+  background: var(--cx-panel-3, rgba(255, 255, 255, .045));
+  color: var(--cx-text, #e6e9ef);
+  border: 1px solid var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+  border-radius: 8px;
+  padding: 6px 9px;
+}}
+{ROOT_SELECTOR} select option {{ background: #0e1626; color: #e6e9ef; }}
+
+/* The last few are set from compound selectors (`.fields+.edit .fieldInner
+   .designerFieldName`, CodeMirror's own theme) that outrank a single-class
+   override, so these are forced. Found by re-running the same sweep after the
+   map above, not by guessing. */
+{ROOT_SELECTOR} .fieldInner {{
+  background: var(--cx-panel-3, rgba(255, 255, 255, .045)) !important;
+}}
+{ROOT_SELECTOR} .designerFieldName {{
+  background: rgba(255, 255, 255, .07) !important;
+}}
+{ROOT_SELECTOR} .CodeMirror-gutters {{
+  background: transparent !important;
+}}
+
+/* ---- 5c. scrollbars -----------------------------------------------------
+   The sweep that found the grey surfaces only looked at element backgrounds,
+   so it missed these: the editor styles its scrollbars through
+   `::-webkit-scrollbar` pseudo-elements and `scrollbar-color`, in the same
+   Discord greys (#36393f track, #202225 / #26272d / #222427 thumbs).
+
+   With the panes no longer scrolling most of these never render, but the JSON
+   editor and any narrow viewport still can, so they are themed rather than
+   left as the last grey in the component. The source sets several with
+   `!important`, which is why these match it. */
+{ROOT_SELECTOR},
+{ROOT_SELECTOR} * {{
+  scrollbar-width: thin;
+  scrollbar-color: rgba(130, 175, 255, .35) transparent;
+}}
+{ROOT_SELECTOR} ::-webkit-scrollbar,
+{ROOT_SELECTOR} *::-webkit-scrollbar {{
+  width: 9px;
+  height: 9px;
+  background: transparent !important;
+}}
+{ROOT_SELECTOR} ::-webkit-scrollbar-track,
+{ROOT_SELECTOR} *::-webkit-scrollbar-track {{
+  background: transparent !important;
+}}
+{ROOT_SELECTOR} ::-webkit-scrollbar-thumb,
+{ROOT_SELECTOR} *::-webkit-scrollbar-thumb {{
+  background: rgba(130, 175, 255, .30) !important;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box !important;
+}}
+{ROOT_SELECTOR} ::-webkit-scrollbar-thumb:hover,
+{ROOT_SELECTOR} *::-webkit-scrollbar-thumb:hover {{
+  background: rgba(130, 175, 255, .50) !important;
+}}
+{ROOT_SELECTOR} ::-webkit-scrollbar-corner,
+{ROOT_SELECTOR} *::-webkit-scrollbar-corner {{
+  background: transparent !important;
+}}
+
+/* CodeMirror sizes itself to a fixed height and scrolls inside by default.
+   Letting it grow keeps the JSON tab consistent with the GUI one - one page,
+   one scrollbar, and that one belongs to the browser. */
+{ROOT_SELECTOR} .CodeMirror {{
+  height: auto;
+}}
+{ROOT_SELECTOR} .CodeMirror-scroll {{
+  max-height: none;
+  min-height: 340px;
+  overflow-y: hidden !important;
+  overflow-x: auto;
+}}
+
+/* ---- 6. the editor's own back arrow -------------------------------------
+   It pointed back to the module index, which is what the page's breadcrumb
+   above the card already does. Two back buttons a few pixels apart is worse
+   than one, so the editor drops its copy and reclaims the gutter reserved for
+   it. */
+{ROOT_SELECTOR} .chooser > .top-btn:has(svg[title="back"]),
+{ROOT_SELECTOR} .chooser > .back {{
+  display: none;
+}}
+{ROOT_SELECTOR} .chooser.needed {{ margin-left: 0 !important; }}
+
+/* The shell's form rules stop at the editor's edge; its controls are styled by
+   the stylesheet above. */
 {ROOT_SELECTOR} input,
 {ROOT_SELECTOR} select,
 {ROOT_SELECTOR} textarea,
 {ROOT_SELECTOR} button {{
   font-family: inherit;
-}}
-
-/* ---- palette -----------------------------------------------------------
-   The editor was built to fill a window, so its chrome is painted in
-   Discord's greys (#36393f, #2f3136, #292b2f, #212226). Dropped into a
-   translucent blue card those read as a grey slab bolted onto the page, so
-   the chrome is moved onto the shell's surfaces.
-
-   The embed preview is deliberately NOT retinted. Its whole job is to show
-   what the embed will look like once it is posted, so it keeps Discord's
-   background, text colours and code-block styling. Retinting it would make
-   it a prettier preview of something that does not exist.
-
-   Values come from the dashboard's tokens with the literal as a fallback, so
-   this tracks the theme without depending on it. */
-{ROOT_SELECTOR} {{
-  --fullEmbedBackground: transparent;
-  --side1Background: transparent;
-  --background-tertiary: rgba(255, 255, 255, .08);
-  background: transparent;
-}}
-
-/* Both panes sit directly on the card. */
-{ROOT_SELECTOR} .main .side1,
-{ROOT_SELECTOR} .main .side2 {{
-  background-color: transparent;
-}}
-{ROOT_SELECTOR} .main .side1 {{
-  border-right: 1px solid var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
-}}
-
-/* The accordion rows, the JSON pane and the bottom bar: the editor's own
-   panels, so they take the shell's nested-panel surface. */
-{ROOT_SELECTOR} .top,
-{ROOT_SELECTOR} .side1 .item.top,
-{ROOT_SELECTOR} .top > .gui .item,
-{ROOT_SELECTOR} .top > .gui .item ~ .edit,
-{ROOT_SELECTOR} .side1 .bottom .box,
-{ROOT_SELECTOR} .bottom .colors,
-{ROOT_SELECTOR} .bottom .sending {{
-  background-color: var(--cx-panel-2, rgba(90, 130, 220, .07));
-  border-color: var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
-}}
-{ROOT_SELECTOR} .top > .gui .item:not(.inlineField):not(.guiEmbedName).active {{
-  background-color: var(--cx-panel-3, rgba(255, 255, 255, .045));
-}}
-{ROOT_SELECTOR} .chooser {{
-  background-color: transparent;
-}}
-
-/* `.embed` drew its default accent bar with --fullEmbedBackground, which is
-   now transparent; the picked colour still overrides this inline. */
-{ROOT_SELECTOR} .embed {{
-  border-left-color: rgba(130, 175, 255, .45);
-}}
-
-/* ---- the editor's own back arrow ---------------------------------------
-   It pointed back to the module index, which is exactly what the page's
-   breadcrumb above the card already does. Two back buttons a few pixels
-   apart, one inside the editor and one outside it, is worse than one. The
-   page keeps the breadcrumb; the editor drops its copy and reclaims the
-   55px of gutter that was reserved for it. */
-{ROOT_SELECTOR} .chooser > .top-btn:has(svg[title="back"]),
-{ROOT_SELECTOR} .chooser > .back {{
-  display: none;
-}}
-{ROOT_SELECTOR} .chooser.needed {{
-  margin-left: 0 !important;
 }}
 """
 
