@@ -1882,8 +1882,18 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   .plc-vol{ margin-left:0 !important; width:100%; }
 }
 </style>
-{{ subnav(name, [(none, 'Player', 'fa-play-circle'),
-                 ('settings', 'Settings', 'fa-sliders')], none, guild) }}
+<div class="dz-subnav">
+  <a class="dz-subnav-item active"
+     href="{{ url_for('third_parties_blueprint.third_party', name=name,
+                        page=none, guild_id=guild.id if guild else none) }}">
+    <i class="fa fa-play-circle"></i> Player
+  </a>
+  <a class="dz-subnav-item"
+     href="{{ url_for('third_parties_blueprint.third_party', name=name,
+                        page='settings', guild_id=guild.id if guild else none) }}">
+    <i class="fa fa-sliders"></i> Settings
+  </a>
+</div>
 
 <div id="plcRoot"
      data-csrf="{{ csrf_token_value }}"
@@ -2980,8 +2990,18 @@ SETTINGS_TEMPLATE = (
       {% else %}No controller has been posted yet.{% endif %}
     </p>
   </div>
-  {{ subnav(name, [(none, 'Player', 'fa-play-circle'),
-                   ('settings', 'Settings', 'fa-sliders')], 'settings', guild) }}
+<div class="dz-subnav">
+  <a class="dz-subnav-item"
+     href="{{ url_for('third_parties_blueprint.third_party', name=name,
+                        page=none, guild_id=guild.id if guild else none) }}">
+    <i class="fa fa-play-circle"></i> Player
+  </a>
+  <a class="dz-subnav-item active"
+     href="{{ url_for('third_parties_blueprint.third_party', name=name,
+                        page='settings', guild_id=guild.id if guild else none) }}">
+    <i class="fa fa-sliders"></i> Settings
+  </a>
+</div>
 
 
   <form method="POST">

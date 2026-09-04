@@ -224,3 +224,19 @@ class DashboardIntegration:
             "status": 0,
             "web_content": {"source": _editor_fragment(), "send_form": send_form_string},
         }
+
+    # `guild` was this page's slug before it was renamed to `create`. Old links
+    # and bookmarks (and a Modules card cached in someone's browser) still
+    # point at it, and after the rename that slug would simply not exist. It is
+    # kept as an alias onto the same handler so those URLs land on the inlined
+    # editor rather than nowhere. Hidden, so the Modules card shows one button.
+    @dashboard_page(
+        name="guild",
+        description="Build an embed and send it to a channel in this server.",
+        methods=("GET", "POST"),
+        hidden=True,
+    )
+    async def dashboard_guild_alias(
+        self, member: discord.Member, guild: discord.Guild, **kwargs
+    ) -> None:
+        return await self.dashboard_guild(member=member, guild=guild, **kwargs)
