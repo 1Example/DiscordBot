@@ -62,6 +62,19 @@ _INLINE_ADJUSTMENTS = f"""
    percentage of that, so the editor needs a positioned ancestor with a real
    height or the whole thing collapses. */
 {ROOT_SELECTOR} {{
+  /* Opaque, not translucent. The shell's panel tokens are 4-7% tints designed
+     to sit on a flat card; this dashboard paints a moving circuit pattern
+     behind everything, and at those alphas it showed through the editor's
+     controls - which is what made the whole component look broken rather than
+     merely wrong. Solid surfaces in the same blue family instead. */
+  --eu-ground:  #0a1020;
+  --eu-panel:   #111c30;
+  --eu-raise:   #18253d;
+  --eu-raise-2: #22314e;
+  --eu-well:    #070d1a;
+  --eu-active:  #2a3d68;
+  --eu-line:    rgba(130, 175, 255, .16);
+
   /* `position: relative` stays: `.notification` and `.done` are absolutely
      positioned and need this as their containing block. The fixed height is
      gone - the card has room, so the editor grows to fit its content and the
@@ -72,7 +85,7 @@ _INLINE_ADJUSTMENTS = f"""
   border-radius: 14px;
   overflow: visible;
   background: transparent;
-  --fullEmbedBackground: transparent;
+  --fullEmbedBackground: var(--eu-ground);
   --side1Background: transparent;
   --background-tertiary: rgba(255, 255, 255, .08);
 }}
@@ -109,10 +122,10 @@ _INLINE_ADJUSTMENTS = f"""
   min-width: 0;
   min-height: 0;
   padding: 12px;
-  border: 1px solid var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
-  border-right: 1px solid var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
+  border: 1px solid var(--eu-line);
+  border-right: 1px solid var(--eu-line);
   border-radius: 12px;
-  background: var(--cx-panel-2, rgba(90, 130, 220, .07));
+  background: var(--eu-panel);
   height: auto;
   overflow: visible;
 }}
@@ -130,8 +143,8 @@ _INLINE_ADJUSTMENTS = f"""
   margin: 0;
   padding: 5px 6px;
   border-radius: 10px;
-  background: var(--cx-panel-3, rgba(255, 255, 255, .045));
-  border: 1px solid var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+  background: var(--eu-raise);
+  border: 1px solid var(--eu-line);
   box-shadow: none;
 }}
 /* The overflow menu belongs at the far end of the strip. */
@@ -172,12 +185,12 @@ _INLINE_ADJUSTMENTS = f"""
 /* JSON mode: a code surface should be the darkest thing in the column, but in
    the shell's blue rather than a flat near-black. */
 {ROOT_SELECTOR} .CodeMirror {{
-  background: rgba(4, 10, 32, .45);
+  background: var(--eu-well);
   border-radius: 10px;
 }}
 {ROOT_SELECTOR} .CodeMirror-gutters {{
   background: transparent;
-  border-right-color: var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+  border-right-color: var(--eu-line);
 }}
 
 /* ---- 3. the send bar ----------------------------------------------------
@@ -211,8 +224,8 @@ _INLINE_ADJUSTMENTS = f"""
   margin: 0 !important;
   padding: 9px 11px;
   border-radius: 10px;
-  background: var(--cx-panel-3, rgba(255, 255, 255, .045));
-  border: 1px solid var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+  background: var(--eu-raise);
+  border: 1px solid var(--eu-line);
 }}
 {ROOT_SELECTOR} .side1 > .bottom > .colors {{ flex: 0 0 auto; }}
 {ROOT_SELECTOR} .side1 > .bottom > .sending {{
@@ -253,9 +266,9 @@ _INLINE_ADJUSTMENTS = f"""
   min-width: 0;
   min-height: 0;
   padding: 14px;
-  border: 1px solid var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
+  border: 1px solid var(--eu-line);
   border-radius: 12px;
-  background: rgba(4, 10, 32, .35);
+  background: var(--eu-ground);
   height: auto;
   overflow: visible;
 }}
@@ -276,26 +289,26 @@ _INLINE_ADJUSTMENTS = f"""
 {ROOT_SELECTOR} .top > .gui .item,
 {ROOT_SELECTOR} .top > .gui .item ~ .edit,
 {ROOT_SELECTOR} .side1 .bottom .box {{
-  background-color: rgba(255, 255, 255, .04);
-  border-color: var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+  background-color: var(--eu-raise);
+  border-color: var(--eu-line);
 }}
 {ROOT_SELECTOR} .top > .gui .item:not(.inlineField):not(.guiEmbedName).active {{
-  background-color: rgba(108, 140, 255, .18);
+  background-color: var(--eu-active);
 }}
 /* The preview too. Keeping it Discord-grey made it a truthful mock-up of the
    posted result, but a grey slab in a blue card is the wrong trade here - the
    embed's own accent bar, fields and layout still show what you are building.
    Colours in the preview are no longer pixel-accurate to Discord. */
 {ROOT_SELECTOR} .embed {{
-  background: var(--cx-panel-2, rgba(90, 130, 220, .07));
+  background: var(--eu-panel);
   border-left-color: rgba(130, 175, 255, .45);
 }}
 {ROOT_SELECTOR} .msgEmbed .markup code,
 {ROOT_SELECTOR} .embed code,
 {ROOT_SELECTOR} .markup pre,
 {ROOT_SELECTOR} .markup blockquote {{
-  background: rgba(4, 10, 32, .5);
-  border-color: var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+  background: var(--eu-well);
+  border-color: var(--eu-line);
 }}
 /* The message row above the embed sat on Discord's channel grey. */
 {ROOT_SELECTOR} .msgEmbed,
@@ -316,7 +329,7 @@ _INLINE_ADJUSTMENTS = f"""
 */
 {ROOT_SELECTOR} .notification,
 {ROOT_SELECTOR} .CodeMirror-lint-tooltip {{
-  background: rgba(4, 10, 32, .5);
+  background: var(--eu-well);
 }}
 {ROOT_SELECTOR} .top-btn,
 {ROOT_SELECTOR} .top-btn.menu > .box,
@@ -326,21 +339,21 @@ _INLINE_ADJUSTMENTS = f"""
 {ROOT_SELECTOR} .fieldInner,
 {ROOT_SELECTOR} .colLeft .picker,
 {ROOT_SELECTOR} .CodeMirror-gutters {{
-  background: var(--cx-panel-3, rgba(255, 255, 255, .045));
+  background: var(--eu-raise);
 }}
 {ROOT_SELECTOR} .designerFieldName,
 {ROOT_SELECTOR} .item.pointer,
 {ROOT_SELECTOR} .spinner-container,
 {ROOT_SELECTOR} .item.toggle .inner .toggles .item,
 {ROOT_SELECTOR} .top-btn.menu > .box .item.normal:hover {{
-  background: rgba(255, 255, 255, .07);
+  background: var(--eu-raise-2);
 }}
-{ROOT_SELECTOR} .chooser > .back {{ background: rgba(255, 255, 255, .10); }}
+{ROOT_SELECTOR} .chooser > .back {{ background: var(--eu-raise-2); }}
 
 /* The active GUI/JSON tab needs to read as selected against the new surface. */
 {ROOT_SELECTOR} .chooser > .opt.selected,
 {ROOT_SELECTOR} .chooser > .opt.active {{
-  background: rgba(108, 140, 255, .28);
+  background: var(--eu-active);
 }}
 
 /* CodeMirror ships white filler corners where its scrollbars meet. */
@@ -353,9 +366,9 @@ _INLINE_ADJUSTMENTS = f"""
    Choices never runs. */
 {ROOT_SELECTOR} select,
 {ROOT_SELECTOR} .sending select {{
-  background: var(--cx-panel-3, rgba(255, 255, 255, .045));
+  background: var(--eu-raise);
   color: var(--cx-text, #e6e9ef);
-  border: 1px solid var(--cx-panel-3-bd, rgba(255, 255, 255, .08));
+  border: 1px solid var(--eu-line);
   border-radius: 8px;
   padding: 6px 9px;
 }}
@@ -366,10 +379,10 @@ _INLINE_ADJUSTMENTS = f"""
    override, so these are forced. Found by re-running the same sweep after the
    map above, not by guessing. */
 {ROOT_SELECTOR} .fieldInner {{
-  background: var(--cx-panel-3, rgba(255, 255, 255, .045)) !important;
+  background: var(--eu-raise) !important;
 }}
 {ROOT_SELECTOR} .designerFieldName {{
-  background: rgba(255, 255, 255, .07) !important;
+  background: var(--eu-raise-2) !important;
 }}
 {ROOT_SELECTOR} .CodeMirror-gutters {{
   background: transparent !important;
@@ -427,6 +440,63 @@ _INLINE_ADJUSTMENTS = f"""
   min-height: 340px;
   overflow-y: hidden !important;
   overflow-x: auto;
+}}
+
+/* ---- 5d. geometry faults, measured on the rendered page -----------------
+   Found by walking the live DOM and comparing each element's rect against its
+   siblings and its parent, rather than by eye. Four things were wrong. */
+
+/* `.top` carried `max-width: 90%`, so the editing area rendered 546px inside a
+   607px column - narrower than the toolbar above it and the send bar below it,
+   which is the inset that made the column look crooked. */
+{ROOT_SELECTOR} .top {{
+  /* `!important` because the source pins this from `body.gui .side1 .item.top`
+     - three classes plus the mode class, which outranks anything sane written
+     against a single class. Same reason for the rules below. */
+  max-width: none !important;
+  width: 100% !important;
+  height: auto !important;
+}}
+
+/* `.top > .gui` was `overflow-y: scroll` - a permanently visible scrollbar
+   even when, as now, the content fits. That is the grey bar down the middle of
+   the editor. */
+{ROOT_SELECTOR} .top > .gui {{
+  overflow: visible !important;
+  height: auto !important;
+  width: 100% !important;
+}}
+
+/* "Add Embed" is absolutely positioned with a translate, and with the panes no
+   longer creating containing blocks it anchored to the editor root and floated
+   loose under the accordion. It belongs in flow, centred under the list. */
+/* It is the *first* child of the list in the DOM and was pinned to the bottom
+   by its absolute positioning, so putting it back in flow floated it above
+   SENDER. A flex column with an order lets it sit last without touching the
+   markup - the accordion rows are block-level and stack identically either
+   way. */
+{ROOT_SELECTOR} .top > .gui {{
+  display: flex;
+  flex-direction: column;
+}}
+{ROOT_SELECTOR} .top > .gui > *:not(.guiEmbedAdd) {{ order: 0; }}
+{ROOT_SELECTOR} .guiEmbedAdd {{
+  order: 99;
+  position: static !important;
+  transform: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin: 10px 0 2px;
+}}
+
+/* The preview's message row uses Discord's negative-margin gutter trick
+   (`margin-left: -72px; padding-left: 72px`), which reached 8px past the
+   pane's own 64px inset and clipped the first characters of the message. */
+{ROOT_SELECTOR} .msgEmbed {{
+  padding-left: 78px;
 }}
 
 /* ---- 6. the editor's own back arrow -------------------------------------
