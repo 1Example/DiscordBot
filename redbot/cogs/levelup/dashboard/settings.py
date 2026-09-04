@@ -1112,7 +1112,6 @@ async def handle_settings_page(
                         cmd_requirements_html=cmd_requirements_html,
                         cmd_cooldowns_html=cmd_cooldowns_html,
                     ),
-                    "expanded": True,
                 },
             }
 
@@ -1143,7 +1142,6 @@ async def handle_settings_page(
                 cmd_requirements_html=cmd_requirements_html,
                 cmd_cooldowns_html=cmd_cooldowns_html,
             ),
-            "expanded": True,
         },
     }
 

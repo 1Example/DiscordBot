@@ -9,6 +9,7 @@ from redbot.core.i18n import Translator
 from redbot.core.utils.chat_formatting import humanize_list
 
 from .converters import ListStringToEmbed
+from .inline_editor import build_fragment
 
 _: Translator = Translator("EmbedUtils", __file__)
 
@@ -21,66 +22,35 @@ def dashboard_page(*args, **kwargs):
     return decorator
 
 
-# The editor is Glitchii's embed builder: a complete HTML document with ~2.5k
-# lines of its own CSS written against `html`/`body` and a fixed two-pane
-# viewport layout. Pasting that into a dashboard page would have the two
-# stylesheets fighting in both directions, so it stays a standalone document
-# and the dashboard page frames it. Same document either way - the wrapper only
-# decides whether the shell (topbar, guild hero, tabs, back button) is around
-# it.
-#
-# `?raw=1` on the page's own URL is what asks for the bare document, so both
-# forms live on one registered page instead of showing an extra button in the
-# Modules list that nobody should click directly.
+# `?raw=1` still serves the original standalone document. Nothing links to it,
+# but it is the untouched page, which makes it the thing to compare against if
+# the inlined build ever looks wrong.
 RAW_QUERY_KEY = "raw"
 
-FRAME_TEMPLATE = """
-<style>
-  .eu-frame-wrap { display:flex; flex-direction:column; gap:10px; }
-  .eu-frame-bar  { display:flex; align-items:center; justify-content:flex-end; gap:9px;
-                   font-size:.8rem; opacity:.7; }
-  .eu-frame-bar a { color:inherit; text-decoration:none; display:inline-flex;
-                    align-items:center; gap:6px; padding:5px 11px; border-radius:9px;
-                    background:rgba(255,255,255,.05);
-                    border:1px solid rgba(255,255,255,.10); }
-  .eu-frame-bar a:hover { background:rgba(255,255,255,.10); color:inherit; }
-  /* Tall enough to work in without being taller than the window; the editor
-     scrolls internally, so the page itself never grows a second scrollbar. */
-  .eu-frame { width:100%; height:min(1100px, calc(100vh - 210px)); min-height:620px;
-              border:1px solid rgba(130,175,255,.16); border-radius:14px;
-              background:#2f3136; display:block; }
-</style>
-<div class="eu-frame-wrap">
-  <div class="eu-frame-bar">
-    <a href="{{ raw_url }}" target="_blank" rel="noopener">
-      <i class="fa fa-external-link"></i> Open in a new tab
-    </a>
-  </div>
-  <iframe class="eu-frame" src="{{ raw_url }}" title="Embed editor"></iframe>
-</div>
-"""
+# Built once: the transform walks ~91KB of CSS, and the result is the same for
+# every request.
+_FRAGMENT: str | None = None
+
+
+def _editor_fragment() -> str:
+    global _FRAGMENT
+    if _FRAGMENT is None:
+        _FRAGMENT = build_fragment()
+    return _FRAGMENT
 
 
 def _wants_raw(kwargs) -> bool:
-    """True when the request asked for the bare editor document."""
+    """True when the request asked for the original standalone document."""
     value = (kwargs.get("extra_kwargs") or {}).get(RAW_QUERY_KEY)
     if isinstance(value, (list, tuple)):
         value = value[-1] if value else None
     return str(value) in ("1", "true", "yes")
 
 
-def _raw_url(kwargs) -> str:
-    """This page's own URL with `?raw=1` appended."""
-    url = kwargs.get("request_url") or ""
-    base = url.split("?", 1)[0]
-    return f"{base}?{RAW_QUERY_KEY}=1"
-
-
-def _frame(kwargs) -> dict:
-    return {
-        "status": 0,
-        "web_content": {"source": FRAME_TEMPLATE, "raw_url": _raw_url(kwargs)},
-    }
+def _raw_document() -> str:
+    file_path = os.path.join(os.path.dirname(__file__), "editor.html")
+    with open(file_path, encoding="utf-8") as f:
+        return f.read()
 
 
 class DashboardIntegration:
@@ -92,12 +62,11 @@ class DashboardIntegration:
 
     @dashboard_page(name=None, description="Create rich Embeds!")
     async def dashboard_editor(self, **kwargs) -> None:
-        if not _wants_raw(kwargs):
-            return _frame(kwargs)
-        file_path = os.path.join(os.path.dirname(__file__), "editor.html")
-        with open(file_path, encoding="utf-8") as f:
-            source = f.read()
-        return {"status": 0, "web_content": {"source": source, "standalone": True}}
+        if _wants_raw(kwargs):
+            return {"status": 0, "web_content": {"source": _raw_document(), "standalone": True}}
+        # A normal module page: the editor renders inside the dashboard shell,
+        # with the topbar, breadcrumb and back button around it.
+        return {"status": 0, "web_content": {"source": _editor_fragment()}}
 
     @dashboard_page(
         name="guild",
@@ -126,15 +95,10 @@ class DashboardIntegration:
                 ),
             }
 
-        # Both checks above run first, so a refusal is reported by the page
-        # rather than by the framed document, where it would be a 403 rendered
-        # inside a box on an otherwise normal-looking page.
-        if not _wants_raw(kwargs):
-            return _frame(kwargs)
-
-        file_path = os.path.join(os.path.dirname(__file__), "editor.html")
-        with open(file_path, encoding="utf-8") as f:
-            source = f.read()
+        # The send form is built either way: on the inlined page it is rendered
+        # into the editor's own sending area, exactly where the standalone
+        # document put it.
+        raw = _wants_raw(kwargs)
 
         import wtforms
 
@@ -244,7 +208,16 @@ class DashboardIntegration:
                 "redirect_url": kwargs["request_url"],
             }
 
+        if raw:
+            return {
+                "status": 0,
+                "web_content": {
+                    "source": _raw_document(),
+                    "standalone": True,
+                    "send_form": send_form_string,
+                },
+            }
         return {
             "status": 0,
-            "web_content": {"source": source, "standalone": True, "send_form": send_form_string},
+            "web_content": {"source": _editor_fragment(), "send_form": send_form_string},
         }

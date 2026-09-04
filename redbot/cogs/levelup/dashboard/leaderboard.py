@@ -74,6 +74,5 @@ async def get_dashboard_leaderboard(
             "data": data,
             "stat": stat,
             "statname": res["stat"],
-            "expanded": True,
         },
     }
