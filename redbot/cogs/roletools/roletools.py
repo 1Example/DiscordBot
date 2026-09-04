@@ -305,6 +305,15 @@ class RoleTools(
                 bad.append(token)
         return found, bad
 
+
+    async def _rt_selfrole(self, ctx, role: discord.Role):
+        """Run the role through SelfRoleConverter's checks.
+
+        It takes a string, so the id goes back through it - the
+        self-assignable check still happens and is not duplicated here.
+        """
+        return await SelfRoleConverter().convert(ctx, str(role.id))
+
     async def _rt_hierarchy_role(self, ctx, role: discord.Role):
         """Run the role through RoleHierarchyConverter's checks.
 
@@ -334,7 +343,10 @@ class RoleTools(
 
     @roletools.command(name="selfrole")
     @app_checks.bot_has_permissions(manage_roles=True)
-    async def selfrole(self, interaction: discord.Interaction, *, role: SelfRoleConverter) -> None:
+    @app_commands.describe(role="The self-assignable role to add or remove.")
+    async def selfrole(
+        self, interaction: discord.Interaction, role: discord.Role
+    ) -> None:
         """
         Add or remove a defined selfrole
 
@@ -342,6 +354,7 @@ class RoleTools(
         If you already have the role it will be removed.
         """
         ctx = await commands.Context.from_interaction(interaction)
+        role = await self._rt_selfrole(ctx, role)
         if role not in ctx.author.roles:
             await self.selfrole_add(ctx, role=role)
         else:
@@ -588,8 +601,7 @@ class RoleTools(
         self,
         interaction: discord.Interaction,
         users: str,
-        *,
-        role: RoleHierarchyConverter,
+        role: discord.Role,
     ) -> None:
         """
         Force a sticky role on one or more users.
@@ -601,6 +613,7 @@ class RoleTools(
         the user.
         """
         ctx = await commands.Context.from_interaction(interaction)
+        role = await self._rt_hierarchy_role(ctx, role)
         await ctx.typing()
         errors = []
         for user in users:
@@ -636,8 +649,7 @@ class RoleTools(
         self,
         interaction: discord.Interaction,
         users: str,
-        *,
-        role: RoleHierarchyConverter,
+        role: discord.Role,
     ) -> None:
         """
         Force remove sticky role on one or more users.
@@ -648,6 +660,7 @@ class RoleTools(
         Note: This is generally only useful for users who have left the server.
         """
         ctx = await commands.Context.from_interaction(interaction)
+        role = await self._rt_hierarchy_role(ctx, role)
         await ctx.typing()
 
         errors = []
