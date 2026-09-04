@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 import discord
-from redbot.core import Config, app_commands, commands
+from redbot.core import Config, commands
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 
@@ -15,7 +15,7 @@ from ..config.defaults import (
     DEFAULT_MEMBER,
     DEFAULT_ROLE,
 )
-from ..core.dispatch import handle_message, handle_slash_command
+from ..core.dispatch import handle_message
 from ..core.random_message_task import RandomMessageTask
 from ..core.reply_queue import cancel_reply_state_tasks
 from ..core.services import AIUserServices
@@ -103,24 +103,6 @@ class AIUser(
     async def on_red_api_tokens_update(self, service_name: str, _):
         if service_name in ["openai", "openrouter"]:
             await invalidate_openai_client(self.services)
-
-    @app_commands.command(name="chat")
-    @app_commands.describe(text="The prompt you want to send to the AI.")
-    @app_commands.checks.cooldown(1, 30)
-    @app_commands.checks.cooldown(1, 5, key=None)
-    async def slash_command(
-        self,
-        inter: discord.Interaction,
-        *,
-        text: app_commands.Range[str, 1, 2000],
-    ):
-        """Talk directly to this bot's AI. Ask it anything you want!"""
-        if self.services is None:
-            return await inter.response.send_message(
-                ":warning: aiuser is still loading, try again shortly.",
-                ephemeral=True,
-            )
-        await handle_slash_command(self.services, inter, text)
 
     @commands.Cog.listener()
     async def on_message_without_command(self, message: discord.Message):

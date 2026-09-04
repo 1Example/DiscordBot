@@ -15,7 +15,6 @@ from ..core.decision import (
     is_valid_message,
 )
 from ..core.reply_queue import ResponseRequest, get_or_create_channel_reply_state
-from ..response import build_and_respond
 from ..utils.logging_context import with_discord_log_context
 
 if TYPE_CHECKING:
@@ -25,30 +24,6 @@ logger = logging.getLogger("red.bz_cogs.aiuser")
 
 
 @with_discord_log_context("slash-command")
-async def handle_slash_command(
-    services: "AIUserServices", inter: discord.Interaction, text: str
-):
-    """Handle /chat slash command interactions"""
-    await inter.response.defer()
-
-    ctx = await commands.Context.from_interaction(inter)
-    ctx.message.content = text
-
-    if not (await is_valid_message(services, ctx)):
-        return await ctx.send(
-            "You're not allowed to use this command here.", ephemeral=True
-        )
-    elif await get_percentage(services, ctx) == 1.0:
-        pass
-    elif not (await services.config.guild(ctx.guild).reply_to_mentions_replies()):
-        return await ctx.send("This command is not enabled.", ephemeral=True)
-
-    get_or_create_channel_reply_state(services, ctx.channel.id)
-    try:
-        await build_and_respond(services, ctx)
-    except Exception:
-        logger.exception("Failed to generate response for slash command")
-        await ctx.send(":warning: Error in generating response!", ephemeral=True)
 
 
 @with_discord_log_context("message")

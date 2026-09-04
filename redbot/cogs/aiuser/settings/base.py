@@ -1,64 +1,52 @@
 import json
 import logging
-from typing import Optional, Union
+from typing import Optional
 
 import discord
-from redbot.core import checks, commands
+from redbot.core import app_commands, commands
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.utils.menus import SimpleMenu
 
-from ..config.constants import CHANNEL_MENTION_OR_ID_PATTERN
 from ..config.defaults import DEFAULT_STT_PROVIDER
-from ..config.model_info import get_model_info
 from ..providers.llm.openai_compatible.endpoints import (
     CompatEndpointKind,
     get_openai_compat_kind,
 )
-from ..providers.llm.registry import list_llm_models
-from ..settings.functions.base import FunctionCallingSettings
-from ..settings.history import HistorySettings
-from ..settings.media import MediaSettings
-from ..settings.memory import MemorySettings
 from ..settings.owner import OwnerSettings
-from ..settings.prompt import PromptSettings
-from ..settings.random_message import RandomMessageSettings
-from ..settings.reply import ReplySettings
-from ..settings.response import ResponseSettings
-from ..settings.triggers import TriggerSettings
 from ..settings.utilities import rank_choices_for_query
 from ..providers.speech.stt import DEFAULT_MODELS as STT_DEFAULT_MODELS
 from ..types.abc import MixinMeta
-from ..types.types import COMPATIBLE_CHANNELS
 
 logger = logging.getLogger("red.bz_cogs.aiuser")
 
 
 class Settings(
-    PromptSettings,
-    MediaSettings,
-    HistorySettings,
-    ReplySettings,
-    ResponseSettings,
-    TriggerSettings,
+    # The per-setting command mixins are gone: every one of those settings is
+    # on the dashboard now, and the tree they formed was four levels deep -
+    # deeper than a slash command can express. What is left here is the handful
+    # of things a person still does from Discord.
     OwnerSettings,
-    RandomMessageSettings,
-    FunctionCallingSettings,
-    MemorySettings,
     MixinMeta,
 ):
-    @commands.group(aliases=["ai_user"])
-    @commands.bot_has_permissions(embed_links=True, add_reactions=True)
-    @commands.guild_only()
-    async def aiuser(self, _):
-        """Configure replies to messages and images in enabled reply channels"""
-        pass
+    # What is left of `/aiuser` once its settings moved to the dashboard: a
+    # consent pair that has to be reachable where people actually are, a status
+    # readout, and the in-channel context reset.
+    aiuser = app_commands.Group(
+        name="aiuser",
+        description="Opt in or out, and reset the conversation.",
+        guild_only=True,
+        extras={"red_force_enable": True},
+    )
 
-    @aiuser.command(aliases=["lobotomize"])
-    async def forget(self, ctx: commands.Context):
+    @aiuser.command(name="forget")
+    @app_checks.bot_has_permissions(add_reactions=True)
+    async def forget(self, interaction: discord.Interaction):
         """Forces the bot to forget the current conversation up to this point
 
         This is useful if the LLM is stuck doing unwanted behaviour or giving undesirable results.
         See `[p]aiuser triggers public_forget` to allow non-admins to use this command.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if (
             not ctx.channel.permissions_for(ctx.author).manage_messages
             and not await self.config.guild(ctx.guild).public_forget()
@@ -68,12 +56,14 @@ class Settings(
         self.services.override_prompt_start_time[ctx.guild.id] = ctx.message.created_at
         await ctx.react_quietly("✅")
 
-    @aiuser.command(aliases=["config", "settings", "showsettings"])
-    async def status(self, ctx: commands.Context):
+    @aiuser.command(name="status")
+    @app_checks.bot_has_permissions(embed_links=True)
+    async def status(self, interaction: discord.Interaction):
         """Returns current settings
 
         (Current config per server)
         """
+        ctx = await commands.Context.from_interaction(interaction)
         config = await self.config.guild(ctx.guild).get_raw()
         glob_config = await self.config.get_raw()
         whitelist = await self.config.guild(ctx.guild).channels_whitelist()
@@ -280,65 +270,6 @@ class Settings(
             await ctx.send(embed=embed)
         return
 
-    @aiuser.group()
-    @checks.admin_or_permissions(manage_guild=True)
-    async def channels(self, _):
-        """Manage enabled reply channels"""
-        pass
-
-    @channels.command(name="list")
-    async def channels_list(self, ctx: commands.Context):
-        """List enabled reply channels"""
-        whitelist = await self.config.guild(ctx.guild).channels_whitelist()
-        return await self._send_channel_whitelist(ctx, whitelist)
-
-    @channels.command(name="add")
-    @checks.is_owner()
-    async def channels_add(
-        self,
-        ctx: commands.Context,
-        channel: COMPATIBLE_CHANNELS,
-    ):
-        """Enable replies in a channel
-
-        **Arguments**
-            - `channel` A mention of the channel
-        """
-        if not channel:
-            return await ctx.send("Invalid channel")
-        new_whitelist = await self.config.guild(ctx.guild).channels_whitelist()
-        if channel.id in new_whitelist:
-            return await ctx.send("Replies are already enabled in that channel.")
-        new_whitelist.append(channel.id)
-        await self.config.guild(ctx.guild).channels_whitelist.set(new_whitelist)
-        return await self._send_channel_whitelist(ctx, new_whitelist)
-
-    @channels.command(name="remove")
-    async def channels_remove(
-        self,
-        ctx: commands.Context,
-        channel: Union[COMPATIBLE_CHANNELS, str],
-    ):
-        """Disable replies in a channel
-
-        **Arguments**
-            - `channel` A mention or ID of the channel
-        """
-        if isinstance(channel, str):
-            match = CHANNEL_MENTION_OR_ID_PATTERN.fullmatch(channel.strip())
-            if not match:
-                return await ctx.send(
-                    "Invalid channel. Provide a channel mention or ID."
-                )
-            channel_id = int(match.group(1) or match.group(2))
-        else:
-            channel_id = channel.id
-        new_whitelist = await self.config.guild(ctx.guild).channels_whitelist()
-        if channel_id not in new_whitelist:
-            return await ctx.send("Replies are not enabled in that channel.")
-        new_whitelist.remove(channel_id)
-        await self.config.guild(ctx.guild).channels_whitelist.set(new_whitelist)
-        return await self._send_channel_whitelist(ctx, new_whitelist)
 
     async def _send_channel_whitelist(self, ctx: commands.Context, whitelist):
         embed = discord.Embed(
@@ -353,50 +284,6 @@ class Settings(
         embed.description = "\n".join(channels) if channels else "None"
         return await ctx.send(embed=embed)
 
-    @aiuser.group(invoke_without_command=True)
-    @checks.is_owner()
-    async def model(self, ctx: commands.Context):
-        """Show the current chat completion model"""
-        model = await self.config.guild(ctx.guild).model()
-        return await ctx.maybe_send_embed(f"This server's chat model is: `{model}`")
-
-    @model.command(name="list")
-    async def model_list(self, ctx: commands.Context):
-        """List available chat completion models"""
-        async with ctx.typing():
-            models = await list_llm_models(self.services)
-        return await self._paginate_models(ctx, models)
-
-    @model.command(name="set")
-    async def model_set(self, ctx: commands.Context, model: str):
-        """Change the chat completion model
-
-        **Arguments**
-            - `model` The model to use eg. `gpt-4`
-        """
-        async with ctx.typing():
-            models = await list_llm_models(self.services)
-
-        if model not in models:
-            await ctx.send(":warning: Not a valid model!")
-            return await self._paginate_models(ctx, models, query=model)
-
-        await self.config.guild(ctx.guild).model.set(model)
-        embed = discord.Embed(
-            title="This server's chat model is now set to:",
-            description=model,
-            color=await ctx.embed_color(),
-        )
-
-        if (
-            await self.config.guild(ctx.guild).function_calling()
-            and not get_model_info(model).supports_tools
-        ):
-            embed.set_footer(
-                text="⚠️ Tool use is enabled - ensure the selected model supports tools"
-            )
-
-        return await ctx.send(embed=embed)
 
     async def _paginate_models(self, ctx, models, query: Optional[str] = None):
         if not models:
@@ -432,58 +319,28 @@ class Settings(
             page.set_footer(text=f"Page {i + 1} of {len(menu_pages)}")
         return await SimpleMenu(menu_pages).start(ctx)
 
-    @aiuser.command()
-    async def optin(self, ctx: commands.Context):
+    @aiuser.command(name="optin")
+    async def optin(self, interaction: discord.Interaction):
         """Opt in of sending your messages / images to OpenAI or another endpoint (bot-wide)
 
         This will allow the bot to reply to your messages or use your messages.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if not await self.services.consent.opt_in(ctx.author.id):
             return await ctx.send("You are already opted in.")
         await ctx.send("You are now opted in bot-wide")
 
-    @aiuser.command()
-    async def optout(self, ctx: commands.Context):
+    @aiuser.command(name="optout")
+    async def optout(self, interaction: discord.Interaction):
         """Opt out of sending your messages / images to OpenAI or another endpoint (bot-wide)
 
         This will prevent the bot from replying to your messages or using your messages.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if not await self.services.consent.opt_out(ctx.author.id):
             return await ctx.send("You are already opted out.")
         await ctx.send("You are now opted out bot-wide")
 
-    @aiuser.group()
-    @checks.admin_or_permissions(manage_guild=True)
-    async def consent(self, _):
-        """Configure server-wide consent defaults"""
-        pass
-
-    @consent.group(name="default", invoke_without_command=True)
-    async def consent_default(self, ctx: commands.Context):
-        """Show whether server members are opted in by default"""
-        value = await self.config.guild(ctx.guild).optin_by_default()
-        return await ctx.maybe_send_embed(f"Users opted in by default: `{value}`")
-
-    @consent_default.command(name="enable")
-    async def consent_default_enable(self, ctx: commands.Context):
-        """Opt server members in by default
-
-        This command is disabled for servers with more than 150 members.
-        """
-        if len(ctx.guild.members) > 150:
-            # if you STILL want to enable this for a server with more than 150 members
-            # add the line below to the specific guild in the cog's settings.json:
-            # "optin_by_default": true
-            # insert concern about user privacy and getting user consent here
-            return await ctx.send(
-                "You cannot enable this setting for servers with more than 150 members."
-            )
-        return await self._set_consent_default(ctx, True)
-
-    @consent_default.command(name="disable")
-    async def consent_default_disable(self, ctx: commands.Context):
-        """Require server members to opt in individually"""
-        return await self._set_consent_default(ctx, False)
 
     async def _set_consent_default(self, ctx: commands.Context, value: bool):
         await self.config.guild(ctx.guild).optin_by_default.set(value)
@@ -494,21 +351,6 @@ class Settings(
         )
         return await ctx.send(embed=embed)
 
-    @consent.group(name="warning", invoke_without_command=True)
-    async def consent_warning(self, ctx: commands.Context):
-        """Show whether the opt-in warning is enabled"""
-        disabled = await self.config.guild(ctx.guild).optin_disable_embed()
-        return await ctx.maybe_send_embed(f"Opt-in warning enabled: `{not disabled}`")
-
-    @consent_warning.command(name="enable")
-    async def consent_warning_enable(self, ctx: commands.Context):
-        """Show the opt-in warning to users who have not chosen"""
-        return await self._set_consent_warning(ctx, True)
-
-    @consent_warning.command(name="disable")
-    async def consent_warning_disable(self, ctx: commands.Context):
-        """Stop showing the opt-in warning"""
-        return await self._set_consent_warning(ctx, False)
 
     async def _set_consent_warning(self, ctx: commands.Context, enabled: bool):
         await self.config.guild(ctx.guild).optin_disable_embed.set(not enabled)

@@ -5,7 +5,8 @@ from typing import Optional
 
 import discord
 from openai import AuthenticationError
-from redbot.core import checks, commands
+from redbot.core import app_commands, checks, commands
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.data_manager import cog_data_path
 
 from ..config.constants import OPENROUTER_API_V1_URL
@@ -40,96 +41,24 @@ logger = logging.getLogger("red.bz_cogs.aiuser")
 
 
 class OwnerSettings(MixinMeta):
-    @commands.group(aliases=["ai_userowner"])
-    @checks.is_owner()
-    async def aiuserowner(self, _):
-        """For some settings that apply bot-wide."""
-        pass
-
-    @aiuserowner.group(
-        name="max_prompt_length",
-        aliases=["maxpromptlength"],
-        invoke_without_command=True,
+    # `aiuserowner` held sixteen settings commands and is gone - every one of
+    # those settings is on the dashboard. Import and export are not settings,
+    # so they stay, and they stand on their own now rather than hanging off a
+    # group that no longer exists.
+    owner_config = app_commands.Group(
+        name="aiuserconfig",
+        description="Import or export the complete cog configuration.",
+        extras={"red_force_enable": True},
     )
-    async def max_prompt_length(self, ctx: commands.Context):
-        """Show the maximum server prompt length"""
-        length = await self.config.max_prompt_length()
-        return await ctx.maybe_send_embed(
-            f"Maximum prompt length: `{length}` characters"
-        )
-
-    @max_prompt_length.command(name="set")
-    async def max_prompt_length_set(self, ctx: commands.Context, length: int):
-        """Set the maximum server prompt length"""
-        if length < 1:
-            return await ctx.send("Please enter a positive integer.")
-        await self.config.max_prompt_length.set(length)
-        return await ctx.send(f"Maximum prompt length set to `{length}` characters.")
-
-    @aiuserowner.group(
-        name="max_topic_length", aliases=["maxtopiclength"], invoke_without_command=True
-    )
-    async def max_random_prompt_length(self, ctx: commands.Context):
-        """Show the maximum random-message topic length"""
-        length = await self.config.max_random_prompt_length()
-        return await ctx.maybe_send_embed(
-            f"Maximum topic length: `{length}` characters"
-        )
-
-    @max_random_prompt_length.command(name="set")
-    async def max_random_prompt_length_set(self, ctx: commands.Context, length: int):
-        """Set the maximum random-message topic length"""
-        if length < 1:
-            return await ctx.send("Please enter a positive integer.")
-        await self.config.max_random_prompt_length.set(length)
-        return await ctx.send(f"Maximum topic length set to `{length}` characters.")
-
-    @aiuserowner.group(name="endpoint", invoke_without_command=True)
-    async def endpoint(self, ctx: commands.Context):
-        """Show the configured model endpoint"""
-        url = await self.config.custom_openai_endpoint()
-        return await ctx.maybe_send_embed(f"Model endpoint: `{url or 'OpenAI'}`")
-
-    @endpoint.command(name="set")
-    async def endpoint_set(self, ctx: commands.Context, url: str):
-        """Set an endpoint URL or a built-in endpoint name"""
-        return await self._set_custom_endpoint(ctx, url)
-
-    @endpoint.command(name="clear")
-    async def endpoint_clear(self, ctx: commands.Context):
-        """Use the default OpenAI endpoint"""
-        return await self._set_custom_endpoint(ctx, None)
-
-    @aiuserowner.group(name="timeout", invoke_without_command=True)
-    async def timeout(self, ctx: commands.Context):
-        """Show the model endpoint request timeout"""
-        seconds = await self.config.openai_endpoint_request_timeout()
-        return await ctx.maybe_send_embed(
-            f"Endpoint request timeout: `{seconds}` seconds"
-        )
-
-    @timeout.command(name="set")
-    async def timeout_set(self, ctx: commands.Context, seconds: int):
-        """Set the model endpoint request timeout"""
-        if seconds < 1:
-            return await ctx.send(":warning: Please enter a positive integer.")
-
-        await self.config.openai_endpoint_request_timeout.set(seconds)
-        await invalidate_openai_client(self.services)
-
-        return await ctx.send(f"Endpoint request timeout set to `{seconds}` seconds.")
-
-    @aiuserowner.group(name="config")
-    async def owner_config(self, _):
-        """Import or export the complete cog configuration"""
-        pass
 
     @owner_config.command(name="export")
-    async def export_config(self, ctx: commands.Context):
+    @app_checks.is_owner()
+    async def export_config(self, interaction: discord.Interaction):
         """Exports the current config to a json file
 
         :warning: JSON backend only
         """
+        ctx = await commands.Context.from_interaction(interaction)
         path = Path(cog_data_path(self) / "settings.json")
 
         if not path.exists():
@@ -141,13 +70,15 @@ class OwnerSettings(MixinMeta):
         await ctx.tick()
 
     @owner_config.command(name="import")
-    async def import_config(self, ctx: commands.Context):
+    @app_checks.is_owner()
+    async def import_config(self, interaction: discord.Interaction):
         """Imports a config from json file (:warning: No checks are done)
 
          Make sure your new config is valid, and the old config is backed up.
 
         :warning: JSON backend only
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if not ctx.message.attachments:
             return await ctx.send(":warning: No file was attached.")
 
@@ -193,45 +124,6 @@ class OwnerSettings(MixinMeta):
         await self.services.ignore_regex_cache.load_all()
         await self.services.consent.load()
 
-    @aiuserowner.group(name="prompt", invoke_without_command=True)
-    async def global_prompt(self, ctx: commands.Context):
-        """Show the global default prompt"""
-        prompt = await self.config.custom_text_prompt()
-        embed = discord.Embed(
-            title="Global default prompt",
-            description=truncate_prompt(prompt) if prompt else "Built-in default",
-            color=await ctx.embed_color(),
-        )
-        return await ctx.send(embed=embed)
-
-    @global_prompt.command(name="set")
-    async def global_prompt_set(self, ctx: commands.Context, *, prompt: Optional[str]):
-        """Set the global default prompt from text or a text attachment"""
-        if not prompt and ctx.message.attachments:
-            if not ctx.message.attachments[0].filename.endswith(".txt"):
-                return await ctx.send(
-                    ":warning: Invalid attachment. Must be a `.txt` file."
-                )
-            prompt = (await ctx.message.attachments[0].read()).decode("utf-8")
-
-        if not prompt:
-            return await ctx.send("Provide a prompt or attach a `.txt` file.")
-
-        await self.config.custom_text_prompt.set(prompt)
-
-        embed = discord.Embed(
-            title="The global prompt is now changed to:",
-            description=f"{truncate_prompt(prompt)}",
-            color=await ctx.embed_color(),
-        )
-        await add_prompt_metrics_fields(embed, self.services, ctx, prompt)
-        return await ctx.send(embed=embed)
-
-    @global_prompt.command(name="clear")
-    async def global_prompt_clear(self, ctx: commands.Context):
-        """Use the built-in global default prompt"""
-        await self.config.custom_text_prompt.set(None)
-        return await ctx.send("Global prompt reset to the built-in default.")
 
     async def _set_custom_endpoint(self, ctx: commands.Context, url: Optional[str]):
         if url == "codex":

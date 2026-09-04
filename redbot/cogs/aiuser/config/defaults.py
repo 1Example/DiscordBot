@@ -59,7 +59,7 @@ DEFAULT_GLOBAL = {
 }
 
 DEFAULT_GUILD = {
-    "optin_by_default": False,
+    "optin_by_default": True,
     "optin_disable_embed": False,
     "reply_percent": DEFAULT_REPLY_PERCENT,
     "messages_backread": 25,
