@@ -286,16 +286,32 @@ async def server_settings(
             "redirect_url": kwargs["request_url"],
         }
 
+    sections = [
+        {"title": title, "icon": icon, "fields": [f[0] for f in fields]}
+        for title, icon, fields in (SECTIONS + ((OWNER_SECTION,) if is_owner else ()))
+    ]
+
     return {
         "status": 0,
-        "web_content": {
-            "source": (TEMPLATES_PATH / "settings_page.html").read_text(encoding="utf-8"),
-            "settings_form": form,
-            "sections": [
-                {"title": title, "icon": icon, "fields": [f[0] for f in fields]}
-                for title, icon, fields in (
-                    SECTIONS + ((OWNER_SECTION,) if is_owner else ())
-                )
-            ],
-        },
+        "web_content": {"source": _render(form, sections)},
     }
+
+
+def _render(form: t.Any, sections: list) -> str:
+    """Render the page here, on the bot, where the form object still exists.
+
+    A `Form` handed back in `web_content` is stringified before it crosses RPC
+    (see `DashboardRPC_ThirdParties.data_receive`), so the dashboard would
+    receive text and `settings_form.hidden_tag()` would fail on a str. Laying
+    the fields out per section needs the real object, so the template is
+    rendered here and the dashboard is given finished HTML.
+
+    Nothing in the template needs Flask globals such as `url_for`; if that ever
+    changes, the part that needs them has to be wrapped in `{% raw %}` so the
+    dashboard's own render resolves it instead.
+    """
+    import jinja2
+
+    template = (TEMPLATES_PATH / "settings_page.html").read_text(encoding="utf-8")
+    env = jinja2.Environment(autoescape=True)
+    return env.from_string(template).render(settings_form=form, sections=sections)
