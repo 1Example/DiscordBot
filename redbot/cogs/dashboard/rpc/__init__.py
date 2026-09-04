@@ -46,6 +46,7 @@ class DashboardRPC:
         self.bot.register_rpc_handler(self.get_user_profile)
         self.bot.register_rpc_handler(self.get_user_access)
         self.bot.register_rpc_handler(self.get_home_guilds)
+        self.bot.register_rpc_handler(self.get_server_list)
         self.bot.register_rpc_handler(self.set_guild_bot_profile)
         self.bot.register_rpc_handler(self.get_data)
         self.bot.register_rpc_handler(self.get_variables)
@@ -82,6 +83,9 @@ class DashboardRPC:
         self.user_fetch_cache: dict[int, tuple[float, typing.Any]] = {}
         self.user_access_cache: dict[int, tuple[float, dict]] = {}
         self.home_guilds_cache: dict[int, tuple[float, dict]] = {}
+        # Keyed by viewer (0 = anonymous), because the same list is
+        # annotated differently depending on who is looking at it.
+        self.server_list_cache: dict[int, tuple[float, dict]] = {}
         self.guild_profile_cache: dict[int, tuple[float, dict]] = {}
         self.guilds_cache: dict[
             int,
@@ -111,6 +115,7 @@ class DashboardRPC:
         self.bot.unregister_rpc_handler(self.get_user_profile)
         self.bot.unregister_rpc_handler(self.get_user_access)
         self.bot.unregister_rpc_handler(self.get_home_guilds)
+        self.bot.unregister_rpc_handler(self.get_server_list)
         self.bot.unregister_rpc_handler(self.set_guild_bot_profile)
         self.bot.unregister_rpc_handler(self.set_custom_pages)
         self.bot.unregister_rpc_handler(self.get_logs)
@@ -578,6 +583,95 @@ class DashboardRPC:
         rows.sort(key=lambda row: (-row["members"], row["name"].lower()))
         result = {"status": 0, "guilds": rows[:limit], "total": len(rows)}
         self.home_guilds_cache[user_id] = (time.time(), result)
+        return result
+
+    @rpc_check()
+    async def get_server_list(
+        self, user_id: int = None, limit: int = 60
+    ) -> dict[str, typing.Any]:
+        """Every server the bot is in, for the public directory on the landing page.
+
+        Unlike `get_home_guilds` this is not scoped to the viewer: it is the
+        bot's own server list, shown to anonymous visitors as well. Only what a
+        server already publishes about itself goes out - name, icon, banner,
+        description, member and presence counts, and the vanity invite if the
+        server has one. No channel names, no member names, no owner identity,
+        and no invite is ever created on the fly.
+
+        When a viewer is known, their own servers are marked so the page can
+        put them first and offer the ones they can manage.
+        """
+        cache_key = int(user_id or 0)
+        cached = self.server_list_cache.get(cache_key)
+        if cached is not None and (cached[0] + 60) > time.time():
+            return cached[1]
+
+        is_owner = bool(user_id) and user_id in self.bot.owner_ids
+        offline = discord.Status.offline
+        rows = []
+        for guild in self.bot.guilds:
+            member = guild.get_member(user_id) if user_id else None
+
+            members = getattr(guild, "member_count", None) or len(guild.members)
+            online = None
+            # Same reasoning as `get_home_guilds`: walking a huge member list
+            # costs more than the number is worth.
+            if members <= 25000:
+                try:
+                    online = sum(
+                        1 for m in guild.members if not m.bot and m.status is not offline
+                    )
+                except Exception:  # noqa: BLE001 - presences may be unavailable
+                    online = None
+
+            can_manage = False
+            if member is not None:
+                can_manage = bool(
+                    is_owner
+                    or guild.owner_id == user_id
+                    or member.guild_permissions.administrator
+                    or member.guild_permissions.manage_guild
+                    or await self.bot.is_admin(member)
+                    or await self.bot.is_mod(member)
+                )
+
+            rows.append(
+                {
+                    "id": str(guild.id),
+                    "name": guild.name,
+                    "icon": guild.icon.url if guild.icon else "",
+                    "banner": guild.banner.url if guild.banner else "",
+                    "description": guild.description or "",
+                    "members": members,
+                    "online": online,
+                    "boosts": guild.premium_subscription_count or 0,
+                    "tier": guild.premium_tier or 0,
+                    "created_at": guild.created_at.timestamp() if guild.created_at else None,
+                    # Only a vanity URL the server has already published. A real
+                    # invite would have to be created, which is both intrusive
+                    # and something the server owner did not ask for.
+                    "invite": (
+                        f"https://discord.gg/{guild.vanity_url_code}"
+                        if getattr(guild, "vanity_url_code", None)
+                        else ""
+                    ),
+                    "shared": member is not None,
+                    "can_manage": can_manage,
+                }
+            )
+
+        # Members first, so the directory leads with the servers most people
+        # are looking for; a viewer's own servers get pulled to the front on
+        # the page rather than here, so the ordering stays the same for
+        # everyone who is not logged in.
+        rows.sort(key=lambda row: (-row["members"], row["name"].lower()))
+        result = {
+            "status": 0,
+            "guilds": rows[:limit],
+            "total": len(rows),
+            "total_members": sum(row["members"] for row in rows),
+        }
+        self.server_list_cache[cache_key] = (time.time(), result)
         return result
 
     @rpc_check()

@@ -485,6 +485,30 @@ class DashboardIntegration:
             data["position"] = position
         return data
 
+    async def _dash_autoplay_playlist(self, player) -> dict:
+        """The playlist autoplay draws from, resolved to a name where possible.
+
+        Returns ``{"id": ..., "name": ...}``; `id` of 0 or None means the guild
+        has never set one, which is worth surfacing because autoplay then has
+        nothing to play.
+        """
+        result = {"id": None, "name": ""}
+        try:
+            playlist_id = await player.config.fetch_auto_play_playlist_id()
+        except Exception:  # noqa: BLE001
+            return result
+        if not playlist_id:
+            return result
+        result["id"] = int(playlist_id)
+        try:
+            playlist = await self.pylav.playlist_db_manager.get_playlist_by_id(int(playlist_id))
+            result["name"] = await self._maybe_await(getattr(playlist, "name", None), "") or ""
+        except Exception:  # noqa: BLE001
+            # A playlist that was deleted after being set still leaves its id
+            # behind; the number on its own is more honest than a blank.
+            result["name"] = f"#{playlist_id}"
+        return result
+
     @staticmethod
     async def _maybe_await(value, default=None):
         """Read a PyLav attribute that is a coroutine on some versions and a
@@ -576,6 +600,11 @@ class DashboardIntegration:
             "queue_truncated": max(0, len(raw_queue) - len(queue_items)),
             "repeat": "track" if repeat_track else ("queue" if repeat_queue else "off"),
             "autoplay": bool(await self._maybe_await(getattr(player, "autoplay_enabled", None), False)),
+            # Autoplay in PyLav is not a recommendation engine: when the queue
+            # empties it keeps playing from the guild's configured auto-play
+            # playlist. Without one set, turning it on does nothing, so the
+            # playlist travels with the flag and the UI can say which it is.
+            "autoplay_playlist": await self._dash_autoplay_playlist(player),
             "listeners": listeners,
             "history_length": history_length,
             "current": None,
@@ -1542,6 +1571,8 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 .plc-chip i{ opacity:.8; }
 .plc-chip.live{ background:rgba(255,107,107,.18); border-color:rgba(255,107,107,.45); color:#ffb3b3; }
 .plc-chip.on{ background:rgba(108,140,255,.20); border-color:rgba(108,140,255,.50); color:#c3d0ff; }
+/* A setting that is switched on but cannot take effect. */
+.plc-chip.warn{ background:rgba(240,170,60,.16); border-color:rgba(240,170,60,.45); color:#f5c877; }
 
 /* ---------- seek ---------- */
 .plc-seek{ margin-top:16px; }
@@ -1946,7 +1977,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
           <i class="fa fa-random"></i></button>
         <button class="plc-btn" data-act="repeat_cycle" id="plcRepeat" title="Repeat: off / track / queue">
           <i class="fa fa-repeat"></i> <span id="plcRepeatLabel">Off</span></button>
-        <button class="plc-btn icon" data-act="autoplay" id="plcAutoplay" title="Autoplay similar tracks when the queue runs dry" aria-label="Autoplay">
+        <button class="plc-btn icon" data-act="autoplay" id="plcAutoplay" title="Autoplay: keep playing from the guild's auto-play playlist when the queue runs out" aria-label="Autoplay">
           <i class="fa fa-magic"></i></button>
         <button class="plc-btn icon" data-act="fav_add" id="plcFav" title="Save this track to the guild favourites" aria-label="Favourite">
           <i class="fa fa-star-o"></i></button>
@@ -2337,7 +2368,18 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     if (st.paused) chips.push('<span class="plc-chip"><i class="fa fa-pause"></i> Paused</span>');
     if (st.repeat === "track") chips.push('<span class="plc-chip on"><i class="fa fa-repeat"></i> Repeat track</span>');
     if (st.repeat === "queue") chips.push('<span class="plc-chip on"><i class="fa fa-repeat"></i> Repeat queue</span>');
-    if (st.autoplay) chips.push('<span class="plc-chip on"><i class="fa fa-magic"></i> Autoplay</span>');
+    if (st.autoplay) {
+      // Name the playlist on the chip. Autoplay with nothing configured is a
+      // switch that looks on and does nothing, which is worth flagging.
+      var ap = st.autoplay_playlist || {};
+      if (ap.name) {
+        chips.push('<span class="plc-chip on" title="When the queue runs out, playback continues from this playlist.">' +
+                   '<i class="fa fa-magic"></i> Autoplay: ' + esc(ap.name) + "</span>");
+      } else {
+        chips.push('<span class="plc-chip warn" title="Autoplay is on, but this server has no auto-play playlist set, so nothing will follow the queue. Set one with [p]audioset autoplay playlist.">' +
+                   '<i class="fa fa-magic"></i> Autoplay: no playlist set</span>');
+      }
+    }
     if (cur && cur.requester) chips.push('<span class="plc-chip"><i class="fa fa-user"></i> ' + esc(cur.requester) + "</span>");
     if (cur && cur.source) chips.push('<span class="plc-chip"><i class="fa fa-cloud"></i> ' + esc(cur.source) + "</span>");
     $("plcChips").innerHTML = chips.join("");
@@ -2370,7 +2412,13 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     var repeatLabel = st.repeat === "track" ? "Track" : st.repeat === "queue" ? "Queue" : "Off";
     $("plcRepeatLabel").textContent = repeatLabel;
     $("plcRepeat").classList.toggle("on", st.repeat !== "off" && st.repeat !== undefined);
-    $("plcAutoplay").classList.toggle("on", !!st.autoplay);
+    var apBtn = $("plcAutoplay");
+    apBtn.classList.toggle("on", !!st.autoplay);
+    var apList = (st.autoplay_playlist || {}).name;
+    apBtn.title = st.autoplay
+        ? (apList ? "Autoplay is on: the queue is followed by “" + apList + "”."
+                  : "Autoplay is on, but no auto-play playlist is set for this server, so nothing will follow the queue.")
+        : "Autoplay: keep playing from the guild's auto-play playlist when the queue runs out.";
 
     var favIds = (S.favourites || []).map(function (f) { return f.identifier; });
     var isFav = !!(cur && cur.identifier && favIds.indexOf(cur.identifier) !== -1);
