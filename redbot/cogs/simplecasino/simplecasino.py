@@ -16,7 +16,7 @@ from .base import BaseCasinoCog
 from .slots import slots
 from .poker import PokerGame
 from .blackjack import Blackjack
-from .utils import DISCORD_RED, POKER_MINIMUM_BET, POKER_RULES
+from .utils import DISCORD_RED, POKER_MAX_PLAYERS, POKER_MINIMUM_BET, POKER_RULES
 from .views.again_view import AgainView
 from .views.replace_view import ReplaceView
 from .dashboard_integration import DashboardIntegration
@@ -27,6 +27,7 @@ old_slot: Optional[commands.Command] = None
 old_payouts: Optional[commands.Command] = None
 old_blackjack: Optional[commands.Command] = None
 
+# Fallback only; the live cap is read from config per guild.
 MAX_CONCURRENT_SLOTS = 3
 MAX_APP_EMOJIS = 2000
 POKER_AFK_LIMIT = 10  # minutes
@@ -151,16 +152,23 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         if not (economy := await self.get_economy_cog(ctx)):
             return
 
-        if self.concurrent_slots > MAX_CONCURRENT_SLOTS and isinstance(ctx, commands.Context) and not ctx.interaction:
+        is_global = await bank.is_global()
+
+        max_concurrent = await (
+            self.config if is_global else self.config.guild(ctx.guild)
+        ).max_concurrent_slots()
+        if max_concurrent is None:
+            max_concurrent = MAX_CONCURRENT_SLOTS
+
+        if self.concurrent_slots > max_concurrent and isinstance(ctx, commands.Context) and not ctx.interaction:
             content = f"Too many people are using the slot machine right now. "
             if self.bot.tree.get_command("slot") is None:
                 content += "The bot owner could enable the `/slot` slash command, which would allow more people to use it at the same time."
             else:
                 content += "Consider using the `/slot` slash command instead, which allows more people to use it at the same time."
             return await reply(content)
-        
-        is_global = await bank.is_global()
-        if await bank.is_global():
+
+        if is_global:
             min_bid = await economy.config.SLOT_MIN()
             max_bid = await economy.config.SLOT_MAX()
             slot_time = await economy.config.SLOT_TIME()
@@ -233,6 +241,9 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
 
         minimum_starting_bet: int = await self.config.pokermin() if await bank.is_global() else await self.config.guild(ctx.guild).pokermin()
         maximum_starting_bet: int = await self.config.pokermax() if await bank.is_global() else await self.config.guild(ctx.guild).pokermax()
+        max_players: int = await self.config.poker_max_players() if await bank.is_global() else await self.config.guild(ctx.guild).poker_max_players()
+        if max_players is None:
+            max_players = POKER_MAX_PLAYERS
         currency_name = await bank.get_currency_name(ctx.guild)
         if starting_bet is None:
             starting_bet = minimum_starting_bet
@@ -274,7 +285,7 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
                             await old_message.delete()
                         except discord.NotFound:
                             pass
-                    game = PokerGame(self, players, ctx.channel, starting_bet)
+                    game = PokerGame(self, players, ctx.channel, starting_bet, max_players)
                     self.poker_games[ctx.channel.id] = game
                     await game.update_message()
 
@@ -299,7 +310,7 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
             await ctx.interaction.response.send_message(STARTING, ephemeral=True)
 
         # New game
-        game = PokerGame(self, players, ctx.channel, starting_bet)
+        game = PokerGame(self, players, ctx.channel, starting_bet, max_players)
         self.poker_games[ctx.channel.id] = game
         await game.update_message()
         return True

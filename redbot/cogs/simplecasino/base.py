@@ -23,6 +23,20 @@ class BaseCasinoCog(commands.Cog):
             "pokermax": 1000,
             "coinfreespin": True,
             "sloteasy": False,
+            # Slot payout multipliers. `payout_seven3` doubles as the threshold
+            # for the jackpot banner, so anything paying at least as much as a
+            # seven triple is celebrated as one.
+            "payout_seven3": 100,
+            "payout_clover3": 25,
+            "payout_cherries3": 20,
+            "payout_seven2": 5,
+            "payout_clover2": 4,
+            "payout_cherries2": 3,
+            "payout_triple": 10,
+            "payout_double": 2,
+            # Table caps.
+            "max_concurrent_slots": 3,
+            "poker_max_players": POKER_MAX_PLAYERS,
         }
         emojis_config = {
             "emoji_dealer": "(D)",
@@ -80,9 +94,13 @@ class BasePokerGame(ABC):
         players: List[discord.Member],
         channel: Union[discord.TextChannel, discord.Thread],
         minimum_bet: int = 0,
+        max_players: int = POKER_MAX_PLAYERS,
     ):
         self.cog = cog
-        self.players_ids = [p.id for p in players][:POKER_MAX_PLAYERS]
+        # Read from config by the caller; kept on the instance because the two
+        # places that enforce it (here and `try_add_player`) are both sync.
+        self.max_players = max(2, int(max_players or POKER_MAX_PLAYERS))
+        self.players_ids = [p.id for p in players][: self.max_players]
         self.channel = channel
         self.deck: List[Card] = make_deck()
         random.shuffle(self.deck)

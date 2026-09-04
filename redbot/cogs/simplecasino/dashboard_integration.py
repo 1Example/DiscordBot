@@ -25,6 +25,26 @@ LIMITS = (
     ("pokermax", "Poker maximum bet", "Largest allowed poker starting bet.", 1, 10_000_000),
 )
 
+# Slot payout multipliers - the house edge, in other words. `payout_seven3` is
+# also the bar the jackpot banner is measured against, which is why it is first.
+PAYOUTS = (
+    ("payout_seven3", "Three sevens (jackpot)", "Also the threshold for the jackpot banner.", 1, 100_000),
+    ("payout_clover3", "Three clovers", "", 1, 100_000),
+    ("payout_cherries3", "Three cherries", "", 1, 100_000),
+    ("payout_triple", "Any other triple", "Three matching symbols not listed above.", 1, 100_000),
+    ("payout_seven2", "Two sevens", "", 1, 100_000),
+    ("payout_clover2", "Two clovers", "", 1, 100_000),
+    ("payout_cherries2", "Two cherries", "", 1, 100_000),
+    ("payout_double", "Any other pair", "Two matching symbols not listed above.", 1, 100_000),
+)
+
+# Table capacity.
+CAPS = (
+    ("max_concurrent_slots", "Concurrent slot players", 
+     "Prefix-command spins allowed at once; /slot is not limited.", 1, 100),
+    ("poker_max_players", "Poker seats", "Players allowed per table.", 2, 20),
+)
+
 TOGGLES = (
     ("coinfreespin", "Free spin on matching coins", "Grants a free spin instead of a loss."),
     ("sloteasy", "Easier slot odds", "Raises the chance of a winning combination."),
@@ -138,6 +158,16 @@ class DashboardIntegration:
                     }
                     for k, lbl, h, lo, hi in LIMITS
                 ],
+                "payouts": [
+                    {"key": k, "label": lbl, "help": h, "min": lo, "max": hi,
+                     "value": settings.get(k, lo)}
+                    for k, lbl, h, lo, hi in PAYOUTS
+                ],
+                "caps": [
+                    {"key": k, "label": lbl, "help": h, "min": lo, "max": hi,
+                     "value": settings.get(k, lo)}
+                    for k, lbl, h, lo, hi in CAPS
+                ],
                 "slot_limits": [
                     {
                         "key": k,
@@ -237,7 +267,7 @@ class DashboardIntegration:
 
         errors: list[dict] = []
         values: dict[str, int] = {}
-        for key, label, _h, low, high in LIMITS:
+        for key, label, _h, low, high in LIMITS + PAYOUTS + CAPS:
             raw = (field(f"f_{key}") or "").strip()
             if raw == "":
                 continue
@@ -403,6 +433,42 @@ CASINO_TEMPLATE = (
               the slot machine is unavailable and its limits cannot be edited.
             </p>
           {% endif %}
+        </div>
+
+        <div class="dz-panel">
+          <h5><i class="fa fa-trophy"></i> Slot payouts</h5>
+          <p class="dz-hint">
+            What each combination pays, as a multiple of the bet. Lower numbers
+            mean a bigger house edge.
+          </p>
+          {% for f in payouts %}
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+              <div style="flex:1 1 auto; min-width:0;">
+                <div class="dz-label" style="margin:0;">{{ f.label }}</div>
+                {% if f.help %}
+                  <div style="font-size:.72rem; opacity:.45;">{{ f.help }}</div>
+                {% endif %}
+              </div>
+              <div style="display:flex; align-items:center; gap:5px; flex:none;">
+                <span style="opacity:.5; font-size:.8rem;">&times;</span>
+                <input class="dz-input" type="number" style="width:96px;"
+                       min="{{ f.min }}" max="{{ f.max }}"
+                       name="f_{{ f.key }}" value="{{ f.value }}" />
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="dz-panel">
+          <h5><i class="fa fa-users"></i> Table capacity</h5>
+          {% for f in caps %}
+            <div style="margin-bottom:11px;">
+              <div class="dz-label">{{ f.label }}</div>
+              <input class="dz-input" type="number" min="{{ f.min }}" max="{{ f.max }}"
+                     name="f_{{ f.key }}" value="{{ f.value }}" />
+              <div style="font-size:.72rem; opacity:.45; margin-top:4px;">{{ f.help }}</div>
+            </div>
+          {% endfor %}
         </div>
 
         <div class="dz-panel">

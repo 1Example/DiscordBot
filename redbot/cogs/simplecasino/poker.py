@@ -119,7 +119,16 @@ class PokerGame(BasePokerGame):
     async def from_config(cog: BaseCasinoCog, channel: Union[discord.TextChannel, discord.Thread], config: dict) -> Optional["PokerGame"]:
         if not config.get("minimum_bet"):
             return None
-        game = PokerGame(cog, [], channel, config["minimum_bet"])
+        # A restored game can still be waiting for players, so it needs the
+        # guild's cap rather than the module default.
+        try:
+            is_global = await bank.is_global()
+            scope = cog.config if is_global else cog.config.guild(channel.guild)
+            max_players = await scope.poker_max_players()
+        except Exception:  # noqa: BLE001
+            max_players = POKER_MAX_PLAYERS
+        game = PokerGame(cog, [], channel, config["minimum_bet"],
+                         max_players or POKER_MAX_PLAYERS)
         game.players = [PokerPlayer.from_dict(p) for p in json.loads(config["players"])]
         game.players_ids = [p.id for p in game.players]
         game.table = [Card.from_dict(c) for c in json.loads(config["table"])]
@@ -187,7 +196,7 @@ class PokerGame(BasePokerGame):
     def try_add_player(self, user_id: int) -> Tuple[bool, str]:
         if self.state != PokerState.WaitingForPlayers:
             return False, "The game already started."
-        if len(self.players) >= POKER_MAX_PLAYERS:
+        if len(self.players) >= self.max_players:
             return False, "This game is full."
         if any(p.id == user_id for p in self.players):
             return False, "You're already playing."

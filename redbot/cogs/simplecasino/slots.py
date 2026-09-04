@@ -11,6 +11,9 @@ from redbot.core.utils.chat_formatting import humanize_number
 from .base import BaseCasinoCog
 from .views.again_view import AgainView
 
+# Fallbacks only. The live values come from config via `get_payouts` so a
+# server can tune its own house edge; these are what a fresh install starts on
+# and what is used if a key somehow reads back as None.
 JACKPOT_AMOUNT = 100
 TRIPLE = 3
 DOUBLE = 2
@@ -27,16 +30,36 @@ class SlotMachine(Enum):
     coin = "🪙"
     heart = "🩷"
 
-PAYOUTS = {
-    (SlotMachine.seven, SlotMachine.seven, SlotMachine.seven): JACKPOT_AMOUNT,
-    (SlotMachine.clover, SlotMachine.clover, SlotMachine.clover): 25,
-    (SlotMachine.cherries, SlotMachine.cherries, SlotMachine.cherries): 20,
-    (SlotMachine.seven, SlotMachine.seven): 5,
-    (SlotMachine.clover, SlotMachine.clover): 4,
-    (SlotMachine.cherries, SlotMachine.cherries): 3,
-    TRIPLE: 10,
-    DOUBLE: 2,
-}
+# The shape of the payout table: which combination each config key pays for,
+# and what a fresh install pays. `key` is what the dashboard edits.
+PAYOUT_KEYS = (
+    ("payout_seven3", (SlotMachine.seven,) * 3, 100),
+    ("payout_clover3", (SlotMachine.clover,) * 3, 25),
+    ("payout_cherries3", (SlotMachine.cherries,) * 3, 20),
+    ("payout_seven2", (SlotMachine.seven,) * 2, 5),
+    ("payout_clover2", (SlotMachine.clover,) * 2, 4),
+    ("payout_cherries2", (SlotMachine.cherries,) * 2, 3),
+    ("payout_triple", TRIPLE, 10),
+    ("payout_double", DOUBLE, 2),
+)
+
+PAYOUTS = {combo: default for _key, combo, default in PAYOUT_KEYS}
+
+
+async def get_payouts(cog, guild, is_global: bool):
+    """(payout table, jackpot threshold) for this guild.
+
+    A seven triple is the headline win, so its payout is also the bar the
+    jackpot banner is measured against - raise it and only bigger wins
+    celebrate; lower it and more do.
+    """
+    scope = cog.config if is_global else cog.config.guild(guild)
+    saved = await scope.all()
+    table = {}
+    for key, combo, default in PAYOUT_KEYS:
+        value = saved.get(key)
+        table[combo] = default if value is None else int(value)
+    return table, table[(SlotMachine.seven,) * 3]
 
 async def slots(cog: BaseCasinoCog, ctx: Union[discord.Interaction, commands.Context], bet: int):
     author = ctx.author if isinstance(ctx, commands.Context) else ctx.user
@@ -45,6 +68,8 @@ async def slots(cog: BaseCasinoCog, ctx: Union[discord.Interaction, commands.Con
     currency_name = await bank.get_currency_name(ctx.guild)
     is_global = await bank.is_global()
     easy = await cog.config.sloteasy() if is_global else await cog.config.guild(ctx.guild).sloteasy()
+
+    payouts, jackpot_at = await get_payouts(cog, ctx.guild, is_global)
 
     default_reel = deque(list(cast(Iterable, SlotMachine))[:9 if easy else 10])
     reels = []
@@ -55,17 +80,17 @@ async def slots(cog: BaseCasinoCog, ctx: Union[discord.Interaction, commands.Con
 
     center_line = (reels[0][1], reels[1][1], reels[2][1])
 
-    multiplier = PAYOUTS.get(center_line,
-                 PAYOUTS.get(center_line[1:],
-                 PAYOUTS.get(center_line[:-1])))
+    multiplier = payouts.get(center_line,
+                 payouts.get(center_line[1:],
+                 payouts.get(center_line[:-1])))
 
     if not multiplier:
         has_three = center_line[0] == center_line[1] == center_line[2]
         has_two = center_line[0] == center_line[1] or center_line[1] == center_line[2]
         if has_three:
-            multiplier = PAYOUTS[TRIPLE]
+            multiplier = payouts[TRIPLE]
         elif has_two:
-            multiplier = PAYOUTS[DOUBLE]
+            multiplier = payouts[DOUBLE]
     
     coinfreespin = await cog.config.coinfreespin() if is_global else await cog.config.guild(ctx.guild).coinfreespin()
     if coinfreespin and not multiplier and SlotMachine.coin in center_line:
@@ -114,7 +139,7 @@ async def slots(cog: BaseCasinoCog, ctx: Union[discord.Interaction, commands.Con
             stats["slot2symbolcount"] += 1
         if multiplier == 1:
             stats["slotfreespincount"] += 1
-        elif multiplier and multiplier >= JACKPOT_AMOUNT:
+        elif multiplier and multiplier >= jackpot_at:
             stats["slotjackpotcount"] += 1
         elif jackpot_whiff:
             stats["slotjackpotwhiffcount"] += 1
@@ -138,7 +163,7 @@ async def slots(cog: BaseCasinoCog, ctx: Union[discord.Interaction, commands.Con
         nonlocal currency_name, balance, phrase
         embed.add_field(name="Winnings", value=phrase)
         embed.add_field(name="Balance", value=f"{humanize_number(balance)} {currency_name}")
-        if multiplier and multiplier >= JACKPOT_AMOUNT:
+        if multiplier and multiplier >= jackpot_at:
             embed.title = "🎆 JACKPOT!!! 🎆"
         elif jackpot_whiff:
             embed.title = "💀 So close..."
@@ -157,7 +182,7 @@ async def slots(cog: BaseCasinoCog, ctx: Union[discord.Interaction, commands.Con
         view = AgainView(cog.slot, bet, await interaction.original_response(), currency_name)
         await interaction.edit_original_response(embed=embed, view=view)
         # pin jackpots if possible
-        if multiplier and multiplier >= JACKPOT_AMOUNT:
+        if multiplier and multiplier >= jackpot_at:
             try:
                 message = await interaction.original_response()
                 await asyncio.sleep(1)
@@ -176,7 +201,7 @@ async def slots(cog: BaseCasinoCog, ctx: Union[discord.Interaction, commands.Con
         view = AgainView(cog.slot, bet, message, currency_name)
         await message.edit(embed=embed, view=view)
         # pin jackpots if possible
-        if multiplier and multiplier >= JACKPOT_AMOUNT:
+        if multiplier and multiplier >= jackpot_at:
             try:
                 await asyncio.sleep(1)
                 await message.pin()
