@@ -249,7 +249,7 @@ class MafiaGame(DashboardIntegration, Cog):
             },
             "town_traitor": {
                 "converter": bool,
-                "description": "If this option is enabled, the town will have a Traitor. The Traitor has to be killed within 3 days of last mafia death.",
+                "description": "Give the town a Traitor, who must be killed within 3 days of the last mafia death.",
             },
             "town_vip": {
                 "converter": bool,
@@ -447,7 +447,7 @@ class MafiaGame(DashboardIntegration, Cog):
     @commands.hybrid_group(aliases=["mafiagame"])
     @app_commands.allowed_installs(guilds=True, users=True)
     async def mafia(self, ctx: commands.Context) -> None:
-        """Play the Mafia game, with many roles (Mafia/Villagers/Neutral), modes (including Random and Custom), anomalies..."""
+        """Play Mafia: many roles, modes and anomalies."""
         pass
 
     # @commands.max_concurrency(1, per=commands.BucketType.channel)

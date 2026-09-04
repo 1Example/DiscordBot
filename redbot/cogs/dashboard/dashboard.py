@@ -217,7 +217,7 @@ class Dashboard(Cog):
             },
             "allow_unsecure_http_requests": {
                 "converter": bool,
-                "description": "Allow unsecure http requests. This is not recommended for production, but required if you can't set up a SSL certificate.",
+                "description": "Allow plain http. Only needed when you cannot set up an SSL certificate.",
                 "path": ["webserver", "core", "allow_unsecure_http_requests"],
                 "aliases": ["allowunsecure"],
             },

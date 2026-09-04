@@ -503,7 +503,7 @@ class User(MixinMeta):
         await msg.edit(content=_("The font {} has been deleted").format(f"`{path}`"))
 
     @set_profile.command(name="backgrounds")
-    @app_checks.cooldown(1, 5, commands.BucketType.user)
+    @app_checks.cooldown(1, 5)
     @app_checks.bot_has_permissions(attach_files=True)
     async def view_all_backgrounds(self, interaction: discord.Interaction):
         """View the all available backgrounds"""
@@ -530,7 +530,7 @@ class User(MixinMeta):
             await ctx.send(txt, file=file)
 
     @set_profile.command(name="fonts")
-    @app_checks.cooldown(1, 5, commands.BucketType.user)
+    @app_checks.cooldown(1, 5)
     @app_checks.bot_has_permissions(attach_files=True)
     async def view_fonts(self, interaction: discord.Interaction):
         """View the available fonts you can use"""

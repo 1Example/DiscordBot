@@ -226,6 +226,10 @@ class RedTree(CommandTree):
         Returns True when a sync was performed.
         """
         current = self.red_fingerprint()
+        if not force and getattr(self, "_red_rejected_fingerprint", None) == current:
+            # Discord already refused this exact tree; the error was logged the
+            # first time and nothing has changed since.
+            return False
         if not force:
             try:
                 previous = await self.client._config.app_command_fingerprint()
@@ -237,14 +241,20 @@ class RedTree(CommandTree):
             await self.sync()
         except discord.HTTPException as exc:
             # A rejected sync must not take the bot down with it; the usual
-            # cause is exceeding 100 top-level commands, which is worth saying
-            # plainly rather than leaving as a raw 400.
+            # causes are a description outside Discord's 1-100 characters, or
+            # more than 100 top-level commands.
             log.error(
                 "Could not publish application commands to Discord: %s. "
                 "The tree currently has %d top-level command(s); Discord allows 100.",
                 exc, len(self.get_commands()),
             )
+            # A 4xx means *this tree* is invalid, so sending it again changes
+            # nothing - and every cog load would send it again. Remember the
+            # attempt so it is not retried until the tree itself changes.
+            if 400 <= exc.status < 500:
+                self._red_rejected_fingerprint = current
             return False
+        self._red_rejected_fingerprint = None
         await self.client._config.app_command_fingerprint.set(current)
         log.info("Application commands published to Discord (%d top-level).",
                  len(self.get_commands()))

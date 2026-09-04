@@ -168,7 +168,7 @@ class Tickets(DashboardIntegration, Cog):
             },
             "custom_message": {
                 "converter": commands.Range[str, 1, 3000],
-                "description": "Custom message that will be sent when a ticket is created. You can use the following placeholders: `{id}`, `{emoji}`, `{owner_display_name}`, `{owner_name}`, `{owner_mention}`, `{owner_id}`, `{guild_name}` and `{guild_id}`.",
+                "description": "Message sent when a ticket opens. Supports placeholders such as {id} and {owner_mention}.",
             },
             "close_reopen_reason_modal": {
                 "converter": bool,
