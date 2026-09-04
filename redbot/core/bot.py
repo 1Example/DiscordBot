@@ -168,6 +168,10 @@ class Red(
             enabled_slash_commands={},
             enabled_user_commands={},
             enabled_message_commands={},
+            # Fingerprint of the application-command tree as Discord last saw
+            # it. `RedTree.red_auto_sync` compares against it so the bot can
+            # publish its own commands instead of waiting to be told to.
+            app_command_fingerprint="",
         )
 
         self._config.register_guild(
@@ -1783,6 +1787,10 @@ class Red(
         try:
             await lib.setup(self)
             await self.tree.red_check_enabled()
+            # A cog loaded after startup brings its own commands; publish them
+            # rather than leaving them invisible until the next restart.
+            if self._red_ready.is_set():
+                await self.tree.red_auto_sync()
         except Exception as e:
             await self._remove_module_references(lib.__name__)
             await self._call_module_finalizers(lib, name)
@@ -1817,6 +1825,14 @@ class Red(
 
         for meth in self.rpc_handlers.pop(cogname.upper(), ()):
             self.unregister_rpc_handler(meth)
+
+        # An unloaded cog takes its slash commands with it; tell Discord, or
+        # they linger in the picker and fail when someone runs them.
+        if self._red_ready.is_set():
+            try:
+                await self.tree.red_auto_sync()
+            except Exception:  # noqa: BLE001 - unloading must still succeed
+                log.exception("Could not publish application commands after unloading %s", cogname)
 
         return cog
 

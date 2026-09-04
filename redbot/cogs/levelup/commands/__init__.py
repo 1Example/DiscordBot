@@ -1,7 +1,6 @@
 from redbot.core.i18n import Translator, cog_i18n
 
 from ..abc import CompositeMetaClass
-from .admin import Admin
 from .data import DataAdmin
 from .owner import Owner
 from .stars import Stars
@@ -13,7 +12,6 @@ _ = Translator("LevelUp", __file__)
 
 @cog_i18n(_)
 class Commands(
-    Admin,
     DataAdmin,
     Owner,
     Stars,

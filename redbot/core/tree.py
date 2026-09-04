@@ -171,6 +171,85 @@ class RedTree(CommandTree):
                     cfg["enabled_user_commands"][command.name] = command.id
         return commands
 
+    def red_fingerprint(self) -> str:
+        """A stable digest of everything Discord would be told about this tree.
+
+        Covers names, descriptions, option shapes and permission defaults, at
+        every nesting level - the things a sync actually publishes. Two runs
+        with an unchanged tree produce the same digest, so the bot can tell
+        whether a sync would be a no-op.
+        """
+        import hashlib
+        import json
+
+        def enum_value(x):
+            """discord.py's enums are not plain ints across versions."""
+            return getattr(x, "value", x)
+
+        def shape(command) -> dict:
+            data = {
+                "n": command.name,
+                "d": getattr(command, "description", "") or "",
+                "t": str(enum_value(getattr(command, "type", None))),
+                "dm": bool(getattr(command, "allowed_contexts", None) is None
+                           and getattr(command, "dm_permission", True)),
+                "p": str(getattr(command, "default_permissions", None)),
+            }
+            params = getattr(command, "parameters", None)
+            if params:
+                data["o"] = [
+                    {
+                        "n": p.name,
+                        "d": p.description or "",
+                        "r": bool(p.required),
+                        "t": str(enum_value(p.type)),
+                        "c": [str(c.value) for c in (p.choices or [])],
+                    }
+                    for p in params
+                ]
+            subs = getattr(command, "commands", None)
+            if subs:
+                data["s"] = [shape(c) for c in sorted(subs, key=lambda c: c.name)]
+            return data
+
+        payload = [shape(c) for c in sorted(self.get_commands(), key=lambda c: c.name)]
+        blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+    async def red_auto_sync(self, *, force: bool = False) -> bool:
+        """Publish the tree to Discord, but only when it has actually changed.
+
+        Command creates are rate limited, and a sync that changes nothing still
+        spends one, so this compares a fingerprint of the tree against the last
+        published one and returns without calling Discord when they match.
+
+        Returns True when a sync was performed.
+        """
+        current = self.red_fingerprint()
+        if not force:
+            try:
+                previous = await self.client._config.app_command_fingerprint()
+            except Exception:  # noqa: BLE001 - never block startup on config
+                previous = ""
+            if previous == current:
+                return False
+        try:
+            await self.sync()
+        except discord.HTTPException as exc:
+            # A rejected sync must not take the bot down with it; the usual
+            # cause is exceeding 100 top-level commands, which is worth saying
+            # plainly rather than leaving as a raw 400.
+            log.error(
+                "Could not publish application commands to Discord: %s. "
+                "The tree currently has %d top-level command(s); Discord allows 100.",
+                exc, len(self.get_commands()),
+            )
+            return False
+        await self.client._config.app_command_fingerprint.set(current)
+        log.info("Application commands published to Discord (%d top-level).",
+                 len(self.get_commands()))
+        return True
+
     async def red_check_enabled(self) -> None:
         """Restructures the commands in this tree, enabling commands that are enabled and disabling commands that are disabled.
 

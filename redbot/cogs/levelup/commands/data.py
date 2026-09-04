@@ -8,7 +8,8 @@ from datetime import datetime
 import discord
 import orjson
 from pydantic import ValidationError
-from redbot.core import commands
+from redbot.core import app_commands, commands
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.i18n import Translator
 from redbot.core.utils.chat_formatting import box, pagify, text_to_file
 
@@ -22,20 +23,23 @@ log = logging.getLogger("red.vrt.levelup.commands.data")
 
 
 class DataAdmin(MixinMeta):
-    @commands.group(name="leveldata", aliases=["lvldata", "ldata"])
-    @commands.guild_only()
-    @commands.admin_or_permissions(manage_guild=True)
-    async def lvldata(self, ctx: commands.Context):
-        """Admin Only Data Commands"""
+    lvldata = app_commands.Group(
+        name="leveldata",
+        description="Backup, restore and import level data.",
+        guild_only=True,
+        extras={"red_force_enable": True},
+    )
 
     @lvldata.command(name="cleanup")
-    async def cleanup_data(self, ctx: commands.Context):
+    @app_checks.admin_or_permissions(manage_guild=True)
+    async def cleanup_data(self, interaction: discord.Interaction):
         """Cleanup the database
 
         Performs the following actions:
         - Delete data for users no longer in the server
         - Removes channels and roles that no longer exist
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         txt = ""
         pruned = 0
@@ -120,9 +124,11 @@ class DataAdmin(MixinMeta):
         self.save()
 
     @lvldata.command(name="resetglobal")
-    @commands.is_owner()
-    async def reset_global(self, ctx: commands.Context):
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_checks.is_owner()
+    async def reset_global(self, interaction: discord.Interaction):
         """Reset user data for all servers"""
+        ctx = await commands.Context.from_interaction(interaction)
         msg = await ctx.send(_("This will reset all user data for all servers. Are you sure?"))
         yes = await utils.confirm_msg(ctx)
         if not yes:
@@ -134,8 +140,10 @@ class DataAdmin(MixinMeta):
         await msg.edit(content=_("Global data reset!"))
 
     @lvldata.command(name="reset")
-    async def reset_user(self, ctx: commands.Context):
+    @app_checks.admin_or_permissions(manage_guild=True)
+    async def reset_user(self, interaction: discord.Interaction):
         """Reset all user data in this server"""
+        ctx = await commands.Context.from_interaction(interaction)
         msg = await ctx.send(_("This will reset all user data for this server. Are you sure?"))
         yes = await utils.confirm_msg(ctx)
         if not yes:
@@ -147,9 +155,11 @@ class DataAdmin(MixinMeta):
         await msg.edit(content=_("Server data reset!"))
 
     @lvldata.command(name="resetcog")
-    @commands.is_owner()
-    async def reset_cog(self, ctx: commands.Context):
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_checks.is_owner()
+    async def reset_cog(self, interaction: discord.Interaction):
         """Reset the ENTIRE cog's data"""
+        ctx = await commands.Context.from_interaction(interaction)
         msg = await ctx.send(_("This will reset all data for this cog. Are you sure?"))
         yes = await utils.confirm_msg(ctx)
         if not yes:
@@ -159,10 +169,12 @@ class DataAdmin(MixinMeta):
         await msg.edit(content=_("Cog data reset!"))
 
     @lvldata.command(name="backupcog")
-    @commands.is_owner()
-    @commands.bot_has_permissions(attach_files=True)
-    async def backup_cog(self, ctx: commands.Context):
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_checks.is_owner()
+    @app_checks.bot_has_permissions(attach_files=True)
+    async def backup_cog(self, interaction: discord.Interaction):
         """Backup the cog's data"""
+        ctx = await commands.Context.from_interaction(interaction)
         dump = self.db.dumpjson(pretty=True)
         now = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
         filename = f"LevelUp {now}.json"
@@ -170,8 +182,10 @@ class DataAdmin(MixinMeta):
         await ctx.send(file=file)
 
     @lvldata.command(name="backup")
-    async def backup_server(self, ctx: commands.Context):
+    @app_checks.admin_or_permissions(manage_guild=True)
+    async def backup_server(self, interaction: discord.Interaction):
         """Backup this server's data"""
+        ctx = await commands.Context.from_interaction(interaction)
         server_name = ctx.guild.name
         # Make sure the server name is safe for a filename
         server_name = "".join([c for c in server_name if c.isalnum() or c in " -_"])
@@ -183,8 +197,10 @@ class DataAdmin(MixinMeta):
         await ctx.send(file=file)
 
     @lvldata.command(name="restore")
-    async def restore_server(self, ctx: commands.Context):
+    @app_checks.admin_or_permissions(manage_guild=True)
+    async def restore_server(self, interaction: discord.Interaction):
         """Restore this server's data"""
+        ctx = await commands.Context.from_interaction(interaction)
         attachments = utils.get_attachments(ctx)
         if not attachments:
             return await ctx.send(_("Please attach a backup file to the command message"))
@@ -203,9 +219,11 @@ class DataAdmin(MixinMeta):
         await ctx.send(_("Server data restored!"))
 
     @lvldata.command(name="restorecog")
-    @commands.is_owner()
-    async def restore_cog(self, ctx: commands.Context):
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_checks.is_owner()
+    async def restore_cog(self, interaction: discord.Interaction):
         """Restore the cog's data"""
+        ctx = await commands.Context.from_interaction(interaction)
         attachments = utils.get_attachments(ctx)
         if not attachments:
             return await ctx.send(_("Please attach a backup file to the command message"))
@@ -223,10 +241,11 @@ class DataAdmin(MixinMeta):
         await ctx.send(_("Cog data restored!"))
 
     @lvldata.command(name="importamari")
-    @commands.guildowner()
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_checks.guildowner()
     async def import_amari_data(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         import_by: t.Literal["level", "exp"],
         replace: bool,
         api_key: str,
@@ -242,6 +261,7 @@ class DataAdmin(MixinMeta):
         ➣ `api_key` - Your [AmariBot API key](https://docs.google.com/forms/d/e/1FAIpQLScQDCsIqaTb1QR9BfzbeohlUJYA3Etwr-iSb0CRKbgjA-fq7Q/viewform?usp=send_form)
         ➣ `all_users` - Import all users regardless of if they're in the server (True/False)
         """
+        ctx = await commands.Context.from_interaction(interaction)
         with suppress(discord.HTTPException):
             await ctx.message.delete()
         msg = await ctx.send(_("Are you sure you want to import data from Amari bot's API?"))
@@ -347,8 +367,9 @@ class DataAdmin(MixinMeta):
             self.save()
 
     @lvldata.command(name="importfixator")
-    @commands.is_owner()
-    async def import_from_fixator(self, ctx: commands.Context):
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_checks.is_owner()
+    async def import_from_fixator(self, interaction: discord.Interaction):
         """
         Import data from Fixator's Leveler cog
 
@@ -357,6 +378,7 @@ class DataAdmin(MixinMeta):
 
         *Obviously you will need MongoDB running while you run this command*
         """
+        ctx = await commands.Context.from_interaction(interaction)
         path = self.cog_path.parent / "Leveler" / "settings.json"
         if not path.exists():
             return await ctx.send(_("No config found for Fixator's Leveler cog!"))
@@ -447,10 +469,11 @@ class DataAdmin(MixinMeta):
             await msg.edit(content=_("Imported data for {} users from Fixator's Leveler cog!").format(imported))
 
     @lvldata.command(name="importmalarne")
-    @commands.is_owner()
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_checks.is_owner()
     async def import_from_malarne(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         import_by: t.Literal["level", "exp"],
         replace: bool,
         all_users: bool,
@@ -465,6 +488,7 @@ class DataAdmin(MixinMeta):
         • If True, it will replace existing data.
         ➣ `all_users` - Import all users regardless of if they're in the server (True/False)
         """
+        ctx = await commands.Context.from_interaction(interaction)
         path = self.cog_path / "UserProfile" / "settings.json"
         if not path.exists():
             return await ctx.send(_("No config found for Malarne's Leveler cog!"))
@@ -514,10 +538,11 @@ class DataAdmin(MixinMeta):
         self.save()
 
     @lvldata.command(name="importmee6")
-    @commands.guildowner()
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_checks.guildowner()
     async def import_from_mee6(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         import_by: t.Literal["level", "exp"],
         replace: bool,
         include_settings: bool,
@@ -533,6 +558,7 @@ class DataAdmin(MixinMeta):
         ➣ `include_settings` - Include MEE6 settings (True/False)
         ➣ `all_users` - Import all users regardless of if they're in the server (True/False)
         """
+        ctx = await commands.Context.from_interaction(interaction)
         msg = await ctx.send(_("Are you sure you want to import data from Mee6?"))
         yes = await utils.confirm_msg(ctx)
         if not yes:
@@ -641,10 +667,11 @@ class DataAdmin(MixinMeta):
             self.save()
 
     @lvldata.command(name="importpolaris")
-    @commands.guildowner()
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_checks.guildowner()
     async def import_from_polaris(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         replace: bool,
         include_settings: bool,
         all_users: bool,
@@ -661,6 +688,7 @@ class DataAdmin(MixinMeta):
 
         [Polaris](https://gdcolon.com/polaris/)
         """
+        ctx = await commands.Context.from_interaction(interaction)
         msg = await ctx.send(_("Are you sure you want to import data from Polaris?"))
         yes = await utils.confirm_msg(ctx)
         if not yes:

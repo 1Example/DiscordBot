@@ -3,21 +3,25 @@ import typing as t
 from datetime import datetime, timedelta
 
 import discord
-from redbot.core import commands
+from redbot.core import app_commands, commands
 from redbot.core.i18n import Translator
 
 from ..abc import MixinMeta
-from ..common import formatter, utils
+from ..common import formatter
 from ..views.dynamic_menu import DynamicMenu
 
 _ = Translator("LevelUp", __file__)
 
 
 class Stars(MixinMeta):
-    @commands.hybrid_command(name="stars", aliases=["givestar", "addstar", "thanks"])
-    @commands.guild_only()
-    async def give_stars(self, ctx: commands.Context, *, user: t.Optional[discord.Member] = None):
+    @app_commands.command(name="stars", extras={"red_force_enable": True})
+    @app_commands.guild_only()
+    @app_commands.describe(user="The member to give a star to.")
+    async def give_stars(
+        self, interaction: discord.Interaction, user: t.Optional[discord.Member] = None
+    ):
         """Reward a good noodle"""
+        ctx = await commands.Context.from_interaction(interaction)
         if user and user.id == ctx.author.id:
             return await ctx.send(_("You can't give stars to yourself!"), ephemeral=True)
         if user and user.bot and self.db.ignore_bots:
@@ -65,15 +69,20 @@ class Stars(MixinMeta):
             kwargs["delete_after"] = conf.starmentionautodelete
         await ctx.send(_("You just gave a star to {}!").format(name), **kwargs)
 
-    @commands.command(name="startop", aliases=["topstars", "starleaderboard", "starlb"])
-    @commands.guild_only()
+    @app_commands.command(name="startop", extras={"red_force_enable": True})
+    @app_commands.guild_only()
+    @app_commands.describe(
+        globalstats="Rank across every server instead of this one.",
+        displayname="Show nicknames instead of usernames.",
+    )
     async def startop(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         globalstats: bool = False,
         displayname: bool = True,
     ):
         """View the Star Leaderboard"""
+        ctx = await commands.Context.from_interaction(interaction)
         stat = "stars"
         pages = await asyncio.to_thread(
             formatter.get_leaderboard,
@@ -91,78 +100,4 @@ class Stars(MixinMeta):
             return await ctx.send(pages)
         await DynamicMenu(ctx, pages).refresh()
 
-    @commands.group(name="starset")
-    @commands.guild_only()
-    @commands.admin_or_permissions(manage_guild=True)
-    async def starset(self, ctx: commands.Context) -> None:
-        """Configure LevelUp Star Settings"""
-        pass
 
-    @starset.command(name="view")
-    @commands.bot_has_permissions(embed_links=True)
-    async def starset_view(self, ctx: commands.Context) -> None:
-        """View Star Settings"""
-        conf = self.db.get_conf(ctx.guild)
-        embed = discord.Embed(
-            title=_("Star Settings"),
-            color=await self.bot.get_embed_color(ctx),
-        )
-        delta = utils.humanize_delta(conf.starcooldown)
-        embed.add_field(
-            name=_("Cooldown"),
-            value=_("Users can give stars every {}").format(delta),
-            inline=False,
-        )
-        embed.add_field(
-            name=_("Star Mention"),
-            value=_("The bot will{} send a message when someone gives a star").format(
-                "" if conf.starmention else _(" **not**")
-            ),
-            inline=False,
-        )
-        if conf.starmentionautodelete:
-            txt = _("The bot will delete the star message after {}").format(
-                utils.humanize_delta(conf.starmentionautodelete)
-            )
-        else:
-            txt = _("The bot will **not** delete the star message after sending it")
-        embed.add_field(
-            name=_("Star Mention Auto Delete"),
-            value=txt,
-            inline=False,
-        )
-        await ctx.send(embed=embed)
-
-    @starset.command(name="cooldown")
-    async def starset_cooldown(self, ctx: commands.Context, cooldown: int) -> None:
-        """Set the star cooldown"""
-        conf = self.db.get_conf(ctx.guild)
-        conf.starcooldown = cooldown
-        await ctx.send(_("Cooldown set to {}").format(utils.humanize_delta(cooldown)))
-        self.save()
-
-    @starset.command(name="mention")
-    async def starset_mention(self, ctx: commands.Context) -> None:
-        """Toggle star reaction mentions"""
-        conf = self.db.get_conf(ctx.guild)
-        if conf.starmention:
-            conf.starmention = False
-            await ctx.send(_("Star mention disabled"))
-        else:
-            conf.starmention = True
-            await ctx.send(_("Star mention enabled"))
-        self.save()
-
-    @starset.command(name="mentiondelete")
-    async def starset_mentionautodelete(self, ctx: commands.Context, delete_after: int) -> None:
-        """Toggle whether the bot auto-deletes the star mentions
-
-        Set to 0 to disable auto-delete
-        """
-        conf = self.db.get_conf(ctx.guild)
-        conf.starmentionautodelete = delete_after
-        if delete_after:
-            await ctx.send(_("Star mention auto delete set to {}").format(delete_after))
-        else:
-            await ctx.send(_("Star mention auto delete disabled"))
-        self.save()

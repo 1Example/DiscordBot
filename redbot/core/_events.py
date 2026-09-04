@@ -162,6 +162,16 @@ def init_events(bot, cli_flags):
                 f"Looking for a quick guide on setting up Red? Checkout {Text('https://start.discord.red', style='link https://start.discord.red}')}"
             )
 
+        # Publish application commands once everything has loaded. This is a
+        # no-op when the tree is unchanged, so an ordinary restart costs
+        # nothing; it only calls Discord when a cog was added, removed or
+        # edited. Without it a slash command exists in the bot but not in
+        # Discord until somebody runs a sync by hand.
+        try:
+            await bot.tree.red_auto_sync()
+        except Exception:  # noqa: BLE001 - never hold up readiness
+            log.exception("Could not publish application commands on startup")
+
         bot._red_ready.set()
 
         try:

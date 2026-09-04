@@ -10,7 +10,8 @@ import discord
 from aiocache import cached
 from discord import app_commands
 from discord.app_commands import Choice
-from redbot.core import commands
+from redbot.core import app_commands, commands
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator
 from redbot.core.utils.chat_formatting import humanize_list
@@ -56,11 +57,18 @@ async def view_profile_context(interaction: discord.Interaction, member: discord
 
 
 class User(MixinMeta):
-    @commands.hybrid_command(name="leveltop", aliases=["lvltop", "topstats", "membertop", "topranks"])
-    @commands.guild_only()
+    set_profile = app_commands.Group(
+        name="setprofile",
+        description="Customize your profile card.",
+        guild_only=True,
+        extras={"red_force_enable": True},
+    )
+
+    @app_commands.command(name="leveltop", extras={"red_force_enable": True})
+    @app_commands.guild_only()
     async def leveltop(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         stat: str = "xp",
         globalstats: bool = False,
         displayname: bool = True,
@@ -77,6 +85,7 @@ class User(MixinMeta):
         `globalstats` - View the global leaderboard instead of the server leaderboard
         `displayname` - Use display names instead of usernames
         """
+        ctx = await commands.Context.from_interaction(interaction)
         stat = stat.lower()
         pages = await asyncio.to_thread(
             formatter.get_leaderboard,
@@ -94,10 +103,11 @@ class User(MixinMeta):
             return await ctx.send(pages)
         await DynamicMenu(ctx, pages).refresh()
 
-    @commands.command(name="roletop")
-    @commands.guild_only()
-    async def role_group_leaderboard(self, ctx: commands.Context):
+    @app_commands.command(name="roletop", extras={"red_force_enable": True})
+    @app_commands.guild_only()
+    async def role_group_leaderboard(self, interaction: discord.Interaction):
         """View the leaderboard for roles"""
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if not conf.role_groups:
             return await ctx.send(_("Role groups have not been configured in this server yet!"))
@@ -110,14 +120,15 @@ class User(MixinMeta):
             return await ctx.send(_("No data available yet!"))
         await DynamicMenu(ctx, pages).refresh()
 
-    @commands.command(name="profiledata")
-    @commands.guild_only()
-    @commands.mod_or_permissions(manage_messages=True)
-    async def profile_data(self, ctx: commands.Context, user_id: int):
+    @app_commands.command(name="profiledata", extras={"red_force_enable": True})
+    @app_commands.guild_only()
+    @app_checks.mod_or_permissions(manage_messages=True)
+    async def profile_data(self, interaction: discord.Interaction, user_id: int):
         """View a user's profile by ID
 
         Useful if user has left the server
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if not conf.enabled:
             return await ctx.send(_("Leveling is disabled in this server!"))
@@ -136,13 +147,14 @@ class User(MixinMeta):
         )
         await ctx.send(txt)
 
-    @commands.hybrid_command(name="lvlupnotify", aliases=["notify"])
-    @commands.guild_only()
-    @commands.cooldown(3, 10, commands.BucketType.user)
-    async def level_up_notify(self, ctx: commands.Context):
+    @app_commands.command(name="lvlupnotify", extras={"red_force_enable": True})
+    @app_commands.guild_only()
+    @app_checks.cooldown(3, 10)
+    async def level_up_notify(self, interaction: discord.Interaction):
         """
         If enabled, level up notifications won't be sent for you in the server
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         profile = conf.get_profile(ctx.author.id)
 
@@ -163,11 +175,12 @@ class User(MixinMeta):
 
         self.save()
 
-    @commands.hybrid_command(name="profile", aliases=["pf"])
-    @commands.guild_only()
-    @commands.cooldown(3, 10, commands.BucketType.user)
-    async def profile(self, ctx: commands.Context, *, user: t.Optional[discord.Member] = None):
+    @app_commands.command(name="profile", extras={"red_force_enable": True})
+    @app_commands.guild_only()
+    @app_checks.cooldown(3, 10)
+    async def profile(self, interaction: discord.Interaction, user: t.Optional[discord.Member] = None):
         """View User Profile"""
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if not conf.enabled:
             txt = _("Leveling is disabled in this server!")
@@ -224,10 +237,10 @@ class User(MixinMeta):
                 txt = _("An error occurred while generating your profile!\n{}").format(str(e))
             await ctx.send(txt)
 
-    @commands.hybrid_command(name="prestige")
-    @commands.guild_only()
-    @commands.bot_has_permissions(manage_roles=True, embed_links=True)
-    async def prestige(self, ctx: commands.Context):
+    @app_commands.command(name="prestige", extras={"red_force_enable": True})
+    @app_commands.guild_only()
+    @app_checks.bot_has_permissions(manage_roles=True, embed_links=True)
+    async def prestige(self, interaction: discord.Interaction):
         """
         Prestige your rank!
         Once you have reached this servers prestige level requirement, you can
@@ -235,6 +248,7 @@ class User(MixinMeta):
 
         If you are over level and xp when you prestige, your xp and levels will carry over
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if ctx.author.id not in conf.users:
             return await ctx.send(_("You have no level data yet!"))
@@ -278,15 +292,12 @@ class User(MixinMeta):
             embed.add_field(name=_("Roles Removed"), value=removed_roles)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_group(name="setprofile", aliases=["myprofile", "mypf", "pfset"])
-    @commands.guild_only()
-    async def set_profile(self, ctx: commands.Context):
-        """Customize your profile"""
 
     @set_profile.command(name="view")
-    @commands.bot_has_permissions(embed_links=True)
-    async def view_profile_settings(self, ctx: commands.Context):
+    @app_checks.bot_has_permissions(embed_links=True)
+    async def view_profile_settings(self, interaction: discord.Interaction):
         """View your profile settings"""
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         profile = conf.get_profile(ctx.author)
         # Display "Stored Image" for base64 backgrounds
@@ -362,17 +373,18 @@ class User(MixinMeta):
         await ctx.send(embeds=embeds, ephemeral=True)
 
     @set_profile.command(name="bgpath")
-    @commands.is_owner()
-    async def get_bg_path(self, ctx: commands.Context):
+    @app_checks.is_owner()
+    async def get_bg_path(self, interaction: discord.Interaction):
         """Get the folder paths for this cog's backgrounds"""
+        ctx = await commands.Context.from_interaction(interaction)
         txt = ""
         txt += _("- Defaults: `{}`\n").format(self.backgrounds)
         txt += _("- Custom: `{}`\n").format(self.custom_backgrounds)
         await ctx.send(txt)
 
     @set_profile.command(name="addbackground")
-    @commands.is_owner()
-    async def add_background(self, ctx: commands.Context, preferred_filename: str = None):
+    @app_checks.is_owner()
+    async def add_background(self, interaction: discord.Interaction, preferred_filename: str = None):
         """
         Add a custom background to the cog from discord
 
@@ -384,6 +396,7 @@ class User(MixinMeta):
         - If you add broken or corrupt images it can break the cog
         - Do not include the file extension in the preferred name, it will be added automatically
         """
+        ctx = await commands.Context.from_interaction(interaction)
         content = utils.get_attachments(ctx)
         if not content:
             return await ctx.send(_("No images found in the message!"))
@@ -410,9 +423,10 @@ class User(MixinMeta):
         await ctx.send(_("Your custom background has been saved as {}").format(f"`{filename}`"))
 
     @set_profile.command(name="rembackground")
-    @commands.is_owner()
-    async def remove_background(self, ctx: commands.Context, *, filename: str):
+    @app_checks.is_owner()
+    async def remove_background(self, interaction: discord.Interaction, *, filename: str):
         """Remove a default background from the cog's backgrounds folder"""
+        ctx = await commands.Context.from_interaction(interaction)
         for path in self.custom_backgrounds.iterdir():
             if filename.lower() in path.name.lower():
                 break
@@ -426,17 +440,18 @@ class User(MixinMeta):
         await msg.edit(content=_("The background {} has been deleted").format(f"`{path}`"))
 
     @set_profile.command(name="fontpath")
-    @commands.is_owner()
-    async def get_font_path(self, ctx: commands.Context):
+    @app_checks.is_owner()
+    async def get_font_path(self, interaction: discord.Interaction):
         """Get folder paths for this cog's fonts"""
+        ctx = await commands.Context.from_interaction(interaction)
         txt = ""
         txt += _("- Defaults: {}\n").format(self.fonts)
         txt += _("- Custom: {}\n").format(self.custom_fonts)
         await ctx.send(txt)
 
     @set_profile.command(name="addfont")
-    @commands.is_owner()
-    async def add_font(self, ctx: commands.Context, preferred_filename: str = None):
+    @app_checks.is_owner()
+    async def add_font(self, interaction: discord.Interaction, preferred_filename: str = None):
         """
         Add a custom font to the cog from discord
 
@@ -444,6 +459,7 @@ class User(MixinMeta):
         `preferred_filename` - If a name is given, it will be saved as this name instead of the filename
         **Note:** do not include the file extension in the preferred name, it will be added automatically
         """
+        ctx = await commands.Context.from_interaction(interaction)
         content = utils.get_attachments(ctx)
         if not content:
             return await ctx.send(_("No fonts found in the message!"))
@@ -470,9 +486,10 @@ class User(MixinMeta):
         await ctx.send(_("Your custom font has been saved as {}").format(f"`{filename}`"))
 
     @set_profile.command(name="remfont")
-    @commands.is_owner()
-    async def remove_font(self, ctx: commands.Context, *, filename: str):
+    @app_checks.is_owner()
+    async def remove_font(self, interaction: discord.Interaction, *, filename: str):
         """Remove a default font from the cog's fonts folder"""
+        ctx = await commands.Context.from_interaction(interaction)
         for path in self.custom_fonts.iterdir():
             if filename.lower() in path.name.lower():
                 break
@@ -486,10 +503,11 @@ class User(MixinMeta):
         await msg.edit(content=_("The font {} has been deleted").format(f"`{path}`"))
 
     @set_profile.command(name="backgrounds")
-    @commands.cooldown(1, 5, commands.BucketType.user)
-    @commands.bot_has_permissions(attach_files=True)
-    async def view_all_backgrounds(self, ctx: commands.Context):
+    @app_checks.cooldown(1, 5, commands.BucketType.user)
+    @app_checks.bot_has_permissions(attach_files=True)
+    async def view_all_backgrounds(self, interaction: discord.Interaction):
         """View the all available backgrounds"""
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if conf.use_embeds:
             return await ctx.send(_("Image profiles are disabled here, this setting has no effect!"))
@@ -512,10 +530,11 @@ class User(MixinMeta):
             await ctx.send(txt, file=file)
 
     @set_profile.command(name="fonts")
-    @commands.cooldown(1, 5, commands.BucketType.user)
-    @commands.bot_has_permissions(attach_files=True)
-    async def view_fonts(self, ctx: commands.Context):
+    @app_checks.cooldown(1, 5, commands.BucketType.user)
+    @app_checks.bot_has_permissions(attach_files=True)
+    async def view_fonts(self, interaction: discord.Interaction):
         """View the available fonts you can use"""
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if conf.use_embeds:
             return await ctx.send(_("Image profiles are disabled here, this setting has no effect!"))
@@ -539,7 +558,7 @@ class User(MixinMeta):
     @set_profile.command(name="style")
     async def toggle_profile_style(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         style: t.Literal["default", "runescape", "minimal", "gaming"],
     ):
         """
@@ -552,6 +571,7 @@ class User(MixinMeta):
         - (WIP) - more to come
 
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if conf.use_embeds:
             return await ctx.send(_("Image profiles are disabled here, this setting has no effect!"))
@@ -567,8 +587,9 @@ class User(MixinMeta):
         await ctx.send(_("Your profile type has been set to {}").format(style.capitalize()))
 
     @set_profile.command(name="shownick")
-    async def toggle_show_nickname(self, ctx: commands.Context):
+    async def toggle_show_nickname(self, interaction: discord.Interaction):
         """Toggle whether your nickname or username is shown in your profile"""
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         profile = conf.get_profile(ctx.author)
         profile.show_displayname = not profile.show_displayname
@@ -580,10 +601,10 @@ class User(MixinMeta):
         )
         await ctx.send(txt)
 
-    @set_profile.command(name="namecolor", aliases=["name"])
-    @commands.bot_has_permissions(embed_links=True, attach_files=True)
+    @set_profile.command(name="namecolor")
+    @app_checks.bot_has_permissions(embed_links=True, attach_files=True)
     @app_commands.describe(color="Name of color, hex or integer value")
-    async def set_name_color(self, ctx: commands.Context, *, color: str):
+    async def set_name_color(self, interaction: discord.Interaction, *, color: str):
         """
         Set a color for your username
 
@@ -591,6 +612,7 @@ class User(MixinMeta):
 
         Set to `default` to randomize the color each time your profile is generated
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if conf.use_embeds:
             return await ctx.send(_("Image profiles are disabled here, this setting has no effect!"))
@@ -616,9 +638,9 @@ class User(MixinMeta):
         self.save()
         await ctx.send(embed=embed)
 
-    @set_profile.command(name="statcolor", aliases=["stat"])
-    @commands.bot_has_permissions(embed_links=True, attach_files=True)
-    async def set_stat_color(self, ctx: commands.Context, *, color: str):
+    @set_profile.command(name="statcolor")
+    @app_checks.bot_has_permissions(embed_links=True, attach_files=True)
+    async def set_stat_color(self, interaction: discord.Interaction, *, color: str):
         """
         Set a color for your server stats
 
@@ -626,6 +648,7 @@ class User(MixinMeta):
 
         Set to `default` to randomize the color each time your profile is generated
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if conf.use_embeds:
             return await ctx.send(_("Image profiles are disabled here, this setting has no effect!"))
@@ -649,9 +672,9 @@ class User(MixinMeta):
         self.save()
         await ctx.send(embed=embed)
 
-    @set_profile.command(name="barcolor", aliases=["levelbar", "lvlbar", "bar"])
-    @commands.bot_has_permissions(embed_links=True, attach_files=True)
-    async def set_levelbar_color(self, ctx: commands.Context, *, color: str):
+    @set_profile.command(name="barcolor")
+    @app_checks.bot_has_permissions(embed_links=True, attach_files=True)
+    async def set_levelbar_color(self, interaction: discord.Interaction, *, color: str):
         """
         Set a color for your level bar
 
@@ -659,6 +682,7 @@ class User(MixinMeta):
 
         Set to `default` to randomize the color each time your profile is generated
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if conf.use_embeds:
             return await ctx.send(_("Image profiles are disabled here, this setting has no effect!"))
@@ -702,11 +726,11 @@ class User(MixinMeta):
                     break
         return choices
 
-    @set_profile.command(name="background", aliases=["bg"])
-    @commands.bot_has_permissions(embed_links=True)
+    @set_profile.command(name="background")
+    @app_checks.bot_has_permissions(embed_links=True)
     async def set_user_background(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         url: t.Optional[str] = None,
     ):
         """
@@ -731,6 +755,7 @@ class User(MixinMeta):
          - `random` will randomly select from a pool of default backgrounds each time
          - `filename` run `[p]mypf backgrounds` to view default options you can use by including their filename
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if conf.use_embeds:
             txt = _("Image profiles are disabled here, this setting has no effect!")
@@ -844,13 +869,14 @@ class User(MixinMeta):
         await ctx.send(txt, file=file)
 
     @set_profile.command(name="font")
-    async def set_user_font(self, ctx: commands.Context, *, font_name: str):
+    async def set_user_font(self, interaction: discord.Interaction, *, font_name: str):
         """
         Set a font for your profile
 
         To view available fonts, type `[p]myprofile fonts`
         To revert to the default font, use `default` for the `font_name` argument
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if conf.use_embeds:
             txt = _("Image profiles are disabled here, this setting has no effect!")
@@ -886,10 +912,11 @@ class User(MixinMeta):
         return choices
 
     @set_profile.command(name="blur")
-    async def set_user_blur(self, ctx: commands.Context):
+    async def set_user_blur(self, interaction: discord.Interaction):
         """
         Toggle a slight blur effect on the background image where the text is displayed.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
         if conf.use_embeds:
             txt = _("Image profiles are disabled here, this setting has no effect!")

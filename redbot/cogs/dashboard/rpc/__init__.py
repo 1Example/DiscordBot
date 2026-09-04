@@ -1066,6 +1066,62 @@ class DashboardRPC:
                     final += await self.build_cmd_list(command.commands, details=False)
         return final
 
+    def _app_privilege(self, command: typing.Any) -> str:
+        """Best guess at the privilege an app command needs.
+
+        Application commands carry `app_commands.check` predicates rather than
+        Red's `Requires`, so the level is read back from the check functions'
+        own names - which is why `redbot.core.app_commands.checks` names them
+        after the text-command checks they mirror.
+        """
+        checks = getattr(command, "checks", []) or []
+        names = {getattr(c, "__qualname__", "") for c in checks}
+        blob = " ".join(names)
+        if "is_owner" in blob:
+            return "BOT_OWNER"
+        if "guildowner" in blob:
+            return "GUILD_OWNER"
+        if "admin" in blob:
+            return "ADMIN"
+        if "mod" in blob:
+            return "MOD"
+        return "NONE"
+
+    async def build_app_cmd_list(
+        self, commands_list: list, prefix: str = "",
+    ) -> list[dict[str, str | list]]:
+        """The same shape as `build_cmd_list`, for application commands.
+
+        A cog that has finished migrating has no text commands at all, so
+        without this it vanishes from the commands page entirely rather than
+        showing the slash commands that replaced them.
+        """
+        final = []
+        for command in sorted(commands_list, key=lambda c: c.name):
+            qualified = f"{prefix}{command.name}"
+            is_group = hasattr(command, "commands")
+            params = getattr(command, "parameters", []) or []
+            final.append(
+                {
+                    "name": f"/{qualified}",
+                    "signature": " ".join(
+                        f"<{p.name}>" if p.required else f"[{p.name}]" for p in params
+                    ),
+                    "short_description": (command.description or "").strip(),
+                    "description": (command.description or "").strip(),
+                    "aliases": [],
+                    "privilege_level": self._app_privilege(command),
+                    "user_permissions": None,
+                    "slash": True,
+                    "subs": (
+                        await self.build_app_cmd_list(command.commands, f"{qualified} ")
+                        if is_group
+                        else []
+                    ),
+                }
+            )
+        return final
+
     @rpc_check()
     async def get_commands(
         self,
@@ -1083,6 +1139,10 @@ class DashboardRPC:
             name = cog.qualified_name
             stripped = [c for c in cog.__cog_commands__ if c.parent is None]
             cmds = await self.build_cmd_list(stripped)
+            # Slash-only cogs have no text commands left; list what they do have.
+            app_cmds = list(getattr(cog, "__cog_app_commands__", []) or [])
+            if app_cmds:
+                cmds = cmds + await self.build_app_cmd_list(app_cmds)
             if not cmds:
                 continue
 
