@@ -75,6 +75,14 @@ class DashboardIntegration:
         name="create",
         description="Build an embed and send it to a channel in this server.",
         methods=("GET", "POST"),
+        # Stated rather than inferred. This handler takes `member`, so the
+        # decorator adds `member_id` to its context ids, and the auto-hide rule
+        # hides any page needing a context id beyond user/guild - on the
+        # assumption the dashboard cannot supply one. It can: `member` is
+        # resolved from the signed-in user plus the guild being viewed, both of
+        # which the Modules card already has. Left to infer, this page exists
+        # but never gets a button.
+        hidden=False,
     )
     async def dashboard_guild(self, member: discord.Member, guild: discord.Guild, **kwargs) -> None:
         is_owner = member.id in self.bot.owner_ids

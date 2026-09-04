@@ -290,12 +290,17 @@ class RSS(DashboardIntegration, commands.Cog):
             pass
 
         # change published_parsed and updated_parsed into a datetime object for embed footers
+        # `rss_object` is a FeedParserDict: a missing `updated_parsed` is mapped
+        # onto `published_parsed` with a deprecation warning rather than raising
+        # KeyError, so the `except` below never fired for it and the two tags
+        # silently produced the same datetime. Testing membership first gets the
+        # real answer and does not warn.
         for time_tag in ["updated_parsed", "published_parsed"]:
-            try:
-                if isinstance(rss_object[time_tag], time.struct_time):
-                    rss_object[f"{time_tag}_datetime"] = datetime.datetime(*rss_object[time_tag][:6])
-            except KeyError:
-                pass
+            if time_tag not in rss_object:
+                continue
+            value = rss_object[time_tag]
+            if isinstance(value, time.struct_time):
+                rss_object[f"{time_tag}_datetime"] = datetime.datetime(*value[:6])
 
         if soup:
             rss_object = self._add_content_images(soup, rss_object)
@@ -539,7 +544,11 @@ class RSS(DashboardIntegration, commands.Cog):
         for tag in time_tag:
             try:
                 baseline_time = time.struct_time((2021, 1, 1, 12, 0, 0, 4, 1, -1))
-                sorted_feed_by_post_time = sorted(feedparser_obj, key=lambda x: x.get(tag, baseline_time), reverse=True)
+                sorted_feed_by_post_time = sorted(
+                    feedparser_obj,
+                    key=lambda x: x[tag] if tag in x else baseline_time,
+                    reverse=True,
+                )
                 break
             except TypeError:
                 sorted_feed_by_post_time = feedparser_obj
@@ -558,11 +567,14 @@ class RSS(DashboardIntegration, commands.Cog):
         # usage (i.e. a feed entry keeps reposting with no perceived change in content)
         use_published_parsed_override = await self.config.use_published()
         if base_url in use_published_parsed_override:
-            entry_time = entry.get("published_parsed", None)
+            entry_time = entry["published_parsed"] if "published_parsed" in entry else None
         else:
-            entry_time = entry.get("updated_parsed", None)
-            if not entry_time:
-                entry_time = entry.get("published_parsed", None)
+            # `in` first: reading a missing `updated_parsed` is what raises the
+            # deprecation warning, and the fallback below is the same one
+            # feedparser would have applied.
+            entry_time = entry["updated_parsed"] if "updated_parsed" in entry else None
+            if not entry_time and "published_parsed" in entry:
+                entry_time = entry["published_parsed"]
 
         if isinstance(entry_time, time.struct_time):
             entry_time = time.mktime(entry_time)
