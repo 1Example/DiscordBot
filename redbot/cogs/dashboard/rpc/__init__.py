@@ -945,6 +945,25 @@ class DashboardRPC:
             setattr(self.bot, "dashboard_url", (dashboard_url, not is_private))
         return variables
 
+    async def _application_info(self):
+        """The bot's application info, cached, and never fatal.
+
+        This used to be fetched twice per call and guarded neither time, so a
+        Discord 5xx - which is routine - took the whole variables handler down
+        and left the dashboard with nothing to render. The description changes
+        about never, so a stale value is far better than an error page.
+        """
+        cached = getattr(self, "_app_info_cache", None)
+        if cached is not None and (cached[0] + 900) > time.time():
+            return cached[1]
+        try:
+            info = await self.bot.application_info()
+        except discord.HTTPException as exc:
+            log.warning("Could not fetch application info (%s); using the cached copy.", exc)
+            return cached[1] if cached is not None else None
+        self._app_info_cache = (time.time(), info)
+        return info
+
     @rpc_check()
     async def get_bot_variables(self) -> dict[str, typing.Any]:
         bot_info = await self.bot._config.custom_info()
@@ -965,8 +984,8 @@ class DashboardRPC:
         if self.invite_url is None:
             self.invite_url: str = await self.bot.get_invite_url()
 
-        if self.owner is None:
-            app_info = await self.bot.application_info()
+        app_info = await self._application_info()
+        if self.owner is None and app_info is not None:
             self.owner: str = (
                 str(app_info.team.name) if app_info.team else app_info.owner.display_name
             )
@@ -977,7 +996,7 @@ class DashboardRPC:
                 "id": self.bot.user.id,
                 "application_id": self.bot.application_id,
                 "info": bot_info,
-                "profile_description": (await self.bot.application_info()).description,
+                "profile_description": getattr(app_info, "description", "") or "",
                 "prefixes": prefixes,
                 "owner_ids": list(self.bot.owner_ids),
                 "owner": self.owner,
