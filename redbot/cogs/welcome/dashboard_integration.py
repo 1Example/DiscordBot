@@ -113,6 +113,7 @@ class DashboardIntegration:
                 "bots_msg": settings.get("BOTS_MSG") or "",
                 "bots_goodbye_msg": settings.get("BOTS_GOODBYE_MSG") or "",
                 "minimum_days": settings.get("MINIMUM_DAYS") or 0,
+                "filter_setting": settings.get("FILTER_SETTING") or "",
                 "delete_after_greeting": settings.get("DELETE_AFTER_GREETING") or "",
                 "delete_after_goodbye": settings.get("DELETE_AFTER_GOODBYE") or "",
                 "mentions": {k: bool((settings.get("MENTIONS") or {}).get(k)) for k in MENTION_KEYS},
@@ -297,6 +298,10 @@ class DashboardIntegration:
                      "category": "warning"}
                 )
         await conf.BOTS_ROLE.set(role_id)
+
+        # What a filtered username is replaced with. Blank falls back to the
+        # cog's own "[Redacted]" rather than storing that literal.
+        await conf.FILTER_SETTING.set((field("filter_setting") or "").strip() or None)
 
         await conf.BOTS_MSG.set((field("bots_msg") or "").strip() or None)
         await conf.BOTS_GOODBYE_MSG.set((field("bots_goodbye_msg") or "").strip() or None)
@@ -511,6 +516,10 @@ WELCOME_TEMPLATE = (
                   none_label='same as join', placeholder='Search channels...') }}
         <div class="dz-label" style="margin-top:10px;">Minimum account age (days)</div>
         <input class="dz-input" type="number" min="0" name="minimum_days" value="{{ minimum_days }}" />
+        <div class="dz-label" style="margin-top:10px;">Replace filtered names with</div>
+        <input class="dz-input" name="filter_setting" value="{{ filter_setting }}"
+               placeholder="[Redacted]" />
+        <div class="dz-hint">Used when a new member's name matches the server filter.</div>
         <div class="dz-row" style="margin-top:10px;">
           <div style="flex:1 1 130px;">
             <div class="dz-label">Delete greeting after (s)</div>
