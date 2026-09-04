@@ -10,7 +10,6 @@
 <script type="application/json" id="eus-boot">
 {
   "csrf": {{ csrf_token_value|tojson }},
-  "action": {{ action_url|tojson }},
   "channels": {{ studio_channels|tojson }},
   "saved": {{ studio_saved|tojson }},
   "limits": {{ studio_limits|tojson }},
@@ -359,6 +358,14 @@
 
   var boot = JSON.parse(document.getElementById("eus-boot").textContent);
   var L = boot.limits;
+
+  // Post back to this page's own path rather than the absolute URL the server
+  // built. Behind a reverse proxy Flask sees the internal scheme, so that URL
+  // arrives as http:// while the page is served over https:// - the browser
+  // blocks it as mixed content and `fetch` fails before it leaves. A relative
+  // path resolves against the document, so it always matches the real scheme,
+  // host and port.
+  var ACTION_URL = window.location.pathname;
   var DRAFT = "eus-draft-" + boot.guild.id;
 
   var $ = function (id) { return document.getElementById(id); };
@@ -858,7 +865,7 @@
       if (Array.isArray(v)) v.forEach(function (one) { body.append(k, one); });
       else body.append(k, v);
     });
-    return fetch(boot.action, { method: "POST", body: body, credentials: "same-origin" })
+    return fetch(ACTION_URL, { method: "POST", body: body, credentials: "same-origin" })
       .then(function (r) {
         if (!r.ok) throw new Error("The server returned " + r.status + ".");
         return r.json();

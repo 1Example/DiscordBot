@@ -201,7 +201,6 @@ class DashboardIntegration:
             "web_content": {
                 "source": _template(),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
-                "action_url": (kwargs.get("request_url") or "").split("?", 1)[0],
                 "studio_channels": channels,
                 "studio_saved": await self._saved(guild),
                 "studio_limits": LIMITS,
