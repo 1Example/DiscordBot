@@ -62,18 +62,21 @@ _INLINE_ADJUSTMENTS = f"""
    percentage of that, so the editor needs a positioned ancestor with a real
    height or the whole thing collapses. */
 {ROOT_SELECTOR} {{
-  /* Opaque, not translucent. The shell's panel tokens are 4-7% tints designed
-     to sit on a flat card; this dashboard paints a moving circuit pattern
-     behind everything, and at those alphas it showed through the editor's
-     controls - which is what made the whole component look broken rather than
-     merely wrong. Solid surfaces in the same blue family instead. */
-  --eu-ground:  #0a1020;
-  --eu-panel:   #111c30;
-  --eu-raise:   #18253d;
-  --eu-raise-2: #22314e;
-  --eu-well:    #070d1a;
-  --eu-active:  #2a3d68;
-  --eu-line:    rgba(130, 175, 255, .16);
+  /* The editor's surfaces, in one place. These are the dashboard's own panel
+     tokens, so the editor is made of the same translucent glass as every other
+     card and sits on the circuit backdrop the same way. The literals are
+     fallbacks for a shell that does not define them.
+
+     They are deliberately NOT opaque: the see-through look is the design, and
+     what made the component look broken was the geometry below, not the
+     alpha. */
+  --eu-ground:  transparent;
+  --eu-panel:   var(--cx-panel-2, rgba(90, 130, 220, .07));
+  --eu-raise:   var(--cx-panel-3, rgba(255, 255, 255, .045));
+  --eu-raise-2: rgba(255, 255, 255, .09);
+  --eu-well:    rgba(4, 10, 32, .45);
+  --eu-active:  rgba(108, 140, 255, .22);
+  --eu-line:    var(--cx-panel-2-bd, rgba(120, 160, 255, .10));
 
   /* `position: relative` stays: `.notification` and `.done` are absolutely
      positioned and need this as their containing block. The fixed height is
@@ -85,7 +88,7 @@ _INLINE_ADJUSTMENTS = f"""
   border-radius: 14px;
   overflow: visible;
   background: transparent;
-  --fullEmbedBackground: var(--eu-ground);
+  --fullEmbedBackground: transparent;
   --side1Background: transparent;
   --background-tertiary: rgba(255, 255, 255, .08);
 }}
