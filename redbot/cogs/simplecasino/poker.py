@@ -455,8 +455,8 @@ class PokerGame(BasePokerGame):
 
     async def get_suit_emojis(self):
         return {
-            CardSuit.HEARTS: "♥️",
-            CardSuit.DIAMONDS: "♦️",
+            CardSuit.HEARTS: await self.cog.config.emoji_hearts(),
+            CardSuit.DIAMONDS: await self.cog.config.emoji_diamonds(),
             CardSuit.SPADES: await self.cog.config.emoji_spades(),
             CardSuit.CLUBS: await self.cog.config.emoji_clubs(),
         }

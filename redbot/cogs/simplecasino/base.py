@@ -29,6 +29,8 @@ class BaseCasinoCog(commands.Cog):
             "emoji_smallblind": "(SB)",
             "emoji_bigblind": "(BB)",
             "emoji_spades": "♠️",
+            "emoji_hearts": "♥️",
+            "emoji_diamonds": "♦️",
             "emoji_clubs": "♣️",
         }
         channel_config = {

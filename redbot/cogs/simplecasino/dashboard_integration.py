@@ -33,6 +33,22 @@ TOGGLES = (
 # Bet pairs that must not be inverted.
 PAIRS = (("bjmin", "bjmax", "Blackjack"), ("pokermin", "pokermax", "Poker"))
 
+# Table markers. These are interpolated straight into the embed text - see
+# `poker.get_suit_emojis` - so a plain string like "(D)" is as valid as an
+# emoji, which is why they are length-checked rather than run through
+# `emoji_problem`. They are registered global-only, so unlike the limits above
+# they are the same in every server and only the bot owner may change them.
+MARKERS = (
+    ("emoji_dealer", "Dealer", "Marks the dealer seat."),
+    ("emoji_smallblind", "Small blind", "Marks the small-blind seat."),
+    ("emoji_bigblind", "Big blind", "Marks the big-blind seat."),
+    ("emoji_spades", "Spades", "Drawn beside a spades card."),
+    ("emoji_hearts", "Hearts", "Drawn beside a hearts card."),
+    ("emoji_diamonds", "Diamonds", "Drawn beside a diamonds card."),
+    ("emoji_clubs", "Clubs", "Drawn beside a clubs card."),
+)
+MARKER_MAX = 32
+
 
 class DashboardIntegration:
     """Betting limits, slot odds and per-member game statistics."""
@@ -58,6 +74,9 @@ class DashboardIntegration:
         if error:
             return error
         staff = await is_staff(self.bot, user, member, guild)
+        # The markers are global, so an admin of one server would be editing
+        # every other server's tables too. Only the owner gets that panel.
+        owner = await self.bot.is_owner(user)
 
         notifications: list[dict] = []
         if kwargs.get("method") == "POST":
@@ -67,12 +86,13 @@ class DashboardIntegration:
                     "error_title": "Forbidden",
                     "error_message": "Only server administrators can change casino settings.",
                 }
-            notifications = await self._sc_handle_post(guild, kwargs)
+            notifications = await self._sc_handle_post(guild, kwargs, owner=owner)
 
         # A global bank means the guild-scoped limits are not what players hit.
         global_bank = await self._sc_global_bank()
         scope = self.config if global_bank else self.config.guild(guild)
         settings = await scope.all()
+        marker_values = await self.config.all() if owner else {}
 
         return {
             "status": 0,
@@ -82,6 +102,12 @@ class DashboardIntegration:
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "is_staff": staff,
+                "is_owner": owner,
+                "markers": [
+                    {"key": k, "label": lbl, "help": h,
+                     "value": marker_values.get(k, ""), "max": MARKER_MAX}
+                    for k, lbl, h in MARKERS
+                ] if owner else [],
                 "global_bank": global_bank,
                 "currency": await self._sc_currency(guild),
                 "limits": [
@@ -158,7 +184,9 @@ class DashboardIntegration:
         row = self._sc_row(member.display_name, stats)
         return row if (row["slots"] or row["blackjack"]) else None
 
-    async def _sc_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+    async def _sc_handle_post(
+        self, guild: discord.Guild, kwargs: dict, *, owner: bool = False
+    ) -> list[dict]:
         field = form_reader(kwargs)
         if field("action") != "save":
             return [{"message": "Unknown action.", "category": "warning"}]
@@ -203,9 +231,40 @@ class DashboardIntegration:
         for key, _lbl, _h in TOGGLES:
             await scope.get_attr(key).set(field.checked(f"t_{key}"))
 
+        # Markers are global and owner-only. A non-owner posting `m_*` fields by
+        # hand is ignored rather than refused, so a stale form cannot lock an
+        # admin out of saving the limits they are allowed to change.
+        saved_markers = 0
+        if owner:
+            for key, label, _h in MARKERS:
+                raw = field(f"m_{key}")
+                if raw is None:
+                    continue
+                raw = raw.strip()
+                if not raw:
+                    errors.append(
+                        {"message": f"{label}: cannot be blank.", "category": "danger"}
+                    )
+                    continue
+                if len(raw) > MARKER_MAX:
+                    errors.append(
+                        {
+                            "message": f"{label}: {len(raw)} characters is too long "
+                            f"(limit {MARKER_MAX}).",
+                            "category": "danger",
+                        }
+                    )
+                    continue
+                if raw != await self.config.get_attr(key)():
+                    await self.config.get_attr(key).set(raw)
+                    saved_markers += 1
+
+        saved = [f"{len(values)} limit(s)"]
+        if saved_markers:
+            saved.append(f"{saved_markers} marker(s)")
         return errors + [
             {
-                "message": f"Saved {len(values)} limit(s)"
+                "message": "Saved " + " and ".join(saved)
                 + (" (global bank)." if global_bank else "."),
                 "category": "success",
             }
@@ -253,13 +312,42 @@ CASINO_TEMPLATE = (
               <div style="font-size:.72rem; opacity:.45; margin-left:26px;">{{ t.help }}</div>
             </div>
           {% endfor %}
+          {% if not is_owner %}
           <div style="margin-top:14px;">
             <button class="dz-btn primary" name="action" value="save">
               <i class="fa fa-save"></i> Save
             </button>
           </div>
+          {% endif %}
         </div>
       </div>
+
+      {% if is_owner %}
+      <div class="dz-panel">
+        <h5><i class="fa fa-id-badge"></i> Table markers</h5>
+        <p class="dz-hint">
+          Drawn beside seats and cards. Text such as <code>(D)</code> works as
+          well as an emoji. These are bot-wide - every server sees the same
+          markers - which is why only you can edit them.
+        </p>
+        <div class="dz-grid two">
+          {% for m in markers %}
+            <div style="margin-bottom:11px;">
+              <div class="dz-label">{{ m.label }}</div>
+              <input class="dz-input" type="text" maxlength="{{ m.max }}"
+                     name="m_{{ m.key }}" value="{{ m.value }}" />
+              <div style="font-size:.72rem; opacity:.45; margin-top:4px;">{{ m.help }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <button class="dz-btn primary" name="action" value="save">
+          <i class="fa fa-save"></i> Save
+        </button>
+      </div>
+      {% endif %}
     </form>
   {% endif %}
 
