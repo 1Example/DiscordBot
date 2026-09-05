@@ -44,11 +44,10 @@ async def get_channel_counts(category, guild):
 
 
 class InfoChannel(DashboardIntegration, Cog):
-    """
-    Create a channel with updating server info
+    """Channels whose names carry live server counts.
 
-    This relies on editing channels, which is a strictly rate-limited activity.
-    As such, updates will not be frequent. Currently capped at 1 per 5 minutes per server.
+    Renaming a channel is heavily rate limited, so these refresh at most
+    once every five minutes.
     """
 
     def __init__(self, bot: Red):

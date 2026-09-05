@@ -234,11 +234,10 @@ class CommandObj:
 
 @cog_i18n(_)
 class CustomCommands(DashboardIntegration, commands.Cog):
-    """This cog contains commands for creating and managing custom commands that display text.
+    """Commands you write yourself that reply with stored text.
 
-    These are useful for storing information members might need, like FAQ answers or invite links.
-    Custom commands can be used by anyone by default, so be careful with pings.
-    Commands can only be lowercase, and will not respond to any uppercase letters.
+    Useful for FAQ answers and invite links. Names are lowercase, and
+    anyone can use them by default, so take care with pings.
     """
 
     def __init__(self, bot):

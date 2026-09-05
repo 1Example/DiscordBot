@@ -329,7 +329,7 @@ insults: List[str] = [
 
 @cog_i18n(_)
 class Insult(DashboardIntegration, commands.Cog):
-    """Airenkun's Insult Cog"""
+    """Insult someone. Affectionately."""
 
     __author__ = ["Airen", "JennJenn", "TrustyJAID"]
     __version__ = "1.0.0"

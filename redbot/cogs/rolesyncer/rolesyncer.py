@@ -11,7 +11,11 @@ _ = Translator("RoleSyncer", __file__)
 
 
 class RoleSyncer(DashboardIntegration, commands.Cog):
-    """Sync Roles"""
+    """Keep roles in step with one another.
+
+    Give someone one role and the other follows, in one direction or in
+    both.
+    """
 
     __version__ = "2.1.1"
 

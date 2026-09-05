@@ -30,9 +30,7 @@ CASETYPES = [
 
 
 class VrtUtils(DashboardIntegration, Utils, RPCMethods, commands.Cog, metaclass=CompositeMetaClass):
-    """
-    A collection of stateless utility commands for getting info about various things.
-    """
+    """Diagnostics and lookups: system stats, disk speed, server and user info."""
 
     __author__ = "[vertyco](https://github.com/vertyco/vrt-cogs)"
     __version__ = "2.18.0"

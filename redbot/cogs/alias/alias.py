@@ -33,12 +33,8 @@ class _TrackingFormatter(Formatter):
 class Alias(DashboardIntegration, commands.Cog):
     """Create aliases for commands.
 
-    Aliases are alternative names/shortcuts for commands. They
-    can act as both a lambda (storing arguments for repeated use)
-    or as simply a shortcut to saying "x y z".
-
-    When run, aliases will accept any additional arguments
-    and append them to the stored alias.
+    An alias is a shortcut name for another command. It can hold arguments
+    for repeated use, and anything typed after it is appended to those.
     """
 
     def __init__(self, bot: Red):

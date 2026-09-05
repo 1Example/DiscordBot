@@ -48,7 +48,7 @@ MAX_ROLL: Final[int] = 2**53 - 1
 
 @cog_i18n(_)
 class General(commands.Cog):
-    """General commands."""
+    """Dice, coin flips, 8 ball, server info and other odds and ends."""
 
     global _
     _ = lambda s: s

@@ -25,11 +25,10 @@ log = logging.getLogger("red.reports")
 
 @cog_i18n(_)
 class Reports(DashboardIntegration, commands.Cog):
-    """Create user reports that server staff can respond to.
+    """User reports that server staff can answer.
 
-    Users can open reports using `[p]report`. These are then sent
-    to a channel in the server for staff, and the report creator
-    gets a DM. Both can be used to communicate.
+    A report goes to a staff channel and opens a line back to the
+    reporter by DM, so the two can talk without sharing a channel.
     """
 
     default_guild_settings = {

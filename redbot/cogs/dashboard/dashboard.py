@@ -47,11 +47,7 @@ class SecretModal(discord.ui.Modal, title="Discord OAuth Secret"):
 
 @cog_i18n(_)
 class Dashboard(CogBase):
-    """Interact with your bot through a web Dashboard!
-
-    **Installation guide:** https://red-web-dashboard.readthedocs.io/en/latest
-    ⚠️ This package is a fork of Neuro Assassin's work, and isn't endorsed by the Org at all.
-    """
+    """Interact with your bot through a web Dashboard!"""
 
     __authors__: list[str] = ["AAA3A", "Neuro Assassin"]
 

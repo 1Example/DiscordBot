@@ -73,10 +73,10 @@ class LevelUp(
     commands.Cog,
     metaclass=CompositeMetaClass,
 ):
-    """
-    Your friendly neighborhood leveling system
+    """A leveling system for text and voice.
 
-    Earn experience by chatting in text and voice channels, compare levels with your friends, customize your profile and view various leaderboards!
+    Members earn experience by talking, compare levels with each other,
+    customise their profile card and appear on the leaderboards.
     """
 
     __author__ = "[vertyco](https://github.com/vertyco/vrt-cogs)"

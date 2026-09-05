@@ -27,15 +27,10 @@ DEPRECATION_NOTICE = _(
 
 @cog_i18n(_)
 class Downloader(DashboardIntegration, commands.Cog):
-    """Install community cogs made by Cog Creators.
+    """Install community cogs from third-party repositories.
 
-    Community cogs, also called third party cogs, are not included
-    in the default Red install.
-
-    Community cogs come in repositories. Repos are a group of cogs
-    you can install. You always need to add the creator's repository
-    using the `[p]repo` command before you can install one or more
-    cogs from the creator.
+    Community cogs are not part of the default install. They come in
+    repos, which you add before installing anything from them.
     """
 
     def __init__(self, bot: Red):

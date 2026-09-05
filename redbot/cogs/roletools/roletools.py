@@ -77,9 +77,7 @@ class RoleTools(
     commands.Cog,
     metaclass=CompositeMetaClass,
 ):
-    """
-    Role related tools for moderation
-    """
+    """Reaction roles, button roles, select menus and temporary roles."""
 
     __author__ = ["TrustyJAID"]
     __version__ = "1.6.0"

@@ -12,7 +12,7 @@ _ = Translator("Image", __file__)
 
 @cog_i18n(_)
 class Image(DashboardIntegration, commands.Cog):
-    """Image related commands."""
+    """Find a picture or a GIF, from Imgur, Giphy or a subreddit."""
 
     image = app_commands.Group(
         name="image",

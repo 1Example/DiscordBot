@@ -47,12 +47,10 @@ log = logging.getLogger("red.core.cogs.Streams")
 
 @cog_i18n(_)
 class Streams(DashboardIntegration, commands.Cog):
-    """Various commands relating to streaming platforms.
+    """Check whether a Twitch, YouTube, Picarto or Kick stream is live.
 
-    You can check if a Twitch, YouTube, Picarto or Kick stream is
-    currently live. Everything else - which streamers are announced where, the
-    alert messages, the mentions and the API credentials - lives on the
-    Streams page of the dashboard.
+    Who gets announced where, the alert messages, the mentions and the
+    API credentials all live on this cog's page.
     """
 
     stream_lookup = app_commands.Group(

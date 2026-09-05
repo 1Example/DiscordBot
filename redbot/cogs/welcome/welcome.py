@@ -60,9 +60,7 @@ log = getLogger("red.trusty-cogs.Welcome")
 
 
 class Welcome(DashboardIntegration, Events, commands.Cog):
-    """Welcomes new members and goodbye those who leave to the guild
-    in the default channel rewritten for V3 from
-    https://github.com/irdumbs/Dumb-Cogs/blob/master/welcome/welcome.py"""
+    """Greet new members and say goodbye to the ones who leave."""
 
     __author__ = ["irdumb", "TrustyJAID"]
     __version__ = "2.6.0"

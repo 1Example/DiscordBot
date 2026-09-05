@@ -1163,8 +1163,10 @@ class DashboardRPC:
             app_cmds = list(getattr(cog, "__cog_app_commands__", []) or [])
             if app_cmds:
                 cmds = cmds + await self.build_app_cmd_list(app_cmds)
-            if not cmds:
-                continue
+            # A cog with no commands at all is still a cog. Skipping it here
+            # left the Modules page with no name, description or author for
+            # it - which is most of them now that the settings live on their
+            # pages. The commands page does its own filtering.
 
             author = "Unknown"
             repo = "Unknown"

@@ -17,13 +17,10 @@ log = logging.getLogger("red.cleanup")
 
 @cog_i18n(_)
 class Cleanup(DashboardIntegration, commands.Cog):
-    """This cog contains commands used for "cleaning up" (deleting) messages.
+    """Bulk-delete messages from a channel.
 
-    This is designed as a moderator tool and offers many convenient use cases.
-    All cleanup commands only apply to the channel the command is executed in.
-
-    Messages older than two weeks cannot be mass deleted.
-    This is a limitation of the API.
+    Filter by author, by content, by age or by count. Discord refuses to
+    mass delete anything older than two weeks.
     """
 
     def __init__(self, bot: Red):

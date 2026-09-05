@@ -107,9 +107,7 @@ class TimezoneConverter(app_commands.Transformer):
 
 
 class Timestamp(DashboardIntegration, commands.Cog):
-    """
-    A discord timestamp creator cog.
-    """
+    """Build Discord timestamps, which read in each viewer's own timezone."""
 
     __author__ = ["TrustyJAID"]
     __version__ = "1.4.0"
