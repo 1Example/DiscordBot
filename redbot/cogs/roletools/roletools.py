@@ -403,6 +403,10 @@ class RoleTools(
     @roletools.command(name="giverole")
     @app_checks.bot_has_permissions(manage_roles=True)
     @app_checks.admin_or_permissions(manage_roles=True)
+    @app_commands.describe(
+        role="The role to hand out.",
+        who="Members, roles, or everyone - separated by spaces.",
+    )
     async def giverole(
         self,
         interaction: discord.Interaction,
@@ -505,6 +509,10 @@ class RoleTools(
     @roletools.command(name="removerole")
     @app_checks.bot_has_permissions(manage_roles=True)
     @app_checks.admin_or_permissions(manage_roles=True)
+    @app_commands.describe(
+        role="The role to take away.",
+        who="Members, roles, or everyone - separated by spaces.",
+    )
     async def removerole(
         self,
         interaction: discord.Interaction,
@@ -596,7 +604,10 @@ class RoleTools(
 
     @roletools.command(name="forcerole")
     @app_checks.admin_or_permissions(manage_roles=True)
-    @app_commands.describe(users="Members or user IDs, separated by spaces.")
+    @app_commands.describe(
+        users="Members or user IDs, separated by spaces.",
+        role="The role to give them, ignoring the usual requirements.",
+    )
     async def forcerole(
         self,
         interaction: discord.Interaction,
@@ -644,7 +655,10 @@ class RoleTools(
 
     @roletools.command(name="forceroleremove")
     @app_checks.admin_or_permissions(manage_roles=True)
-    @app_commands.describe(users="Members or user IDs, separated by spaces.")
+    @app_commands.describe(
+        users="Members or user IDs, separated by spaces.",
+        role="The role to take away, ignoring the usual requirements.",
+    )
     async def forceroleremove(
         self,
         interaction: discord.Interaction,
@@ -694,7 +708,10 @@ class RoleTools(
     @app_checks.bot_has_permissions(
         read_message_history=True, add_reactions=True, embed_links=True
     )
-    async def viewroles(self, interaction: discord.Interaction, *, role: Optional[discord.Role] = None) -> None:
+    @app_commands.describe(role="One role to look at. Leave empty for all of them.")
+    async def viewroles(
+        self, interaction: discord.Interaction, role: Optional[discord.Role] = None
+    ) -> None:
         """
         View current roletools setup for each role in the server
 
