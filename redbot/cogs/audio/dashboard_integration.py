@@ -9,10 +9,13 @@ from redbot.core import commands
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
+    channel_options,
     dashboard_page,
     form_reader,
     guild_member,
     is_staff,
+    member_options,
+    role_options,
 )
 
 log = logging.getLogger("red.audio.dashboard")
@@ -28,6 +31,21 @@ def _fmt_ms(milliseconds: float | int | None) -> str:
     minutes, seconds = divmod(rest, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
 
+
+# The seven settings that exist per server and again as a global ceiling.
+# (key, label, help)
+PLAYER_TOGGLES = (
+    ("auto_play", "Autoplay when the queue ends",
+     "Keep playing similar tracks once the queue runs out."),
+    ("shuffle", "Shuffle", "Play the queue in a random order."),
+    ("auto_shuffle", "Shuffle new tracks in",
+     "Shuffle each batch of tracks as it is added."),
+    ("self_deaf", "Deafen myself", "Join voice channels deafened."),
+    ("empty_queue_dc", "Leave when the queue ends",
+     "Disconnect once there is nothing left to play."),
+    ("alone_dc", "Leave when alone",
+     "Disconnect when the last person leaves the channel."),
+)
 
 # The pages of this module, in the order the subnav shows them. Owner-only ones
 # are dropped for everybody else, so nobody is offered a link to a 403.
@@ -82,6 +100,7 @@ class DashboardIntegration:
         if error:
             return error
         staff = await is_staff(self.bot, user, member, guild)
+        is_owner = await self.bot.is_owner(user)
 
         notifications: list[dict] = []
         if kwargs.get("method") == "POST":
@@ -91,17 +110,41 @@ class DashboardIntegration:
                     "error_title": "Forbidden",
                     "error_message": "Only server administrators can change audio settings.",
                 }
-            notifications = await self._au_handle_post(guild, kwargs)
+            notifications = await self._au_handle_post(guild, is_owner, kwargs)
 
         settings = await self._config.guild(guild).all()
         player = self.pylav.get_player(guild)
+        # One read: the DJ pickers need the same data the panels render.
+        player_settings = await self._au_player_settings(guild, is_owner)
 
         return {
             "status": 0,
             "notifications": notifications,
             "web_content": {
                 "source": AUDIO_TEMPLATE,
-                "audio_pages": audio_pages(await self.bot.is_owner(user)),
+                "audio_pages": audio_pages(is_owner),
+                "player": player_settings,
+                "player_toggles": [
+                    {"key": k, "label": lbl, "help": h}
+                    for k, lbl, h in PLAYER_TOGGLES
+                ],
+                "command_channels": channel_options(
+                    guild, kinds=("text", "voice", "stage"), require_send=True
+                ),
+                "voice_channels": channel_options(guild, kinds=("voice", "stage")),
+                "dj_role_options": role_options(
+                    guild,
+                    selected_many=[
+                        int(r["id"]) for r in player_settings["dj_roles"]
+                    ],
+                ),
+                "dj_member_options": member_options(
+                    guild,
+                    humans_only=True,
+                    selected_many=[
+                        int(u["id"]) for u in player_settings["dj_users"]
+                    ],
+                ),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "is_staff": staff,
@@ -186,9 +229,154 @@ class DashboardIntegration:
             return default
         return default if value is None else value
 
-    async def _au_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+
+    # --------------------------------------------------------- player setup
+
+    async def _au_player_settings(self, guild: discord.Guild, is_owner: bool) -> dict:
+        """What [p]playerset server and [p]playerset global report."""
+        config = self.pylav.player_config_manager.get_config(guild.id)
+        server = {key: bool(await getattr(config, f"fetch_{key}")()) for key, _l, _h in PLAYER_TOGGLES}
+        server["max_volume"] = await config.fetch_max_volume()
+        server["text_channel_id"] = await config.fetch_text_channel_id()
+        server["forced_channel_id"] = await config.fetch_forced_channel_id()
+        server["auto_play_playlist_id"] = await config.fetch_auto_play_playlist_id()
+
+        dj_roles, dj_users = [], []
+        for role_id in await config.fetch_dj_roles():
+            role = guild.get_role(role_id)
+            dj_roles.append({"id": str(role_id), "name": role.name if role else str(role_id)})
+        for user_id in await config.fetch_dj_users():
+            member = guild.get_member(user_id)
+            dj_users.append(
+                {"id": str(user_id), "name": member.display_name if member else str(user_id)}
+            )
+
+        out = {
+            "server": server,
+            "dj_roles": sorted(dj_roles, key=lambda r: r["name"].lower()),
+            "dj_users": sorted(dj_users, key=lambda u: u["name"].lower()),
+        }
+        if is_owner:
+            glob = self.pylav.player_manager.global_config
+            out["global"] = {
+                key: bool(await getattr(glob, f"fetch_{key}")()) for key, _l, _h in PLAYER_TOGGLES
+            }
+            out["global"]["max_volume"] = await glob.fetch_max_volume()
+        return out
+
+    async def _au_save_player(self, guild: discord.Guild, field, *, scope: str) -> list[dict]:
+        """Write the player defaults, for this server or for every server."""
+        if scope == "global":
+            config = self.pylav.player_manager.global_config
+        else:
+            config = self.pylav.player_config_manager.get_config(guild.id)
+
+        for key, _label, _help in PLAYER_TOGGLES:
+            await getattr(config, f"update_{key}")(field.checked(f"{scope}_{key}"))
+
+        volume = field.integer(f"{scope}_max_volume", 0) or 0
+        if not 1 <= volume <= 1000:
+            return [
+                {"message": "The maximum volume has to be between 1% and 1000%.",
+                 "category": "warning"}
+            ]
+        await config.update_max_volume(volume)
+
+        if scope == "global":
+            return [
+                {"message": "Saved. These are the defaults for every server.",
+                 "category": "success"}
+            ]
+
+        # Per-server only: which channels the player is pinned to, and what it
+        # autoplays from.
+        notes = []
+        for form_key, setter, kind in (
+            ("text_channel_id", "update_text_channel_id", "commands"),
+            ("forced_channel_id", "update_forced_channel_id", "voice"),
+        ):
+            raw = field.integer(form_key, 0) or 0
+            if raw:
+                channel = guild.get_channel(raw)
+                if channel is None:
+                    notes.append(
+                        {"message": f"That {kind} channel is not in this server.",
+                         "category": "warning"}
+                    )
+                    continue
+                if kind == "commands" and not channel.permissions_for(guild.me).send_messages:
+                    notes.append(
+                        {"message": f"I cannot send messages in #{channel.name}, so "
+                                    "locking commands there would silence me.",
+                         "category": "warning"}
+                    )
+                    continue
+            await getattr(config, setter)(raw or None)
+
+        playlist = (field("auto_play_playlist_id") or "").strip()
+        await config.update_auto_play_playlist_id(int(playlist) if playlist.isdigit() else None)
+        return notes + [{"message": "Player settings saved.", "category": "success"}]
+
+    async def _au_dj(self, guild: discord.Guild, field, *, action: str) -> list[dict]:
+        """The disc jockey lists, as [p]playerset server dj managed them."""
+        config = self.pylav.player_config_manager.get_config(guild.id)
+
+        if action == "dj_clear":
+            for role_id in list(await config.fetch_dj_roles()):
+                await config.remove_from_dj_roles(discord.Object(id=role_id))
+            for user_id in list(await config.fetch_dj_users()):
+                await config.remove_from_dj_users(discord.Object(id=user_id))
+            return [
+                {"message": "Cleared. With no DJs set, everyone can use the player.",
+                 "category": "success"}
+            ]
+
+        added = removed = 0
+        wanted_roles = {int(x) for x in field.many("dj_roles") if str(x).isdigit()}
+        current_roles = set(await config.fetch_dj_roles())
+        for role_id in wanted_roles - current_roles:
+            await config.add_to_dj_roles(discord.Object(id=role_id))
+            added += 1
+        for role_id in current_roles - wanted_roles:
+            await config.remove_from_dj_roles(discord.Object(id=role_id))
+            removed += 1
+
+        wanted_users = {int(x) for x in field.many("dj_users") if str(x).isdigit()}
+        current_users = set(await config.fetch_dj_users())
+        for user_id in wanted_users - current_users:
+            await config.add_to_dj_users(discord.Object(id=user_id))
+            added += 1
+        for user_id in current_users - wanted_users:
+            await config.remove_from_dj_users(discord.Object(id=user_id))
+            removed += 1
+
+        return [
+            {"message": f"DJs saved: {added} added, {removed} removed.",
+             "category": "success"}
+        ]
+
+    async def _au_handle_post(
+        self, guild: discord.Guild, is_owner: bool, kwargs: dict
+    ) -> list[dict]:
         field = form_reader(kwargs)
-        if field("action") != "save":
+        action = field("action")
+
+        try:
+            if action == "save_player":
+                return await self._au_save_player(guild, field, scope="server")
+            if action == "save_player_global":
+                if not is_owner:
+                    return [
+                        {"message": "Only the bot owner can change the global defaults.", "category": "danger"}
+                    ]
+                return await self._au_save_player(guild, field, scope="global")
+            if action in ("dj_save", "dj_clear"):
+                return await self._au_dj(guild, field, action=action)
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Audio dashboard action %r failed", action)
+            return [{"message": f"Action failed: {exc}", "category": "danger"}]
+
+        if action != "save":
             return [{"message": "Unknown action.", "category": "warning"}]
         conf = self._config.guild(guild)
         await conf.enable_slash.set(field.checked("enable_slash"))
@@ -218,6 +406,117 @@ AUDIO_TEMPLATE = (
   </div>
 
   {{ subnav(name, audio_pages, none, guild) }}
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-sliders"></i> Player settings for this server</h5>
+      <p class="dz-hint">How the player behaves here. The bot owner sets a
+         ceiling for the volume on every server further down.</p>
+      {% for t in player_toggles %}
+        <label class="dz-toggle">
+          <input type="checkbox" name="server_{{ t.key }}"
+                 {% if player.server[t.key] %}checked{% endif %} />
+          <span>{{ t.label }}</span>
+        </label>
+        <div class="dz-hint" style="margin:0 0 7px 30px;">{{ t.help }}</div>
+      {% endfor %}
+
+      <div class="dz-grid two" style="margin-top:9px;">
+        <div>
+          <div class="dz-label">Maximum volume (%)</div>
+          <input class="dz-input" type="number" min="1" max="1000"
+                 name="server_max_volume" value="{{ player.server.max_volume }}" />
+        </div>
+        <div>
+          <div class="dz-label">Autoplay playlist ID</div>
+          <input class="dz-input" type="text" name="auto_play_playlist_id"
+                 value="{{ player.server.auto_play_playlist_id or '' }}"
+                 placeholder="empty = PyLav picks" />
+        </div>
+      </div>
+
+      <div class="dz-grid two" style="margin-top:9px;">
+        <div>
+          <div class="dz-label">Only accept commands in</div>
+          {{ picker('text_channel_id', command_channels, allow_none=true,
+                    none_label='anywhere', placeholder='Search channels...') }}
+        </div>
+        <div>
+          <div class="dz-label">Only play in</div>
+          {{ picker('forced_channel_id', voice_channels, allow_none=true,
+                    none_label='any voice channel', placeholder='Search channels...') }}
+        </div>
+      </div>
+
+      <div class="dz-save">
+        <button class="dz-btn primary" name="action" value="save_player">
+          <i class="fa fa-save"></i> Save player settings
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-headphones"></i> Disc jockeys</h5>
+      <p class="dz-hint">
+        With nobody set, everyone can use the player. Set anyone here and the
+        player is theirs, plus anyone with Manage Server.
+        {% if player.dj_roles or player.dj_users %}
+          Currently
+          {{ player.dj_roles|length }} role(s) and {{ player.dj_users|length }} member(s).
+        {% endif %}
+      </p>
+      <div class="dz-grid two">
+        <div>
+          <div class="dz-label">DJ roles</div>
+          {{ picker('dj_roles', dj_role_options, multiple=true, size=7,
+                    placeholder='Search roles...') }}
+        </div>
+        <div>
+          <div class="dz-label">DJ members</div>
+          {{ picker('dj_users', dj_member_options, multiple=true, size=7,
+                    placeholder='Search members...') }}
+        </div>
+      </div>
+      <div class="dz-row" style="margin-top:11px;">
+        <button class="dz-btn primary" name="action" value="dj_save">
+          <i class="fa fa-save"></i> Save DJs
+        </button>
+        <button class="dz-btn danger" name="action" value="dj_clear"
+                onclick="return confirm('Let everyone use the player again?');">
+          <i class="fa fa-times"></i> Clear
+        </button>
+      </div>
+    </div>
+  </form>
+
+  {% if player.global %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-globe"></i> Defaults for every server</h5>
+        <p class="dz-hint">Owner only. A server cannot exceed the volume set here.</p>
+        {% for t in player_toggles %}
+          <label class="dz-toggle">
+            <input type="checkbox" name="global_{{ t.key }}"
+                   {% if player.global[t.key] %}checked{% endif %} />
+            <span>{{ t.label }}</span>
+          </label>
+        {% endfor %}
+        <div class="dz-label" style="margin-top:9px;">Maximum volume anywhere (%)</div>
+        <input class="dz-input" type="number" min="1" max="1000" style="max-width:200px;"
+               name="global_max_volume" value="{{ player.global.max_volume }}" />
+        <div class="dz-save">
+          <button class="dz-btn primary" name="action" value="save_player_global">
+            <i class="fa fa-save"></i> Save global defaults
+          </button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
 
   {% if state.current %}
     <div class="dz-panel">

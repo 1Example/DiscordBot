@@ -323,8 +323,16 @@ def role_options(
     return out
 
 
-def member_options(guild: discord.Guild, *, selected: int | None = None,
-                   limit: int = 500, humans_only: bool = False):
+def member_options(
+    guild: discord.Guild,
+    *,
+    selected: int | None = None,
+    selected_many=None,
+    limit: int = 500,
+    humans_only: bool = False,
+):
+    # `selected_many` mirrors role_options, for a multi-select of members.
+    chosen = {str(i) for i in (selected_many or [])}
     members = [m for m in guild.members if not (humans_only and m.bot)]
     members.sort(key=lambda m: m.display_name.lower())
     return [
@@ -332,7 +340,8 @@ def member_options(guild: discord.Guild, *, selected: int | None = None,
             "id": str(m.id),
             "name": m.display_name,
             "group": "Bots" if m.bot else "Members",
-            "selected": selected is not None and m.id == selected,
+            "selected": (selected is not None and m.id == selected)
+            or str(m.id) in chosen,
             "warn": False,
         }
         for m in members[:limit]
