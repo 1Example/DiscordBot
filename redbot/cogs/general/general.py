@@ -6,6 +6,7 @@ from typing import Final
 import urllib.parse
 import aiohttp
 import discord
+from discord import app_commands
 from redbot.core import commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
@@ -24,25 +25,25 @@ _ = T_ = Translator("General", __file__)
 
 
 class RPS(Enum):
-    rock = "\N{MOYAI}"
-    paper = "\N{PAGE FACING UP}"
-    scissors = "\N{BLACK SCISSORS}\N{VARIATION SELECTOR-16}"
+    """The three throws. discord.py turns this into the option's choices,
+    so the member names are what a person picks from.
+    """
+
+    rock = "rock"
+    paper = "paper"
+    scissors = "scissors"
 
 
-class RPSParser:
-    def __init__(self, argument):
-        argument = argument.lower()
-        if argument == "rock":
-            self.choice = RPS.rock
-        elif argument == "paper":
-            self.choice = RPS.paper
-        elif argument == "scissors":
-            self.choice = RPS.scissors
-        else:
-            self.choice = None
+EMOJI = {
+    RPS.rock: "\N{MOYAI}",
+    RPS.paper: "\N{PAGE FACING UP}",
+    RPS.scissors: "\N{BLACK SCISSORS}\N{VARIATION SELECTOR-16}",
+}
 
 
-MAX_ROLL: Final[int] = 2**63 - 1
+# Discord will not accept an integer option bound outside 2**53, which is
+# where a double stops counting whole numbers. The old ceiling was 2**63-1.
+MAX_ROLL: Final[int] = 2**53 - 1
 
 
 @cog_i18n(_)
@@ -84,56 +85,64 @@ class General(commands.Cog):
         """Nothing to delete"""
         return
 
-    @commands.command(usage="<first> <second> [others...]")
-    async def choose(self, ctx, *choices):
-        """Choose between multiple options.
-
-        There must be at least 2 options to pick from.
-        Options are separated by spaces.
-
-        To denote options which include whitespace, you should enclose the options in double quotes.
-        """
-        choices = [escape(c, mass_mentions=True) for c in choices if c]
+    @app_commands.command(
+        name="choose",
+        description="Choose between multiple options.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.describe(
+        options="At least two options, separated by | - or by spaces if you use no |."
+    )
+    async def choose(self, interaction: discord.Interaction, options: str):
+        """Choose between multiple options."""
+        ctx = await commands.Context.from_interaction(interaction)
+        # A slash command gets one string, so | is the separator when it is
+        # there. Without it this falls back to whitespace, which is what the
+        # prefix version did.
+        parts = options.split("|") if "|" in options else options.split()
+        choices = [escape(c.strip(), mass_mentions=True) for c in parts if c.strip()]
         if len(choices) < 2:
             await ctx.send(_("Not enough options to pick from."))
         else:
             await ctx.send(choice(choices))
 
-    @commands.command()
-    async def roll(self, ctx, number: int = 100):
-        """Roll a random number.
-
-        The result will be between 1 and `<number>`.
-
-        `<number>` defaults to 100.
-        """
-        author = ctx.author
-        if 1 < number <= MAX_ROLL:
-            n = randint(1, number)
-            await ctx.send(
-                "{author.mention} :game_die: {n} :game_die:".format(
-                    author=author, n=humanize_number(n)
-                )
+    @app_commands.command(
+        name="roll",
+        description="Roll a random number between 1 and the number you give.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.describe(number="The highest number to roll. Defaults to 100.")
+    async def roll(
+        self,
+        interaction: discord.Interaction,
+        number: app_commands.Range[int, 2, MAX_ROLL] = 100,
+    ):
+        """Roll a random number."""
+        # Discord enforces the range before the command runs, so the two
+        # out-of-bounds replies the prefix version needed are gone.
+        ctx = await commands.Context.from_interaction(interaction)
+        n = randint(1, number)
+        await ctx.send(
+            "{author.mention} :game_die: {n} :game_die:".format(
+                author=interaction.user, n=humanize_number(n)
             )
-        elif number <= 1:
-            await ctx.send(_("{author.mention} Maybe higher than 1? ;P").format(author=author))
-        else:
-            await ctx.send(
-                _("{author.mention} Max allowed number is {maxamount}.").format(
-                    author=author, maxamount=humanize_number(MAX_ROLL)
-                )
-            )
+        )
 
-    @commands.command()
-    async def flip(self, ctx, user: discord.Member = None):
-        """Flip a coin... or a user.
-
-        Defaults to a coin.
-        """
+    @app_commands.command(
+        name="flip",
+        description="Flip a coin, or flip a user upside down.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.describe(user="Who to flip. Leave empty to flip a coin.")
+    async def flip(
+        self, interaction: discord.Interaction, user: discord.Member = None
+    ):
+        """Flip a coin... or a user."""
+        ctx = await commands.Context.from_interaction(interaction)
         if user is not None:
             msg = ""
-            if user.id == ctx.bot.user.id:
-                user = ctx.author
+            if user.id == self.bot.user.id:
+                user = interaction.user
                 msg = _("Nice try. You think this is funny?\n How about *this* instead:\n\n")
             char = "abcdefghijklmnopqrstuvwxyz"
             tran = "ɐqɔpǝɟƃɥᴉɾʞlɯuodbɹsʇnʌʍxʎz"
@@ -147,17 +156,17 @@ class General(commands.Cog):
         else:
             await ctx.send(_("*flips a coin and... ") + choice([_("HEADS!*"), _("TAILS!*")]))
 
-    @commands.command()
-    async def rps(self, ctx, your_choice: RPSParser):
+    @app_commands.command(
+        name="rps",
+        description="Play Rock Paper Scissors.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.describe(your_choice="Rock, paper or scissors.")
+    async def rps(self, interaction: discord.Interaction, your_choice: RPS):
         """Play Rock Paper Scissors."""
-        author = ctx.author
-        player_choice = your_choice.choice
-        if not player_choice:
-            return await ctx.send(
-                _("This isn't a valid option. Try {r}, {p}, or {s}.").format(
-                    r="rock", p="paper", s="scissors"
-                )
-            )
+        ctx = await commands.Context.from_interaction(interaction)
+        author = interaction.user
+        player_choice = your_choice
         red_choice = choice((RPS.rock, RPS.paper, RPS.scissors))
         cond = {
             (RPS.rock, RPS.paper): False,
@@ -176,37 +185,48 @@ class General(commands.Cog):
         if outcome is True:
             await ctx.send(
                 _("{choice} You win {author.mention}!").format(
-                    choice=red_choice.value, author=author
+                    choice=EMOJI[red_choice], author=author
                 )
             )
         elif outcome is False:
             await ctx.send(
                 _("{choice} You lose {author.mention}!").format(
-                    choice=red_choice.value, author=author
+                    choice=EMOJI[red_choice], author=author
                 )
             )
         else:
             await ctx.send(
                 _("{choice} We're square {author.mention}!").format(
-                    choice=red_choice.value, author=author
+                    choice=EMOJI[red_choice], author=author
                 )
             )
 
-    @commands.command(name="8", aliases=["8ball"])
-    async def _8ball(self, ctx, *, question: str):
+    @app_commands.command(
+        name="8ball",
+        description="Ask 8 ball a question.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.describe(question="Your question. It must end with a question mark.")
+    async def _8ball(self, interaction: discord.Interaction, question: str):
         """Ask 8 ball a question.
 
         Question must end with a question mark.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if question.endswith("?") and question != "?":
             await ctx.send("`" + T_(choice(self.ball)) + "`")
         else:
             await ctx.send(_("That doesn't look like a question."))
 
-    @commands.command(aliases=["sw"])
-    async def stopwatch(self, ctx):
+    @app_commands.command(
+        name="stopwatch",
+        description="Start or stop your stopwatch.",
+        extras={"red_force_enable": True},
+    )
+    async def stopwatch(self, interaction: discord.Interaction):
         """Start or stop the stopwatch."""
-        author = ctx.author
+        ctx = await commands.Context.from_interaction(interaction)
+        author = interaction.user
         if author.id not in self.stopwatches:
             self.stopwatches[author.id] = int(time.perf_counter())
             await ctx.send(author.mention + _(" Stopwatch started!"))
@@ -218,21 +238,38 @@ class General(commands.Cog):
             )
             self.stopwatches.pop(author.id, None)
 
-    @commands.command()
-    async def lmgtfy(self, ctx, *, search_terms: str):
+    @app_commands.command(
+        name="lmgtfy",
+        description="Create a let-me-google-that-for-you link.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.describe(search_terms="What to search for.")
+    async def lmgtfy(self, interaction: discord.Interaction, search_terms: str):
         """Create a lmgtfy link."""
+        ctx = await commands.Context.from_interaction(interaction)
         search_terms = escape(urllib.parse.quote_plus(search_terms), mass_mentions=True)
         await ctx.send(
             f"https://cog-creators.github.io/lmgtfy/search?q={search_terms}&btnK=Google+Search"
         )
 
-    @commands.command(hidden=True)
-    @commands.guild_only()
-    async def hug(self, ctx, user: discord.Member, intensity: int = 1):
-        """Because everyone likes hugs!
-
-        Up to 10 intensity levels.
-        """
+    @app_commands.command(
+        name="hug",
+        description="Because everyone likes hugs!",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_commands.describe(
+        user="Who to hug.",
+        intensity="How big a hug, 0 to 10. Defaults to 1.",
+    )
+    async def hug(
+        self,
+        interaction: discord.Interaction,
+        user: discord.Member,
+        intensity: app_commands.Range[int, 0, 10] = 1,
+    ):
+        """Because everyone likes hugs!"""
+        ctx = await commands.Context.from_interaction(interaction)
         name = italics(user.display_name)
         if intensity <= 0:
             msg = "(っ˘̩╭╮˘̩)っ" + name
@@ -249,16 +286,22 @@ class General(commands.Cog):
             raise RuntimeError
         await ctx.send(msg)
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.bot_has_permissions(embed_links=True)
-    async def serverinfo(self, ctx, details: bool = False):
+    @app_commands.command(
+        name="serverinfo",
+        description="Show information about this server.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_commands.checks.bot_has_permissions(embed_links=True)
+    @app_commands.describe(details="Show the long version, with every feature listed.")
+    async def serverinfo(self, interaction: discord.Interaction, details: bool = False):
         """
         Show server information.
 
         `details`: Shows more information when set to `True`.
         Default to False.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         guild = ctx.guild
         created_at = _("Created on {date_and_time}. That's {relative_time}!").format(
             date_and_time=discord.utils.format_dt(guild.created_at),
@@ -472,12 +515,18 @@ class General(commands.Cog):
 
         await ctx.send(embed=data)
 
-    @commands.command()
-    async def urban(self, ctx, *, word):
+    @app_commands.command(
+        name="urban",
+        description="Look a word up on Urban Dictionary.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.describe(word="The word to look up.")
+    async def urban(self, interaction: discord.Interaction, word: str):
         """Search the Urban Dictionary.
 
         This uses the unofficial Urban Dictionary API.
         """
+        ctx = await commands.Context.from_interaction(interaction)
 
         try:
             url = "https://api.urbandictionary.com/v0/define"
