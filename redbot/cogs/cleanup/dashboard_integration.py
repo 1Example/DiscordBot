@@ -249,6 +249,12 @@ class DashboardIntegration:
                 log.exception("Cleanup deletion failed")
                 return ([{"message": f"Deletion failed: {exc}", "category": "danger"}], [], state)
 
+            # The page has a Notify toggle; honour it here, or the setting
+            # does nothing once the dashboard is the only way to clean up.
+            try:
+                await self.send_optional_notification(len(messages), channel)
+            except discord.HTTPException:
+                log.debug("Could not post the cleanup notification.", exc_info=True)
             log.info("Dashboard cleanup: %s removed %s messages from #%s (%s)",
                      actor, len(messages), channel.name, state["mode"])
             return (
