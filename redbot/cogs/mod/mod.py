@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import re
 from abc import ABC
 from collections import defaultdict
 from typing import Literal

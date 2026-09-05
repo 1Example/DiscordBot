@@ -378,7 +378,9 @@ class DashboardIntegration:
         name = (field("command_name") or "").strip().lstrip("/")
         if not name:
             return {"query": "", "error": "Enter a command name."}
-        command = self.bot.get_command(name)
+        # Looks in the application commands first; bot.get_command only
+        # knows the prefix ones, and most cogs no longer have any.
+        command = self._find_command(name)
         if command is None:
             return {"query": name, "error": "No loaded command by that name."}
 
