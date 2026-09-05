@@ -1,8 +1,10 @@
 from typing import Optional, Tuple
-from datetime import timezone, timedelta, datetime
+from datetime import timedelta, datetime
 from .abc import MixinMeta
 
 import discord
+from discord import app_commands
+
 from redbot.core import commands, i18n, modlog
 from redbot.core.utils.chat_formatting import (
     humanize_timedelta,
@@ -12,7 +14,6 @@ from redbot.core.utils.chat_formatting import (
 )
 from redbot.core.utils.mod import get_audit_reason
 
-from .converters import MuteTime
 
 _ = i18n.Translator("Mutes", __file__)
 
@@ -63,25 +64,32 @@ class VoiceMutes(MixinMeta):
             )
         return True, None
 
-    @commands.command(name="voicemute", usage="<users...> [reason]")
-    @commands.guild_only()
+    @app_commands.command(
+        name="voicemute",
+        description="Mute a member in voice.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_commands.describe(
+        member="Who to act on.",
+        time="How long, e.g. 30 minutes or 2 days. Leave empty for the server default.",
+        reason="Why. This goes in the modlog.",
+    )
     async def voice_mute(
         self,
-        ctx: commands.Context,
-        users: commands.Greedy[discord.Member],
-        *,
-        time_and_reason: MuteTime = {},
+        interaction: discord.Interaction,
+        member: discord.Member,
+        time: str = None,
+        reason: str = None,
     ):
-        """Mute a user in their current voice channel.
-
-        `<users...>` is a space separated list of usernames, ID's, or mentions.
-        `[time_and_reason]` is the time to mute for and reason. Time is
-        any valid time length such as `30 minutes` or `2 days`. If nothing
-        is provided the mute will use the set default time or indefinite if not set.
-
-        Examples:
-        `[p]voicemute @member1 @member2 spam 5 hours`
-        `[p]voicemute @member1 3 days`"""
+        """Mute a member in the voice channel they are in."""
+        ctx = await commands.Context.from_interaction(interaction)
+        users = [member]
+        try:
+            time_and_reason = await self._mute_time(ctx, time, reason)
+        except commands.BadArgument as error:
+            await ctx.send(str(error))
+            return
         if not users:
             return await ctx.send_help()
         if ctx.me in users:
@@ -165,19 +173,25 @@ class VoiceMutes(MixinMeta):
                 msg += f"{user}: {issue}\n"
             await ctx.send_interactive(pagify(msg))
 
-    @commands.command(name="voiceunmute", usage="<users...> [reason]")
-    @commands.guild_only()
+    @app_commands.command(
+        name="voiceunmute",
+        description="Unmute a member in voice.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_commands.describe(
+        member="Who to act on.",
+        reason="Why. This goes in the modlog.",
+    )
     async def unmute_voice(
         self,
-        ctx: commands.Context,
-        users: commands.Greedy[discord.Member],
-        *,
-        reason: Optional[str] = None,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        reason: str = None,
     ):
-        """Unmute a user in their current voice channel.
-
-        `<users...>` is a space separated list of usernames, ID's, or mentions.
-        `[reason]` is the reason for the unmute."""
+        """Lift a voice mute."""
+        ctx = await commands.Context.from_interaction(interaction)
+        users = [member]
         if not users:
             return await ctx.send_help()
         if ctx.me in users:

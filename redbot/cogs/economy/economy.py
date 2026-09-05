@@ -722,6 +722,17 @@ class Economy(DashboardIntegration, commands.Cog):
             )
         )
 
+    async def _too_soon(self, ctx: commands.Context, relative_time: str) -> str:
+        """Explain the wait, and say so differently when payday is automatic."""
+        if ctx.guild is not None and await self.config.guild(ctx.guild).AUTO_PAYDAY():
+            return _(
+                "{author.mention} You do not need this command here â€” the whole "
+                "server is paid together. The next payslip lands {relative_time}."
+            ).format(author=ctx.author, relative_time=relative_time)
+        return _("{author.mention} Too soon. Your next payday is {relative_time}.").format(
+            author=ctx.author, relative_time=relative_time
+        )
+
     @app_commands.command(
         name="payday",
         description="Claim your free currency.",

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import Optional, TypedDict
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta, datetime
 from typing_extensions import Annotated
 
 from discord.ext.commands.converter import Converter

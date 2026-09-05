@@ -199,23 +199,11 @@ class Warnings(DashboardIntegration, commands.Cog):
                         return await ctx.send(_("You cannot apply negative points."))
                     reason_type = {"description": reason, "points": points}
                 else:
-                    # logic taken from `[p]permissions canrun`
-                    fake_message = copy(ctx.message)
-                    fake_message.content = f"{ctx.prefix}warningset allowcustomreasons"
-                    fake_context = await ctx.bot.get_context(fake_message)
-                    try:
-                        can = await self.allowcustomreasons.can_run(
-                            fake_context,
-                            check_all_parents=True,
-                            change_permission_state=False,
-                        )
-                    except commands.CommandError:
-                        can = False
-                    if can:
+                    if await self.bot.is_admin(ctx.author):
                         msg += " " + _(
-                            "Do `{prefix}warningset allowcustomreasons true` to enable custom "
-                            "reasons."
-                        ).format(prefix=ctx.clean_prefix)
+                            "Custom reasons are off for this server. Turn them on "
+                            "under Warnings on the dashboard."
+                        )
                     return await ctx.send(msg)
         if reason_type is None:
             return

@@ -77,6 +77,25 @@ class Filter(DashboardIntegration, commands.Cog):
             ]
         )
 
+    def invalidate_cache(
+        self,
+        guild: discord.Guild,
+        channel: Optional[
+            Union[
+                discord.TextChannel,
+                discord.VoiceChannel,
+                discord.StageChannel,
+                discord.ForumChannel,
+            ]
+        ] = None,
+    ) -> None:
+        """Invalidate a cached pattern"""
+        self.pattern_cache.pop((guild.id, channel and channel.id), None)
+        if channel is None:
+            for keyset in list(self.pattern_cache.keys()):  # cast needed, no remove
+                if guild.id == keyset[0]:
+                    self.pattern_cache.pop(keyset, None)
+
     async def add_to_filter(
         self,
         server_or_channel: Union[
