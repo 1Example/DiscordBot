@@ -2,9 +2,10 @@ import asyncio
 import io
 import textwrap
 from copy import copy
-from typing import Union, Optional, Dict, List, Tuple, Any, Iterator, ItemsView, Literal, cast
+from typing import Union, Optional, Dict, List, Tuple, Any, Iterator, ItemsView, Literal
 
 import discord
+from discord import app_commands
 import yaml
 from schema import And, Or, Schema, SchemaError, Optional as UseOptional
 from redbot.core import commands, config
@@ -15,13 +16,7 @@ from redbot.core.utils.chat_formatting import box, error, success
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import ReactionPredicate, MessagePredicate
 
-from .converters import (
-    CogOrCommand,
-    RuleType,
-    ClearableRuleType,
-    GuildUniqueObjectFinder,
-    GlobalUniqueObjectFinder,
-)
+from .converters import CogOrCommand
 from .dashboard_integration import DashboardIntegration
 
 _ = Translator("Permissions", __file__)
@@ -184,99 +179,126 @@ class Permissions(DashboardIntegration, commands.Cog):
                 # have a potential impact on global configuration
                 # as well as the parent groups
                 if ctx.command in (
-                    self.permissions,  # main top level group
-                    self.permissions_acl,  # acl group
-                    self.permissions_acl_getguild,
-                    self.permissions_acl_setguild,
-                    self.permissions_acl_updateguild,
-                    self.permissions_addguildrule,
-                    self.permissions_clearguildrules,
-                    self.permissions_removeguildrule,
-                    self.permissions_setdefaultguildrule,
                     self.permissions_canrun,
-                    self.permissions_explain,
+                    self.permissions_acl_export,
+                    self.permissions_acl_import,
+                    self.permissions_acl_yaml_example,
                 ):
                     return True  # permission rules will be ignored at this case
 
         # this delegates to permissions rules, do not change to False which would deny
         return None
 
-    @commands.group()
-    async def permissions(self, ctx: commands.Context):
-        """Command permission management tools."""
-        pass
+    permissions = app_commands.Group(
+        name="permissions",
+        description="Command permission rules.",
+        extras={"red_force_enable": True},
+    )
+    acl = app_commands.Group(
+        name="acl",
+        description="Import and export the rules as a YAML file.",
+        parent=permissions,
+    )
 
-    @permissions.command(name="explain")
-    async def permissions_explain(self, ctx: commands.Context):
-        """Explain how permissions works."""
-        # Apologies in advance for the translators out there...
-
-        message = _(
-            "This cog extends the default permission model of the bot. By default, many commands "
-            "are restricted based on what the command can do.\n"
-            "This cog allows you to refine some of those restrictions. You can allow wider or "
-            "narrower access to most commands using it. You cannot, however, change the "
-            "restrictions on owner-only commands.\n\n"
-            "When additional rules are set using this cog, those rules will be checked prior to "
-            "checking for the default restrictions of the command.\n"
-            "Global rules (set by the owner) are checked first, then rules set for servers. If "
-            "multiple global or server rules apply to the case, the order they are checked in is:\n"
-            "1. Rules about a user.\n"
-            "2. Rules about the voice/stage channel a user is connected to.\n"
-            "3. Rules about the channel or a parent of the thread a command was issued in.\n"
-            "4. Rules about a role the user has (The highest role they have with a rule will be "
-            "used).\n"
-            "5. Rules about the server a user is in (Global rules only).\n\n"
-            "For more details, please read the [official documentation]"
-            "(https://docs.discord.red/en/stable/cog_permissions.html)."
-        )
-
-        await ctx.maybe_send_embed(message)
-
-    @permissions.command(name="canrun")
+    @permissions.command(
+        name="canrun", description="Check whether someone can run a command."
+    )
+    @app_commands.describe(
+        user="Who to check.",
+        command="The command, as you would type it without the leading slash.",
+    )
     async def permissions_canrun(
-        self, ctx: commands.Context, user: discord.Member, *, command: str
+        self, interaction: discord.Interaction, user: discord.Member, command: str
     ):
         """Check if a user can run a command.
 
-        This will take the current context into account, such as the
-        server and text channel.
+        Answered for this channel and server, which is where the rules that
+        matter usually live.
         """
-
-        if not command:
-            return await ctx.send_help()
+        ctx = await commands.Context.from_interaction(interaction)
+        name = command.strip().lstrip("/")
+        com = ctx.bot.get_command(name)
+        if com is None:
+            await ctx.send(_("No such command"))
+            return
 
         fake_message = copy(ctx.message)
         fake_message.author = user
-        fake_message.content = "{}{}".format(ctx.prefix, command)
-
-        com = ctx.bot.get_command(command)
-        if com is None:
-            out = _("No such command")
-        else:
-            fake_context = await ctx.bot.get_context(fake_message)
-            try:
-                can = await com.can_run(
-                    fake_context, check_all_parents=True, change_permission_state=False
-                )
-            except commands.CommandError:
-                can = False
-
-            out = (
-                success(_("That user can run the specified command."))
-                if can
-                else error(_("That user can not run the specified command."))
+        fake_message.content = f"{ctx.prefix}{name}"
+        fake_context = await ctx.bot.get_context(fake_message)
+        try:
+            can = await com.can_run(
+                fake_context, check_all_parents=True, change_permission_state=False
             )
-        await ctx.send(out)
+        except commands.CommandError:
+            can = False
 
-    @commands.guildowner_or_permissions(administrator=True)
-    @permissions.group(name="acl", aliases=["yaml"])
-    async def permissions_acl(self, ctx: commands.Context):
-        """Manage permissions with YAML files."""
+        await ctx.send(
+            success(_("That user can run the specified command."))
+            if can
+            else error(_("That user can not run the specified command."))
+        )
 
-    @permissions_acl.command(name="yamlexample")
-    async def permissions_acl_yaml_example(self, ctx: commands.Context):
+    @acl.command(name="export", description="Get a YAML file of every rule.")
+    @app_commands.describe(scope="Whose rules. Global is owner only.")
+    @app_commands.choices(
+        scope=[
+            app_commands.Choice(name="This server", value="server"),
+            app_commands.Choice(name="Global", value="global"),
+        ]
+    )
+    async def permissions_acl_export(
+        self, interaction: discord.Interaction, scope: str = "server"
+    ):
+        """Get a YAML file detailing the rules at one level."""
+        ctx = await commands.Context.from_interaction(interaction)
+        guild_id = await self._acl_scope(ctx, scope)
+        if guild_id is None:
+            return
+        file = await self._yaml_get_acl(guild_id=guild_id)
+        try:
+            await ctx.author.send(file=file)
+        except discord.Forbidden:
+            await ctx.send(_("I'm not allowed to DM you."))
+        else:
+            await ctx.send(_("I've just sent the file to you via DM."))
+        finally:
+            file.close()
+
+    @acl.command(name="import", description="Set rules from a YAML file.")
+    @app_commands.describe(
+        file="The YAML file of rules.",
+        scope="Whose rules to change. Global is owner only.",
+        merge="Keep rules the file does not mention. Off replaces everything.",
+    )
+    @app_commands.choices(
+        scope=[
+            app_commands.Choice(name="This server", value="server"),
+            app_commands.Choice(name="Global", value="global"),
+        ]
+    )
+    async def permissions_acl_import(
+        self,
+        interaction: discord.Interaction,
+        file: discord.Attachment,
+        scope: str = "server",
+        merge: bool = False,
+    ):
+        """Set rules from a YAML file.
+
+        With merge off this replaces every rule at that level. Command and cog
+        names in the file are not checked against what is loaded.
+        """
+        ctx = await commands.Context.from_interaction(interaction)
+        guild_id = await self._acl_scope(ctx, scope)
+        if guild_id is None:
+            return
+        await self._permissions_acl_set(ctx, guild_id=guild_id, update=merge, source=file)
+
+    @acl.command(name="example", description="Show the YAML layout an import expects.")
+    async def permissions_acl_yaml_example(self, interaction: discord.Interaction):
         """Sends an example of the yaml layout for permissions"""
+        ctx = await commands.Context.from_interaction(interaction)
         await ctx.send(
             _("Example YAML for setting rules:\n")
             + box(
@@ -297,244 +319,28 @@ class Permissions(DashboardIntegration, commands.Cog):
             )
         )
 
-    @commands.is_owner()
-    @permissions_acl.command(name="setglobal")
-    async def permissions_acl_setglobal(self, ctx: commands.Context):
-        """Set global rules with a YAML file.
+    async def _acl_scope(self, ctx, scope: str):
+        """The guild_id a scope means, or None once the refusal is sent.
 
-        **WARNING**: This will override reset *all* global rules
-        to the rules specified in the uploaded file.
-
-        This does not validate the names of commands and cogs before
-        setting the new rules.
+        The prefix commands split this into a global pair and a server pair,
+        each with its own check. One option, one check.
         """
-        await self._permissions_acl_set(ctx, guild_id=GLOBAL, update=False)
-
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(administrator=True)
-    @permissions_acl.command(name="setserver", aliases=["setguild"])
-    async def permissions_acl_setguild(self, ctx: commands.Context):
-        """Set rules for this server with a YAML file.
-
-        **WARNING**: This will override reset *all* rules in this
-        server to the rules specified in the uploaded file.
-        """
-        await self._permissions_acl_set(ctx, guild_id=ctx.guild.id, update=False)
-
-    @commands.is_owner()
-    @permissions_acl.command(name="getglobal")
-    async def permissions_acl_getglobal(self, ctx: commands.Context):
-        """Get a YAML file detailing all global rules."""
-        file = await self._yaml_get_acl(guild_id=GLOBAL)
-        try:
-            await ctx.author.send(file=file)
-        except discord.Forbidden:
-            await ctx.send(_("I'm not allowed to DM you."))
-        else:
-            if ctx.guild is not None:
-                await ctx.send(_("I've just sent the file to you via DM."))
-        finally:
-            file.close()
-
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(administrator=True)
-    @permissions_acl.command(name="getserver", aliases=["getguild"])
-    async def permissions_acl_getguild(self, ctx: commands.Context):
-        """Get a YAML file detailing all rules in this server."""
-        file = await self._yaml_get_acl(guild_id=ctx.guild.id)
-        try:
-            await ctx.author.send(file=file)
-        except discord.Forbidden:
-            await ctx.send(_("I'm not allowed to DM you."))
-        else:
-            await ctx.send(_("I've just sent the file to you via DM."))
-        finally:
-            file.close()
-
-    @commands.is_owner()
-    @permissions_acl.command(name="updateglobal")
-    async def permissions_acl_updateglobal(self, ctx: commands.Context):
-        """Update global rules with a YAML file.
-
-        This won't touch any rules not specified in the YAML
-        file.
-        """
-        await self._permissions_acl_set(ctx, guild_id=GLOBAL, update=True)
-
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(administrator=True)
-    @permissions_acl.command(name="updateserver", aliases=["updateguild"])
-    async def permissions_acl_updateguild(self, ctx: commands.Context):
-        """Update rules for this server with a YAML file.
-
-        This won't touch any rules not specified in the YAML
-        file.
-        """
-        await self._permissions_acl_set(ctx, guild_id=ctx.guild.id, update=True)
-
-    @commands.is_owner()
-    @permissions.command(name="addglobalrule", require_var_positional=True)
-    async def permissions_addglobalrule(
-        self,
-        ctx: commands.Context,
-        allow_or_deny: RuleType,
-        cog_or_command: CogOrCommand,
-        *who_or_what: GlobalUniqueObjectFinder,
-    ):
-        """Add a global rule to a command.
-
-        `<allow_or_deny>` should be one of "allow" or "deny".
-
-        `<cog_or_command>` is the cog or command to add the rule to.
-        This is case sensitive.
-
-        `<who_or_what...>` is one or more users, channels or roles the rule is for.
-        """
-        for w in who_or_what:
-            await self._add_rule(
-                rule=cast(bool, allow_or_deny),
-                cog_or_cmd=cog_or_command,
-                model_id=w.id,
-                guild_id=0,
-            )
-        await ctx.send(_("Rule added."))
-
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(administrator=True)
-    @permissions.command(
-        name="addserverrule", aliases=["addguildrule"], require_var_positional=True
-    )
-    async def permissions_addguildrule(
-        self,
-        ctx: commands.Context,
-        allow_or_deny: RuleType,
-        cog_or_command: CogOrCommand,
-        *who_or_what: GuildUniqueObjectFinder,
-    ):
-        """Add a rule to a command in this server.
-
-        `<allow_or_deny>` should be one of "allow" or "deny".
-
-        `<cog_or_command>` is the cog or command to add the rule to.
-        This is case sensitive.
-
-        `<who_or_what...>` is one or more users, channels or roles the rule is for.
-        """
-        for w in who_or_what:
-            await self._add_rule(
-                rule=cast(bool, allow_or_deny),
-                cog_or_cmd=cog_or_command,
-                model_id=w.id,
-                guild_id=ctx.guild.id,
-            )
-        await ctx.send(_("Rule added."))
-
-    @commands.is_owner()
-    @permissions.command(name="removeglobalrule", require_var_positional=True)
-    async def permissions_removeglobalrule(
-        self,
-        ctx: commands.Context,
-        cog_or_command: CogOrCommand,
-        *who_or_what: GlobalUniqueObjectFinder,
-    ):
-        """Remove a global rule from a command.
-
-        `<cog_or_command>` is the cog or command to remove the rule
-        from. This is case sensitive.
-
-        `<who_or_what...>` is one or more users, channels or roles the rule is for.
-        """
-        for w in who_or_what:
-            await self._remove_rule(cog_or_cmd=cog_or_command, model_id=w.id, guild_id=GLOBAL)
-        await ctx.send(_("Rule removed."))
-
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(administrator=True)
-    @permissions.command(
-        name="removeserverrule", aliases=["removeguildrule"], require_var_positional=True
-    )
-    async def permissions_removeguildrule(
-        self,
-        ctx: commands.Context,
-        cog_or_command: CogOrCommand,
-        *who_or_what: GlobalUniqueObjectFinder,
-    ):
-        """Remove a server rule from a command.
-
-        `<cog_or_command>` is the cog or command to remove the rule
-        from. This is case sensitive.
-
-        `<who_or_what...>` is one or more users, channels or roles the rule is for.
-        """
-        for w in who_or_what:
-            await self._remove_rule(
-                cog_or_cmd=cog_or_command, model_id=w.id, guild_id=ctx.guild.id
-            )
-        await ctx.send(_("Rule removed."))
-
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(administrator=True)
-    @permissions.command(name="setdefaultserverrule", aliases=["setdefaultguildrule"])
-    async def permissions_setdefaultguildrule(
-        self, ctx: commands.Context, allow_or_deny: ClearableRuleType, cog_or_command: CogOrCommand
-    ):
-        """Set the default rule for a command in this server.
-
-        This is the rule a command will default to when no other rule
-        is found.
-
-        `<allow_or_deny>` should be one of "allow", "deny" or "clear".
-        "clear" will reset the default rule.
-
-        `<cog_or_command>` is the cog or command to set the default
-        rule for. This is case sensitive.
-        """
-        await self._set_default_rule(
-            rule=cast(Optional[bool], allow_or_deny),
-            cog_or_cmd=cog_or_command,
-            guild_id=ctx.guild.id,
-        )
-        await ctx.send(_("Default set."))
-
-    @commands.is_owner()
-    @permissions.command(name="setdefaultglobalrule")
-    async def permissions_setdefaultglobalrule(
-        self, ctx: commands.Context, allow_or_deny: ClearableRuleType, cog_or_command: CogOrCommand
-    ):
-        """Set the default global rule for a command.
-
-        This is the rule a command will default to when no other rule
-        is found.
-
-        `<allow_or_deny>` should be one of "allow", "deny" or "clear".
-        "clear" will reset the default rule.
-
-        `<cog_or_command>` is the cog or command to set the default
-        rule for. This is case sensitive.
-        """
-        await self._set_default_rule(
-            rule=cast(Optional[bool], allow_or_deny), cog_or_cmd=cog_or_command, guild_id=GLOBAL
-        )
-        await ctx.send(_("Default set."))
-
-    @commands.is_owner()
-    @permissions.command(name="clearglobalrules")
-    async def permissions_clearglobalrules(self, ctx: commands.Context):
-        """Reset all global rules."""
-        agreed = await self._confirm(ctx)
-        if agreed:
-            await self._clear_rules(guild_id=GLOBAL)
-            await ctx.tick()
-
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(administrator=True)
-    @permissions.command(name="clearserverrules", aliases=["clearguildrules"])
-    async def permissions_clearguildrules(self, ctx: commands.Context):
-        """Reset all rules in this server."""
-        agreed = await self._confirm(ctx)
-        if agreed:
-            await self._clear_rules(guild_id=ctx.guild.id)
-            await ctx.tick()
+        if scope == "global":
+            if not await ctx.bot.is_owner(ctx.author):
+                await ctx.send(_("Only a bot owner can touch the global rules."))
+                return None
+            return GLOBAL
+        if ctx.guild is None:
+            await ctx.send(_("There is no server here to read rules from."))
+            return None
+        if not (
+            ctx.author.id == ctx.guild.owner_id
+            or ctx.author.guild_permissions.administrator
+            or await ctx.bot.is_owner(ctx.author)
+        ):
+            await ctx.send(_("You need to be the server owner or an administrator."))
+            return None
+        return ctx.guild.id
 
     @commands.Cog.listener()
     async def on_cog_add(self, cog: commands.Cog) -> None:
@@ -629,24 +435,14 @@ class Permissions(DashboardIntegration, commands.Cog):
                     rules.pop(str(guild_id), None)
 
     async def _permissions_acl_set(
-        self, ctx: commands.Context, guild_id: int, update: bool
+        self,
+        ctx: commands.Context,
+        guild_id: int,
+        update: bool,
+        source: discord.Attachment,
     ) -> None:
         """Set rules from a YAML file and handle response to users too."""
-        if not ctx.message.attachments:
-            await ctx.send(_("Supply a file with next message or type anything to cancel."))
-            try:
-                message = await ctx.bot.wait_for(
-                    "message", check=MessagePredicate.same_context(ctx), timeout=30
-                )
-            except asyncio.TimeoutError:
-                await ctx.send(_("You took too long to upload a file."))
-                return
-            if not message.attachments:
-                await ctx.send(_("You have cancelled the upload process."))
-                return
-            parsedfile = message.attachments[0]
-        else:
-            parsedfile = ctx.message.attachments[0]
+        parsedfile = source
 
         try:
             await self._yaml_set_acl(parsedfile, guild_id=guild_id, update=update)
