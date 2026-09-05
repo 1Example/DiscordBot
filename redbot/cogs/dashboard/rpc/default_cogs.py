@@ -2,10 +2,11 @@ import typing
 
 import discord
 
-from AAA3A_utils import CogsUtils
 from redbot.cogs.customcom.customcom import ArgParseError
 from redbot.core import commands
 from redbot.core.i18n import Translator
+
+from redbot.core.utils import synthetic_context
 
 from .utils import rpc_check
 
@@ -90,12 +91,10 @@ class DashboardRPC_DefaultCogs:
             existing_aliases = await Alias._aliases.get_guild_aliases(guild)
         else:
             existing_aliases = await Alias._aliases.get_global_aliases()
-        ctx = await CogsUtils.invoke_command(
+        ctx = await synthetic_context(
             bot=self.bot,
             author=member or self.bot.get_user(user_id),
             channel=discord.Object(id=0) if guild is None else guild.text_channels[0],
-            command="alias",
-            invoke=False,
         )
         existing_aliases = {alias.name: alias for alias in existing_aliases}
         errors = []
@@ -172,12 +171,10 @@ class DashboardRPC_DefaultCogs:
         CustomCommands = self.bot.get_cog("CustomCommands")
         if CustomCommands is None:
             return {"status": 2}
-        ctx = await CogsUtils.invoke_command(
+        ctx = await synthetic_context(
             bot=self.bot,
             author=member,
             channel=guild.text_channels[0],
-            command="customcom",
-            invoke=False,
         )
         existing_custom_commands = await CustomCommands.commandobj.get_commands(
             CustomCommands.config.guild(guild),

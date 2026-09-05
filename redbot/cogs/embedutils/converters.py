@@ -8,10 +8,10 @@ import aiohttp
 import discord
 import yaml
 
-from AAA3A_utils import Menu
 from redbot.core import commands, dev_commands
 from redbot.core.i18n import Translator
 from redbot.core.utils.chat_formatting import box
+from redbot.core.utils.views import SimpleMenu
 
 _: Translator = Translator("EmbedUtils", __file__)
 
@@ -187,7 +187,7 @@ class StringToEmbed(commands.Converter):
                 ctx=ctx,
             ),
         )
-        await Menu(pages=[embed]).start(ctx)
+        await SimpleMenu(pages=[embed]).start(ctx)
 
 
 class ListStringToEmbed(StringToEmbed):

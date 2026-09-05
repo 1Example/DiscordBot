@@ -118,39 +118,7 @@ class DashboardIntegration:
     @commands.Cog.listener()
     async def on_dashboard_cog_add(self, dashboard_cog) -> None:  # noqa: D401
         log.info("Dashboard cog found, registering MafiaGame as a third party.")
-        handler = dashboard_cog.rpc.third_parties_handler
-        handler.add_third_party(self)
-        self._mafia_drop_broken_settings_page(handler)
-
-    def _mafia_drop_broken_settings_page(self, handler) -> None:
-        """Hide the "settings" page AAA3A_utils adds to every cog it powers.
-
-        `add_third_party` builds its page list by scanning `dir(cog)`, and the
-        cog's `Settings` object has attached its own decorated callback there -
-        so registering this cog registers that page too. It cannot work here:
-        `rpc_callback_settings` reads `remove_profile_form`, which is only ever
-        assigned when the cog uses the profiles system, and this one does not.
-        Every request to it raises UnboundLocalError and the visitor gets
-        "Something went wrong."
-
-        Nothing is lost. All 39 settings are on the main page.
-        """
-        try:
-            pages = handler.third_parties.get(self.qualified_name) or {}
-            entry = pages.get("settings")
-            if entry is None:
-                return
-            callback = entry[0]
-            module = getattr(getattr(callback, "__func__", callback), "__module__", "")
-            # Only ever remove the library's own page, never one this cog adds.
-            if module.startswith("AAA3A_utils"):
-                pages.pop("settings", None)
-                log.info(
-                    "Hid the AAA3A_utils settings page for MafiaGame; it raises "
-                    "UnboundLocalError when the cog has no profiles system."
-                )
-        except Exception:  # noqa: BLE001 - never stop the cog registering
-            log.exception("Could not check the AAA3A_utils settings page")
+        dashboard_cog.rpc.third_parties_handler.add_third_party(self)
 
     # ------------------------------------------------------------------ pages
 
@@ -270,7 +238,7 @@ class DashboardIntegration:
 
         from redbot.core import commands as _commands
 
-        spec = (getattr(self, "settings", None) and self.settings.settings or {}).get(key, {})
+        spec = getattr(self, "_settings", {}).get(key, {})
         converter = spec.get("converter")
         description = spec.get("description", "")
         option = {

@@ -23,8 +23,8 @@ from wtforms.meta import DefaultMeta
 from wtforms.validators import ValidationError
 from wtforms.widgets import HiddenInput
 
-from AAA3A_utils import CogsUtils
 from redbot.core import commands
+from redbot.core.utils import synthetic_context
 
 INITIAL_INIT_FIELD = Field.__init__
 
@@ -265,7 +265,7 @@ async def get_form_class(
             pass
 
         async def convert(self, argument: str) -> typing.Any:
-            context = await CogsUtils.invoke_command(
+            context = await synthetic_context(
                 bot=_self.bot,
                 author=kwargs["user"],
                 channel=kwargs.get(
@@ -273,12 +273,9 @@ async def get_form_class(
                     (
                         kwargs["guild"].text_channels[0]
                         if kwargs.get("guild") is not None
-                        else kwargs["user"].create_dm()
+                        else await kwargs["user"].create_dm()
                     ),
                 ),
-                command="ping",
-                invoke=False,
-                cog=third_party_cog,
             )
             return await discord.ext.commands.converter.run_converters(
                 context,

@@ -6,7 +6,8 @@ import typing
 
 import discord
 
-from AAA3A_utils import CogsUtils
+from redbot.core.utils import synthetic_context
+from redbot.core.utils.views import confirm
 from redbot.core import bank, commands
 from redbot.core.i18n import Translator
 from redbot.core.utils.chat_formatting import humanize_timedelta
@@ -1266,7 +1267,7 @@ class SuicideView(discord.ui.View):
                 "send": functools.partial(interaction.followup.send, wait=True),
             },
         )()
-        if await CogsUtils.ConfirmationAsk(
+        if await confirm(
             fake_context,
             embed=embed,
             ephemeral=True,
@@ -1896,12 +1897,20 @@ class ExplainView(discord.ui.View):
     ) -> None:
         await interaction.response.defer()
         command = self.pages[self.page]["command"]
-        await CogsUtils.invoke_command(
-            bot=interaction.client,
+        # These pages point at this cog's own commands. They are still
+        # prefix commands, so this runs one the way a person would; when
+        # MafiaGame moves to slash commands the button should call the
+        # callback instead of going back through the message parser.
+        bot = interaction.client
+        prefixes = await bot.get_valid_prefixes(guild=interaction.guild)
+        context = await synthetic_context(
+            bot=bot,
             author=interaction.user,
             channel=interaction.channel,
-            command=command,
+            content=f"{prefixes[0]}{command}",
         )
+        if context.valid:
+            await bot.invoke(context)
 
     @discord.ui.button(emoji="✖️", style=discord.ButtonStyle.danger)
     async def close(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:

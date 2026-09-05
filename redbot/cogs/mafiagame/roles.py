@@ -6,7 +6,7 @@ import typing
 from dataclasses import dataclass, field
 
 import discord
-from AAA3A_utils import CogsUtils
+from redbot.core.utils.views import confirm
 from redbot.core.i18n import Translator
 from redbot.core.utils.chat_formatting import humanize_list
 
@@ -1120,7 +1120,7 @@ class Mayor(Role):
                 "send": functools.partial(interaction.followup.send, wait=True),
             },
         )()
-        if await CogsUtils.ConfirmationAsk(
+        if await confirm(
             fake_context,
             embed=embed,
             file=cls.get_image(night.game),
@@ -2914,7 +2914,7 @@ class Lawyer(Role):
                 "send": functools.partial(interaction.followup.send, wait=True),
             },
         )()
-        if await CogsUtils.ConfirmationAsk(
+        if await confirm(
             fake_context,
             embed=embed,
             file=cls.get_image(day.game),
@@ -3268,7 +3268,7 @@ class Manipulator(Role):
                 "send": functools.partial(interaction.followup.send, wait=True),
             },
         )()
-        if await CogsUtils.ConfirmationAsk(
+        if await confirm(
             fake_context,
             embed=embed,
             file=cls.get_image(day.game),

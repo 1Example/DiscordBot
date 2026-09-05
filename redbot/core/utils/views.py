@@ -11,7 +11,7 @@ from redbot.core.commands.converter import get_dict_converter
 if TYPE_CHECKING:
     from redbot.core.commands import Context
 
-__all__ = ("SimpleMenu", "SetApiModal", "SetApiView", "ConfirmView")
+__all__ = ("SimpleMenu", "SetApiModal", "SetApiView", "ConfirmView", "confirm")
 
 _ = Translator("UtilsViews", __file__)
 
@@ -703,3 +703,37 @@ class ConfirmView(discord.ui.View):
             )
             return False
         return True
+
+
+async def confirm(
+    ctx: Context,
+    content: Optional[str] = None,
+    *,
+    embed: Optional[discord.Embed] = None,
+    file: Optional[discord.File] = None,
+    ephemeral: bool = False,
+    timeout: float = 60.0,
+    timeout_message: Optional[str] = None,
+    author: Optional[discord.abc.User] = None,
+) -> bool:
+    """Ask a yes/no question and wait for the answer.
+
+    Returns whether the user said yes; a timeout is a no. `ConfirmView` is
+    the view underneath - this is the ask-and-wait around it, so a caller
+    with one question does not have to send, wait and tidy up by hand.
+
+    Replaces AAA3A_utils' ``CogsUtils.ConfirmationAsk``.
+    """
+    view = ConfirmView(author or ctx.author, timeout=timeout, disable_buttons=True)
+    kwargs = {"view": view, "ephemeral": ephemeral}
+    if content is not None:
+        kwargs["content"] = content
+    if embed is not None:
+        kwargs["embed"] = embed
+    if file is not None:
+        kwargs["file"] = file
+    view.message = await ctx.send(**kwargs)
+    await view.wait()
+    if view.result is None and timeout_message is not None:
+        await ctx.send(timeout_message, ephemeral=ephemeral)
+    return bool(view.result)

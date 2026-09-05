@@ -9,11 +9,11 @@ from discord import app_commands
 # import sys
 from fernet import Fernet
 
-from AAA3A_utils import Cog
 from redbot.core import Config, commands
 from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
+from redbot.core.utils.cog_base import CogBase
 
 from .logs import DashboardLogHandler
 from .rpc import DashboardRPC
@@ -46,7 +46,7 @@ class SecretModal(discord.ui.Modal, title="Discord OAuth Secret"):
 
 
 @cog_i18n(_)
-class Dashboard(Cog):
+class Dashboard(CogBase):
     """Interact with your bot through a web Dashboard!
 
     **Installation guide:** https://red-web-dashboard.readthedocs.io/en/latest

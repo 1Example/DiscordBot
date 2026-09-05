@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import discord
 from redbot.core import commands
 from redbot.core.bot import Red
+from redbot.core.utils import generate_key
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
@@ -583,7 +584,6 @@ class DashboardIntegration:
         ValueError
             With the reason, for anything Discord or the cog will not accept.
         """
-        from AAA3A_utils import CogsUtils
 
         from .views import CreateTicketView
 
@@ -610,7 +610,7 @@ class DashboardIntegration:
                     raise ValueError("A dropdown holds at most 25 options.")
                 if description is not None and len(description) > 100:
                     raise ValueError("A description is at most 100 characters.")
-                identifier = CogsUtils.generate_key(
+                identifier = generate_key(
                     length=5, existing_keys=components["dropdown_options"]
                 )
                 components["dropdown_options"][identifier] = {
@@ -623,7 +623,7 @@ class DashboardIntegration:
             else:
                 if len(components["buttons"]) >= 20:
                     raise ValueError("A message holds at most 20 buttons.")
-                identifier = CogsUtils.generate_key(
+                identifier = generate_key(
                     length=5, existing_keys=components["buttons"]
                 )
                 components["buttons"][identifier] = {

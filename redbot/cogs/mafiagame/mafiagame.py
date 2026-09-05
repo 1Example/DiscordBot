@@ -4,12 +4,14 @@ from copy import deepcopy
 
 import discord
 
-from AAA3A_utils import Cog, CogsUtils, Loop, Menu, Settings
-from AAA3A_utils.context import is_dev
+from discord.ext import tasks
+
 from redbot.core import Config, app_commands, commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import humanize_timedelta
+from redbot.core.utils.cog_base import CogBase
+from redbot.core.utils.views import SimpleMenu, confirm as ask_confirmation
 
 from .anomalies import ANOMALIES, Anomaly
 from .constants import ACHIEVEMENTS_COLOR, DEVELOPER, HELPERS, SUPPORTERS, TESTERS
@@ -86,7 +88,7 @@ DurationConverter: commands.converter.TimedeltaConverter = commands.converter.Ti
 
 
 @cog_i18n(_)
-class MafiaGame(DashboardIntegration, Cog):
+class MafiaGame(DashboardIntegration, CogBase):
     """Play the Mafia game, with many roles (Mafia/Villagers/Neutral), modes (including Random and Custom), anomalies...!"""
 
     def __init__(self, bot: Red) -> None:
@@ -335,40 +337,28 @@ class MafiaGame(DashboardIntegration, Cog):
                 "no_slash": True,
             },
         }
-        self.settings: Settings = Settings(
-            bot=self.bot,
-            cog=self,
-            config=self.config,
-            group=self.config.GUILD,
-            settings=_settings,
-            global_path=[],
-            use_profiles_system=False,
-            can_edit=True,
-            commands_group=self.setmafia,
-        )
+        # The schema stays: the page reads it to decide what control to
+        # draw for each setting. What went with AAA3A_utils' Settings is
+        # the [p]setmafia subcommand it generated per entry - all 39 of
+        # them are on the page.
+        self._settings: dict[str, dict[str, typing.Any]] = _settings
 
         self.games: dict[discord.Guild, Game] = {}
         self.last_games: dict[discord.Guild, Game] = {}
 
     async def cog_load(self) -> None:
         await super().cog_load()
-        await self.settings.add_commands()
-        self.loops.append(
-            Loop(
-                cog=self,
-                name="Check Temp Bans",
-                function=self.check_temp_bans,
-                seconds=30,
-            ),
-        )
-        if is_dev(self.bot):
+        check = tasks.loop(seconds=30, name="Check Temp Bans")(self.check_temp_bans)
+        self.loops.append(check)
+        check.start()
+        if self.bot.get_cog("Dev") is not None:
             self.bot.add_dev_env_value(
                 name="mafia_game",
                 value=lambda ctx: self.games.get(ctx.guild) or self.last_games.get(ctx.guild),
             )
 
     async def cog_unload(self) -> None:
-        if is_dev(self.bot):
+        if self.bot.get_cog("Dev") is not None:
             self.bot.remove_dev_env_value("mafia_game")
         await super().cog_unload()
 
@@ -509,7 +499,7 @@ class MafiaGame(DashboardIntegration, Cog):
             raise commands.UserFeedbackCheckFailure(
                 _("No game is currently running in this guild."),
             )
-        if not confirm and not await CogsUtils.ConfirmationAsk(
+        if not confirm and not await ask_confirmation(
             ctx,
             _("Are you sure you want to end the current game of Mafia?"),
         ):
@@ -530,13 +520,13 @@ class MafiaGame(DashboardIntegration, Cog):
     async def role(self, ctx: commands.Context, *, role: RoleConverter) -> None:
         """Show the informations about a specific role."""
         theme = await self.config.guild(ctx.guild).theme()
-        await Menu(pages=[role.get_kwargs(theme=theme)]).start(ctx)
+        await SimpleMenu(pages=[role.get_kwargs(theme=theme)]).start(ctx)
 
     @mafia.command()
     async def roles(self, ctx: commands.Context) -> None:
         """Show the different roles of the Mafia game."""
         theme = await self.config.guild(ctx.guild).theme()
-        await Menu(
+        await SimpleMenu(
             pages=[
                 role.get_kwargs(theme=theme)
                 for role in ROLES
@@ -547,12 +537,12 @@ class MafiaGame(DashboardIntegration, Cog):
     @mafia.command()
     async def mode(self, ctx: commands.Context, *, mode: ModeConverter) -> None:
         """Show the informations about a specific mode."""
-        await Menu(pages=[mode.get_kwargs()]).start(ctx)
+        await SimpleMenu(pages=[mode.get_kwargs()]).start(ctx)
 
     @mafia.command()
     async def modes(self, ctx: commands.Context) -> None:
         """Show the different modes of the Mafia game."""
-        await Menu(
+        await SimpleMenu(
             pages=[mode.get_kwargs() for mode in MODES],
         ).start(ctx)
 
@@ -572,12 +562,12 @@ class MafiaGame(DashboardIntegration, Cog):
     @mafia.command()
     async def anomaly(self, ctx: commands.Context, *, anomaly: AnomalyConverter) -> None:
         """Show the information about a specific anomaly."""
-        await Menu(pages=[anomaly.get_kwargs()]).start(ctx)
+        await SimpleMenu(pages=[anomaly.get_kwargs()]).start(ctx)
 
     @mafia.command()
     async def anomalies(self, ctx: commands.Context) -> None:
         """Show the different anomalies of the Mafia game."""
-        await Menu(
+        await SimpleMenu(
             pages=[anomaly.get_kwargs() for anomaly in ANOMALIES],
         ).start(ctx)
 
@@ -674,7 +664,7 @@ class MafiaGame(DashboardIntegration, Cog):
         else:
             image = role.name.lower().replace(" ", "_")
             embed.set_thumbnail(url=f"attachment://{image}.png")
-        await Menu(
+        await SimpleMenu(
             pages=[
                 {
                     "embed": embed,

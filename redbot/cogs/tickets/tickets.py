@@ -4,12 +4,15 @@ import typing
 
 import discord
 
-from AAA3A_utils import Cog, Loop, Menu
+from discord.ext import tasks
+
 from redbot.core import Config, app_commands, commands, modlog
 from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import humanize_list, pagify
+from redbot.core.utils.cog_base import CogBase
+from redbot.core.utils.views import SimpleMenu
 
 from .dashboard_integration import DashboardIntegration
 from .types import Ticket, get_non_animated_asset
@@ -89,7 +92,7 @@ def support_any_profile_predicate():
     return predicate
 
 @cog_i18n(_)
-class Tickets(DashboardIntegration, Cog):
+class Tickets(DashboardIntegration, CogBase):
     """Configure and manage a tickets system for your server!"""
 
     def __init__(self, bot: Red) -> None:
@@ -266,14 +269,9 @@ class Tickets(DashboardIntegration, Cog):
         view: ClosedTicketControls = ClosedTicketControls(cog=self)
         self.bot.add_view(view)
         self.views["ClosedTicketControls"] = view
-        self.loops.append(
-            Loop(
-                cog=self,
-                name="Check Tickets",
-                function=self.check_tickets,
-                minutes=1,
-            ),
-        )
+        check = tasks.loop(minutes=1, name="Check Tickets")(self.check_tickets)
+        self.loops.append(check)
+        check.start()
 
     async def check_tickets(self) -> None:
         for guild_id, tickets in self.tickets.copy().items():
@@ -836,7 +834,8 @@ class Tickets(DashboardIntegration, Cog):
                 color=await ctx.embed_color(),
             ),
         )
-        await Menu(pages=[{"embeds": embeds}]).start(ctx)
+        # One page carrying every embed, so this is a menu only in name.
+        await SimpleMenu(pages=[{"embeds": embeds}]).start(ctx)
 
     @ticket.command(name="show", description="Show a ticket's details.")
     @is_support_any_profile_app()
@@ -935,7 +934,8 @@ class Tickets(DashboardIntegration, Cog):
                 e = embed.copy()
                 e.description = page
                 embeds.append(e)
-        await Menu(pages=embeds, page_start=-1).start(ctx)
+        # The newest page first: this is a transcript.
+        await SimpleMenu(pages=embeds, page_start=len(embeds) - 1).start(ctx)
 
     @ticket.command(name="close", description="Close a ticket.")
     @is_support_app()

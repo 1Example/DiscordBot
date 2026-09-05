@@ -6,11 +6,13 @@ from urllib.parse import quote
 import aiohttp
 import discord
 
-from AAA3A_utils import Cog, CogsUtils, Menu
 from redbot.core import Config, app_commands, commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
+from redbot.core.utils import get_or_create_webhook
 from redbot.core.utils.chat_formatting import pagify, text_to_file
+from redbot.core.utils.cog_base import CogBase
+from redbot.core.utils.views import SimpleMenu
 
 from .converters import (
     ListStringToEmbed,
@@ -43,7 +45,7 @@ PASTEBIN_LIST_CONVERTER = PastebinListConverter(conversion_type="json")
 
 
 @cog_i18n(_)
-class EmbedUtils(DashboardIntegration, Cog):
+class EmbedUtils(DashboardIntegration, CogBase):
     """Create, send, and store rich embeds, from Red-Web-Dashboard too!"""
 
     __authors__: list[str] = ["PhenoM4n4n", "AAA3A"]
@@ -682,7 +684,7 @@ class EmbedUtils(DashboardIntegration, Cog):
             e = embed.copy()
             e.description = page
             embeds.append(e)
-        await Menu(pages=embeds).start(ctx)
+        await SimpleMenu(pages=embeds).start(ctx)
 
     @commands.mod_or_permissions(manage_guild=True)
     @embed.command(
@@ -850,7 +852,9 @@ class EmbedUtils(DashboardIntegration, Cog):
                 stored_embeds[name]["uses"] += 1
         try:
             channel = channel or ctx.channel
-            hook: discord.Webhook = await CogsUtils.get_hook(bot=self.bot, channel=channel)
+            hook: discord.Webhook = await get_or_create_webhook(
+                bot=self.bot, channel=channel
+            )
             await hook.send(
                 embeds=embeds,
                 username=username,

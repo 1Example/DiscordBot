@@ -17,3 +17,4 @@ def rpc_check():
         return rpccheckwrapped
 
     return conditional
+

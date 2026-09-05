@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import chat_exporter
 import discord
 
-from AAA3A_utils import CogsUtils
+from redbot.core.utils.views import confirm
 from redbot.core import bank, commands
 from redbot.core.errors import BalanceTooHigh
 from redbot.core.i18n import Translator
@@ -1382,7 +1382,7 @@ class Game:
         if self.channel.permissions_for(self.ctx.guild.me).manage_channels:
             if not self.config["channel_auto_delete"]:
                 await asyncio.sleep(10)
-                if not await CogsUtils.ConfirmationAsk(
+                if not await confirm(
                     self.ctx,
                     _(
                         "{host.mention} Do you want to delete the channel of the previous Mafia game?",

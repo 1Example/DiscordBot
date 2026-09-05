@@ -1,8 +1,8 @@
 import discord
 
-from AAA3A_utils import Cog
 from redbot.core import app_commands, commands
 from redbot.core.i18n import Translator, cog_i18n
+from redbot.core.utils.cog_base import CogBase
 
 from .dashboard_integration import DashboardIntegration
 from .view import SplitOrStealGameView
@@ -15,7 +15,7 @@ _: Translator = Translator("SplitOrStealGame", __file__)
 
 
 @cog_i18n(_)
-class SplitOrStealGame(DashboardIntegration, Cog):
+class SplitOrStealGame(DashboardIntegration, CogBase):
     """A cog to play a match of Split Or Steal game!"""
 
     @property

@@ -1,11 +1,15 @@
 from __future__ import annotations
 import asyncio
+import datetime
 import json
 import logging
+import secrets
+import string
 from asyncio import as_completed, Semaphore
 from asyncio.futures import isfuture
 from itertools import chain
 from pathlib import Path
+import typing
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -34,6 +38,10 @@ from discord.utils import maybe_coroutine
 from redbot.core import commands
 
 if TYPE_CHECKING:
+    # Imported for the annotation only: redbot.core.bot imports this
+    # module, so importing it at runtime would be a cycle.
+    from redbot.core.bot import Red
+
     GuildMessageable = Union[
         commands.GuildContext,
         discord.TextChannel,
@@ -55,6 +63,9 @@ __all__ = (
     "can_user_send_messages_in",
     "can_user_manage_channel",
     "can_user_react_in",
+    "generate_key",
+    "get_or_create_webhook",
+    "synthetic_context",
 )
 
 log = logging.getLogger("red.core.utils")
@@ -854,3 +865,94 @@ def can_user_react_in(obj: discord.abc.User, messageable: discord.abc.Messageabl
         )
 
     return perms.read_message_history and perms.add_reactions
+
+
+def generate_key(
+    length: int = 10,
+    existing_keys: Iterable[str] = (),
+    characters: str = string.ascii_lowercase + string.digits,
+) -> str:
+    """A short random identifier that is not already in ``existing_keys``.
+
+    For naming things a person will see and retype - a dropdown option, a
+    button - rather than anything that needs to be unguessable. It is drawn
+    from `secrets` all the same, since that costs nothing.
+    """
+    existing_keys = set(existing_keys)
+    while True:
+        key = "".join(secrets.choice(characters) for _ in range(length))
+        if key not in existing_keys:
+            return key
+
+
+async def get_or_create_webhook(
+    bot: Red, channel: discord.TextChannel
+) -> discord.Webhook:
+    """The bot's own webhook in ``channel``, creating one if it has none.
+
+    Needs Manage Webhooks in the channel, and raises `discord.Forbidden`
+    without it.
+    """
+    hook = discord.utils.find(
+        lambda webhook: webhook.user is not None and webhook.user.id == bot.user.id,
+        await channel.webhooks(),
+    )
+    if hook is None:
+        hook = await channel.create_webhook(name=f"red_bot_hook_{channel.id}")
+    return hook
+
+
+async def synthetic_context(
+    bot: Red,
+    author: discord.abc.User,
+    channel: typing.Any,
+    content: str = "",
+) -> commands.Context:
+    """A Context for code that has no message to build one from.
+
+    Red's converters, and the Alias and CustomCommands APIs, all take a
+    Context and read the bot, author, guild and channel off it. A dashboard
+    request or a button press has all four and no message, so this stands one
+    in. With ``content`` left empty the Context is inert; pass a prefixed
+    command string and it resolves, so `Red.invoke` will run it.
+
+    This replaces AAA3A_utils' ``CogsUtils.invoke_command``.
+    """
+    created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    message: discord.Message = discord.Message(
+        channel=channel,
+        state=bot._connection,
+        data={
+            "id": discord.utils.time_snowflake(created_at),
+            "type": 0,
+            "content": content,
+            "channel_id": str(getattr(channel, "id", 0)),
+            "author": {
+                "id": str(author.id),
+                "username": author.display_name,
+                "avatar": author.avatar,
+                "avatar_decoration": None,
+                "discriminator": str(author.discriminator),
+                "public_flags": author.public_flags,
+                "bot": author.bot,
+            },
+            "attachments": [],
+            "embeds": [],
+            "mentions": [],
+            "mention_roles": [],
+            "pinned": False,
+            "mention_everyone": False,
+            "tts": False,
+            "timestamp": created_at.isoformat(),
+            "edited_timestamp": None,
+            "flags": 0,
+            "components": [],
+            "referenced_message": None,
+        },
+    )
+    context: commands.Context = await bot.get_context(message)
+    context.author = author
+    # A global alias has no channel to speak of and passes a bare Object.
+    context.guild = getattr(channel, "guild", None)
+    context.channel = channel
+    return context
