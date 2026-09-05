@@ -212,6 +212,10 @@ class DashboardIntegration:
                 "is_admin": staff,
                 "profiles": profile_rows,
                 "profile_names": sorted(profiles),
+                "profile_choices": [
+                    {"name": row["name"], "enabled": row["enabled"]}
+                    for row in profile_rows
+                ],
                 "tickets": tickets,
                 "open_count": sum(1 for t_ in tickets if not t_["closed"]),
                 "closed_count": sum(1 for t_ in tickets if t_["closed"]),
@@ -393,7 +397,10 @@ class DashboardIntegration:
                 {"message": "Discord refused that action; check my permissions.",
                  "category": "danger"}
             ]
-        except RuntimeError as exc:
+        except (RuntimeError, commands.UserFeedbackCheckFailure) as exc:
+            # The cog raises these to say why it declined - a disabled
+            # profile, a ticket that no longer exists. That is an answer for
+            # the person asking, not a fault to log a traceback for.
             return [{"message": str(exc), "category": "warning"}]
         except Exception as exc:  # noqa: BLE001
             log.exception("Tickets dashboard action %r failed", action)
@@ -985,10 +992,16 @@ TICKETS_TEMPLATE = (
         <div>
           <label class="dz-label">Profile</label>
           <select class="dz-select" name="profile">
-            {% for name in profile_names %}
-              <option value="{{ name }}">{{ name }}</option>
+            {% for p in profile_choices %}
+              <option value="{{ p.name }}">
+                {{ p.name }}{% if not p.enabled %} &mdash; disabled{% endif %}
+              </option>
             {% endfor %}
           </select>
+          <div class="dz-hint" style="margin-top:5px;">
+            A disabled profile will not open a ticket. Turn it on in that
+            profile's panel below.
+          </div>
         </div>
         <div>
           <label class="dz-label">Reason</label>
