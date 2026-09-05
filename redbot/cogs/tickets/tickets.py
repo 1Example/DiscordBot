@@ -4,14 +4,13 @@ import typing
 
 import discord
 
-from AAA3A_utils import Cog, Loop, Menu, Settings
+from AAA3A_utils import Cog, Loop, Menu
 from redbot.core import Config, app_commands, commands, modlog
 from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import humanize_list, pagify
 
-from .converters import Emoji, ForumTagConverter, ModalConverter
 from .dashboard_integration import DashboardIntegration
 from .types import Ticket, get_non_animated_asset
 from .views import (
@@ -170,224 +169,6 @@ class Tickets(DashboardIntegration, Cog):
 
         self.tickets: dict[int, dict[int, Tickets]] = {}
 
-        _settings: dict[str, dict[str, typing.Any]] = {
-            "enabled": {
-                "converter": bool,
-                "description": "Whether the profile is enabled or not.",
-            },
-            "creating_modal": {
-                "converter": ModalConverter,
-                "description": "Whether a modal will be sent to the ticket owner when they create a ticket.\n\n**Example:**\n```\n[p]settickets creatingmodal <profile>\n- label: What is the problem?\n  style: 2 #  short = 1, paragraph = 2\n  required: True\n  default: None\n  placeholder: None\n  min_length: None\n  max_length: None\n```",
-                "no_slash": True,
-            },
-            "max_open_tickets_by_member": {
-                "converter": commands.Range[int, 1, 50],
-                "description": "Maximum number of open tickets a member can have.",
-            },
-            "channel_name": {
-                "converter": commands.Range[str, 1, 500],
-                "description": "Name of the channel where the tickets will be created, reduced to 100 characters. You can use the following placeholders: `{id}`, `{emoji}`, `{owner_display_name}`, `{owner_name}`, `{owner_mention}`, `{owner_id}`, `{guild_name}` and `{guild_id}`.",
-                "no_slash": True,
-            },
-            "welcome_message": {
-                "converter": commands.Range[str, 1, 1000],
-                "description": "Welcome message that will be sent when a ticket is created. You can use the following placeholders: `{id}`, `{emoji}`, `{owner_display_name}`, `{owner_name}`, `{owner_mention}`, `{owner_id}`, `{guild_name}` and `{guild_id}`.",
-                "no_slash": True,
-            },
-            "custom_message": {
-                "converter": commands.Range[str, 1, 3000],
-                "description": "Message sent when a ticket opens. Supports placeholders such as {id} and {owner_mention}.",
-            },
-            "close_reopen_reason_modal": {
-                "converter": bool,
-                "description": "Whether a modal will be sent to the ticket owner when they close or reopen a ticket for asking a reason.",
-                "no_slash": True,
-            },
-            "create_modlog_case": {
-                "converter": bool,
-                "description": "Whether a modlog's case will be created when a ticket is created.",
-                "no_slash": True,
-            },
-            "transcripts": {
-                "converter": bool,
-                "description": "Whether a transcript will be created when a ticket is deleted.",
-                "no_slash": True,
-            },
-            "always_include_item_label": {
-                "converter": bool,
-                "description": "Whether the item label will always be included in the embeds.",
-                "no_slash": True,
-            },
-            "disable_default_open_modal": {
-                "converter": bool,
-                "description": "Whether the default open modal will be disabled.",
-                "no_slash": True,
-            },
-            # Roles.
-            "support_roles": {
-                "converter": commands.Greedy[discord.Role],
-                "description": "Roles that can support tickets.",
-            },
-            "ping_roles": {
-                "converter": commands.Greedy[discord.Role],
-                "description": "Roles that will be pinged when a ticket is created.",
-            },
-            "speak_roles": {
-                "converter": commands.Greedy[discord.Role],
-                "description": "Roles that can speak in the ticket channel.",
-                "no_slash": True,
-            },
-            "view_roles": {
-                "converter": commands.Greedy[discord.Role],
-                "description": "Roles that can view tickets.",
-            },
-            "whitelist_roles": {
-                "converter": commands.Greedy[discord.Role],
-                "description": "Roles that can create tickets.",
-            },
-            "blacklist_roles": {
-                "converter": commands.Greedy[discord.Role],
-                "description": "Roles that can't create tickets.",
-            },
-            "ticket_role": {
-                "converter": discord.Role,
-                "description": "Role that will be added to the ticket owner for the duration of the ticket.",
-                "no_slash": True,
-            },
-            # Channels.
-            "forum_channel": {
-                "converter": typing.Union[discord.ForumChannel, discord.TextChannel],
-                "description": "Forum/text channel where the tickets will be created as threads.",
-            },
-            "forum_tags": {
-                "converter": commands.Greedy[ForumTagConverter],
-                "description": "Tags that will be added to the threads in the forum channel.",
-                "no_slash": True,
-            },
-            "category_open": {
-                "converter": discord.CategoryChannel,
-                "description": "Category where the open tickets will be created.",
-            },
-            "category_closed": {
-                "converter": discord.CategoryChannel,
-                "description": "Category where the closed tickets will be created.",
-            },
-            "logs_channel": {
-                "converter": typing.Union[
-                    discord.TextChannel,
-                    discord.VoiceChannel,
-                    discord.Thread,
-                ],
-                "description": "Channel where the logs will be sent.",
-            },
-            # Checks.
-            "owner_close_confirmation": {
-                "converter": bool,
-                "description": "Whether the ticket owner get a message to confirm the closing of the ticket.",
-                "no_slash": True,
-            },
-            "owner_can_close": {
-                "converter": bool,
-                "description": "Whether the ticket owner can close the ticket.",
-                "no_slash": True,
-            },
-            "owner_can_reopen": {
-                "converter": bool,
-                "description": "Whether the ticket owner can reopen the ticket.",
-                "no_slash": True,
-            },
-            "owner_can_add_members": {
-                "converter": bool,
-                "description": "Whether the ticket owner can add members to the ticket.",
-                "no_slash": True,
-            },
-            "owner_can_remove_members": {
-                "converter": bool,
-                "description": "Whether the ticket owner can remove members from the ticket.",
-                "no_slash": True,
-            },
-            "close_on_leave": {
-                "converter": bool,
-                "description": "Whether the ticket will be closed when the owner leaves the server.",
-                "no_slash": True,
-            },
-            "close_after_dank_payout": {
-                "converter": bool,
-                "description": "Whether the ticket will be closed after a Dank Memer payout.",
-                "no_slash": True,
-            },
-            "auto_delete_on_close": {
-                "converter": commands.Range[int, 0, 30 * 24],
-                "description": "Time in hours before the ticket is deleted after being closed. Set to 0 for an immediate deletion.",
-                "no_slash": True,
-            },
-            # Emojis.
-            "emoji_close": {
-                "path": ["emojis", "close"],
-                "converter": Emoji,
-                "description": "Emoji of the `Close` buttons.",
-                "no_slash": True,
-            },
-            "emoji_reopen": {
-                "path": ["emojis", "reopen"],
-                "converter": Emoji,
-                "description": "Emoji of the `Reopen` buttons.",
-                "no_slash": True,
-            },
-            "emoji_claim": {
-                "path": ["emojis", "claim"],
-                "converter": Emoji,
-                "description": "Emoji of the `Claim` button.",
-                "no_slash": True,
-            },
-            "emoji_unclaim": {
-                "path": ["emojis", "unclaim"],
-                "converter": Emoji,
-                "description": "Emoji of the `Unclaim` button.",
-                "no_slash": True,
-            },
-            "emoji_lock": {
-                "path": ["emojis", "lock"],
-                "converter": Emoji,
-                "description": "Emoji of the `Lock` button.",
-                "no_slash": True,
-            },
-            "emoji_unlock": {
-                "path": ["emojis", "unlock"],
-                "converter": Emoji,
-                "description": "Emoji of the `Unlock` button.",
-                "no_slash": True,
-            },
-            "emoji_transcript": {
-                "path": ["emojis", "transcript"],
-                "converter": Emoji,
-                "description": "Emoji of the `Transcript` button.",
-                "no_slash": True,
-            },
-            "emoji_delete": {
-                "path": ["emojis", "delete"],
-                "converter": Emoji,
-                "description": "Emoji of the `Delete` button.",
-                "no_slash": True,
-            },
-            "emoji_approve_appeal": {
-                "path": ["emojis", "approve_appeal"],
-                "converter": Emoji,
-                "description": "Emoji of the `Approve Appeal` button.",
-                "no_slash": True,
-            },
-        }
-        self.settings: Settings = Settings(
-            bot=self.bot,
-            cog=self,
-            config=self.config,
-            group=self.config.GUILD,
-            settings=_settings,
-            global_path=["profiles"],
-            use_profiles_system=True,
-            can_edit=True,
-            commands_group=self.settickets,
-        )
 
     async def cog_load(self) -> None:
         await super().cog_load()
@@ -449,7 +230,6 @@ class Tickets(DashboardIntegration, Cog):
                 },
             ],
         )
-        await self.settings.add_commands()
         asyncio.create_task(self.load_tickets())
 
     async def cog_unload(self) -> None:
