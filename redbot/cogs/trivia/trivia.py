@@ -1,6 +1,5 @@
 """Module for Trivia cog."""
 import asyncio
-import math
 import pathlib
 from collections import Counter
 from typing import Any, Dict, List, Literal, Union
@@ -10,17 +9,19 @@ import io
 import yaml
 import discord
 
-from redbot.core import Config, commands, bank
+from discord import app_commands
+
+from redbot.core import Config, commands
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils import AsyncIter, can_user_react_in
-from redbot.core.utils.chat_formatting import box, pagify, bold, inline, italics, humanize_number
+from redbot.core.utils.chat_formatting import box, pagify, humanize_number
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 
 from .checks import trivia_stop_check
-from .converters import finite_float
 from .log import LOG
 from .session import TriviaSession
 from .schema import TRIVIA_LIST_SCHEMA, format_schema_error
@@ -109,229 +110,27 @@ class Trivia(DashboardIntegration, commands.Cog):
             if user_id in guild_data:
                 await self.config.member_from_ids(guild_id, user_id).clear()
 
-    @commands.group()
-    @commands.guild_only()
-    @commands.mod_or_permissions(administrator=True)
-    async def triviaset(self, ctx: commands.Context):
-        """Manage Trivia settings."""
+    trivia = app_commands.Group(
+        name="trivia",
+        description="Play trivia.",
+        extras={"red_force_enable": True},
+        guild_only=True,
+    )
 
-    @triviaset.command(name="showsettings")
-    async def triviaset_showsettings(self, ctx: commands.Context):
-        """Show the current trivia settings."""
-        settings = await self.config.guild(ctx.guild).all()
-        msg = box(_("Current settings:\n\n") + format_settings(settings))
-        await ctx.send(msg)
+    @trivia.command(name="start", description="Start a trivia session.")
+    @app_commands.describe(
+        categories="One or more list names, separated by spaces. See the dashboard for what is available."
+    )
+    async def trivia_start(self, interaction: discord.Interaction, categories: str):
+        """Start trivia session on the specified categories.
 
-    @triviaset.command(name="maxscore")
-    async def triviaset_max_score(self, ctx: commands.Context, score: int):
-        """Set the total points required to win."""
-        if score <= 0:
-            await ctx.send(_("Score must be greater than 0."))
-            return
-        settings = self.config.guild(ctx.guild)
-        await settings.max_score.set(score)
-        await ctx.send(_("Done. Points required to win set to {num}.").format(num=score))
-
-    @triviaset.command(name="timelimit")
-    async def triviaset_timelimit(self, ctx: commands.Context, seconds: finite_float):
-        """Set the maximum seconds permitted to answer a question."""
-        if seconds < 4.0:
-            await ctx.send(_("Must be at least 4 seconds."))
-            return
-        settings = self.config.guild(ctx.guild)
-        await settings.delay.set(seconds)
-        await ctx.send(_("Done. Maximum seconds to answer set to {num}.").format(num=seconds))
-
-    @triviaset.command(name="stopafter")
-    async def triviaset_stopafter(self, ctx: commands.Context, seconds: finite_float):
-        """Set how long until trivia stops due to no response."""
-        settings = self.config.guild(ctx.guild)
-        if seconds < await settings.delay():
-            await ctx.send(_("Must be larger than the answer time limit."))
-            return
-        await settings.timeout.set(seconds)
-        await ctx.send(
-            _(
-                "Done. Trivia sessions will now time out after {num} seconds of no responses."
-            ).format(num=seconds)
-        )
-
-    @triviaset.command(name="override")
-    async def triviaset_allowoverride(self, ctx: commands.Context, enabled: bool):
-        """Allow/disallow trivia lists to override settings."""
-        settings = self.config.guild(ctx.guild)
-        await settings.allow_override.set(enabled)
-        if enabled:
-            await ctx.send(
-                _("Done. Trivia lists can now override the trivia settings for this server.")
-            )
-        else:
-            await ctx.send(
-                _(
-                    "Done. Trivia lists can no longer override the trivia settings for this "
-                    "server."
-                )
-            )
-
-    @triviaset.command(name="usespoilers", usage="<true_or_false>")
-    async def triviaset_use_spoilers(self, ctx: commands.Context, enabled: bool):
-        """Set if bot will display the answers in spoilers.
-
-        If enabled, the bot will use spoilers to hide answers.
+        Questions from every list named are mixed together.
         """
-        settings = self.config.guild(ctx.guild)
-        await settings.use_spoilers.set(enabled)
-        if enabled:
-            await ctx.send(_("Done. I'll put the answers in spoilers next time."))
-        else:
-            await ctx.send(_("Alright, I won't use spoilers to hide answers anymore."))
-
-    @triviaset.command(name="botplays", usage="<true_or_false>")
-    async def triviaset_bot_plays(self, ctx: commands.Context, enabled: bool):
-        """Set whether or not the bot gains points.
-
-        If enabled, the bot will gain a point if no one guesses correctly.
-        """
-        settings = self.config.guild(ctx.guild)
-        await settings.bot_plays.set(enabled)
-        if enabled:
-            await ctx.send(_("Done. I'll now gain a point if users don't answer in time."))
-        else:
-            await ctx.send(_("Alright, I won't embarrass you at trivia anymore."))
-
-    @triviaset.command(name="revealanswer", usage="<true_or_false>")
-    async def triviaset_reveal_answer(self, ctx: commands.Context, enabled: bool):
-        """Set whether or not the answer is revealed.
-
-        If enabled, the bot will reveal the answer if no one guesses correctly
-        in time.
-        """
-        settings = self.config.guild(ctx.guild)
-        await settings.reveal_answer.set(enabled)
-        if enabled:
-            await ctx.send(_("Done. I'll reveal the answer if no one knows it."))
-        else:
-            await ctx.send(_("Alright, I won't reveal the answer to the questions anymore."))
-
-    @bank.is_owner_if_bank_global()
-    @commands.admin_or_permissions(manage_guild=True)
-    @triviaset.command(name="payout")
-    async def triviaset_payout_multiplier(self, ctx: commands.Context, multiplier: finite_float):
-        """Set the payout multiplier.
-
-        This can be any positive decimal number. If a user wins trivia when at
-        least 3 members are playing, they will receive credits. Set to 0 to
-        disable.
-
-        The number of credits is determined by multiplying their total score by
-        this multiplier.
-        """
-        settings = self.config.guild(ctx.guild)
-        if multiplier < 0:
-            await ctx.send(_("Multiplier must be at least 0."))
+        ctx = await commands.Context.from_interaction(interaction)
+        categories = [c.lower() for c in categories.split()]
+        if not categories:
+            await ctx.send(_("Name at least one trivia list."))
             return
-        await settings.payout_multiplier.set(multiplier)
-        if multiplier:
-            await ctx.send(_("Done. Payout multiplier set to {num}.").format(num=multiplier))
-        else:
-            await ctx.send(_("Done. I will no longer reward the winner with a payout."))
-
-    @triviaset.group(name="custom")
-    @commands.is_owner()
-    async def triviaset_custom(self, ctx: commands.Context):
-        """Manage Custom Trivia lists."""
-        pass
-
-    @triviaset_custom.command(name="list")
-    async def custom_trivia_list(self, ctx: commands.Context):
-        """List uploaded custom trivia."""
-        personal_lists = sorted([p.resolve().stem for p in cog_data_path(self).glob("*.yaml")])
-        no_lists_uploaded = _("No custom Trivia lists uploaded.")
-
-        if not personal_lists:
-            if await ctx.embed_requested():
-                await ctx.send(
-                    embed=discord.Embed(
-                        colour=await ctx.embed_colour(), description=no_lists_uploaded
-                    )
-                )
-            else:
-                await ctx.send(no_lists_uploaded)
-            return
-
-        if await ctx.embed_requested():
-            await ctx.send(
-                embed=discord.Embed(
-                    title=_("Uploaded trivia lists"),
-                    colour=await ctx.embed_colour(),
-                    description=", ".join(sorted(personal_lists)),
-                )
-            )
-        else:
-            msg = box(
-                bold(_("Uploaded trivia lists")) + "\n\n" + ", ".join(sorted(personal_lists))
-            )
-            if len(msg) > 1000:
-                await ctx.author.send(msg)
-            else:
-                await ctx.send(msg)
-
-    @commands.is_owner()
-    @triviaset_custom.command(name="upload", aliases=["add"])
-    async def trivia_upload(self, ctx: commands.Context):
-        """Upload a trivia file."""
-        if not ctx.message.attachments:
-            await ctx.send(_("Supply a file with next message or type anything to cancel."))
-            try:
-                message = await ctx.bot.wait_for(
-                    "message", check=MessagePredicate.same_context(ctx), timeout=30
-                )
-            except asyncio.TimeoutError:
-                await ctx.send(_("You took too long to upload a list."))
-                return
-            if not message.attachments:
-                await ctx.send(_("You have cancelled the upload process."))
-                return
-            parsedfile = message.attachments[0]
-        else:
-            parsedfile = ctx.message.attachments[0]
-        try:
-            await self._save_trivia_list(ctx=ctx, attachment=parsedfile)
-        except yaml.error.MarkedYAMLError as exc:
-            await ctx.send(_("Invalid syntax:\n") + box(str(exc)))
-        except yaml.error.YAMLError:
-            await ctx.send(
-                _("There was an error parsing the trivia list. See logs for more info.")
-            )
-            LOG.exception("Custom Trivia file %s failed to upload", parsedfile.filename)
-        except schema.SchemaError as exc:
-            await ctx.send(
-                _(
-                    "The custom trivia list was not saved."
-                    " The file does not follow the proper data format.\n{schema_error}"
-                ).format(schema_error=box(format_schema_error(exc)))
-            )
-
-    @commands.is_owner()
-    @triviaset_custom.command(name="delete", aliases=["remove"])
-    async def trivia_delete(self, ctx: commands.Context, name: str):
-        """Delete a trivia file."""
-        filepath = cog_data_path(self) / f"{name}.yaml"
-        if filepath.exists():
-            filepath.unlink()
-            await ctx.send(_("Trivia {filename} was deleted.").format(filename=filepath.stem))
-        else:
-            await ctx.send(_("Trivia file was not found."))
-
-    @commands.group(invoke_without_command=True, require_var_positional=True)
-    @commands.guild_only()
-    async def trivia(self, ctx: commands.Context, *categories: str):
-        """Start trivia session on the specified category.
-
-        You may list multiple categories, in which case the trivia will involve
-        questions from all of them.
-        """
-        categories = [c.lower() for c in categories]
         session = self._get_trivia_session(ctx.channel)
         if session is not None:
             await ctx.send(_("There is already an ongoing trivia session in this channel."))
@@ -379,8 +178,8 @@ class Trivia(DashboardIntegration, commands.Cog):
         LOG.debug("New trivia session; #%s in %d", ctx.channel, ctx.guild.id)
 
     @trivia_stop_check()
-    @trivia.command(name="stop")
-    async def trivia_stop(self, ctx: commands.Context):
+    @trivia.command(name="stop", description="Stop the trivia session in this channel.")
+    async def trivia_stop(self, interaction: discord.Interaction):
         """Stop an ongoing trivia session."""
         session = self._get_trivia_session(ctx.channel)
         if session is None:
@@ -390,115 +189,70 @@ class Trivia(DashboardIntegration, commands.Cog):
         session.force_stop()
         await ctx.send(_("Trivia stopped."))
 
-    @trivia.command(name="list")
-    async def trivia_list(self, ctx: commands.Context):
-        """List available trivia categories."""
-        lists = set(p.stem for p in self._all_lists())
-        if await ctx.embed_requested():
-            await ctx.send(
-                embed=discord.Embed(
-                    title=_("Available trivia lists"),
-                    colour=await ctx.embed_colour(),
-                    description=", ".join(sorted(lists)),
-                )
-            )
-        else:
-            msg = box(bold(_("Available trivia lists")) + "\n\n" + ", ".join(sorted(lists)))
-            if len(msg) > 1000:
-                await ctx.author.send(msg)
-            else:
-                await ctx.send(msg)
-
-    @trivia.command(name="info")
-    async def trivia_info(self, ctx: commands.Context, category: str.lower):
-        """Get information about a trivia category."""
-        try:
-            data = self.get_trivia_list(category)
-        except FileNotFoundError:
-            return await ctx.send(
-                _(
-                    "Category {name} does not exist."
-                    " See {command} for the list of available trivia categories."
-                ).format(name=inline(category), command=inline(f"{ctx.clean_prefix}trivia list"))
-            )
-        except InvalidListError:
-            return await ctx.send(
-                _(
-                    "There was an error parsing the trivia list for the {name} category."
-                    " It may be formatted incorrectly."
-                ).format(name=inline(category))
-            )
-
-        config_overrides = data.pop("CONFIG", None)
-
-        embed = discord.Embed(
-            title=_('"{category}" Category Details').format(category=category),
-            color=await ctx.embed_colour(),
-        )
-        embed.add_field(
-            name=_("Authors"), value=data.pop("AUTHOR", "").strip() or italics(_("Not provided."))
-        )
-        embed.add_field(name=_("Question count"), value=len(data))
-        embed.add_field(
-            name=_("Custom"),
-            value=_format_setting_value(
-                "", any(category == p.resolve().stem for p in cog_data_path(self).glob("*.yaml"))
-            ),
-        )
-        embed.add_field(
-            name=_("Description"),
-            value=(
-                data.pop("DESCRIPTION", "").strip()
-                or italics(_("No description provided for this category."))
-            ),
-            inline=False,
-        )
-
-        if config_overrides:
-            embed.add_field(
-                name=_("Config"),
-                value=box(format_settings(config_overrides)),
-                inline=False,
-            )
-        await ctx.send(embed=embed)
-
-    @trivia.group(
-        name="leaderboard", aliases=["lboard"], autohelp=False, invoke_without_command=True
+    @trivia.command(
+        name="upload",
+        description="Add a custom trivia list from a YAML file.",
     )
-    async def trivia_leaderboard(self, ctx: commands.Context):
-        """Leaderboard for trivia.
-
-        Defaults to the top 10 of this server, sorted by total wins. Use
-        subcommands for a more customised leaderboard.
-        """
-        cmd = self.trivia_leaderboard_server
-        if ctx.guild is None:
-            cmd = self.trivia_leaderboard_global
-        await ctx.invoke(cmd, "wins", 10)
-
-    @trivia_leaderboard.command(name="server")
-    @commands.guild_only()
-    async def trivia_leaderboard_server(
-        self, ctx: commands.Context, sort_by: str = "wins", top: int = 10
+    @app_checks.is_owner()
+    @app_commands.describe(file="The .yaml list to add.")
+    async def trivia_upload(
+        self, interaction: discord.Interaction, file: discord.Attachment
     ):
-        """Leaderboard for this server.
+        """Upload a trivia file.
 
-        `<sort_by>` can be any of the following fields:
-         - `wins`  : total wins
-         - `avg`   : average score
-         - `total` : total correct answers
-         - `games` : total games played
-
-        `<top>` is the number of ranks to show on the leaderboard.
+        The prefix version took the attachment off the invoking message, or
+        waited thirty seconds for another one. Here it is an option.
         """
-        key = self._get_sort_key(sort_by)
-        if key is None:
+        ctx = await commands.Context.from_interaction(interaction)
+        try:
+            await self._save_trivia_list(ctx=ctx, attachment=file)
+        except yaml.error.MarkedYAMLError as exc:
+            await ctx.send(_("Invalid syntax:\n") + box(str(exc)))
+        except yaml.error.YAMLError:
+            await ctx.send(
+                _("There was an error parsing the trivia list. See logs for more info.")
+            )
+            LOG.exception("Custom Trivia file %s failed to upload", file.filename)
+        except schema.SchemaError as exc:
             await ctx.send(
                 _(
-                    "Unknown field `{field_name}`, see `{prefix}help trivia leaderboard server` "
-                    "for valid fields to sort by."
-                ).format(field_name=sort_by, prefix=ctx.clean_prefix)
+                    "The custom trivia list was not saved."
+                    " The file does not follow the proper data format.\n{schema_error}"
+                ).format(schema_error=box(format_schema_error(exc)))
             )
+
+    @trivia.command(name="leaderboard", description="Show the trivia leaderboard.")
+    @app_commands.describe(
+        scope="This server, or every server the bot is in.",
+        sort_by="Which column to rank by.",
+        top="How many places to show.",
+    )
+    @app_commands.choices(
+        scope=[
+            app_commands.Choice(name="This server", value="server"),
+            app_commands.Choice(name="Global", value="global"),
+        ],
+        sort_by=[
+            app_commands.Choice(name="Total wins", value="wins"),
+            app_commands.Choice(name="Average score", value="avg"),
+            app_commands.Choice(name="Total correct answers", value="total"),
+            app_commands.Choice(name="Games played", value="games"),
+        ],
+    )
+    async def trivia_leaderboard(
+        self,
+        interaction: discord.Interaction,
+        scope: str = "server",
+        sort_by: str = "wins",
+        top: app_commands.Range[int, 1, 100] = 10,
+    ):
+        """Leaderboard for trivia."""
+        ctx = await commands.Context.from_interaction(interaction)
+        # The choices are fixed, so an unknown field is not reachable here
+        # the way it was when this took free text.
+        key = self._get_sort_key(sort_by)
+        if scope == "global":
+            await self._trivia_leaderboard_global(ctx, key, top)
             return
         guild = ctx.guild
         data = await self.config.all_members(guild)
@@ -506,29 +260,8 @@ class Trivia(DashboardIntegration, commands.Cog):
         data.pop(None, None)  # remove any members which aren't in the guild
         await self.send_leaderboard(ctx, data, key, top)
 
-    @trivia_leaderboard.command(name="global")
-    async def trivia_leaderboard_global(
-        self, ctx: commands.Context, sort_by: str = "wins", top: int = 10
-    ):
-        """Global trivia leaderboard.
-
-        `<sort_by>` can be any of the following fields:
-         - `wins`  : total wins
-         - `avg`   : average score
-         - `total` : total correct answers from all sessions
-         - `games` : total games played
-
-        `<top>` is the number of ranks to show on the leaderboard.
-        """
-        key = self._get_sort_key(sort_by)
-        if key is None:
-            await ctx.send(
-                _(
-                    "Unknown field `{field_name}`, see `{prefix}help trivia leaderboard server` "
-                    "for valid fields to sort by."
-                ).format(field_name=sort_by, prefix=ctx.clean_prefix)
-            )
-            return
+    async def _trivia_leaderboard_global(self, ctx, key, top: int) -> None:
+        """The leaderboard across every server the bot is in."""
         data = await self.config.all_members()
         collated_data = {}
         for guild_id, guild_data in data.items():

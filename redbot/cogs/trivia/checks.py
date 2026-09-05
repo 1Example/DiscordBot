@@ -1,3 +1,6 @@
+import discord
+from discord import app_commands
+
 from redbot.core import commands
 from redbot.core.i18n import Translator
 
@@ -7,19 +10,30 @@ _ = Translator("Trivia", __file__)
 
 
 def trivia_stop_check():
-    async def predicate(ctx: commands.GuildContext) -> bool:
-        session = ctx.cog._get_trivia_session(ctx.channel)
-        if session is None:
-            raise commands.CheckFailure(_("There is no ongoing trivia session in this channel."))
+    """Only someone who can end this session may end it.
 
-        author = ctx.author
+    An application command check: the prefix `commands.permissions_check` this
+    used to be is accepted on an app command and then never consulted, so the
+    session was stoppable by anyone.
+    """
+
+    async def predicate(interaction: discord.Interaction) -> bool:
+        cog = interaction.client.get_cog("Trivia")
+        session = cog and cog._get_trivia_session(interaction.channel)
+        if session is None:
+            raise commands.UserFeedbackCheckFailure(
+                _("There is no ongoing trivia session in this channel.")
+            )
+
+        author = interaction.user
+        guild = interaction.guild
         auth_checks = (
-            await ctx.bot.is_owner(author),
-            await ctx.bot.is_mod(author),
-            await ctx.bot.is_admin(author),
-            author == ctx.guild.owner,
+            await interaction.client.is_owner(author),
+            await interaction.client.is_mod(author),
+            await interaction.client.is_admin(author),
+            guild is not None and author == guild.owner,
             author == session.ctx.author,
         )
         return any(auth_checks)
 
-    return commands.permissions_check(predicate)
+    return app_commands.check(predicate)
