@@ -20,6 +20,58 @@ from redbot.core.utils.dashboard_helpers import (
 
 log = logging.getLogger("red.streams.dashboard")
 
+# The steps [p]streamset twitchtoken / youtubekey / kicktoken used to print.
+# Each service's own docs are linked rather than restated, since they move.
+CREDENTIAL_HELP = (
+    {
+        "key": "twitch",
+        "label": "Twitch",
+        "docs": "https://dev.twitch.tv/dashboard/apps",
+        "steps": [
+            "Open the Twitch developer console linked above.",
+            "Click <b>Register Your Application</b>.",
+            "Enter a name, set the OAuth Redirect URI to <code>http://localhost</code>,"
+            " and pick any application category.",
+            "Click <b>Register</b>, then copy the client ID and the client secret.",
+        ],
+        "command": (
+            "[p]set api twitch client_id &lt;your_client_id&gt;"
+            " client_secret &lt;your_client_secret&gt;"
+        ),
+    },
+    {
+        "key": "youtube",
+        "label": "YouTube",
+        "docs": "https://support.google.com/googleapi/answer/6251787",
+        "steps": [
+            "Create a Google API project - the link above is Google's guide.",
+            "Enable the YouTube Data API v3 for that project"
+            " (<a href=\"https://support.google.com/googleapi/answer/6158841\""
+            ' target="_blank" rel="noopener">how</a>).',
+            "Create an API key"
+            " (<a href=\"https://support.google.com/googleapi/answer/6158862\""
+            ' target="_blank" rel="noopener">how</a>).',
+        ],
+        "command": "[p]set api youtube api_key &lt;your_api_key&gt;",
+    },
+    {
+        "key": "kick",
+        "label": "Kick",
+        "docs": "https://kick.com/settings/developer",
+        "steps": [
+            "Open the Kick developer settings linked above.",
+            "Click <b>Create new</b>.",
+            "Fill in a name and description, and set the redirection URL to"
+            " <code>http://localhost</code>.",
+            "Click <b>Create Application</b>, then copy the client ID and client secret.",
+        ],
+        "command": (
+            "[p]set api kick client_id &lt;your_client_id&gt;"
+            " client_secret &lt;your_client_secret&gt;"
+        ),
+    },
+)
+
 # Platform key -> (stream class name, label, token service, hint)
 PLATFORMS = {
     "twitch": ("TwitchStream", "Twitch", "twitch", "Channel name, e.g. someone"),
@@ -39,10 +91,14 @@ ALERT_CHANNEL_KINDS = ("text", "voice", "stage")
 class DashboardIntegration:
     """Stream alerts and settings from the dashboard.
 
-    Covers ``[p]streamalert`` in full (add, remove, list, stop) and every
-    ``[p]streamset`` option: the live messages with and without a mention,
-    everyone/here/role mentions, auto-delete, rerun and schedule filtering,
-    buttons, and the owner-only refresh timer and API credentials.
+    The only place these can be changed. ``[p]streamalert`` and
+    ``[p]streamset`` are gone, so this page has to keep covering all of it:
+    adding, removing and listing alerts, stopping them per channel or per
+    server, the live messages with and without a mention, everyone/here/role
+    mentions, auto-delete, rerun and schedule filtering, buttons, and the
+    owner-only refresh timer plus how to obtain each service's credentials.
+
+    ``/stream twitch|youtube|picarto|kick`` is all that stayed in Discord.
     """
 
     bot: t.Any
@@ -153,6 +209,12 @@ class DashboardIntegration:
                 "use_buttons": bool(settings.get("use_buttons")),
                 "refresh_timer": await self.config.refresh_timer(),
                 "tokens": tokens,
+                "credentials": [
+                    {**service, "set": tokens.get(service["key"], False)}
+                    for service in CREDENTIAL_HELP
+                ]
+                if owner
+                else [],
                 "live": live,
             },
         }
@@ -530,7 +592,9 @@ STREAMS_TEMPLATE = (
       <h5><i class="fa fa-comment"></i> Alert messages</h5>
       <p class="dz-hint">
         Use <code>&#123;stream&#125;</code> for the streamer and
-        <code>&#123;stream.display_name&#125;</code> for their display name.
+        <code>&#123;stream.display_name&#125;</code> for their display name
+        (on Twitch the two can differ). <code>&#123;mention&#125;</code> inserts
+        the mentions chosen below, and works in the first box only.
         Leave a box empty to use the default.
       </p>
       <label class="dz-label">Message when a mention is used</label>
@@ -612,7 +676,29 @@ STREAMS_TEMPLATE = (
           Credentials: Twitch {{ 'set' if tokens.twitch else 'missing' }} &middot;
           YouTube {{ 'set' if tokens.youtube else 'missing' }} &middot;
           Kick {{ 'set' if tokens.kick else 'missing' }}.
-          Set them with <code>[p]set api</code>; they are never shown here.
+          They are set from Discord and are never shown here.
+        </p>
+
+        {% for c in credentials %}
+          <details style="margin:8px 0; padding:9px 11px;
+                          border:1px solid rgba(255,255,255,.09); border-radius:9px;">
+            <summary style="cursor:pointer;">
+              How to get {{ c.label }} credentials &mdash;
+              <b>{{ 'already set' if c.set else 'not set' }}</b>
+            </summary>
+            <p class="dz-hint" style="margin-top:8px;">
+              <a href="{{ c.docs }}" target="_blank" rel="noopener">{{ c.docs }}</a>
+            </p>
+            <ol class="dz-hint" style="margin:0 0 8px 18px; padding:0;">
+              {% for step in c.steps %}<li style="margin:3px 0;">{{ step|safe }}</li>{% endfor %}
+            </ol>
+            <p class="dz-hint" style="margin:0;">Then send the bot, in a DM:</p>
+            <code style="display:block; margin-top:5px; word-break:break-all;"
+              >{{ c.command|safe }}</code>
+          </details>
+        {% endfor %}
+        <p class="dz-hint">
+          These are secrets: send that in a DM with the bot, not a server channel.
         </p>
         <label class="dz-label">Seconds between checks</label>
         <div class="dz-row">
