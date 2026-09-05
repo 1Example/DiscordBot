@@ -9,6 +9,8 @@ from discord.ext import tasks
 from redbot.core import Config, app_commands, commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
+from redbot.core.commands.converter import parse_timedelta
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.utils.chat_formatting import humanize_timedelta
 from redbot.core.utils.cog_base import CogBase
 from redbot.core.utils.views import SimpleMenu, confirm as ask_confirmation
@@ -432,24 +434,70 @@ class MafiaGame(DashboardIntegration, CogBase):
             )
         return True
 
-    @commands.bot_has_permissions(embed_links=True)
-    @commands.guild_only()
-    @commands.hybrid_group(aliases=["mafiagame"])
-    @app_commands.allowed_installs(guilds=True, users=True)
-    async def mafia(self, ctx: commands.Context) -> None:
-        """Play Mafia: many roles, modes and anomalies."""
-        pass
+    mafia = app_commands.Group(
+        name="mafia",
+        description="Play Mafia.",
+        extras={"red_force_enable": True},
+        guild_only=True,
+        allowed_installs=app_commands.AppInstallationType(guild=True, user=True),
+    )
 
-    # @commands.max_concurrency(1, per=commands.BucketType.channel)
-    @commands.admin_or_permissions(manage_guild=True)
-    @commands.bot_has_permissions(manage_channels=True)
-    @mafia.command()
+    @staticmethod
+    async def _pick(ctx, pool, name: str, kind: str, required: bool = False):
+        """One of `pool` by name, or False once the complaint is sent.
+
+        The options autocomplete from these same lists, so a miss means
+        somebody typed over the suggestion.
+        """
+        if name is None:
+            if required:
+                await ctx.send(_("Pick a {kind}.").format(kind=kind))
+                return False
+            return None
+        wanted = name.lower().replace(" ", "")
+        for item in pool:
+            if wanted == item.name.lower().replace(" ", ""):
+                if item is Developer and ctx.author.id != DEVELOPER:
+                    break
+                return item
+        await ctx.send(_("`{name}` is not a Mafia {kind}.").format(name=name[:100], kind=kind))
+        return False
+
+    @staticmethod
+    async def _duration(ctx, raw: str):
+        """A ban length of at least thirty minutes, or None once refused."""
+        delta = parse_timedelta(
+            raw, allowed_units=["weeks", "days", "hours", "minutes"], default_unit="hours"
+        )
+        if delta is None or delta < datetime.timedelta(minutes=30):
+            await ctx.send(_("Give a length of at least 30 minutes, like `2 days`."))
+            return None
+        return delta
+
+    @staticmethod
+    def _names(pool, current: str) -> list:
+        """Autocomplete choices from one of the game's lists."""
+        current = current.lower()
+        return [
+            app_commands.Choice(name=item.name[:100], value=item.name)
+            for item in pool
+            if current in item.name.lower()
+        ][:25]
+
+    @mafia.command(name="start", description="Start a game of Mafia.")
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_commands.checks.bot_has_permissions(manage_channels=True)
+    @app_commands.describe(mode="Which mode to play. Leave empty for the server default.")
     async def start(
         self,
-        ctx: commands.Context,
-        mode: ModeConverter | None = None,
+        interaction: discord.Interaction,
+        mode: str = None,
     ) -> None:
         """Start a game of Mafia!"""
+        ctx = await commands.Context.from_interaction(interaction)
+        mode = await self._pick(ctx, MODES, mode, _("mode"))
+        if mode is False:
+            return
         if self.games.get(ctx.guild) is not None:
             raise commands.UserFeedbackCheckFailure(_("A game is already running in this guild."))
         config = await self.config.guild(ctx.guild).all()
@@ -490,11 +538,17 @@ class MafiaGame(DashboardIntegration, CogBase):
         game: Game = Game(self, mode=join_view.mode, config=config)
         game.start_task(ctx, players=players)
 
-    @commands.admin_or_permissions(manage_guild=True)
-    @commands.bot_has_permissions(manage_channels=True)
-    @mafia.command()
-    async def end(self, ctx: commands.Context, confirm: bool = False) -> None:
+    @mafia.command(name="end", description="End the game running here.")
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_commands.checks.bot_has_permissions(manage_channels=True)
+    @app_commands.describe(confirm="Skip the are-you-sure prompt.")
+    async def end(
+        self,
+        interaction: discord.Interaction,
+        confirm: bool = False,
+    ) -> None:
         """End the current game of Mafia."""
+        ctx = await commands.Context.from_interaction(interaction)
         if (game := self.games.get(ctx.guild)) is None:
             raise commands.UserFeedbackCheckFailure(
                 _("No game is currently running in this guild."),
@@ -506,9 +560,15 @@ class MafiaGame(DashboardIntegration, CogBase):
             return
         await game.end()
 
-    @mafia.command(aliases=["e"])
-    async def explain(self, ctx: commands.Context, page: str = "main") -> None:
+    @mafia.command(name="explain", description="Read up on how Mafia works.")
+    @app_commands.describe(page="Which page of the guide.")
+    async def explain(
+        self,
+        interaction: discord.Interaction,
+        page: str = "main",
+    ) -> None:
         """Explain how to play the Mafia game."""
+        ctx = await commands.Context.from_interaction(interaction)
         await ExplainView(
             ROLES=ROLES,
             MODES=MODES,
@@ -516,15 +576,28 @@ class MafiaGame(DashboardIntegration, CogBase):
             page=page,
         ).start(ctx)
 
-    @mafia.command()
-    async def role(self, ctx: commands.Context, *, role: RoleConverter) -> None:
+    @mafia.command(name="role", description="Show what one role does.")
+    @app_commands.describe(role="Which role.")
+    async def role(
+        self,
+        interaction: discord.Interaction,
+        role: str,
+    ) -> None:
         """Show the informations about a specific role."""
+        ctx = await commands.Context.from_interaction(interaction)
+        role = await self._pick(ctx, ROLES, role, _("role"), required=True)
+        if role is False:
+            return
         theme = await self.config.guild(ctx.guild).theme()
         await SimpleMenu(pages=[role.get_kwargs(theme=theme)]).start(ctx)
 
-    @mafia.command()
-    async def roles(self, ctx: commands.Context) -> None:
+    @mafia.command(name="roles", description="List every role in the game.")
+    async def roles(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
         """Show the different roles of the Mafia game."""
+        ctx = await commands.Context.from_interaction(interaction)
         theme = await self.config.guild(ctx.guild).theme()
         await SimpleMenu(
             pages=[
@@ -534,39 +607,66 @@ class MafiaGame(DashboardIntegration, CogBase):
             ],
         ).start(ctx)
 
-    @mafia.command()
-    async def mode(self, ctx: commands.Context, *, mode: ModeConverter) -> None:
+    @mafia.command(name="mode", description="Show what one mode changes.")
+    @app_commands.describe(mode="Which mode.")
+    async def mode(
+        self,
+        interaction: discord.Interaction,
+        mode: str,
+    ) -> None:
         """Show the informations about a specific mode."""
+        ctx = await commands.Context.from_interaction(interaction)
+        mode = await self._pick(ctx, MODES, mode, _("mode"), required=True)
+        if mode is False:
+            return
         await SimpleMenu(pages=[mode.get_kwargs()]).start(ctx)
 
-    @mafia.command()
-    async def modes(self, ctx: commands.Context) -> None:
+    @mafia.command(name="modes", description="List every mode.")
+    async def modes(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
         """Show the different modes of the Mafia game."""
+        ctx = await commands.Context.from_interaction(interaction)
         await SimpleMenu(
             pages=[mode.get_kwargs() for mode in MODES],
         ).start(ctx)
 
-    @mafia.command(aliases=["dmsg"])
+    @mafia.command(name="defaultdyingmessage", description="Set the message posted when you die, for every game.")
+    @app_commands.describe(default_dying_message="Up to 200 characters. Leave empty to clear it.")
     async def defaultdyingmessage(
         self,
-        ctx: commands.Context,
-        *,
-        default_dying_message: commands.Range[str, 1, 200] = None,
+        interaction: discord.Interaction,
+        default_dying_message: app_commands.Range[str, 1, 200] = None,
     ) -> None:
         """Set your default custom dying message."""
+        ctx = await commands.Context.from_interaction(interaction)
         if default_dying_message is not None:
             await self.config.user(ctx.author).default_dying_message.set(default_dying_message)
         else:
             await self.config.user(ctx.author).default_dying_message.clear()
 
-    @mafia.command()
-    async def anomaly(self, ctx: commands.Context, *, anomaly: AnomalyConverter) -> None:
+    @mafia.command(name="anomaly", description="Show what one anomaly does.")
+    @app_commands.describe(anomaly="Which anomaly.")
+    async def anomaly(
+        self,
+        interaction: discord.Interaction,
+        anomaly: str,
+    ) -> None:
         """Show the information about a specific anomaly."""
+        ctx = await commands.Context.from_interaction(interaction)
+        anomaly = await self._pick(ctx, ANOMALIES, anomaly, _("anomaly"), required=True)
+        if anomaly is False:
+            return
         await SimpleMenu(pages=[anomaly.get_kwargs()]).start(ctx)
 
-    @mafia.command()
-    async def anomalies(self, ctx: commands.Context) -> None:
+    @mafia.command(name="anomalies", description="List every anomaly.")
+    async def anomalies(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
         """Show the different anomalies of the Mafia game."""
+        ctx = await commands.Context.from_interaction(interaction)
         await SimpleMenu(
             pages=[anomaly.get_kwargs() for anomaly in ANOMALIES],
         ).start(ctx)
@@ -583,15 +683,23 @@ class MafiaGame(DashboardIntegration, CogBase):
             if anomaly.name.lower().startswith(current.lower())
         ][:25]
 
-    @mafia.command()
+    @mafia.command(name="achievements", description="Show someone's achievements.")
+    @app_commands.describe(
+        role="Only achievements for this role. Leave empty for all of them.",
+        user="Whose achievements. Defaults to yours.",
+    )
     async def achievements(
         self,
-        ctx: commands.Context,
-        role: RoleConverter | None = None,
-        *,
-        user: discord.User | None = commands.Author,
+        interaction: discord.Interaction,
+        role: str = None,
+        user: discord.User = None,
     ) -> None:
         """Show your achievements or the achievements of a specific member."""
+        ctx = await commands.Context.from_interaction(interaction)
+        user = user or ctx.author
+        role = await self._pick(ctx, ROLES, role, _("role"))
+        if role is False:
+            return
         if user.bot:
             raise commands.UserFeedbackCheckFailure(_("A bot can't play the Mafia game."))
         achievements = ACHIEVEMENTS if role is None else role.achievements
@@ -686,15 +794,23 @@ class MafiaGame(DashboardIntegration, CogBase):
             if role.name.lower().startswith(current.lower())
         ][:25]
 
-    @commands.mod_or_permissions(manage_guild=True)
-    @mafia.command()
+    @mafia.command(name="tempban", description="Ban a member from the next few games.")
+    @app_checks.mod_or_permissions(manage_guild=True)
+    @app_commands.describe(
+        member="Who to ban.",
+        duration="How long, e.g. 2 days. At least 30 minutes.",
+    )
     async def tempban(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         member: discord.Member,
-        duration: DurationConverter,
+        duration: str,
     ) -> None:
         """Ban a member temporary from the Mafia games in this server."""
+        ctx = await commands.Context.from_interaction(interaction)
+        duration = await self._duration(ctx, duration)
+        if duration is None:
+            return
         if member.bot:
             raise commands.UserFeedbackCheckFailure(_("A bot can't play a Mafia game."))
         await self.config.member(member).temp_banned_until.set(
@@ -710,10 +826,16 @@ class MafiaGame(DashboardIntegration, CogBase):
             ).format(duration=humanize_timedelta(timedelta=duration)),
         )
 
-    @commands.mod_or_permissions(manage_guild=True)
-    @mafia.command()
-    async def unban(self, ctx: commands.Context, *, member: discord.Member) -> None:
+    @mafia.command(name="unban", description="Lift a Mafia ban.")
+    @app_checks.mod_or_permissions(manage_guild=True)
+    @app_commands.describe(member="Who to unban.")
+    async def unban(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+    ) -> None:
         """Unban a member from the Mafia game in this server."""
+        ctx = await commands.Context.from_interaction(interaction)
         if member.bot:
             raise commands.UserFeedbackCheckFailure(_("A bot can't play a Mafia game."))
         if await self.config.member(member).temp_banned_until() is None:
@@ -723,10 +845,16 @@ class MafiaGame(DashboardIntegration, CogBase):
         await self.config.member(member).temp_banned_until.clear()
         await ctx.send(_("This member has been **unbanned** from the Mafia games in this server."))
 
-    @commands.mod_or_permissions(manage_guild=True)
-    @mafia.command()
-    async def afkkill(self, ctx: commands.Context, *, member: discord.Member) -> None:
+    @mafia.command(name="afkkill", description="Kill an idle player so the game can move on.")
+    @app_checks.mod_or_permissions(manage_guild=True)
+    @app_commands.describe(member="Which player.")
+    async def afkkill(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+    ) -> None:
         """Kill a member for AFK from the Mafia game in this server."""
+        ctx = await commands.Context.from_interaction(interaction)
         if member.bot:
             raise commands.UserFeedbackCheckFailure(_("A bot can't play the Mafia game."))
         if (game := self.games.get(ctx.guild)) is None:
@@ -742,11 +870,13 @@ class MafiaGame(DashboardIntegration, CogBase):
         await player.kill(cause="afk")
         await ctx.send(_("This player has been **killed** from the Mafia game in this server."))
 
-    @commands.max_concurrency(1, per=commands.BucketType.guild)
-    @commands.cooldown(1, 1200, type=commands.BucketType.guild)
-    @mafia.command()
-    async def poll(self, ctx: commands.Context) -> None:
+    @mafia.command(name="poll", description="Ask the server whether anyone wants a game.")
+    async def poll(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
         """Create a poll for the game."""
+        ctx = await commands.Context.from_interaction(interaction)
         if self.games.get(ctx.guild) is not None:
             raise commands.UserFeedbackCheckFailure(_("A game is already running in this guild."))
         if (threshold := await self.config.guild(ctx.guild).poll_threshold()) is None:
@@ -786,9 +916,16 @@ class MafiaGame(DashboardIntegration, CogBase):
         await poll_view.start(ctx)
         await poll_view.wait()
 
-    @commands.guild_only()
-    @commands.admin_or_permissions(manage_guild=True)
-    @commands.hybrid_group(alias="setmafiagame")
-    async def setmafia(self, ctx: commands.Context) -> None:
-        """Settings for MafiaGame."""
-        pass
+    @start.autocomplete("mode")
+    @mode.autocomplete("mode")
+    async def _mode_autocomplete(self, interaction, current: str) -> list:
+        return self._names(MODES, current)
+
+    @role.autocomplete("role")
+    @achievements.autocomplete("role")
+    async def _role_autocomplete(self, interaction, current: str) -> list:
+        return self._names(ROLES, current)
+
+    @anomaly.autocomplete("anomaly")
+    async def _anomaly_autocomplete(self, interaction, current: str) -> list:
+        return self._names(ANOMALIES, current)
