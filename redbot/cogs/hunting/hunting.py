@@ -6,7 +6,8 @@ from datetime import datetime
 from typing import Literal
 
 import discord
-from redbot.core import Config, bank, checks, commands
+from discord import app_commands
+from redbot.core import Config, bank, commands
 from redbot.core.bot import Red
 from redbot.core.errors import BalanceTooHigh
 from redbot.core.utils.chat_formatting import (
@@ -17,7 +18,6 @@ from redbot.core.utils.chat_formatting import (
     pagify,
 )
 from redbot.core.utils.menus import DEFAULT_CONTROLS, menu
-from redbot.core.utils.predicates import MessagePredicate
 from .dashboard_integration import DashboardIntegration
 
 __version__ = "3.5.2"
@@ -72,53 +72,28 @@ class Hunting(DashboardIntegration, commands.Cog):
         self.config.register_guild(**default_guild)
         self.config.register_global(**default_global)
 
-    @commands.guild_only()
-    @commands.group()
-    async def hunting(self, ctx):
-        """Hunting, it hunts birds and things that fly."""
-        if ctx.invoked_subcommand is None:
-            guild_data = await self.config.guild(ctx.guild).all()
-            if not guild_data["channels"]:
-                channel_names = ["No channels set."]
-            else:
-                channel_names = []
-                for channel_id in guild_data["channels"]:
-                    channel_obj = self.bot.get_channel(channel_id)
-                    if channel_obj:
-                        channel_names.append(channel_obj.name)
+    hunting = app_commands.Group(
+        name="hunting",
+        description="Hunting, it hunts birds and things that fly.",
+        extras={"red_force_enable": True},
+        guild_only=True,
+    )
 
-            hunting_mode = "Words" if guild_data["bang_words"] else "Reactions"
-            reaction_time = "On" if guild_data["bang_time"] else "Off"
-
-            msg = f"[Hunting in]:                 {humanize_list(channel_names)}\n"
-            msg += f"[Bang timeout]:               {guild_data['wait_for_bang_timeout']} seconds\n"
-            msg += f"[Hunt interval minimum]:      {guild_data['hunt_interval_minimum']} seconds\n"
-            msg += f"[Hunt interval maximum]:      {guild_data['hunt_interval_maximum']} seconds\n"
-            msg += f"[Hunting mode]:               {hunting_mode}\n"
-            msg += f"[Bang response time message]: {reaction_time}\n"
-            msg += f"[Eagle shoot punishment]:     {guild_data['eagle']}\n"
-
-            if await bank.is_global():
-                reward = await self.config.reward_range()
-                if reward:
-                    reward = f"{reward[0]} - {reward[1]}"
-                msg += f"[Hunting reward range]:       {reward if reward else 'None'}\n"
-            else:
-                reward = guild_data["reward_range"]
-                if reward:
-                    reward = f"{reward[0]} - {reward[1]}"
-                msg += f"[Hunting reward range]:       {reward if reward else 'None'}\n"
-
-            for page in pagify(msg, delims=["\n"]):
-                await ctx.send(box(page, lang="ini"))
-
-    @hunting.command()
-    @commands.bot_has_permissions(embed_links=True)
-    async def leaderboard(self, ctx, global_leaderboard=False):
+    @hunting.command(
+        name="leaderboard", description="Show the top hunters."
+    )
+    @app_commands.checks.bot_has_permissions(embed_links=True)
+    @app_commands.describe(
+        global_leaderboard="Show every server rather than just this one."
+    )
+    async def leaderboard(
+        self, interaction: discord.Interaction, global_leaderboard: bool = False
+    ):
         """
         This will show the top 50 hunters for the server.
         Use True for the global_leaderboard variable to show the global leaderboard.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         userinfo = await self.config.all_users()
         if not userinfo:
             return await ctx.send(bold("Please shoot something before you can brag about it."))
@@ -172,83 +147,13 @@ class Hunting(DashboardIntegration, commands.Cog):
         else:
             await menu(ctx, page_list, DEFAULT_CONTROLS)
 
-    @checks.mod_or_permissions(manage_guild=True)
-    @hunting.command()
-    async def bangtime(self, ctx):
-        """Toggle displaying the bang response time from users."""
-        toggle = await self.config.guild(ctx.guild).bang_time()
-        await self.config.guild(ctx.guild).bang_time.set(not toggle)
-        toggle_text = "will not" if toggle else "will"
-        await ctx.send(f"Bang reaction time {toggle_text} be shown.\n")
-
-    @checks.mod_or_permissions(manage_guild=True)
-    @hunting.command()
-    async def eagle(self, ctx):
-        """Toggle whether shooting an eagle is bad."""
-        toggle = await self.config.guild(ctx.guild).eagle()
-        await self.config.guild(ctx.guild).eagle.set(not toggle)
-        toggle_text = "**Okay**" if toggle else "**Bad**"
-        await ctx.send(f"Shooting an eagle is now {toggle_text}")
-
-    @checks.mod_or_permissions(manage_guild=True)
-    @hunting.command()
-    async def mode(self, ctx):
-        """Toggle whether the bot listens for 'bang' or a reaction."""
-        toggle = await self.config.guild(ctx.guild).bang_words()
-        await self.config.guild(ctx.guild).bang_words.set(not toggle)
-        toggle_text = "Use the reaction" if toggle else "Type 'bang'"
-        await ctx.send(f"{toggle_text} to react to the bang message when it appears.\n")
-
-    @checks.mod_or_permissions(manage_guild=True)
-    @hunting.command()
-    async def reward(self, ctx, min_reward: int = None, max_reward: int = None):
-        """
-        Set a credit reward range for successfully shooting a bird
-
-        Leave the options blank to disable bang rewards
-        """
-        bank_is_global = await bank.is_global()
-        if ctx.author.id not in self.bot.owner_ids and bank_is_global:
-            return await ctx.send("Bank is global, only bot owner can set a reward range.")
-        if not min_reward or not max_reward:
-            if min_reward != 0 and not max_reward:  # Maybe they want users to sometimes not get rewarded
-                if bank_is_global:
-                    await self.config.reward_range.set([])
-                else:
-                    await self.config.guild(ctx.guild).reward_range.set([])
-                msg = "Reward range reset to default(None)."
-                return await ctx.send(msg)
-        if min_reward > max_reward:
-            return await ctx.send("Your minimum reward is greater than your max reward...")
-        reward_range = [min_reward, max_reward]
-        currency_name = await bank.get_currency_name(ctx.guild)
-        if bank_is_global:
-            await self.config.reward_range.set(reward_range)
-        else:
-            await self.config.guild(ctx.guild).reward_range.set(reward_range)
-        msg = f"Users can now get {min_reward} to {max_reward} {currency_name} for shooting a bird."
-        await ctx.send(msg)
-
-    @checks.mod_or_permissions(manage_guild=True)
-    @hunting.command()
-    async def next(self, ctx):
-        """When will the next occurrence happen?"""
-        gid = ctx.guild.id
-        if gid not in self.next_bang:
-            self.next_bang[gid] = datetime.now().timestamp()
-        last = self.next_bang.get(gid)
-        try:
-            total_seconds = int(abs(datetime.now().timestamp() - last))
-            hours, remainder = divmod(total_seconds, 60 * 60)
-            minutes, seconds = divmod(remainder, 60)
-            message = f"The next occurrence will be in {hours} hours and {minutes} minutes."
-        except KeyError:
-            message = "There is currently no hunt."
-        await ctx.send(bold(message))
-
-    @hunting.command(name="score")
-    async def score(self, ctx, member: discord.Member = None):
+    @hunting.command(name="score", description="Show a hunter's score.")
+    @app_commands.describe(member="Whose score. Defaults to yours.")
+    async def score(
+        self, interaction: discord.Interaction, member: discord.Member = None
+    ):
         """This will show the score of a hunter."""
+        ctx = await commands.Context.from_interaction(interaction)
         if not member:
             member = ctx.author
         score = await self.config.user(member).score()
@@ -266,105 +171,6 @@ class Hunting(DashboardIntegration, commands.Cog):
                 kill_list.append(f"{animal[1]} {animal[0].capitalize()}s")
             message = f"{member.name} shot a total of {total} animals ({humanize_list(kill_list)})"
         await ctx.send(bold(message))
-
-    @checks.mod_or_permissions(manage_guild=True)
-    @hunting.command()
-    async def start(self, ctx, channel: discord.TextChannel = commands.CurrentChannel):
-        """Start the hunt."""
-
-        if not channel.permissions_for(ctx.guild.me).send_messages:
-            return await ctx.send(bold("I can't send messages in that channel!"))
-
-        channel_list = await self.config.guild(ctx.guild).channels()
-        if channel.id in channel_list:
-            message = f"We're already hunting in {channel.mention}!"
-        else:
-            channel_list.append(channel.id)
-            message = f"The hunt has started in {channel.mention}. Good luck to all."
-            await self.config.guild(ctx.guild).channels.set(channel_list)
-
-        await ctx.send(bold(message))
-
-    @checks.mod_or_permissions(manage_guild=True)
-    @hunting.command()
-    async def stop(self, ctx, channel: discord.TextChannel = commands.CurrentChannel):
-        """Stop the hunt."""
-        channel_list = await self.config.guild(ctx.guild).channels()
-
-        if channel.id not in channel_list:
-            message = f"We're not hunting in {channel.mention}!"
-        else:
-            channel_list.remove(channel.id)
-            message = f"The hunt has stopped in {channel.mention}."
-            await self.config.guild(ctx.guild).channels.set(channel_list)
-
-        await ctx.send(bold(message))
-
-    @checks.is_owner()
-    @hunting.command()
-    async def clearleaderboard(self, ctx):
-        """
-        Clear all the scores from the leaderboard.
-        """
-        warning_string = (
-            "Are you sure you want to clear all the scores from the leaderboard?\n"
-            "This is a global wipe and **cannot** be undone!\n"
-            'Type "Yes" to confirm, or "No" to cancel.'
-        )
-
-        await ctx.send(warning_string)
-        pred = MessagePredicate.yes_or_no(ctx)
-        try:
-            await self.bot.wait_for("message", check=pred, timeout=15)
-            if pred.result is True:
-                await self.config.clear_all_users()
-                return await ctx.send("Done!")
-            else:
-                return await ctx.send("Alright, not clearing the leaderboard.")
-        except asyncio.TimeoutError:
-            return await ctx.send("Response timed out.")
-
-    @checks.mod_or_permissions(manage_guild=True)
-    @hunting.command()
-    async def timing(
-        self,
-        ctx,
-        interval_min: commands.positive_int,
-        interval_max: commands.positive_int,
-        bang_timeout: commands.positive_int,
-    ):
-        """
-        Change the hunting timing.
-
-        `interval_min` = Minimum time in seconds for a new bird. (60 min)
-        `interval_max` = Maximum time in seconds for a new bird. (120 min)
-        `bang_timeout` = Time in seconds for users to shoot a bird before it flies away. (10s min)
-        """
-        message = ""
-        if interval_min > interval_max:
-            return await ctx.send("`interval_min` needs to be lower than `interval_max`.")
-        if interval_min < 60:
-            interval_min = 60
-            message += "Minimum interval set to minimum of 120s.\n"
-        if interval_max < 120:
-            interval_max = 120
-            message += "Maximum interval set to minimum of 240s.\n"
-        if bang_timeout < 10:
-            bang_timeout = 10
-            message += "Bang timeout set to minimum of 10s.\n"
-
-        await self.config.guild(ctx.guild).hunt_interval_minimum.set(interval_min)
-        await self.config.guild(ctx.guild).hunt_interval_maximum.set(interval_max)
-        await self.config.guild(ctx.guild).wait_for_bang_timeout.set(bang_timeout)
-        message += (
-            f"Timing has been set:\nMin time {interval_min}s\nMax time {interval_max}s\nBang timeout {bang_timeout}s"
-        )
-        await ctx.send(bold(message))
-
-    @hunting.command()
-    async def version(self, ctx):
-        """Show the cog version."""
-        await ctx.send(f"Hunting version {__version__}.")
 
     async def add_score(self, author: discord.User, avian: str):
         user_data = await self.config.user(author).all()
@@ -391,8 +197,8 @@ class Hunting(DashboardIntegration, commands.Cog):
             self.in_game.discard(channel.id)
 
     async def _wait_for_bang(self, guild: discord.Guild, channel: discord.TextChannel, conf: dict):
-        bang = ["💥", "\N{COLLISION SYMBOL}"]
-        salute = ["🫡", "\N{SALUTING FACE}"]
+        bang = ["ðŸ’¥", "\N{COLLISION SYMBOL}"]
+        salute = ["ðŸ«¡", "\N{SALUTING FACE}"]
         animal = random.choice(list(self.animals.keys()))
         animal_message = await channel.send(self.animals[animal])
 
