@@ -8,7 +8,7 @@ import time
 import typing as t
 
 import discord
-from redbot.core import bank, commands
+from redbot.core import bank
 from redbot.core.errors import BalanceTooHigh  # noqa: F401
 
 from ...dashboard_integration import audio_pages
@@ -781,7 +781,6 @@ class ControllerDashboard:
         if len(tracks) > 1:
             return (f"Added {len(tracks)} tracks to the queue.", "success")
         return ("Added to the queue." if not play_now else "Now playing.", "success")
-
 
 
     # ---------- economy ----------

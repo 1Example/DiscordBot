@@ -22,7 +22,7 @@ from pylav.helpers.discord.converters.radio import (
 from pylav.helpers.format.strings import shorten_string
 from pylav.logging import getLogger
 from pylav.players.query.obj import Query
-from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 
 from .dashboard_integration import RadioDashboard
 

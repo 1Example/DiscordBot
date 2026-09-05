@@ -15,7 +15,6 @@ from redbot.core.i18n import Translator
 from pylav.constants.config import DEFAULT_SEARCH_SOURCE
 from pylav.extension.red.utils import rgetattr
 from pylav.extension.red.utils.decorators import is_dj_logic
-from pylav.helpers import emojis
 from pylav.players.player import Player
 from pylav.type_hints.bot import DISCORD_INTERACTION_TYPE
 
@@ -652,7 +651,6 @@ class RefreshButton(discord.ui.Button):
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True)
         await self.view.update_view()
-
 
 
 class ControllerDisconnectButton(discord.ui.Button):

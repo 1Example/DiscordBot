@@ -8,17 +8,15 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
-import discord
 from redbot.core import Config, commands
 from redbot.core.i18n import Translator, cog_i18n
 
 from pylav import logging
-from pylav.core.context import PyLavContext
 from pylav.events.track import TrackEndEvent, TrackSkippedEvent, TrackStartEvent
 from pylav.players.player import Player
 from pylav.players.query.obj import Query
 from pylav.players.tracks.obj import Track
-from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN
 from .dashboard_integration import YouTubeRadioDashboard
 
 _ = Translator("PyLavYouTubeRadio", Path(__file__))
@@ -490,63 +488,6 @@ class PyLavYouTubeRadio(YouTubeRadioDashboard, DISCORD_COG_TYPE_MIXIN):
     # Commands
     # ------------------------------------------------------------------
 
-    @commands.group(name="ytradio")
-    @commands.guild_only()
-    async def command_ytradio(self, context: PyLavContext) -> None:
-        """Control YouTube radio autoplay."""
-
-    @command_ytradio.command(name="toggle")
-    @commands.admin_or_permissions(manage_guild=True)
-    async def command_ytradio_toggle(self, context: PyLavContext, toggle: bool) -> None:
-        """Turn YouTube radio on or off for this server."""
-        if isinstance(context, discord.Interaction):
-            context = await self.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-
-        await self._ytradio_config.guild(context.guild).enabled.set(toggle)
-        self._enabled_cache[context.guild.id] = toggle
-
-        if toggle:
-            message = _(
-                "When the queue runs out I will keep playing tracks recommended by YouTube "
-                "based on whatever played last."
-            )
-        else:
-            message = _("I will stop playing recommended tracks when the queue runs out.")
-
-        await context.send(
-            embed=await self.pylav.construct_embed(description=message, messageable=context),
-            ephemeral=True,
-        )
-
-    @command_ytradio.command(name="buffer")
-    @commands.admin_or_permissions(manage_guild=True)
-    async def command_ytradio_buffer(self, context: PyLavContext, size: int) -> None:
-        """Set how many recommended tracks to queue at a time (1-10)."""
-        if isinstance(context, discord.Interaction):
-            context = await self.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-
-        if not 1 <= size <= 10:
-            await context.send(
-                embed=await self.pylav.construct_embed(
-                    description=_("Pick a number between 1 and 10."), messageable=context
-                ),
-                ephemeral=True,
-            )
-            return
-
-        await self._ytradio_config.guild(context.guild).buffer.set(size)
-        self._buffer_cache[context.guild.id] = size
-        await context.send(
-            embed=await self.pylav.construct_embed(
-                description=_("I will queue {number} recommended tracks at a time.").format(number=size),
-                messageable=context,
-            ),
-            ephemeral=True,
-        )
 
     async def _ytradio_diagnosis(self, guild_id: int) -> list[str]:
         """Walk the radio pipeline and report each step.
@@ -614,20 +555,3 @@ class PyLavYouTubeRadio(YouTubeRadioDashboard, DISCORD_COG_TYPE_MIXIN):
 
         return lines
 
-    @command_ytradio.command(name="reset")
-    @commands.admin_or_permissions(manage_guild=True)
-    async def command_ytradio_reset(self, context: PyLavContext) -> None:
-        """Forget which tracks the radio has already played here."""
-        if isinstance(context, discord.Interaction):
-            context = await self.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-
-        self._played.pop(context.guild.id, None)
-        self._seeds.pop(context.guild.id, None)
-        await context.send(
-            embed=await self.pylav.construct_embed(
-                description=_("Radio history cleared."), messageable=context
-            ),
-            ephemeral=True,
-        )

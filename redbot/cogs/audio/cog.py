@@ -17,8 +17,8 @@ from .context_menus import ContextMenus
 from .hybrid_commands import HybridCommands
 from .player_commands import PlayerCommands
 from .slash_commands import SlashCommands
-from .utility_commands import UtilityCommands
 from .dashboard_integration import DashboardIntegration
+from .shared import player as player_group
 from .parts.plconfig import PyLavConfigurator
 from .parts.plcontroller import PyLavController
 from .parts.pleffects import PyLavEffects
@@ -65,7 +65,6 @@ class PyLavPlayer(
     PyLavConfigurator,
     PyLavUtils,
     HybridCommands,
-    UtilityCommands,
     PlayerCommands,
     ConfigCommands,
     ContextMenus,
@@ -79,6 +78,10 @@ class PyLavPlayer(
     """
 
     __version__ = "1.0.0"
+
+    # Defined in shared.py, where the two modules that hang commands off it
+    # can import it; bound here so discord.py collects it.
+    player = player_group
 
     def __init__(self, bot: DISCORD_BOT_TYPE, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

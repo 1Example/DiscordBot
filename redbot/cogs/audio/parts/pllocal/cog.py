@@ -11,18 +11,15 @@ import discord
 from discord import app_commands
 from discord.app_commands import AppCommandError, Choice, CommandOnCooldown, Cooldown
 from rapidfuzz import fuzz
-from redbot.core import commands
 from redbot.core.i18n import Translator, cog_i18n
-from redbot.core.utils.chat_formatting import box
 from tabulate import tabulate
 
 from pylav.core.context import PyLavContext
 from pylav.extension.red.utils import rgetattr
-from pylav.helpers.format.ascii import EightBitANSI
 from pylav.helpers.format.strings import shorten_string
 from pylav.logging import getLogger
 from pylav.players.query.obj import Query
-from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 
 from .dashboard_integration import LocalFilesDashboard
 
@@ -57,61 +54,6 @@ class PyLavLocalFiles(LocalFilesDashboard, DISCORD_COG_TYPE_MIXIN):
             return False
         return cache.is_ready
 
-    @commands.group(name="pllocalset")
-    async def command_pllocalset(self, ctx: PyLavContext):
-        """Configure cog settings"""
-
-    @command_pllocalset.command(name="version")
-    async def command_pllocalset_version(self, context: PyLavContext) -> None:
-        """Show the version of the Cog and PyLav"""
-        if isinstance(context, discord.Interaction):
-            context = await self.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-        data = [
-            (EightBitANSI.paint_white(self.__class__.__name__), EightBitANSI.paint_blue(self.__version__)),
-            (EightBitANSI.paint_white("PyLav"), EightBitANSI.paint_blue(context.pylav.lib_version)),
-        ]
-
-        await context.send(
-            embed=await context.pylav.construct_embed(
-                description=box(
-                    tabulate(
-                        data,
-                        headers=(
-                            EightBitANSI.paint_yellow(_("Library / Cog"), bold=True, underline=True),
-                            EightBitANSI.paint_yellow(_("Version"), bold=True, underline=True),
-                        ),
-                        tablefmt="fancy_grid",
-                    ),
-                    lang="ansi",
-                ),
-                messageable=context,
-            ),
-            ephemeral=True,
-        )
-
-    @command_pllocalset.command(name="update")
-    @commands.is_owner()
-    async def command_pllocalset_update(self, context: PyLavContext) -> None:
-        """Update the track list for /local"""
-        if isinstance(context, discord.Interaction):
-            context = await self.cog.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-        await self.pylav.local_tracks_cache.update()
-        await context.send(
-            embed=await self.pylav.construct_embed(
-                description=shorten_string(
-                    max_length=100,
-                    string=_(
-                        "I have updated my local track cache. There are now {number_variable_do_not_translate} tracks present."
-                    ).format(number_variable_do_not_translate=len(self.pylav.local_tracks_cache.path_to_track)),
-                ),
-                messageable=context,
-            ),
-            ephemeral=True,
-        )
 
     @app_commands.command(
         name="local",

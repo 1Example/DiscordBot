@@ -1,11 +1,23 @@
 from pathlib import Path
 
+from redbot.core import app_commands
 from redbot.core.i18n import Translator
 from redbot.core.utils.chat_formatting import humanize_list
 
 from pylav.core.client import Client
 
 _ = Translator("PyLavPlayer", Path(__file__))
+
+# The player commands that are reached for occasionally rather than every
+# track. Defined here because two modules hang commands off it, and
+# assigned onto the cog class as well - discord.py only collects a Group
+# that is an attribute of the cog.
+player = app_commands.Group(
+    name="player",
+    description="Connect, move around the queue, and edit what is in it.",
+    guild_only=True,
+    extras={"red_force_enable": True},
+)
 
 
 class SharedMethods:

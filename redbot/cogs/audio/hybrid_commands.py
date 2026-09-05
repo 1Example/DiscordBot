@@ -7,10 +7,8 @@ from typing import Final
 
 import discord
 from discord import app_commands
-from redbot.core import commands
 from redbot.core.i18n import Translator
 
-from pylav.core.context import PyLavContext
 from pylav.extension.red.ui.menus.queue import QueueMenu
 from pylav.extension.red.ui.sources.queue import QueueSource
 from pylav.extension.red.utils import rgetattr
@@ -18,7 +16,8 @@ from pylav.extension.red.utils.decorators import invoker_is_dj, requires_player
 from pylav.helpers.format.strings import format_time_dd_hh_mm_ss, shorten_string
 from pylav.logging import getLogger
 from pylav.players.tracks.obj import Track
-from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN
+from .shared import player
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 
 LOGGER = getLogger("PyLav.cog.Player.commands.hybrids")
 _ = Translator("PyLavPlayer", Path(__file__))
@@ -44,17 +43,16 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             total_tracks_from_search += 1
         return single_track, total_tracks_enqueue
 
-    @commands.hybrid_command(
+    @player.command(
         name="connect",
         description=shorten_string(
             max_length=100, string=_("Request that I connect to the specified channel or your current channel.")
         ),
-        extras={"red_force_enable": True},
     )
     @app_commands.describe(channel=shorten_string(max_length=100, string=_("The voice channel to connect to.")))
-    @commands.guild_only()
-    @invoker_is_dj()
-    async def command_connect(self, context: PyLavContext, *, channel: discord.VoiceChannel | None = None):
+    @app_commands.guild_only()
+    @invoker_is_dj(slash=True)
+    async def command_connect(self, context: DISCORD_INTERACTION_TYPE, channel: discord.VoiceChannel | None = None):
         """Request that I connect to the specified channel or your current channel."""
 
         if isinstance(context, discord.Interaction):
@@ -136,20 +134,19 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
                 ephemeral=True,
             )
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="np",
         description=shorten_string(
             max_length=100, string=_("Shows which track is currently being played on this server.")
         ),
-        aliases=["now"],
         extras={"red_force_enable": True},
     )
     @app_commands.describe(
         to_dm=shorten_string(max_length=100, string=_("Whether to send this command to your DM instead."))
     )
-    @commands.guild_only()
-    @requires_player()
-    async def command_now(self, context: PyLavContext, to_dm: bool = False):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    async def command_now(self, context: DISCORD_INTERACTION_TYPE, to_dm: bool = False):
         """Shows which track is currently being played on this server."""
         if isinstance(context, discord.Interaction):
             context = await self.bot.get_context(context)
@@ -185,15 +182,15 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             return
         await context.send(ephemeral=True, **kwargs)
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="skip",
         description=shorten_string(max_length=100, string=_("Skips the current track.")),
         extras={"red_force_enable": True},
     )
-    @commands.guild_only()
-    @requires_player()
-    @invoker_is_dj()
-    async def command_skip(self, context: PyLavContext):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_skip(self, context: DISCORD_INTERACTION_TYPE):
         """Skips the current track."""
         if isinstance(context, discord.Interaction):
             context = await self.bot.get_context(context)
@@ -224,15 +221,15 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             )
         await context.player.skip(requester=context.author)
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="stop",
         description=shorten_string(max_length=100, string=_("Stops the player and clears the queue.")),
         extras={"red_force_enable": True},
     )
-    @commands.guild_only()
-    @requires_player()
-    @invoker_is_dj()
-    async def command_stop(self, context: PyLavContext):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_stop(self, context: DISCORD_INTERACTION_TYPE):
         """Stops the player and clears the queue."""
         if isinstance(context, discord.Interaction):
             context = await self.bot.get_context(context)
@@ -268,17 +265,16 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="dc",
         description=shorten_string(
             max_length=100, string=_("Request that I disconnect from the current voice channel.")
         ),
-        aliases=["disconnect"],
         extras={"red_force_enable": True},
     )
-    @requires_player()
-    @invoker_is_dj()
-    async def command_disconnect(self, context: PyLavContext):
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_disconnect(self, context: DISCORD_INTERACTION_TYPE):
         """Request that I disconnect from the current voice channel."""
         if isinstance(context, discord.Interaction):
             context = await self.bot.get_context(context)
@@ -304,15 +300,14 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="queue",
         description=shorten_string(max_length=100, string=_("Shows the current queue for this server.")),
-        aliases=["q"],
         extras={"red_force_enable": True},
     )
-    @commands.guild_only()
-    @requires_player()
-    async def command_queue(self, context: PyLavContext):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    async def command_queue(self, context: DISCORD_INTERACTION_TYPE):
         """Shows the current queue for this server."""
         if isinstance(context, discord.Interaction):
             context = await self.bot.get_context(context)
@@ -333,15 +328,15 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             original_author=context.interaction.user if context.interaction else context.author,
         ).start(ctx=context)
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="shuffle",
         description=shorten_string(max_length=100, string=_("Shuffles the current queue.")),
         extras={"red_force_enable": True},
     )
-    @commands.guild_only()
-    @requires_player()
-    @invoker_is_dj()
-    async def command_shuffle(self, context: PyLavContext):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_shuffle(self, context: DISCORD_INTERACTION_TYPE):
         """Shuffles the current queue."""
         if isinstance(context, discord.Interaction):
             context = await self.bot.get_context(context)
@@ -382,16 +377,16 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="repeat",
         description=shorten_string(max_length=100, string=_("Set whether to repeat the current song or queue.")),
         extras={"red_force_enable": True},
     )
     @app_commands.describe(queue=shorten_string(max_length=100, string=_("Should the whole queue be repeated?")))
-    @commands.guild_only()
-    @requires_player()
-    @invoker_is_dj()
-    async def command_repeat(self, context: PyLavContext, queue: bool | None = None):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_repeat(self, context: DISCORD_INTERACTION_TYPE, queue: bool | None = None):
         """Set whether to repeat the current song or queue.
 
         If no argument is given, the current repeat mode will be toggled between the current track and off.
@@ -429,15 +424,15 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             embed=await context.pylav.construct_embed(description=msg, messageable=context), ephemeral=True
         )
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="pause",
         description=shorten_string(max_length=100, string=_("Pause the player")),
         extras={"red_force_enable": True},
     )
-    @commands.guild_only()
-    @requires_player()
-    @invoker_is_dj()
-    async def command_pause(self, context: PyLavContext):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_pause(self, context: DISCORD_INTERACTION_TYPE):
         """Pause the player"""
         if isinstance(context, discord.Interaction):
             context = await self.bot.get_context(context)
@@ -471,15 +466,15 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="resume",
         description=shorten_string(max_length=100, string=_("Resume the player")),
         extras={"red_force_enable": True},
     )
-    @commands.guild_only()
-    @requires_player()
-    @invoker_is_dj()
-    async def command_resume(self, context: PyLavContext):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_resume(self, context: DISCORD_INTERACTION_TYPE):
         """Resume the player"""
         if isinstance(context, discord.Interaction):
             context = await self.bot.get_context(context)
@@ -513,14 +508,14 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @commands.hybrid_command(
+    @app_commands.command(
         name="volume", description=_("Set the current volume for the player."), extras={"red_force_enable": True}
     )
     @app_commands.describe(volume=_("The volume to set"))
-    @commands.guild_only()
-    @requires_player()
-    @invoker_is_dj()
-    async def command_volume(self, context: PyLavContext, volume: int):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_volume(self, context: DISCORD_INTERACTION_TYPE, volume: int):
         """Set the current volume for the player.
 
         The volume is a percentage value between 0% and 1,000%, where 100% is the default volume.
@@ -576,12 +571,12 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @commands.hybrid_command(name="seek", description=_("Seek the current track."), extras={"red_force_enable": True})
+    @app_commands.command(name="seek", description=_("Seek the current track."), extras={"red_force_enable": True})
     @app_commands.describe(seek=_("The player position to seek to"))
-    @commands.guild_only()
-    @requires_player()
-    @invoker_is_dj()
-    async def command_seek(self, context: PyLavContext, seek: str):  # sourcery skip: low-code-quality
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_seek(self, context: DISCORD_INTERACTION_TYPE, seek: str):  # sourcery skip: low-code-quality
         """Seek the current track.
 
         Seek can either be a number of seconds, a timestamp, or a specific percentage of the track.
@@ -734,16 +729,14 @@ class HybridCommands(DISCORD_COG_TYPE_MIXIN):
 
         await context.player.seek(seek_ms, context.author, False)
 
-    @commands.hybrid_command(
+    @player.command(
         name="prev",
         description=_("Play previously played tracks."),
-        aliases=["previous"],
-        extras={"red_force_enable": True},
     )
-    @commands.guild_only()
-    @requires_player()
-    @invoker_is_dj()
-    async def command_previous(self, context: PyLavContext):
+    @app_commands.guild_only()
+    @requires_player(slash=True)
+    @invoker_is_dj(slash=True)
+    async def command_previous(self, context: DISCORD_INTERACTION_TYPE):
         """Play previously played tracks.
 
         A history of the last 100 tracks played is kept.

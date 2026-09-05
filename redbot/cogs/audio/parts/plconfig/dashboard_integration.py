@@ -93,6 +93,9 @@ class PyLavConfigDashboard:
             "web_content": {
                 "source": PLCONFIG_TEMPLATE,
                 "audio_pages": audio_pages(await self.bot.is_owner(user)),
+                "spotify_set": bool(
+                    await self.bot.get_shared_api_tokens("spotify")
+                ),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "lib_version": str(self.pylav.lib_version),
                 "cog_version": getattr(self, "__version__", ""),
@@ -235,6 +238,32 @@ PLCONFIG_TEMPLATE = (
   </div>
 
   {{ subnav(name, audio_pages, 'pylav', guild) }}
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-spotify"></i> Spotify credentials</h5>
+    <p class="dz-hint">
+      Without these, Spotify links resolve through a fallback that finds the
+      wrong track more often. Currently
+      <b>{{ 'set' if spotify_set else 'not set' }}</b>.
+    </p>
+    <details>
+      <summary style="cursor:pointer;">How to get them</summary>
+      <ol class="dz-hint" style="margin:8px 0 8px 18px;">
+        <li>Sign in at
+          <a href="https://developer.spotify.com/dashboard/applications"
+             target="_blank" rel="noopener">developer.spotify.com</a>.</li>
+        <li>Click <b>Create an App</b> and fill in a name and description.</li>
+        <li>Answer <b>No</b> when asked about commercial integration.</li>
+        <li>Accept the terms, then copy the client ID and client secret.</li>
+      </ol>
+      <p class="dz-hint" style="margin:0;">Then send the bot, in a DM:</p>
+      <code style="display:block; margin-top:5px; word-break:break-all;"
+        >[p]set api spotify client_id &lt;client_id&gt; client_secret &lt;client_secret&gt;</code>
+      <p class="dz-hint" style="margin-top:7px;">
+        These are secrets: send that in a DM, not a server channel.
+      </p>
+    </details>
+  </div>
 
   {{ stats([('Nodes', nodes|length),
             ('Active players', players|length),

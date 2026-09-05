@@ -6,12 +6,12 @@ from pathlib import Path
 import discord
 from discord import app_commands
 from discord.app_commands import Range
-from redbot.core import Config, commands
+from redbot.core import Config
+
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import box
 from tabulate import tabulate
 
-from pylav.constants.misc import EQ_BAND_MAPPING
 from pylav.core.context import PyLavContext
 from pylav.exceptions.node import NodeHasNoFiltersException
 from pylav.extension.red.converters.equalizer import BassBoostConverter
@@ -24,6 +24,7 @@ from pylav.storage.models.equilizer import Equalizer as Equalizer_namespace_conf
 from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 from pylav.type_hints.dict_typing import JSON_DICT_TYPE
 from .dashboard_integration import EffectsDashboard
+from pylav.constants.misc import EQ_BAND_MAPPING
 
 LOGGER = getLogger("PyLav.cog.Effects")
 
@@ -45,82 +46,6 @@ class PyLavEffects(EffectsDashboard, DISCORD_COG_TYPE_MIXIN):
         self._effects_config.register_global(enable_slash=True)
         self._effects_config.register_guild(persist_fx=False, persist_eq=False)
 
-    @commands.group(name="fxset")
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(manage_guild=True)
-    async def command_fxset(self, ctx: PyLavContext) -> None:
-        """Configure the Player behaviour when an effect is set"""
-
-    @command_fxset.command(name="version")
-    async def command_fxset_version(self, context: PyLavContext) -> None:
-        """Show the version of the Cog and PyLav"""
-        if isinstance(context, discord.Interaction):
-            context = await self.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-        data = [
-            (EightBitANSI.paint_white(self.__class__.__name__), EightBitANSI.paint_blue(self.__version__)),
-            (EightBitANSI.paint_white("PyLav"), EightBitANSI.paint_blue(context.pylav.lib_version)),
-        ]
-
-        await context.send(
-            embed=await context.pylav.construct_embed(
-                description=box(
-                    tabulate(
-                        data,
-                        headers=(
-                            EightBitANSI.paint_yellow(_("Library / Cog"), bold=True, underline=True),
-                            EightBitANSI.paint_yellow(_("Version"), bold=True, underline=True),
-                        ),
-                        tablefmt="fancy_grid",
-                    ),
-                    lang="ansi",
-                ),
-                messageable=context,
-            ),
-            ephemeral=True,
-        )
-
-    @commands.group(name="eq")
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(manage_guild=True)
-    async def command_fxset_eq(self, ctx: PyLavContext) -> None:
-        """Configure the Player behaviour when an equalizer preset is set"""
-
-    @command_fxset_eq.command(name="persist")
-    async def command_fxset_eq_persist(self, context: PyLavContext) -> None:
-        """Persist the last used preset"""
-        if isinstance(context, discord.Interaction):
-            context = await self.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-        async with self._effects_config.guild(context.guild).all() as guild_config:
-            guild_config["persist_eq"] = state = not guild_config["persist_eq"]
-
-        if state:
-            if context.player:
-                effects = await context.player.config.fetch_effects()
-                effects["equalizer"] = {}
-                await context.player.config.update_effects(effects)
-            await context.send(
-                embed=await self.pylav.construct_embed(
-                    messageable=context,
-                    description=_("The player will now apply the last used preset when it is created"),
-                ),
-                ephemeral=True,
-            )
-        else:
-            if context.player:
-                effects = await context.player.config.fetch_effects()
-                effects["equalizer"] = context.player.equalizer.to_dict()
-                await context.player.config.update_effects(effects)
-            await context.send(
-                embed=await self.pylav.construct_embed(
-                    messageable=context,
-                    description=_("Last used preset will no longer be saved"),
-                ),
-                ephemeral=True,
-            )
 
     @slash_fx.command(
         name="nightcore",

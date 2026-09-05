@@ -35,7 +35,7 @@ from pylav.nodes.api.responses.track import Track as Track_namespace_conflict
 from pylav.players.query.obj import Query
 from pylav.players.tracks.obj import Track
 from pylav.storage.models.playlist import Playlist
-from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 from .dashboard_integration import PlaylistsDashboard
 
 _ = Translator("PyLavPlaylists", Path(__file__))
@@ -276,7 +276,7 @@ class PyLavPlaylists(
         if not playlist:
             return
         if invoked_with_start:
-            await self.command_playlist_play.callback(self, context, playlist=[playlist])  # type: ignore
+            await self.command_playlist_play(context, playlist=[playlist])
             return
         if invoked_with_info:
             await PaginatingMenu(
@@ -590,7 +590,7 @@ class PyLavPlaylists(
         playlist = await maybe_prompt_for_playlist(cog=self, playlists=playlists, context=context)
         if not playlist:
             return
-        await self.command_playlist_play.callback(self, context, playlist=[playlist])  # type: ignore
+        await self.command_playlist_play(context, playlist=[playlist])
 
     @slash_playlist.command(
         name="delete",
@@ -1104,7 +1104,8 @@ class PyLavPlaylists(
             file=file,
         )
 
-    @commands.command(name="__command_playlist_play", hidden=True)
+    # Not a command: reached only from the two call sites above, which is
+    # why it was a hidden one with a name nobody could type.
     @always_hidden()
     async def command_playlist_play(self, context: PyLavContext, *, playlist: PlaylistConverter):
         if isinstance(context, discord.Interaction):

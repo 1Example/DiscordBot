@@ -4,7 +4,6 @@ import logging
 import typing as t
 
 import discord
-from redbot.core import commands
 
 from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (

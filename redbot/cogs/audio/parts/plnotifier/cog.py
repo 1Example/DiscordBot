@@ -13,12 +13,12 @@ import discord
 from apscheduler.job import Job
 from redbot.core import Config, commands
 from redbot.core.i18n import Translator, cog_i18n
-from redbot.core.utils.chat_formatting import box, humanize_list, inline
+from redbot.core.utils.chat_formatting import box
+from redbot.core.utils.chat_formatting import inline
 from tabulate import tabulate
 
 from pylav.compat import json
 from pylav.constants.misc import EQ_BAND_MAPPING
-from pylav.core.client import Client
 from pylav.core.context import PyLavContext
 from pylav.events.node import NodeChangedEvent, NodeConnectedEvent, NodeDisconnectedEvent, WebSocketClosedEvent
 from pylav.events.player import (
@@ -49,6 +49,7 @@ from pylav.events.track import (
     TrackSkippedEvent,
     TrackStuckEvent,
 )
+from pylav.core.client import Client
 from pylav.events.track.track_start import (
     TrackStartAppleMusicEvent,
     TrackStartBandcampEvent,
@@ -413,225 +414,6 @@ class PyLavNotifier(NotifierDashboard, DISCORD_COG_TYPE_MIXIN):
         with contextlib.suppress(discord.HTTPException):
             await message.delete()
 
-    @commands.guildowner_or_permissions(manage_guild=True)
-    @commands.guild_only()
-    @commands.group(name="plnotifier")
-    async def command_plnotify(self, context: PyLavContext):
-        """Configure the PyLavNotifier cog"""
-
-    @command_plnotify.command(name="version")
-    async def command_plnotify_version(self, context: PyLavContext) -> None:
-        """Show the version of the Cog and PyLav"""
-        if isinstance(context, discord.Interaction):
-            context = await self.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-        data = [
-            (EightBitANSI.paint_white(self.__class__.__name__), EightBitANSI.paint_blue(self.__version__)),
-            (EightBitANSI.paint_white("PyLav"), EightBitANSI.paint_blue(context.pylav.lib_version)),
-        ]
-
-        await context.send(
-            embed=await context.pylav.construct_embed(
-                description=box(
-                    tabulate(
-                        data,
-                        headers=(
-                            EightBitANSI.paint_yellow(_("Library / Cog"), bold=True, underline=True),
-                            EightBitANSI.paint_yellow(_("Version"), bold=True, underline=True),
-                        ),
-                        tablefmt="fancy_grid",
-                    ),
-                    lang="ansi",
-                ),
-                messageable=context,
-            ),
-            ephemeral=True,
-        )
-
-    @command_plnotify.command(name="webhook")
-    async def command_plnotify_webhook(
-        self,
-        context: PyLavContext,
-        channel: discord.TextChannel | discord.VoiceChannel | discord.Thread,
-        use_thread: bool = True,
-    ) -> None:  # sourcery skip: low-code-quality
-        """Set the notify channel for the player"""
-        if isinstance(context, discord.Interaction):
-            context = await self.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-        if not isinstance(channel, discord.Thread):
-            if not channel.permissions_for(context.guild.me).manage_webhooks:
-                await context.send(
-                    embed=await self.pylav.construct_embed(
-                        description=_(
-                            "I do not have permission to manage webhooks in {channel_variable_do_not_translate}."
-                        ).format(channel_variable_do_not_translate=channel.mention),
-                        messageable=context,
-                    ),
-                    ephemeral=True,
-                )
-                return
-            if use_thread and not (
-                (permission := channel.permissions_for(context.guild.me)).create_public_threads
-                and permission.send_messages_in_threads
-            ):
-                await context.send(
-                    embed=await self.pylav.construct_embed(
-                        description=_(
-                            "I do not have permission to create a thread in {channel_variable_do_not_translate}."
-                        ).format(channel_variable_do_not_translate=channel.mention),
-                        messageable=context,
-                    ),
-                    ephemeral=True,
-                )
-                return
-            webhook = await channel.create_webhook(
-                name=_("PyLavNotifier"),
-                reason=_("PyLav Notifier - Requested by {author_variable_do_not_translate}.").format(
-                    author_variable_do_not_translate=context.author
-                ),
-            )
-            if not use_thread:
-                existing_thread = None
-                if isinstance(channel, discord.VoiceChannel):
-                    existing_thread = channel
-                else:
-                    for thread in channel.guild.threads:
-                        if thread.parent.id == channel.id and thread.name.startswith("PyLavNotifier"):
-                            existing_thread = thread
-                if not existing_thread:
-                    message = await channel.send(
-                        _("This thread will be used by PyLav to post notifications about the player.")
-                    )
-                    existing_thread = await channel.create_thread(
-                        invitable=False,
-                        name=_("PyLavNotifier"),
-                        message=message,
-                        auto_archive_duration=10080,
-                        reason=_("PyLav Notifier - Requested by {author_variable_do_not_translate}.").format(
-                            author_variable_do_not_translate=context.author
-                        ),
-                    )
-            else:
-                existing_thread = channel
-            channel = existing_thread
-            if old_url := await self._notifier_config.guild(context.guild).webhook_url():
-                with contextlib.suppress(discord.HTTPException):
-                    await discord.Webhook.from_url(url=old_url, session=self._session).delete(
-                        reason=_("A new webhook was being created.")
-                    )
-
-            await self._notifier_config.guild(context.guild).webhook_url.set(webhook.url)
-            await self._notifier_config.guild(context.guild).webhook_channel_id.set(channel.id)
-            self._webhook_cache[context.guild.id] = webhook
-        else:
-            existing_webhook_url = await self._notifier_config.guild(context.guild).webhook_url()
-            existing_webhook_channel_id = await self._notifier_config.guild(context.guild).webhook_channel_id()
-            webhook = (
-                discord.Webhook.from_url(url=existing_webhook_url, session=self._session)
-                if channel.id == existing_webhook_channel_id
-                else None
-            )
-            if not webhook:
-                if not channel.parent.permissions_for(context.guild.me).manage_webhooks:
-                    await context.send(
-                        embed=await self.pylav.construct_embed(
-                            description=_(
-                                "I do not have permission to manage webhooks in {channel_variable_do_not_translate}."
-                            ).format(channel_variable_do_not_translate=channel.parent.mention),
-                            messageable=context,
-                        ),
-                        ephemeral=True,
-                    )
-                    return
-                webhook_channel = channel.parent
-                webhook = await webhook_channel.create_webhook(
-                    name=_("PyLavNotifier"),
-                    reason=_("PyLav Notifier - Requested by {author_variable_do_not_translate}.").format(
-                        author_variable_do_not_translate=context.author
-                    ),
-                )
-                if existing_webhook_url:
-                    with contextlib.suppress(discord.HTTPException):
-                        await discord.Webhook.from_url(url=existing_webhook_url, session=self._session).delete(
-                            reason=_("A new webhook was being created.")
-                        )
-                await self._notifier_config.guild(context.guild).webhook_url.set(webhook.url)
-                await self._notifier_config.guild(context.guild).webhook_channel_id.set(webhook_channel.id)
-        self._webhook_cache[context.guild.id] = webhook
-        if context.player:
-            config = context.player.config
-        else:
-            config = self.pylav.player_config_manager.get_config(context.guild.id)
-        await config.update_notify_channel_id(channel.id if channel else 0)
-        if await self.bot.is_owner(context.author):
-            # Vestigial: node notices read the per-guild channel now.
-            await self._notifier_config.notify_channel_id.set(channel.id)
-        await context.send(
-            embed=await context.pylav.construct_embed(
-                description=_("PyLavNotifier channel set to {channel_variable_do_not_translate}.").format(
-                    channel_variable_do_not_translate=channel.mention
-                ),
-                messageable=context,
-            ),
-            ephemeral=True,
-        )
-
-    @command_plnotify.command(name="event")
-    async def command_plnotify_event(
-        self, context: PyLavContext, event: str, toggle: bool, use_mention: bool = False
-    ) -> None:
-        """Set whether or not to notify for the specified event.
-
-        Arguments:
-            event -- The event to set.
-            toggle -- Whether or not to notify upon receiving this event.
-            use_mention -- Whether or not to use a mention instead of the name for the action requested.
-        """
-        if isinstance(context, discord.Interaction):
-            context = await self.bot.get_context(context)
-        if context.interaction and not context.interaction.response.is_done():
-            await context.defer(ephemeral=True)
-        event = event.lower()
-        possible_events = self.pylav.dispatch_manager.simple_event_names()
-
-        if event not in possible_events:
-            await context.send(
-                embed=await context.pylav.construct_embed(
-                    description=_("Invalid event, possible events are:\n\n{events_variable_do_not_translate}.").format(
-                        events_variable_do_not_translate=humanize_list(
-                            sorted(list(map(inline, possible_events)), key=str.lower)
-                        )
-                    ),
-                    messageable=context,
-                ),
-                ephemeral=True,
-            )
-            return
-        await self._notifier_config.guild(guild=context.guild).set_raw(event, value={"enabled": toggle, "mention": use_mention})
-        if event in {
-            "node_connected",
-            "node_disconnected",
-        } and await self.bot.is_owner(context.author):
-            await self._notifier_config.set_raw(event, value={"enabled": toggle, "mention": use_mention})
-
-        await context.send(
-            embed=await context.pylav.construct_embed(
-                description=_(
-                    "Event {event_variable_do_not_translate} set to {toggle_variable_do_not_translate}{extras_variable_do_not_translate}."
-                ).format(
-                    event_variable_do_not_translate=inline(event),
-                    toggle_variable_do_not_translate=_("notify") if toggle else _("do not notify"),
-                    extras_variable_do_not_translate=(
-                        _(" with mentions") if use_mention and toggle else _(" without mentions") if toggle else ""
-                    ),
-                ),
-                messageable=context,
-            ),
-            ephemeral=True,
-        )
 
     @commands.Cog.listener()
     async def on_plcontroller_charged(
