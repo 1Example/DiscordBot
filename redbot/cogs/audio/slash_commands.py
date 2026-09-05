@@ -6,7 +6,6 @@ from typing import Literal
 
 from discord import app_commands
 from discord.app_commands import Choice
-from discord.ext.commands import HybridCommand
 from expiringdict import ExpiringDict
 from redbot.core.i18n import Translator
 
@@ -29,7 +28,6 @@ _ = Translator("PyLavPlayer", Path(__file__))
 
 
 class SlashCommands(DISCORD_COG_TYPE_MIXIN, SharedMethods):
-    command_play: HybridCommand
 
     _track_cache: ExpiringDict
 
@@ -65,7 +63,7 @@ class SlashCommands(DISCORD_COG_TYPE_MIXIN, SharedMethods):
             )
         _track = self._track_cache.get(query)
         track = query if _track is None else _track
-        await self.command_play.callback(self, interaction, query=track)
+        await self.slash_play.callback(self, interaction, query=track)
 
     @slash_search.autocomplete("query")
     async def slash_search_autocomplete_query(

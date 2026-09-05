@@ -4,7 +4,6 @@ import re
 import shlex
 
 import discord
-from discord.ext.commands import HybridCommand
 from redbot.core.i18n import Translator, cog_i18n
 
 from pylav.constants.regex import SOURCE_INPUT_MATCH_MERGED
@@ -20,7 +19,6 @@ YOUTUBE_MUSIC_ACTIVITY = re.compile(r"i\.ytimg\.com/vi/([A-Za-z0-9_\-]{11}).*\.j
 
 @cog_i18n(_)
 class ContextMenus(DISCORD_COG_TYPE_MIXIN):
-    command_play: HybridCommand
 
     async def _context_message_play(self, interaction: DISCORD_INTERACTION_TYPE, message: discord.Message) -> None:
         await interaction.response.defer(ephemeral=True)
@@ -101,7 +99,7 @@ class ContextMenus(DISCORD_COG_TYPE_MIXIN):
             wait=True,
         )
 
-        await self.command_play.callback(self, interaction, query="\n".join(valid_matches))  # type: ignore
+        await self.slash_play.callback(self, interaction, query="\n".join(valid_matches))  # type: ignore
 
     @staticmethod
     async def _reconstruct_msg_content(message):
@@ -200,7 +198,7 @@ class ContextMenus(DISCORD_COG_TYPE_MIXIN):
             )
             return
         if spotify_activity and spotify_activity.track_id:
-            await self.command_play.callback(
+            await self.slash_play.callback(
                 self,
                 interaction,
                 query=f"https://open.spotify.com/track/{spotify_activity.track_id}",
@@ -257,7 +255,7 @@ class ContextMenus(DISCORD_COG_TYPE_MIXIN):
                     wait=True,
                 )
                 return
-            await self.command_play.callback(
+            await self.slash_play.callback(
                 self,
                 interaction,
                 query=tracks[0],
@@ -267,7 +265,7 @@ class ContextMenus(DISCORD_COG_TYPE_MIXIN):
             if image_url := youtube_music_activity.assets.get("large_image"):
                 track_id_match = YOUTUBE_MUSIC_ACTIVITY.search(image_url)
                 if track_id_match and track_id_match.group(1):
-                    await self.command_play.callback(
+                    await self.slash_play.callback(
                         self,
                         interaction,
                         query=f"https://music.youtube.com/watch?v={track_id_match.group(1)}",
@@ -317,7 +315,7 @@ class ContextMenus(DISCORD_COG_TYPE_MIXIN):
                     wait=True,
                 )
                 return
-            await self.command_play.callback(
+            await self.slash_play.callback(
                 self,
                 interaction,
                 query=tracks[0],
