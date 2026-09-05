@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import inspect
 import logging
 import pathlib
 import random
@@ -1201,7 +1202,7 @@ class DashboardRPC:
             self.cogs_infos_cache[name] = {"author": author, "repo": repo}
             returning[name] = {
                 "name": name,
-                "description": (cog.__doc__ or "").strip(),
+                "description": inspect.cleandoc(cog.__doc__ or ""),
                 "author": author or "",
                 "repo": repo,
                 "commands": cmds,

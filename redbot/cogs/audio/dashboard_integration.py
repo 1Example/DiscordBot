@@ -84,7 +84,7 @@ class DashboardIntegration:
 
     @commands.Cog.listener()
     async def on_dashboard_cog_add(self, dashboard_cog) -> None:  # noqa: D401
-        log.info("Dashboard cog found, registering PyLavPlayer as a third party.")
+        log.info("Dashboard cog found, registering Audio as a third party.")
         dashboard_cog.rpc.third_parties_handler.add_third_party(self)
 
     @dashboard_page(

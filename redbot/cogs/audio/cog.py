@@ -50,7 +50,7 @@ _ = Translator("PyLavPlayer", Path(__file__))
 #   defined by several of them. Only one of each survives the MRO, so
 #   each part's is named for itself and called below.
 @cog_i18n(_)
-class PyLavPlayer(
+class Audio(
     DashboardIntegration,
     PyLavController,
     PyLavPlaylists,
@@ -86,7 +86,11 @@ class PyLavPlayer(
     def __init__(self, bot: DISCORD_BOT_TYPE, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.bot = bot
-        self._config = Config.get_conf(self, identifier=208903205982044161)
+        # cog_name pinned for the same reason the parts below pin theirs: the
+        # class used to be called PyLavPlayer, and Config keys storage on it.
+        self._config = Config.get_conf(
+            self, identifier=208903205982044161, cog_name="PyLavPlayer"
+        )
         self._config.register_guild(enable_slash=True, enable_context=True)
         self._config.register_global(
             enable_slash=False,

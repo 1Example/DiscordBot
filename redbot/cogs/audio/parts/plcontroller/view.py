@@ -656,8 +656,9 @@ class RefreshButton(discord.ui.Button):
 class ControllerDisconnectButton(discord.ui.Button):
     """Disconnect, acting on the player directly.
 
-    PyLav's queue-view DisconnectButton calls `cog.command_disconnect`, which
-    only exists on PyLavPlayer - not on this cog - so it can't be reused here.
+    PyLav's queue-view DisconnectButton invokes `cog.command_disconnect`, which
+    is an application command now and wants an interaction of its own. This
+    stops the player instead, which is all the button was ever for.
     """
 
     def __init__(
