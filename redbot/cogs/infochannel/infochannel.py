@@ -1,10 +1,10 @@
 import asyncio
 import logging
 from collections import defaultdict
-from typing import Dict, Optional, Union
+from typing import Dict, Optional
 
 import discord
-from redbot.core import Config, checks, commands
+from redbot.core import Config
 from redbot.core.bot import Red
 from redbot.core.commands import Cog
 from .dashboard_integration import DashboardIntegration
@@ -41,8 +41,6 @@ async def get_channel_counts(category, guild):
         "online": online_num,
         "offline": offline_num,
     }
-
-
 
 
 class InfoChannel(DashboardIntegration, Cog):
@@ -118,190 +116,6 @@ class InfoChannel(DashboardIntegration, Cog):
     def cog_unload(self):
         self.stop_all_queues()
 
-    @commands.command()
-    @checks.admin()
-    async def infochannel(self, ctx: commands.Context):
-        """
-        Toggle info channel for this server
-        """
-
-        def check(m):
-            return (
-                m.content.upper() in ["Y", "YES", "N", "NO"]
-                and m.channel == ctx.channel
-                and m.author == ctx.author
-            )
-
-        guild: discord.Guild = ctx.guild
-        category_id = await self.config.guild(guild).category_id()
-        category = None
-
-        if category_id is not None:
-            category: Union[discord.CategoryChannel, None] = guild.get_channel(category_id)
-
-        if category_id is not None and category is None:
-            await ctx.maybe_send_embed("Info category has been deleted, recreate it?")
-        elif category_id is None:
-            await ctx.maybe_send_embed("Enable info channels on this server?")
-        else:
-            await ctx.maybe_send_embed("Do you wish to delete current info channels?")
-
-        msg = await self.bot.wait_for("message", check=check)
-
-        if msg.content.upper() in ["N", "NO"]:
-            await ctx.maybe_send_embed("Cancelled")
-            return
-
-        if category is None:
-            try:
-                await self.make_infochannel(guild)
-            except discord.Forbidden:
-                await ctx.maybe_send_embed(
-                    "Failure: Missing permission to create necessary channels"
-                )
-                return
-        else:
-            await self.delete_all_infochannels(guild)
-
-        ctx.message = msg
-
-        if not await ctx.tick():
-            await ctx.maybe_send_embed("Done!")
-
-    @commands.group(aliases=["icset"])
-    @checks.admin()
-    async def infochannelset(self, ctx: commands.Context):
-        """
-        Toggle different types of infochannels
-        """
-
-    @infochannelset.command(name="togglechannel")
-    async def _infochannelset_togglechannel(
-        self, ctx: commands.Context, channel_type: str, enabled: Optional[bool] = None
-    ):
-        """Toggles the infochannel for the specified channel type.
-
-        Valid Types are:
-        - `members`: Total members on the server
-        - `humans`: Total members that aren't bots
-        - `boosters`: Total amount of boosters
-        - `bots`: Total bots
-        - `roles`: Total number of roles
-        - `channels`: Total number of channels excluding infochannels,
-        - `online`: Total online members,
-        - `offline`: Total offline members,
-        """
-        guild = ctx.guild
-        if channel_type not in self.default_channel_names.keys():
-            await ctx.maybe_send_embed("Invalid channel type provided.")
-            return
-
-        if enabled is None:
-            enabled = not await self.config.guild(guild).enabled_channels.get_raw(channel_type)
-
-        await self.config.guild(guild).enabled_channels.set_raw(channel_type, value=enabled)
-        await self.make_infochannel(ctx.guild, channel_type=channel_type)
-
-        if enabled:
-            await ctx.maybe_send_embed(f"InfoChannel `{channel_type}` has been enabled.")
-        else:
-            await ctx.maybe_send_embed(f"InfoChannel `{channel_type}` has been disabled.")
-
-    @infochannelset.command(name="togglerole")
-    async def _infochannelset_rolecount(
-        self, ctx: commands.Context, role: discord.Role, enabled: bool = None
-    ):
-        """Toggle an infochannel that shows the count of users with the specified role"""
-        if enabled is None:
-            enabled = not await self.config.role(role).enabled()
-
-        await self.config.role(role).enabled.set(enabled)
-
-        await self.make_infochannel(ctx.guild, channel_role=role)
-
-        if enabled:
-            await ctx.maybe_send_embed(f"InfoChannel for {role.name} count has been enabled.")
-        else:
-            await ctx.maybe_send_embed(f"InfoChannel for {role.name} count has been disabled.")
-
-    @infochannelset.command(name="name")
-    async def _infochannelset_name(self, ctx: commands.Context, channel_type: str, *, text=None):
-        """
-        Change the name of the infochannel for the specified channel type.
-
-        {count} must be used to display number of total members in the server.
-        Leave blank to set back to default.
-
-        Examples:
-        - `[p]infochannelset name members Cool Cats: {count}`
-        - `[p]infochannelset name bots {count} Robot Overlords`
-
-        Valid Types are:
-        - `members`: Total members on the server
-        - `humans`: Total members that aren't bots
-        - `boosters`: Total amount of boosters
-        - `bots`: Total bots
-        - `roles`: Total number of roles
-        - `channels`: Total number of channels excluding infochannels
-        - `online`: Total online members
-        - `offline`: Total offline members
-
-        Warning: This command counts against the channel update rate limit and may be queued.
-        """
-        guild = ctx.guild
-        if channel_type not in self.default_channel_names.keys():
-            await ctx.maybe_send_embed("Invalid channel type provided.")
-            return
-
-        if text is None:
-            text = self.default_channel_names.get(channel_type)
-        elif "{count}" not in text:
-            await ctx.maybe_send_embed(
-                "Improperly formatted. Make sure to use `{count}` in your channel name"
-            )
-            return
-        elif len(text) > 93:
-            await ctx.maybe_send_embed("Name is too long, max length is 93.")
-            return
-
-        await self.config.guild(guild).channel_names.set_raw(channel_type, value=text)
-        await self.update_infochannel(guild, channel_type=channel_type)
-        if not await ctx.tick():
-            await ctx.maybe_send_embed("Done!")
-
-    @infochannelset.command(name="rolename")
-    async def _infochannelset_rolename(
-        self, ctx: commands.Context, role: discord.Role, *, text=None
-    ):
-        """
-        Change the name of the infochannel for specific roles.
-
-        {count} must be used to display number members with the given role.
-        {role} can be used for the roles name.
-        Leave blank to set back to default.
-
-        Default is set to: `{role}: {count}`
-
-        Examples:
-        - `[p]infochannelset rolename @Patrons {role}: {count}`
-        - `[p]infochannelset rolename Elite {count} members with {role} role`
-        - `[p]infochannelset rolename "Space Role" Total boosters: {count}`
-
-        Warning: This command counts against the channel update rate limit and may be queued.
-        """
-        guild = ctx.message.guild
-        if text is None:
-            text = self.default_role["name"]
-        elif "{count}" not in text:
-            await ctx.maybe_send_embed(
-                "Improperly formatted. Make sure to use `{count}` in your channel name"
-            )
-            return
-
-        await self.config.role(role).name.set(text)
-        await self.update_infochannel(guild, channel_role=role)
-        if not await ctx.tick():
-            await ctx.maybe_send_embed("Done!")
 
     async def create_individual_channel(
         self, guild, category: discord.CategoryChannel, overwrites, channel_type, count

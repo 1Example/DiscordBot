@@ -1,10 +1,8 @@
 import io
 import re
-import zipfile
 import aiohttp
 import discord
 from typing import Optional, Union, List
-from itertools import zip_longest
 from redbot.core import commands, app_commands
 from .dashboard_integration import DashboardIntegration
 
@@ -43,8 +41,18 @@ class EmojiSteal(DashboardIntegration, commands.Cog):
     def __init__(self, bot):
         super().__init__()
         self.bot = bot
-        self.steal_context_menu = app_commands.ContextMenu(name='Steal Emotes', callback=self.steal_app_command)
-        self.steal_upload_context_menu = app_commands.ContextMenu(name='Steal+Upload Emotes', callback=self.steal_upload_app_command)
+        # Force-enabled, or Red's [p]slash gate keeps them hidden - and with
+        # the prefix commands gone these are the only way in.
+        self.steal_context_menu = app_commands.ContextMenu(
+            name="Steal Emotes",
+            callback=self.steal_app_command,
+            extras={"red_force_enable": True},
+        )
+        self.steal_upload_context_menu = app_commands.ContextMenu(
+            name="Steal+Upload Emotes",
+            callback=self.steal_upload_app_command,
+            extras={"red_force_enable": True},
+        )
         self.bot.tree.add_command(self.steal_context_menu)
         self.bot.tree.add_command(self.steal_upload_context_menu)
 
@@ -79,15 +87,6 @@ class EmojiSteal(DashboardIntegration, commands.Cog):
         return emojis
 
 
-    @commands.group(name="steal", aliases=["emojisteal"], invoke_without_command=True)
-    async def steal_command(self, ctx: commands.Context):
-        """Steals the emojis and stickers of the message you reply to. Can also upload them with [p]steal upload."""
-        if not (emojis := await self.steal_ctx(ctx)):
-            return
-        response = '\n'.join([emoji.url for emoji in emojis])
-        await ctx.send(response)
-
-
     # context menu added in __init__
     async def steal_app_command(self, ctx: discord.Interaction, message: discord.Message):
         if message.stickers:
@@ -97,59 +96,6 @@ class EmojiSteal(DashboardIntegration, commands.Cog):
 
         response = '\n'.join([emoji.url for emoji in emojis])
         await ctx.response.send_message(content=response, ephemeral=True)
-
-
-    @steal_command.command(name="upload")
-    @commands.guild_only()
-    @commands.has_permissions(manage_emojis=True)
-    @commands.bot_has_permissions(manage_emojis=True, add_reactions=True)
-    async def steal_upload_command(self, ctx: commands.Context, *names: str):
-        """Steals emojis and stickers you reply to and uploads them to this server."""
-        assert ctx.guild
-        if not (emojis_or_stickers := await self.steal_ctx(ctx)):
-            return
-        
-        if isinstance(emojis_or_stickers[0], discord.StickerItem):
-            if len(ctx.guild.stickers) >= ctx.guild.sticker_limit:
-                return await ctx.send(STICKER_SLOTS)
-
-            sticker = emojis_or_stickers[0]
-            fp = io.BytesIO()
-
-            try:
-                await sticker.save(fp)
-                await ctx.guild.create_sticker(
-                    name=sticker.name, description=STICKER_DESC, emoji=STICKER_EMOJI, file=discord.File(fp))
-
-            except discord.DiscordException as error:
-                return await ctx.send(f"{STICKER_FAIL}, {type(error).__name__}: {error}")
-
-            return await ctx.send(f"{STICKER_SUCCESS}: {sticker.name}")
-        
-        final_names = [''.join(re.findall(r"\w+", name)) for name in names]
-        final_names = [name if len(name) >= 2 else None for name in final_names]
-        emojis: List[discord.PartialEmoji] = list(dict.fromkeys(emojis_or_stickers))  # type: ignore
-
-        async with aiohttp.ClientSession() as session:
-            for emoji, name in zip_longest(emojis, final_names):
-                if not self.available_emoji_slots(ctx.guild, emoji.animated):
-                    return await ctx.send(EMOJI_SLOTS)
-                if not emoji:
-                    break
-
-                try:
-                    async with session.get(emoji.url) as resp:
-                        resp.raise_for_status()
-                        image = io.BytesIO(await resp.read()).read()
-                    added = await ctx.guild.create_custom_emoji(name=name or emoji.name, image=image)
-
-                except (aiohttp.ClientError, discord.DiscordException) as error:
-                    return await ctx.send(f"{EMOJI_FAIL} {emoji.name}, {type(error).__name__}: {error}")
-
-                try:
-                    await ctx.message.add_reaction(added)
-                except discord.DiscordException:
-                    pass  # fail silently to not interrupt the loop, ideally there'd be a summary at the end
 
 
     # context menu added in __init__
@@ -212,58 +158,3 @@ class EmojiSteal(DashboardIntegration, commands.Cog):
         await ctx.edit_original_response(content=response)
 
 
-    @commands.command()
-    async def getemoji(self, ctx: commands.Context, *, emoji: str):
-        """Get the image link for custom emojis or an emoji ID."""
-        emoji = emoji.strip()
-
-        if emoji.isnumeric():
-            emojis = [discord.PartialEmoji(name="e", animated=b, id=int(emoji)) for b in [False, True]]
-        elif not (emojis := self.get_emojis(emoji)):
-            await ctx.send(INVALID_EMOJI)
-            return
-
-        await ctx.send('\n'.join(emoji.url for emoji in emojis))
-
-
-    @commands.has_permissions(manage_emojis=True)
-    @commands.bot_has_permissions(manage_emojis=True)
-    @commands.guild_only()
-    @commands.command()
-    async def uploadsticker(self, ctx: commands.Context, *, name: str = None):
-        """Uploads a sticker to the server, useful for mobile."""
-        assert ctx.guild
-        if len(ctx.guild.stickers) >= ctx.guild.sticker_limit:
-            return await ctx.send(content=STICKER_SLOTS)
-
-        if not ctx.message.attachments or not ctx.message.attachments[0].filename.endswith((".png", ".zip")):
-            return await ctx.send(STICKER_ATTACHMENT)
-
-        attachment = ctx.message.attachments[0]
-        if attachment.size > STICKER_KB * 1024 or attachment.width and attachment.width > STICKER_DIM or attachment.height and attachment.height > STICKER_DIM:
-            return await ctx.send(STICKER_TOO_BIG)
-
-        await ctx.typing()
-        name = name or attachment.filename.split('.')[0]
-        fp = io.BytesIO()
-
-        try:
-            await attachment.save(fp)
-
-            if attachment.filename.endswith(".zip"):
-                z = zipfile.ZipFile(fp)
-                files = zipfile.ZipFile.namelist(z)
-                file = next(iter(f for f in files if f.endswith(".png")), None)
-                if not file:
-                    return await ctx.send(STICKER_ATTACHMENT)
-                fp = io.BytesIO(z.read(file))
-
-            sticker = await ctx.guild.create_sticker(
-                name=name, description=f"{UPLOADED_BY} {ctx.author}", emoji=STICKER_EMOJI, file=discord.File(fp))
-
-        except (discord.DiscordException, zipfile.BadZipFile) as error:
-            if "exceed" in str(error):
-                return await ctx.send(STICKER_TOO_BIG)
-            return await ctx.send(f"{STICKER_FAIL}, {type(error).__name__}: {error}")
-
-        return await ctx.send(f"{STICKER_SUCCESS}: {sticker.name}")

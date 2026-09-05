@@ -1,7 +1,7 @@
 import discord
 
 from AAA3A_utils import Cog
-from redbot.core import commands
+from redbot.core import app_commands, commands
 from redbot.core.i18n import Translator, cog_i18n
 
 from .dashboard_integration import DashboardIntegration
@@ -22,9 +22,13 @@ class SplitOrStealGame(DashboardIntegration, Cog):
     def games(self) -> dict[discord.Message, SplitOrStealGameView]:
         return self.views
 
-    @commands.guild_only()
-    @commands.hybrid_command(aliases=["splitorsteal", "sosg", "sos"])
-    async def splitorstealgame(self, ctx: commands.Context) -> None:
+    @app_commands.command(
+        name="splitorsteal",
+        description="Play a round of Split or Steal.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    async def splitorstealgame(self, interaction: discord.Interaction) -> None:
         """
         Play a match of Split Or Steal game.
 
@@ -33,4 +37,5 @@ class SplitOrStealGame(DashboardIntegration, Cog):
         • If both choose `steal`, both loose.
         • if one chooses `split` and one chooses `steal`, the one who choose `steal` will win.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         await SplitOrStealGameView(cog=self).start(ctx)

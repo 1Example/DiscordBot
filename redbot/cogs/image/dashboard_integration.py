@@ -15,6 +15,39 @@ from redbot.core.utils.dashboard_helpers import (
 
 log = logging.getLogger("red.image.dashboard")
 
+# What [p]imgurcreds and [p]giphycreds printed. Kept as steps rather than a
+# link because two of the Imgur ones are easy to get wrong.
+CREDENTIAL_STEPS = (
+    {
+        "key": "imgur",
+        "label": "Imgur",
+        "docs": "https://api.imgur.com/oauth2/addclient",
+        "steps": [
+            "Sign in to an Imgur account, then open the link above.",
+            "Enter a name for the application.",
+            "Choose <b>Anonymous usage without user authorization</b> as the auth type.",
+            "Set the authorization callback URL to <code>https://localhost</code>.",
+            "Leave the app website blank.",
+            "Enter a valid email address and a description.",
+            "Complete the captcha. The client ID is on the next page.",
+        ],
+        "command": "[p]set api imgur client_id &lt;your_client_id&gt;",
+    },
+    {
+        "key": "giphy",
+        "label": "Giphy",
+        "docs": "https://developers.giphy.com/dashboard",
+        "steps": [
+            "Sign in to (or create) a Giphy account, then open the link above.",
+            "Press <b>Create an App</b>.",
+            "Click <b>Select API</b>, then <b>Next Step</b>.",
+            "Give it a name and a description, then create it.",
+            "Copy the API key it shows you.",
+        ],
+        "command": "[p]set api giphy api_key &lt;your_api_key&gt;",
+    },
+)
+
 
 class DashboardIntegration:
     """Image searches and the Imgur credentials, owner only.
@@ -50,6 +83,15 @@ class DashboardIntegration:
             "notifications": notifications,
             "web_content": {
                 "source": IMAGE_TEMPLATE,
+                "credentials": [
+                    {
+                        **service,
+                        "set": bool(
+                            await self.bot.get_shared_api_tokens(service["key"])
+                        ),
+                    }
+                    for service in CREDENTIAL_STEPS
+                ],
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "configured": bool(client_id),
                 # Never send the credential itself to the browser; a length and
@@ -203,6 +245,31 @@ IMAGE_TEMPLATE = (
       {% else %}No Imgur client ID set &mdash; the imgur commands will not work.{% endif %}
     </p>
   </div>
+
+  {% if is_owner %}
+    <div class="dz-panel">
+      <h5><i class="fa fa-key"></i> API credentials</h5>
+      {% for c in credentials %}
+        <details style="margin:8px 0; padding:9px 11px;
+                        border:1px solid rgba(255,255,255,.09); border-radius:9px;">
+          <summary style="cursor:pointer;">
+            How to get a {{ c.label }} key &mdash;
+            <b>{{ 'already set' if c.set else 'not set' }}</b>
+          </summary>
+          <p class="dz-hint" style="margin-top:8px;">
+            <a href="{{ c.docs }}" target="_blank" rel="noopener">{{ c.docs }}</a>
+          </p>
+          <ol class="dz-hint" style="margin:0 0 8px 18px; padding:0;">
+            {% for step in c.steps %}<li style="margin:3px 0;">{{ step|safe }}</li>{% endfor %}
+          </ol>
+          <p class="dz-hint" style="margin:0;">Then send the bot, in a DM:</p>
+          <code style="display:block; margin-top:5px; word-break:break-all;"
+            >{{ c.command|safe }}</code>
+        </details>
+      {% endfor %}
+      <p class="dz-hint">These are secrets: send that in a DM, not a server channel.</p>
+    </div>
+  {% endif %}
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />

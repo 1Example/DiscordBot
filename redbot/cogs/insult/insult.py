@@ -2,7 +2,7 @@ from random import choice
 from typing import List
 
 import discord
-from redbot.core import commands
+from redbot.core import app_commands, commands
 from redbot.core.i18n import Translator, cog_i18n
 
 from .dashboard_integration import DashboardIntegration
@@ -350,13 +350,21 @@ class Insult(DashboardIntegration, commands.Cog):
         """
         return
 
-    @commands.command(aliases=["takeitback"])
-    async def insult(self, ctx: commands.Context, user: discord.Member = None) -> None:
+    @app_commands.command(
+        name="insult",
+        description="Insult someone. Affectionately.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.describe(user="Who to insult. Leave empty to insult yourself.")
+    async def insult(
+        self, interaction: discord.Interaction, user: discord.Member = None
+    ) -> None:
         """
         Insult the user
 
         `user` the user you would like to insult
         """
+        ctx = await commands.Context.from_interaction(interaction)
 
         msg = " "
         if user:

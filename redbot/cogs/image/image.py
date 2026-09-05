@@ -1,11 +1,10 @@
 from random import shuffle
-from typing import Optional
 
 import aiohttp
 
 from redbot.core.i18n import Translator, cog_i18n
-from redbot.core import Config, commands
-from redbot.core.commands import UserInputOptional
+import discord
+from redbot.core import Config, app_commands, commands
 from .dashboard_integration import DashboardIntegration
 
 _ = Translator("Image", __file__)
@@ -14,6 +13,12 @@ _ = Translator("Image", __file__)
 @cog_i18n(_)
 class Image(DashboardIntegration, commands.Cog):
     """Image related commands."""
+
+    image = app_commands.Group(
+        name="image",
+        description="Find a picture or a GIF.",
+        extras={"red_force_enable": True},
+    )
 
     default_global = {"imgur_client_id": None}
 
@@ -40,21 +45,24 @@ class Image(DashboardIntegration, commands.Cog):
         """Nothing to delete"""
         return
 
-    @commands.group(name="imgur")
-    async def _imgur(self, ctx):
-        """Retrieve pictures from Imgur.
 
-        Make sure to set the Client ID using `[p]imgurcreds`.
-        """
-        pass
-
-    @_imgur.command(name="search", usage="[count] <terms...>")
-    async def imgur_search(self, ctx, count: UserInputOptional[int] = 1, *, term: str):
+    @image.command(name="imgur", description="Search Imgur.")
+    @app_commands.describe(
+        term="What to search for.",
+        count="How many results, up to 5.",
+    )
+    async def imgur_search(
+        self,
+        interaction: discord.Interaction,
+        term: str,
+        count: app_commands.Range[int, 1, 5] = 1,
+    ):
         """Search Imgur for the specified term.
 
         - `[count]`: How many images should be returned (maximum 5). Defaults to 1.
         - `<terms...>`: The terms used to search Imgur.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if count < 1 or count > 5:
             await ctx.send(_("Image count has to be between 1 and 5."))
             return
@@ -88,12 +96,31 @@ class Image(DashboardIntegration, commands.Cog):
                 _("Something went wrong. Error code is {code}.").format(code=data["status"])
             )
 
-    @_imgur.command(name="subreddit")
+    @image.command(name="subreddit", description="Images from a subreddit, via Imgur.")
+    @app_commands.describe(
+        subreddit="The subreddit to pull from.",
+        count="How many results, up to 5.",
+        sort_type="Top posts or the newest ones.",
+        window="How far back to look, when sorting by top.",
+    )
+    @app_commands.choices(
+        sort_type=[
+            app_commands.Choice(name="Top", value="top"),
+            app_commands.Choice(name="Newest", value="new"),
+        ],
+        window=[
+            app_commands.Choice(name="Today", value="day"),
+            app_commands.Choice(name="This week", value="week"),
+            app_commands.Choice(name="This month", value="month"),
+            app_commands.Choice(name="This year", value="year"),
+            app_commands.Choice(name="All time", value="all"),
+        ],
+    )
     async def imgur_subreddit(
         self,
-        ctx,
+        interaction: discord.Interaction,
         subreddit: str,
-        count: Optional[int] = 1,
+        count: app_commands.Range[int, 1, 5] = 1,
         sort_type: str = "top",
         window: str = "day",
     ):
@@ -104,6 +131,7 @@ class Image(DashboardIntegration, commands.Cog):
         - `[sort_type]`: New, or top results. Defaults to top.
         - `[window]`: The timeframe, can be the past day, week, month, year or all. Defaults to day.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if count < 1 or count > 5:
             await ctx.send(_("Image count has to be between 1 and 5."))
             return
@@ -154,34 +182,15 @@ class Image(DashboardIntegration, commands.Cog):
                 _("Something went wrong. Error code is {code}.").format(code=data["status"])
             )
 
-    @commands.is_owner()
-    @commands.command()
-    async def imgurcreds(self, ctx):
-        """Explain how to set imgur API tokens."""
 
-        message = _(
-            "To get an Imgur Client ID:\n"
-            "1. Login to an Imgur account.\n"
-            "2. Visit this page https://api.imgur.com/oauth2/addclient.\n"
-            "3. Enter a name for your application.\n"
-            "4. Select *Anonymous usage without user authorization* for the auth type.\n"
-            "5. Set the authorization callback URL to `https://localhost`.\n"
-            "6. Leave the app website blank.\n"
-            "7. Enter a valid email address and a description.\n"
-            "8. Check the captcha box and click next.\n"
-            "9. Your Client ID will be on the next page.\n"
-            "10. Run the command `{prefix}set api imgur client_id <your_client_id_here>`.\n"
-        ).format(prefix=ctx.clean_prefix)
-
-        await ctx.maybe_send_embed(message)
-
-    @commands.guild_only()
-    @commands.command(usage="<keywords...>")
-    async def gif(self, ctx, *, keywords):
+    @image.command(name="gif", description="The first Giphy result for a search.")
+    @app_commands.describe(keywords="What to search for.")
+    async def gif(self, interaction: discord.Interaction, keywords: str):
         """Retrieve the first search result from Giphy.
 
         - `<keywords...>`: The keywords used to search Giphy.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         giphy_api_key = (await ctx.bot.get_shared_api_tokens("GIPHY")).get("api_key")
         if not giphy_api_key:
             await ctx.send(
@@ -202,13 +211,14 @@ class Image(DashboardIntegration, commands.Cog):
             else:
                 await ctx.send(_("Error contacting the Giphy API."))
 
-    @commands.guild_only()
-    @commands.command(usage="<keywords...>")
-    async def gifr(self, ctx, *, keywords):
+    @image.command(name="gifrandom", description="A random Giphy result for a search.")
+    @app_commands.describe(keywords="What to search for.")
+    async def gifr(self, interaction: discord.Interaction, keywords: str):
         """Retrieve a random GIF from a Giphy search.
 
         - `<keywords...>`: The keywords used to generate a random GIF.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         giphy_api_key = (await ctx.bot.get_shared_api_tokens("GIPHY")).get("api_key")
         if not giphy_api_key:
             await ctx.send(
@@ -229,26 +239,3 @@ class Image(DashboardIntegration, commands.Cog):
             else:
                 await ctx.send(_("Error contacting the API."))
 
-    @commands.is_owner()
-    @commands.command()
-    async def giphycreds(self, ctx):
-        """Explains how to set GIPHY API tokens."""
-
-        message = _(
-            "To get a GIPHY API Key:\n"
-            "1. Login to (or create) a GIPHY account.\n"
-            "2. Visit this page: https://developers.giphy.com/dashboard.\n"
-            "3. Press *Create an App*.\n"
-            "4. Click *Select API*, then *Next Step*.\n"
-            "5. Add an app name, for example *Red*.\n"
-            "6. Add an app description, for example *Used for Red's image cog*.\n"
-            "7. Click *Create App*. You'll need to agree to the GIPHY API Terms.\n"
-            "8. Copy the API Key.\n"
-            "9. In Discord, run the command {command}.\n"
-        ).format(
-            command="`{prefix}set api GIPHY api_key {placeholder}`".format(
-                prefix=ctx.clean_prefix, placeholder=_("<your_api_key_here>")
-            )
-        )
-
-        await ctx.maybe_send_embed(message)

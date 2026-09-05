@@ -7,9 +7,9 @@ from types import SimpleNamespace
 import contextlib
 import discord
 
-from redbot.core import Config, commands
+from redbot.core import app_commands, Config, commands
 from redbot.core.utils import AsyncIter
-from redbot.core.utils.chat_formatting import humanize_list, pagify, box
+from redbot.core.utils.chat_formatting import pagify, box
 from redbot.core.utils.antispam import AntiSpam
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n, set_contextual_locales_from_guild
@@ -107,67 +107,6 @@ class Reports(DashboardIntegration, commands.Cog):
     def tunnels(self):
         return [x["tun"] for x in self.tunnel_store.values()]
 
-    @commands.admin_or_permissions(manage_guild=True)
-    @commands.guild_only()
-    @commands.group(name="reportset")
-    async def reportset(self, ctx: commands.Context):
-        """Manage Reports."""
-        pass
-
-    @commands.admin_or_permissions(manage_guild=True)
-    @reportset.command(name="output")
-    async def reportset_output(
-        self,
-        ctx: commands.Context,
-        channel: Union[discord.TextChannel, discord.VoiceChannel, discord.StageChannel],
-    ):
-        """Set the channel where reports will be sent."""
-        await self.config.guild(ctx.guild).output_channel.set(channel.id)
-        await ctx.send(_("The report channel has been set."))
-
-    @commands.admin_or_permissions(manage_guild=True)
-    @reportset.command(name="ticketprofile")
-    async def reportset_ticketprofile(self, ctx: commands.Context, profile: str = None):
-        """Open reports as tickets, using this Tickets profile.
-
-        Run without a profile to go back to forwarding reports into the output
-        channel.
-        """
-        if profile is None:
-            await self.config.guild(ctx.guild).ticket_profile.clear()
-            return await ctx.send(
-                _("Reports will be sent to the report channel again.")
-            )
-        tickets_cog = self.bot.get_cog("Tickets")
-        if tickets_cog is None:
-            return await ctx.send(_("The Tickets cog is not loaded."))
-        profiles = await tickets_cog.config.guild(ctx.guild).profiles()
-        if profile not in profiles:
-            return await ctx.send(
-                _("No Tickets profile named `{profile}` in this server. Available: {available}.")
-                .format(
-                    profile=profile,
-                    available=humanize_list([f"`{p}`" for p in profiles]) or _("none"),
-                )
-            )
-        await self.config.guild(ctx.guild).ticket_profile.set(profile)
-        await ctx.send(
-            _("Reports will now open a ticket under the `{profile}` profile.").format(
-                profile=profile
-            )
-        )
-
-    @commands.admin_or_permissions(manage_guild=True)
-    @reportset.command(name="toggle", aliases=["toggleactive"])
-    async def reportset_toggle(self, ctx: commands.Context):
-        """Enable or disable reporting for this server."""
-        active = await self.config.guild(ctx.guild).active()
-        active = not active
-        await self.config.guild(ctx.guild).active.set(active)
-        if active:
-            await ctx.send(_("Reporting is now enabled"))
-        else:
-            await ctx.send(_("Reporting is now disabled."))
 
     async def internal_filter(self, m: discord.Member, mod=False, perms=None):
         if perms is not None and m.guild_permissions >= perms:
@@ -341,13 +280,23 @@ class Reports(DashboardIntegration, commands.Cog):
         )
         return ticket_number
 
-    @commands.group(name="report", usage="[text]", invoke_without_command=True)
-    async def report(self, ctx: commands.Context, *, _report: str = ""):
+    @app_commands.command(
+        name="report",
+        description="Send a report to the moderators.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.describe(
+        _report="What you want to report. Leave empty and I will ask."
+    )
+    async def report(
+        self, interaction: discord.Interaction, _report: str = ""
+    ):
         """Send a report.
 
         Use without arguments for interactive reporting, or do
         `[p]report [text]` to use it non-interactively.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         author = ctx.author
         guild = ctx.guild
         if guild is None:
@@ -379,6 +328,16 @@ class Reports(DashboardIntegration, commands.Cog):
                 )
             )
         self.user_cache.append(author.id)
+        try:
+            await self._run_report(ctx, author, guild, _report)
+        finally:
+            # The old after_invoke released this; every early return below
+            # would otherwise leave the author unable to report again.
+            if author.id in self.user_cache:
+                self.user_cache.remove(author.id)
+
+    async def _run_report(self, ctx, author, guild, _report: str) -> None:
+        """The body of /report, so the in-flight guard is always released."""
 
         if _report:
             _m = copy(ctx.message)
@@ -440,20 +399,6 @@ class Reports(DashboardIntegration, commands.Cog):
                     )
                 self.antispam[guild.id][author.id].stamp()
 
-    @report.after_invoke
-    async def report_cleanup(self, ctx: commands.Context):
-        """
-        The logic is cleaner this way
-        """
-        if ctx.author.id in self.user_cache:
-            self.user_cache.remove(ctx.author.id)
-        if ctx.guild and ctx.invoked_subcommand is None:
-            if ctx.bot_permissions.manage_messages:
-                try:
-                    await ctx.message.delete()
-                except discord.NotFound:
-                    pass
-
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         """
@@ -508,65 +453,3 @@ class Reports(DashboardIntegration, commands.Cog):
                     ).format(ticket_number=ticket, guild=guild)
                 )
 
-    @commands.guild_only()
-    @commands.mod_or_permissions(manage_roles=True)
-    @report.command(name="interact")
-    async def response(self, ctx, ticket_number: int):
-        """Open a message tunnel.
-
-        This tunnel will forward things you say in this channel or thread
-        to the ticket opener's direct messages.
-
-        Tunnels do not persist across bot restarts.
-        """
-
-        guild = ctx.guild
-        rec = await self.config.custom("REPORT", guild.id, ticket_number).report()
-
-        try:
-            user = guild.get_member(rec.get("user_id"))
-        except KeyError:
-            return await ctx.send(_("That ticket doesn't seem to exist"))
-
-        if user is None:
-            return await ctx.send(_("That user isn't here anymore."))
-
-        tun = Tunnel(recipient=user, origin=ctx.channel, sender=ctx.author)
-
-        if tun is None:
-            return await ctx.send(
-                _(
-                    "Either you or the user you are trying to reach already "
-                    "has an open communication."
-                )
-            )
-
-        big_topic = _(
-            " Anything you say or upload here "
-            "(8MB file size limitation on uploads) "
-            "will be forwarded to them until the communication is closed.\n"
-            "You can close a communication at any point by reacting with "
-            "the \N{NEGATIVE SQUARED CROSS MARK} to the last message received.\n"
-            "Any message successfully forwarded will be marked with "
-            "\N{WHITE HEAVY CHECK MARK}.\n"
-            "Tunnels are not persistent across bot restarts."
-        )
-        topic = (
-            _(
-                "A moderator in the server `{guild.name}` has opened a 2-way communication about "
-                "ticket number {ticket_number}."
-            ).format(guild=guild, ticket_number=ticket_number)
-            + big_topic
-        )
-        try:
-            m = await tun.communicate(message=ctx.message, topic=topic, skip_message_content=True)
-        except discord.Forbidden:
-            await ctx.send(_("That user has DMs disabled."))
-        else:
-            self.tunnel_store[(guild, ticket_number)] = {"tun": tun, "msgs": m}
-            await ctx.send(
-                _(
-                    "You have opened a 2-way communication about ticket number {ticket_number}."
-                ).format(ticket_number=ticket_number)
-                + big_topic
-            )
