@@ -3,13 +3,15 @@ import asyncio
 import typing
 
 import discord
+from discord import app_commands
 
 # import importlib
 # import sys
 from fernet import Fernet
 
-from AAA3A_utils import Cog, Settings
+from AAA3A_utils import Cog
 from redbot.core import Config, commands
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 
@@ -23,28 +25,24 @@ from .rpc import DashboardRPC
 _: Translator = Translator("Dashboard", __file__)
 
 
-class StrConverter(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> str:
-        return argument
+class SecretModal(discord.ui.Modal, title="Discord OAuth Secret"):
+    """Takes the OAuth secret without it ever being typed into a channel."""
 
+    secret: discord.ui.TextInput = discord.ui.TextInput(
+        label=_("Discord Secret"),
+        style=discord.TextStyle.short,
+        custom_id="discord_secret",
+    )
 
-class RedirectURIConverter(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> str:
-        if not argument.startswith("http"):
-            raise commands.BadArgument(_("This is not a valid URL."))
-        if not argument.endswith("/callback"):
-            raise commands.BadArgument(
-                _("This is not a valid Dashboard redirect URI: it must end with `/callback`."),
-            )
-        return argument
+    def __init__(self, cog: "Dashboard") -> None:
+        super().__init__()
+        self.cog: "Dashboard" = cog
 
-
-class ThirdPartyConverter(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> str:
-        cog = ctx.bot.get_cog("Dashboard")
-        if argument not in cog.rpc.third_parties_handler.third_parties:
-            raise commands.BadArgument(_("This third party is not available."))
-        return argument
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await self.cog.config.webserver.core.secret.set(self.secret.value)
+        await interaction.response.send_message(
+            _("Discord OAuth secret set."), ephemeral=True
+        )
 
 
 @cog_i18n(_)
@@ -196,97 +194,6 @@ class Dashboard(Cog):
             },
         )
 
-        _settings: dict[str, dict[str, typing.Any]] = {
-            "all_in_one": {
-                "converter": bool,
-                "description": "Run the webserver in the bot process, without having to open another window. You have to install Red-Web-Dashboard in your bot venv with Pip and reload the cog.",
-                "hidden": True,
-                "no_slash": True,
-            },
-            "flask_flags": {
-                "converter": commands.Greedy[StrConverter],
-                "description": "The flags used to setting the webserver if `all_in_one` is enabled. They are the cli flags of `reddash` without `--rpc-port`.",
-                "hidden": True,
-                "no_slash": True,
-            },
-            "redirect_uri": {
-                "converter": RedirectURIConverter,
-                "description": "The redirect uri to use for the Discord OAuth.",
-                "path": ["webserver", "core", "redirect_uri"],
-                "aliases": ["redirect"],
-            },
-            "allow_unsecure_http_requests": {
-                "converter": bool,
-                "description": "Allow plain http. Only needed when you cannot set up an SSL certificate.",
-                "path": ["webserver", "core", "allow_unsecure_http_requests"],
-                "aliases": ["allowunsecure"],
-            },
-            "meta_title": {
-                "converter": str,
-                "description": "The website title to use.",
-                "path": ["webserver", "ui", "meta", "title"],
-            },
-            "meta_icon": {
-                "converter": str,
-                "description": "The website icon to use.",
-                "path": ["webserver", "ui", "meta", "icon"],
-            },
-            "meta_website_description": {
-                "converter": str,
-                "description": "The website short description to use.",
-                "path": ["webserver", "ui", "meta", "website_description"],
-            },
-            "meta_description": {
-                "converter": str,
-                "description": "The website long description to use.",
-                "path": ["webserver", "ui", "meta", "description"],
-            },
-            "support_server": {
-                "converter": str,
-                "description": "Set the support server url of your bot.",
-                "path": ["webserver", "ui", "meta", "support_server"],
-                "aliases": ["support"],
-            },
-            "default_color": {
-                "converter": typing.Literal[
-                    "success",
-                    "danger",
-                    "primary",
-                    "info",
-                    "warning",
-                    "dark",
-                ],
-                "description": "Set the default Color of the dashboard.",
-                "path": ["webserver", "ui", "meta", "default_color"],
-            },
-            "default_background_theme": {
-                "converter": typing.Literal["white", "dark"],
-                "description": "Set the default Background theme of the dashboard.",
-                "path": ["webserver", "ui", "meta", "default_background_theme"],
-            },
-            "default_sidenav_theme": {
-                "converter": typing.Literal["white", "dark"],
-                "description": "Set the default Sidenav theme of the dashboard.",
-                "path": ["webserver", "ui", "meta", "default_sidenav_theme"],
-            },
-            "disabled_third_parties": {
-                "converter": commands.Greedy[ThirdPartyConverter],
-                "description": "The third parties to disable.",
-                "path": ["webserver", "disabled_third_parties"],
-            },
-        }
-        self.settings: Settings = Settings(
-            bot=self.bot,
-            cog=self,
-            config=self.config,
-            group=self.config.GLOBAL,
-            settings=_settings,
-            global_path=[],
-            use_profiles_system=False,
-            can_edit=True,
-            commands_group=self.setdashboard,
-        )
-
         self.app: typing.Any | None = None
         # Feeds the owner-only log viewer. Constructed here but only attached
         # to the root logger in `cog_load`, so an unloaded cog costs nothing.
@@ -296,7 +203,6 @@ class Dashboard(Cog):
     async def cog_load(self) -> None:
         await super().cog_load()
         await self.edit_config_schema()
-        await self.settings.add_commands()
         self.log_handler.install()
         self.logger.info("Loading cog...")
         asyncio.create_task(self.create_app(flask_flags=await self.config.flask_flags()))
@@ -375,18 +281,25 @@ class Dashboard(Cog):
             except Exception as e:
                 self.logger.critical("Error when creating the Flask webserver app.", exc_info=e)
 
-    @commands.bot_has_permissions(embed_links=True)
-    @commands.hybrid_command()
-    async def dashboard(self, ctx: commands.Context) -> None:
+    @app_commands.command(
+        name="dashboard",
+        description="Get the link to the Dashboard.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.checks.bot_has_permissions(embed_links=True)
+    async def dashboard(self, interaction: discord.Interaction) -> None:
         """Get the link to the Dashboard."""
+        ctx: commands.Context = await commands.Context.from_interaction(interaction)
         if (dashboard_url := getattr(ctx.bot, "dashboard_url", None)) is None:
-            raise commands.UserFeedbackCheckFailure(
+            await ctx.send(
                 _(
                     "Red-Web-Dashboard is not installed. Check <https://red-web-dashboard.readthedocs.io>.",
                 ),
             )
+            return
         if not dashboard_url[1] and ctx.author.id not in ctx.bot.owner_ids:
-            raise commands.UserFeedbackCheckFailure(_("You can't access the Dashboard."))
+            await ctx.send(_("You can't access the Dashboard."))
+            return
         embed: discord.Embed = discord.Embed(
             title=_("Red-Web-Dashboard"),
             color=await ctx.embed_color(),
@@ -400,70 +313,151 @@ class Dashboard(Cog):
         embed.url = url
         await ctx.send(embed=embed)
 
-    @commands.is_owner()
-    @commands.hybrid_group()
-    async def setdashboard(self, ctx: commands.Context) -> None:
-        """Configure Dashboard."""
-        pass
+    # Only what you need before the dashboard will let you in. Everything else
+    # is on its Admin page, under Dashboard Settings.
+    setdashboard = app_commands.Group(
+        name="setdashboard",
+        description="Configure the Dashboard's login and webserver.",
+        extras={"red_force_enable": True},
+    )
 
-    @setdashboard.command()
-    async def secret(self, ctx: commands.Context, *, secret: str = None):
-        """Set the client secret needed for Discord OAuth."""
-        if secret is not None:
-            await self.config.webserver.core.secret.set(secret)
+    @setdashboard.command(
+        name="secret",
+        description="Set the client secret needed for Discord OAuth.",
+    )
+    @app_checks.is_owner()
+    async def secret(self, interaction: discord.Interaction) -> None:
+        """Set the client secret needed for Discord OAuth.
+
+        Asked for in a modal, so the secret is never typed into a channel.
+        """
+        await interaction.response.send_modal(SecretModal(self))
+
+    @setdashboard.command(
+        name="redirect-uri",
+        description="Set the redirect URI to use for the Discord OAuth.",
+    )
+    @app_commands.describe(uri="The full callback URL, ending in /callback.")
+    @app_checks.is_owner()
+    async def redirect_uri(self, interaction: discord.Interaction, uri: str) -> None:
+        """Set the redirect URI to use for the Discord OAuth."""
+        uri = uri.strip()
+        if not uri.startswith("http"):
+            await interaction.response.send_message(
+                _("This is not a valid URL."), ephemeral=True
+            )
             return
-
-        class SecretModal(discord.ui.Modal):
-            def __init__(_self) -> None:
-                super().__init__(title="Discord OAuth Secret")
-                _self.secret: discord.ui.TextInput = discord.ui.TextInput(
-                    label=_("Discord Secret"),
-                    style=discord.TextStyle.short,
-                    custom_id="discord_secret",
-                )
-                _self.add_item(_self.secret)
-
-            async def on_submit(_self, interaction: discord.Interaction) -> None:
-                await self.config.webserver.core.secret.set(_self.secret.value)
-                await interaction.response.send_message(_("Discord OAuth secret set."))
-
-        class SecretView(discord.ui.View):
-            def __init__(_self) -> None:
-                super().__init__()
-                _self._message: discord.Message = None
-
-            async def on_timeout(_self) -> None:
-                for child in _self.children:
-                    child: discord.ui.Item
-                    if hasattr(child, "disabled") and not (
-                        isinstance(child, discord.ui.Button)
-                        and child.style == discord.ButtonStyle.url
-                    ):
-                        child.disabled = True
-                try:
-                    await _self._message.edit(view=_self)
-                except discord.HTTPException:
-                    pass
-
-            async def interaction_check(_self, interaction: discord.Interaction) -> bool:
-                if interaction.user.id not in [ctx.author.id] + list(ctx.bot.owner_ids):
-                    await interaction.response.send_message(
-                        _("You are not allowed to use this interaction."),
-                        ephemeral=True,
-                    )
-                    return False
-                return True
-
-            @discord.ui.button(label=_("Set Discord OAuth Secret"))
-            async def set_secret_button(
-                _self,
-                interaction: discord.Interaction,
-                button: discord.ui.Button,
-            ) -> None:
-                await interaction.response.send_modal(SecretModal())
-
-        view = SecretView()
-        view._message = await ctx.send(
-            _("Click on the button below to set a secret for Discord OAuth."),
-            view=view,
+        if not uri.endswith("/callback"):
+            await interaction.response.send_message(
+                _("This is not a valid Dashboard redirect URI: it must end with `/callback`."),
+                ephemeral=True,
+            )
+            return
+        await self.config.webserver.core.redirect_uri.set(uri)
+        await interaction.response.send_message(
+            _("Redirect URI set to <{uri}>.").format(uri=uri), ephemeral=True
         )
+
+    @setdashboard.command(
+        name="allow-unsecure-http",
+        description="Allow plain http. Only for when you cannot set up an SSL certificate.",
+    )
+    @app_commands.describe(enabled="Whether to serve the dashboard over plain http.")
+    @app_checks.is_owner()
+    async def allow_unsecure_http_requests(
+        self, interaction: discord.Interaction, enabled: bool
+    ) -> None:
+        """Allow plain http requests."""
+        await self.config.webserver.core.allow_unsecure_http_requests.set(enabled)
+        await interaction.response.send_message(
+            _("Plain http is now allowed.")
+            if enabled
+            else _("Plain http is no longer allowed."),
+            ephemeral=True,
+        )
+
+    @setdashboard.command(
+        name="all-in-one",
+        description="Run the webserver inside the bot instead of a separate process.",
+    )
+    @app_commands.describe(enabled="Whether the bot should host the webserver itself.")
+    @app_checks.is_owner()
+    async def all_in_one(self, interaction: discord.Interaction, enabled: bool) -> None:
+        """Run the webserver in the bot process.
+
+        Needs Red-Web-Dashboard installed in the bot's venv, and a reload.
+        """
+        await self.config.all_in_one.set(enabled)
+        await interaction.response.send_message(
+            _(
+                "All-in-one mode is now {state}. Reload the cog to apply it, and make sure "
+                "Red-Web-Dashboard is installed in the bot's venv."
+            ).format(state=_("enabled") if enabled else _("disabled")),
+            ephemeral=True,
+        )
+
+    @setdashboard.command(
+        name="flask-flags",
+        description="The reddash cli flags used when all-in-one is enabled.",
+    )
+    @app_commands.describe(
+        flags="Space-separated reddash flags, without --rpc-port. Leave empty to clear."
+    )
+    @app_checks.is_owner()
+    async def flask_flags(self, interaction: discord.Interaction, flags: str = "") -> None:
+        """The flags used to start the webserver if `all_in_one` is enabled."""
+        parsed = flags.split()
+        await self.config.flask_flags.set(parsed)
+        await interaction.response.send_message(
+            _("Flask flags set to `{flags}`.").format(flags=" ".join(parsed))
+            if parsed
+            else _("Flask flags cleared."),
+            ephemeral=True,
+        )
+
+    @setdashboard.command(
+        name="view",
+        description="Show the settings that have to be set from here.",
+    )
+    @app_checks.is_owner()
+    async def view_settings(self, interaction: discord.Interaction) -> None:
+        """Show the login and webserver settings.
+
+        The secret is only ever reported as set or not.
+        """
+        core = await self.config.webserver.core.all()
+        embed: discord.Embed = discord.Embed(
+            title=_("Dashboard setup"),
+            description=_(
+                "Everything else is on the Dashboard's own Admin page, "
+                "under Dashboard Settings."
+            ),
+            color=await self.bot.get_embed_color(interaction.channel),
+        )
+        embed.add_field(
+            name=_("Discord OAuth secret"),
+            value=_("Set") if core["secret"] else _("Not set"),
+            inline=False,
+        )
+        embed.add_field(
+            name=_("Redirect URI"),
+            value=core["redirect_uri"] or _("Not set (the login page guesses one)"),
+            inline=False,
+        )
+        embed.add_field(
+            name=_("Allow unsecure http"),
+            value=_("Yes") if core["allow_unsecure_http_requests"] else _("No"),
+            inline=False,
+        )
+        embed.add_field(
+            name=_("All in one"),
+            value=_("Yes") if await self.config.all_in_one() else _("No"),
+            inline=False,
+        )
+        flags = await self.config.flask_flags()
+        embed.add_field(
+            name=_("Flask flags"),
+            value=f"`{' '.join(flags)}`" if flags else _("None"),
+            inline=False,
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
