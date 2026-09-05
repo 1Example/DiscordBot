@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import discord
 
-from redbot.core import commands, modlog
+from redbot.core import app_commands, commands, modlog
 from redbot.core.i18n import Translator
+
+from ..abc import MixinMeta
 from redbot.core.utils.chat_formatting import bold, pagify
 from redbot.core.utils.menus import menu
 
@@ -24,10 +26,13 @@ class CaseCommands:
 
     bot: Any
 
-    @commands.command()
-    @commands.guild_only()
-    async def case(self, ctx: commands.Context, number: int):
+    modlog = MixinMeta.modlog
+
+    @modlog.command(name="case", description="Show one moderation case.")
+    @app_commands.describe(number="The case number.")
+    async def case(self, interaction: discord.Interaction, number: int):
         """Show the specified case."""
+        ctx = await commands.Context.from_interaction(interaction)
         try:
             case = await modlog.get_case(number, ctx.guild, self.bot)
         except RuntimeError:
@@ -44,10 +49,13 @@ class CaseCommands:
                 )
                 await ctx.send(message)
 
-    @commands.command()
-    @commands.guild_only()
-    async def casesfor(self, ctx: commands.Context, *, member: Union[discord.Member, int]):
+    @modlog.command(
+        name="cases", description="Show a member's cases, one per page."
+    )
+    @app_commands.describe(member="Whose cases to show.")
+    async def casesfor(self, interaction: discord.Interaction, member: discord.User):
         """Display cases for the specified member."""
+        ctx = await commands.Context.from_interaction(interaction)
         async with ctx.typing():
             try:
                 if isinstance(member, int):
@@ -83,10 +91,13 @@ class CaseCommands:
 
         await menu(ctx, rendered_cases)
 
-    @commands.command()
-    @commands.guild_only()
-    async def listcases(self, ctx: commands.Context, *, member: Union[discord.Member, int]):
+    @modlog.command(
+        name="list", description="List a member's cases together."
+    )
+    @app_commands.describe(member="Whose cases to list.")
+    async def listcases(self, interaction: discord.Interaction, member: discord.User):
         """List cases for the specified member."""
+        ctx = await commands.Context.from_interaction(interaction)
         async with ctx.typing():
             try:
                 if isinstance(member, int):
@@ -118,9 +129,16 @@ class CaseCommands:
                 rendered_cases.append(page)
         await menu(ctx, rendered_cases)
 
-    @commands.command()
-    @commands.guild_only()
-    async def reason(self, ctx: commands.Context, case: Optional[int], *, reason: str):
+    @modlog.command(
+        name="reason", description="Set or correct the reason on a case."
+    )
+    @app_commands.describe(
+        reason="The reason to record.",
+        case="The case number. Defaults to the most recent case.",
+    )
+    async def reason(
+        self, interaction: discord.Interaction, reason: str, case: Optional[int] = None
+    ):
         """Specify a reason for a modlog case.
 
         Please note that you can only edit cases you are
@@ -128,6 +146,7 @@ class CaseCommands:
 
         If no case number is specified, the latest case will be used.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         author = ctx.author
         guild = ctx.guild
         if case is None:

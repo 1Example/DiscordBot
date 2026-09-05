@@ -9,15 +9,12 @@ from redbot.core import Config, commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils import AsyncIter
-from redbot.core.utils._internal_utils import send_to_owners_with_prefix_replaced
-from redbot.core.utils.chat_formatting import inline
 from .cases import CaseCommands
 from .events import Events
 from .eventlog import EventLogMixin
 from .kickban import KickBanMixin
 from .names import ModInfo
 from .slowmode import Slowmode
-from .settings import ModSettings
 from .dashboard_integration import DashboardIntegration
 
 _ = T_ = Translator("Mod", __file__)
@@ -46,7 +43,6 @@ class CompositeMetaClass(type(commands.Cog), type(ABC)):
 @cog_i18n(_)
 class Mod(
     DashboardIntegration,
-    ModSettings,
     Events,
     KickBanMixin,
     ModInfo,
@@ -151,35 +147,35 @@ class Mod(
                 await self.config.guild_from_id(guild_id).delete_repeats.set(val)
             await self.config.version.set("1.0.0")  # set version of last update
         if await self.config.version() < "1.1.0":
-            message_sent = False
-            async for e in AsyncIter((await self.config.all_channels()).values(), steps=25):
-                if e["ignored"] is not False:
-                    msg = _(
-                        "Ignored guilds and channels have been moved. "
-                        "Please use {command} to migrate the old settings."
-                    ).format(command=inline("[p]moveignoredchannels"))
-                    asyncio.create_task(send_to_owners_with_prefix_replaced(self.bot, msg))
-                    message_sent = True
-                    break
-            if message_sent is False:
-                async for e in AsyncIter((await self.config.all_guilds()).values(), steps=25):
-                    if e["ignored"] is not False:
-                        msg = _(
-                            "Ignored guilds and channels have been moved. "
-                            "Please use {command} to migrate the old settings."
-                        ).format(command=inline("[p]moveignoredchannels"))
-                        asyncio.create_task(send_to_owners_with_prefix_replaced(self.bot, msg))
-                        break
+            # Ignored guilds and channels live in core now. This used to ask the
+            # owner to run [p]moveignoredchannels; there is nothing to decide,
+            # so it just happens.
+            async for guild_id, settings in AsyncIter(
+                (await self.config.all_guilds()).items(), steps=25
+            ):
+                await self.bot._config.guild_from_id(guild_id).ignored.set(
+                    settings["ignored"]
+                )
+                await self.config.guild_from_id(guild_id).ignored.clear()
+            async for channel_id, settings in AsyncIter(
+                (await self.config.all_channels()).items(), steps=25
+            ):
+                await self.bot._config.channel_from_id(channel_id).ignored.set(
+                    settings["ignored"]
+                )
+                await self.config.channel_from_id(channel_id).clear()
             await self.config.version.set("1.1.0")
         if await self.config.version() < "1.2.0":
-            async for e in AsyncIter((await self.config.all_guilds()).values(), steps=25):
-                if e["delete_delay"] != -1:
-                    msg = _(
-                        "Delete delay settings have been moved. "
-                        "Please use {command} to migrate the old settings."
-                    ).format(command=inline("[p]movedeletedelay"))
-                    asyncio.create_task(send_to_owners_with_prefix_replaced(self.bot, msg))
-                    break
+            # Same for the delete delay, which [p]movedeletedelay used to move.
+            async for guild_id, settings in AsyncIter(
+                (await self.config.all_guilds()).items(), steps=25
+            ):
+                if settings["delete_delay"] == -1:
+                    continue
+                await self.bot._config.guild_from_id(guild_id).delete_delay.set(
+                    settings["delete_delay"]
+                )
+                await self.config.guild_from_id(guild_id).delete_delay.clear()
             await self.config.version.set("1.2.0")
         if await self.config.version() < "1.3.0":
             guild_dict = await self.config.all_guilds()
@@ -191,31 +187,3 @@ class Mod(
                             guild_data["mention_spam"] = {}
                         guild_data["mention_spam"]["ban"] = current_state
             await self.config.version.set("1.3.0")
-
-    @commands.command(hidden=True)
-    @commands.is_owner()
-    async def moveignoredchannels(self, ctx: commands.Context) -> None:
-        """Move ignored channels and servers to core"""
-        all_guilds = await self.config.all_guilds()
-        all_channels = await self.config.all_channels()
-        for guild_id, settings in all_guilds.items():
-            await self.bot._config.guild_from_id(guild_id).ignored.set(settings["ignored"])
-            await self.config.guild_from_id(guild_id).ignored.clear()
-        for channel_id, settings in all_channels.items():
-            await self.bot._config.channel_from_id(channel_id).ignored.set(settings["ignored"])
-            await self.config.channel_from_id(channel_id).clear()
-        await ctx.send(_("Ignored channels and guilds restored."))
-
-    @commands.command(hidden=True)
-    @commands.is_owner()
-    async def movedeletedelay(self, ctx: commands.Context) -> None:
-        """
-        Move deletedelay settings to core
-        """
-        all_guilds = await self.config.all_guilds()
-        for guild_id, settings in all_guilds.items():
-            await self.bot._config.guild_from_id(guild_id).delete_delay.set(
-                settings["delete_delay"]
-            )
-            await self.config.guild_from_id(guild_id).delete_delay.clear()
-        await ctx.send(_("Delete delay settings restored."))

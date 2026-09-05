@@ -5,10 +5,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Union
 
 import discord
-from redbot.core import commands, i18n, modlog
-from redbot.core.commands import RawUserIdConverter
+from redbot.core import app_commands, commands, i18n, modlog
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.utils import AsyncIter
 from redbot.core.utils.chat_formatting import (
+    inline,
     pagify,
     humanize_number,
     bold,
@@ -20,6 +21,8 @@ from redbot.core.utils.views import ConfirmView
 from .abc import MixinMeta
 from .utils import is_allowed_by_hierarchy
 
+voice = MixinMeta.voice
+
 log = logging.getLogger("red.mod")
 _ = i18n.Translator("Mod", __file__)
 
@@ -28,6 +31,21 @@ class KickBanMixin(MixinMeta):
     """
     Kick and ban commands and tasks go here.
     """
+
+    @staticmethod
+    def _parse_user_ids(raw: str) -> Tuple[List[int], List[str]]:
+        """Split a string of user IDs into (ids, whatever was not an ID).
+
+        Slash has no Greedy, so the IDs that used to arrive already
+        converted come in as one string instead.
+        """
+        ids, bad = [], []
+        for token in (raw or "").replace(",", " ").split():
+            if token.isdigit():
+                ids.append(int(token))
+            else:
+                bad.append(token)
+        return ids, bad
 
     @staticmethod
     async def get_invite_for_reinvite(ctx: commands.Context, max_age: int = 86400) -> str:
@@ -300,23 +318,28 @@ class KickBanMixin(MixinMeta):
                     changed = True
         return changed
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.bot_has_permissions(kick_members=True)
-    @commands.admin_or_permissions(kick_members=True)
-    async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = None):
-        """
-        Kick a user.
+    @app_commands.command(
+        name="kick",
+        description="Kick a member from this server.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_checks.bot_has_permissions(kick_members=True)
+    @app_checks.admin_or_permissions(kick_members=True)
+    @app_commands.describe(
+        member="The member to kick.",
+        reason="Shown in the audit log and recorded on the modlog case.",
+    )
+    async def kick(
+        self, interaction: discord.Interaction, member: discord.Member, reason: str = None
+    ):
+        """Kick a member from the server.
 
-        Examples:
-        - `[p]kick 428675506947227648 wanted to be kicked.`
-            This will kick the user with ID 428675506947227648 from the server.
-        - `[p]kick @Twentysix wanted to be kicked.`
-            This will kick Twentysix from the server.
-
-        If a reason is specified, it will be the reason that shows up
-        in the audit log.
+        The reason, if given, is what shows up in the audit log and on
+        the modlog case.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         author = ctx.author
         guild = ctx.guild
 
@@ -384,37 +407,38 @@ class KickBanMixin(MixinMeta):
             )
             await ctx.send(_("Done. That felt good."))
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.bot_has_permissions(ban_members=True)
-    @commands.admin_or_permissions(ban_members=True)
+    @app_commands.command(
+        name="ban", description="Ban a user from this server.", extras={"red_force_enable": True}
+    )
+    @app_commands.guild_only()
+    @app_checks.bot_has_permissions(ban_members=True)
+    @app_checks.admin_or_permissions(ban_members=True)
+    @app_commands.describe(
+        user="The user to ban. They do not have to be in the server.",
+        days="Days of their messages to delete, 0-7. Defaults to the server setting.",
+        reason="Shown in the audit log and recorded on the modlog case.",
+    )
     async def ban(
         self,
-        ctx: commands.Context,
-        user: Union[discord.Member, RawUserIdConverter],
-        days: Optional[int] = None,
-        *,
+        interaction: discord.Interaction,
+        user: discord.User,
+        days: Optional[app_commands.Range[int, 0, 7]] = None,
         reason: str = None,
     ):
-        """Ban a user from this server and optionally delete days of messages.
+        """Ban a user, optionally deleting days of their messages.
 
-        `days` is the amount of days of messages to cleanup on ban.
-
-        Examples:
-        - `[p]ban 428675506947227648 7 Continued to spam after told to stop.`
-            This will ban the user with ID 428675506947227648 and it will delete 7 days worth of messages.
-        - `[p]ban @Twentysix 7 Continued to spam after told to stop.`
-            This will ban Twentysix and it will delete 7 days worth of messages.
-
-        A user ID should be provided if the user is not a member of this server.
-        If days is not a number, it's treated as the first word of the reason.
-        Minimum 0 days, maximum 7. If not specified, the defaultdays setting will be used instead.
+        The target does not have to be a member; pasting an ID into the
+        user option bans someone who has never been here. `days` is 0-7
+        and falls back to the server's default when left empty.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         guild = ctx.guild
         if days is None:
             days = await self.config.guild(guild).default_days()
-        if isinstance(user, int):
-            user = self.bot.get_user(user) or discord.Object(id=user)
+        # ban_user runs the hierarchy checks only against a Member, so give
+        # it one whenever the target is actually in the server.
+        user = guild.get_member(user.id) or user
 
         success_, message = await self.ban_user(
             user=user, ctx=ctx, days=days, reason=reason, create_modlog_case=True
@@ -422,29 +446,43 @@ class KickBanMixin(MixinMeta):
 
         await ctx.send(message)
 
-    @commands.command(aliases=["hackban"], usage="<user_ids...> [days] [reason]")
-    @commands.guild_only()
-    @commands.bot_has_permissions(ban_members=True)
-    @commands.admin_or_permissions(ban_members=True)
+    @app_commands.command(
+        name="massban",
+        description="Ban several users at once by ID.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_checks.bot_has_permissions(ban_members=True)
+    @app_checks.admin_or_permissions(ban_members=True)
+    @app_commands.describe(
+        user_ids="The user IDs to ban, separated by spaces or commas.",
+        days="Days of their messages to delete, 0-7. Defaults to the server setting.",
+        reason="Shown in the audit log and recorded on each modlog case.",
+    )
     async def massban(
         self,
-        ctx: commands.Context,
-        user_ids: commands.Greedy[RawUserIdConverter],
-        days: Optional[int] = None,
-        *,
+        interaction: discord.Interaction,
+        user_ids: str,
+        days: Optional[app_commands.Range[int, 0, 7]] = None,
         reason: str = None,
     ):
-        """Mass bans user(s) from the server.
+        """Ban several users at once.
 
-        `days` is the amount of days of messages to cleanup on massban.
-
-        Example:
-           - `[p]massban 345628097929936898 57287406247743488 7 they broke all rules.`
-            This will ban all the added userids and delete 7 days worth of their messages.
-
-        User IDs need to be provided in order to ban
-        using this command.
+        Takes user IDs, separated by spaces or commas - none of them has
+        to be a member. `days` is 0-7 and falls back to the server's
+        default when left empty.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        user_ids, unrecognised = self._parse_user_ids(user_ids)
+        if unrecognised:
+            await ctx.send(
+                _("These are not user IDs: {items}").format(
+                    items=humanize_list(unrecognised)
+                )
+            )
+            return
+
         banned = []
         errors = {}
         upgrades = []
@@ -601,39 +639,59 @@ class KickBanMixin(MixinMeta):
             )
         await show_results()
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.bot_has_permissions(ban_members=True)
-    @commands.admin_or_permissions(ban_members=True)
+    @app_commands.command(
+        name="tempban",
+        description="Ban a user for a limited time.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_checks.bot_has_permissions(ban_members=True)
+    @app_checks.admin_or_permissions(ban_members=True)
+    @app_commands.describe(
+        member="The user to ban. They do not have to be in the server.",
+        duration="How long, e.g. 15m, 2h30m, 7d. Defaults to the server setting.",
+        days="Days of their messages to delete, 0-7. Defaults to the server setting.",
+        reason="Shown in the audit log and recorded on the modlog case.",
+    )
     async def tempban(
         self,
-        ctx: commands.Context,
-        member: Union[discord.Member, RawUserIdConverter],
-        duration: Optional[commands.TimedeltaConverter] = None,
-        days: Optional[int] = None,
-        *,
+        interaction: discord.Interaction,
+        member: discord.User,
+        duration: Optional[str] = None,
+        days: Optional[app_commands.Range[int, 0, 7]] = None,
         reason: str = None,
     ):
-        """Temporarily ban a user from this server.
+        """Ban a user until the duration runs out, then unban them.
 
-        `duration` is the amount of time the user should be banned for.
-        `days` is the amount of days of messages to cleanup on tempban.
-
-        Examples:
-        - `[p]tempban @Twentysix Because I say so`
-            This will ban Twentysix for the default amount of time set by an administrator.
-        - `[p]tempban @Twentysix 15m You need a timeout`
-            This will ban Twentysix for 15 minutes.
-        - `[p]tempban 428675506947227648 1d2h15m 5 Evil person`
-            This will ban the user with ID 428675506947227648 for 1 day 2 hours 15 minutes and will delete the last 5 days of their messages.
+        `duration` accepts things like 15m, 2h30m or 1d2h15m, and falls
+        back to the server's default when left empty. So does `days`,
+        which is 0-7 days of their messages to delete.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         guild = ctx.guild
         author = ctx.author
-        in_server = True
 
-        if isinstance(member, int):
-            in_server = False
-            member = self.bot.get_user(member) or discord.Object(id=member)
+        if duration is not None:
+            # This was a bare TimedeltaConverter, so the same strings work.
+            try:
+                parsed = commands.parse_timedelta(duration.strip())
+            except commands.BadArgument as exc:
+                await ctx.send(str(exc))
+                return
+            if parsed is None:
+                await ctx.send(
+                    _(
+                        "{duration} is not a length of time I understand. Try "
+                        "something like 15m, 2h30m or 7d."
+                    ).format(duration=inline(duration))
+                )
+                return
+            duration = parsed
+
+        # The hierarchy checks below only apply to someone still in the server.
+        member = guild.get_member(member.id) or member
+        in_server = isinstance(member, discord.Member)
 
         if reason is None and await self.config.guild(guild).require_reason():
             await ctx.send(_("You must provide a reason for the temporary ban."))
@@ -763,12 +821,24 @@ class KickBanMixin(MixinMeta):
             )
             await ctx.send(_("Done. Enough chaos for now."))
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.bot_has_permissions(ban_members=True)
-    @commands.admin_or_permissions(ban_members=True)
-    async def softban(self, ctx: commands.Context, member: discord.Member, *, reason: str = None):
+    @app_commands.command(
+        name="softban",
+        description="Kick a member and delete a day of their messages.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_checks.bot_has_permissions(ban_members=True)
+    @app_checks.admin_or_permissions(ban_members=True)
+    @app_commands.describe(
+        member="The member to softban.",
+        reason="Shown in the audit log and recorded on the modlog case.",
+    )
+    async def softban(
+        self, interaction: discord.Interaction, member: discord.Member, reason: str = None
+    ):
         """Kick a user and delete 1 day's worth of their messages."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         guild = ctx.guild
         author = ctx.author
 
@@ -856,13 +926,18 @@ class KickBanMixin(MixinMeta):
             )
             await ctx.send(_("Done. Enough chaos."))
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.mod_or_permissions(move_members=True)
+    @voice.command(name="kick", description="Disconnect a member from voice.")
+    @app_checks.mod_or_permissions(move_members=True)
+    @app_commands.describe(
+        member="The member to disconnect.",
+        reason="Shown in the audit log and recorded on the modlog case.",
+    )
     async def voicekick(
-        self, ctx: commands.Context, member: discord.Member, *, reason: str = None
+        self, interaction: discord.Interaction, member: discord.Member, reason: str = None
     ):
         """Kick a member from a voice channel."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         if reason is None and await self.config.guild(ctx.guild).require_reason():
             await ctx.send(_("You must provide a reason for the voice kick."))
             return
@@ -907,13 +982,20 @@ class KickBanMixin(MixinMeta):
             )
             await ctx.send(_("User has been kicked from the voice channel."))
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.admin_or_permissions(mute_members=True, deafen_members=True)
+    @voice.command(
+        name="unban", description="Let a member speak and listen in voice again."
+    )
+    @app_checks.admin_or_permissions(mute_members=True, deafen_members=True)
+    @app_commands.describe(
+        member="The member to unmute and undeafen.",
+        reason="Shown in the audit log and recorded on the modlog case.",
+    )
     async def voiceunban(
-        self, ctx: commands.Context, member: discord.Member, *, reason: str = None
+        self, interaction: discord.Interaction, member: discord.Member, reason: str = None
     ):
         """Unban a user from speaking and listening in the server's voice channels."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         if reason is None and await self.config.guild(ctx.guild).require_reason():
             await ctx.send(_("You must provide a reason for the voice unban."))
             return
@@ -954,11 +1036,20 @@ class KickBanMixin(MixinMeta):
         )
         await ctx.send(_("User is now allowed to speak and listen in voice channels."))
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.admin_or_permissions(mute_members=True, deafen_members=True)
-    async def voiceban(self, ctx: commands.Context, member: discord.Member, *, reason: str = None):
+    @voice.command(
+        name="ban", description="Server mute and deafen a member in voice."
+    )
+    @app_checks.admin_or_permissions(mute_members=True, deafen_members=True)
+    @app_commands.describe(
+        member="The member to mute and deafen.",
+        reason="Shown in the audit log and recorded on the modlog case.",
+    )
+    async def voiceban(
+        self, interaction: discord.Interaction, member: discord.Member, reason: str = None
+    ):
         """Ban a user from speaking and listening in the server's voice channels."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         if reason is None and await self.config.guild(ctx.guild).require_reason():
             await ctx.send(_("You must provide a reason for the voice ban."))
             return
@@ -999,12 +1090,18 @@ class KickBanMixin(MixinMeta):
         )
         await ctx.send(_("User has been banned from speaking or listening in voice channels."))
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.bot_has_permissions(ban_members=True)
-    @commands.admin_or_permissions(ban_members=True)
+    @app_commands.command(
+        name="unban", description="Lift a ban on a user.", extras={"red_force_enable": True}
+    )
+    @app_commands.guild_only()
+    @app_checks.bot_has_permissions(ban_members=True)
+    @app_checks.admin_or_permissions(ban_members=True)
+    @app_commands.describe(
+        user_id="The ID of the banned user.",
+        reason="Shown in the audit log and recorded on the modlog case.",
+    )
     async def unban(
-        self, ctx: commands.Context, user_id: RawUserIdConverter, *, reason: str = None
+        self, interaction: discord.Interaction, user_id: str, reason: str = None
     ):
         """Unban a user from this server.
 
@@ -1012,6 +1109,15 @@ class KickBanMixin(MixinMeta):
         1. Copy it from the mod log case (if one was created), or
         2. Enable Developer Mode, go to Bans in this server's settings, right-click the user and select 'Copy ID'.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        if not user_id.isdigit():
+            await ctx.send(
+                _("{value} is not a user ID.").format(value=inline(user_id))
+            )
+            return
+        user_id = int(user_id)
+
         if reason is None and await self.config.guild(ctx.guild).require_reason():
             await ctx.send(_("You must provide a reason for the unban."))
             return

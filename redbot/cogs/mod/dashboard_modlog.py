@@ -32,9 +32,10 @@ class ModLogDashboardMixin:
     API rather than the ModLog cog's own state, so it hosts perfectly well from
     Mod and the two arrive together.
 
-    Covers ``[p]case``, ``[p]casesfor``, ``[p]listcases`` and ``[p]reason``, plus
-    the ``[p]modlogset`` settings: the modlog channel, which case types are
-    logged, and resetting the case history.
+    Covers the same ground as ``/modlog case``, ``/modlog cases``,
+    ``/modlog list`` and ``/modlog reason``, plus the ``[p]modlogset``
+    settings: the modlog channel, which case types are logged, and resetting
+    the case history.
     """
 
     bot: t.Any

@@ -187,7 +187,7 @@ class Events(MixinMeta):
 
     @commands.Cog.listener("on_member_update")
     async def _mod_track_nicknames(self, before: discord.Member, after: discord.Member):
-        """Record a nickname the member used to have, for `[p]names`.
+        """Record a nickname the member used to have, for `/userinfo`.
 
         The event log subscribes to the same event from `eventlog.EventMixin`;
         listeners are keyed by method name, so this one cannot also be called

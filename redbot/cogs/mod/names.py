@@ -1,12 +1,11 @@
 import datetime
-from typing import List, Tuple, cast
+from typing import List, Optional, Tuple, cast
 
 import discord
-from redbot.core import commands, i18n
-from redbot.core.utils.chat_formatting import bold, pagify
+from redbot.core import app_commands, commands, i18n
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.utils.common_filters import (
     filter_invites,
-    filter_various_mentions,
     escape_spoilers_and_mass_mentions,
 )
 from redbot.core.utils.mod import get_audit_reason
@@ -30,15 +29,30 @@ class ModInfo(MixinMeta):
         nicks = list(map(escape_spoilers_and_mass_mentions, filter(None, nicks)))
         return usernames, display_names, nicks
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.bot_has_permissions(manage_nicknames=True)
-    @commands.admin_or_permissions(manage_nicknames=True)
-    async def rename(self, ctx: commands.Context, member: discord.Member, *, nickname: str = ""):
+    @app_commands.command(
+        name="rename",
+        description="Change a member's server nickname.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_checks.bot_has_permissions(manage_nicknames=True)
+    @app_checks.admin_or_permissions(manage_nicknames=True)
+    @app_commands.describe(
+        member="The member to rename.",
+        nickname="The new nickname. Leave empty to clear it.",
+    )
+    async def rename(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        nickname: app_commands.Range[str, 0, 32] = "",
+    ):
         """Change a member's server nickname.
 
         Leaving the nickname argument empty will remove it.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         nickname = nickname.strip()
         me = cast(discord.Member, ctx.me)
         if not nickname:
@@ -169,10 +183,17 @@ class ModInfo(MixinMeta):
             string += f"{status_string}\n"
         return string
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.bot_has_permissions(embed_links=True)
-    async def userinfo(self, ctx, *, member: discord.Member = None):
+    @app_commands.command(
+        name="userinfo",
+        description="Show what the server knows about a member.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_checks.bot_has_permissions(embed_links=True)
+    @app_commands.describe(member="Whose information to show. Defaults to you.")
+    async def userinfo(
+        self, interaction: discord.Interaction, member: Optional[discord.Member] = None
+    ):
         """Show information about a member.
 
         This includes fields for status, discord join date, server
@@ -181,6 +202,8 @@ class ModInfo(MixinMeta):
         If the member has no roles, previous usernames, global display names, or server nicknames,
         these fields will be omitted.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         author = ctx.author
         guild = ctx.guild
 
@@ -302,23 +325,3 @@ class ModInfo(MixinMeta):
         data.set_thumbnail(url=avatar)
 
         await ctx.send(embed=data)
-
-    @commands.command()
-    async def names(self, ctx: commands.Context, *, member: discord.Member):
-        """Show previous usernames, global display names, and server nicknames of a member."""
-        usernames, display_names, nicks = await self.get_names(member)
-        parts = []
-        for header, names in (
-            (_("Past 20 usernames: "), usernames),
-            (_("Past 20 global display names: "), display_names),
-            (_("Past 20 server nicknames: "), nicks),
-        ):
-            if names:
-                parts.append(bold(header) + ", ".join(names))
-        if parts:
-            # each name can have 32 characters, we store 3*20 names which totals to
-            # 60*32=1920 characters which is quite close to the message length limit
-            for msg in pagify(filter_various_mentions("\n\n".join(parts))):
-                await ctx.send(msg)
-        else:
-            await ctx.send(_("That member doesn't have any recorded name or nickname change."))

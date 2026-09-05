@@ -53,10 +53,13 @@ class DashboardIntegration(ModLogDashboardMixin):
     The modlog and the event log are further pages of this module rather than
     modules of their own; see ``dashboard_modlog.py`` and ``eventlog/dashboard.py``.
 
-    Runs the moderation commands themselves - kick, ban, tempban, softban,
-    massban, unban, the voice actions, rename and slowmode - alongside every
-    ``[p]modset`` option, the mention-spam thresholds, the tempban list, and a
-    member lookup covering ``[p]userinfo`` and ``[p]names``.
+    Runs the moderation actions themselves - kick, ban, tempban, softban,
+    massban, unban, the voice actions, rename and slowmode - alongside the
+    settings that used to be ``[p]modset``, the mention-spam thresholds, the
+    tempban list, and a member lookup covering everything ``/userinfo`` shows.
+
+    ``[p]modset`` no longer exists: this page is the only way to change these,
+    which is why every one of its options has to stay covered here.
     """
 
     bot: t.Any
@@ -192,7 +195,7 @@ class DashboardIntegration(ModLogDashboardMixin):
                             "category": "success",
                         }
                     ], {}
-                # Same walk `[p]modset deletenames` does: drop the name lists
+                # Same walk `[p]modset deletenames` used to do: drop the name lists
                 # and then any record left empty by that.
                 async with self.config._get_base_group(
                     self.config.MEMBER
