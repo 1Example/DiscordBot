@@ -3,12 +3,12 @@ from typing import Deque, Dict
 import discord
 from red_commons.logging import getLogger
 from redbot.core import Config, commands, modlog
-from redbot.core.i18n import Translator, cog_i18n
+from redbot.core.i18n import Translator
 from redbot.core.utils.chat_formatting import humanize_list
 
 from .eventmixin import EventMixin, MemberUpdateEnum
 from .settings import inv_settings
-from .dashboard_integration import DashboardIntegration
+from .dashboard import EventLogDashboard
 
 _ = Translator("ExtendedModLog", __file__)
 logger = getLogger("red.trusty-cogs.ExtendedModLog")
@@ -55,51 +55,52 @@ def wrapped_additional_help():
     return decorator
 
 
-@cog_i18n(_)
-class ExtendedModLog(DashboardIntegration, EventMixin, commands.Cog):
-    """
-    Extended modlogs
-    Works with core modlogset channel
+class EventLogMixin(EventLogDashboard, EventMixin):
+    """Extended modlogs, as part of the Mod cog.
+
+    Originally the standalone ExtendedModLog cog by RePulsar and TrustyJAID
+    (v2.13.1). It logs server events - edits, deletions, joins, role and
+    channel changes - to the channels chosen on the Event log page, alongside
+    the moderation cases the core modlog records.
+
+    Two things follow from living inside Mod rather than in a cog of its own:
+
+    * The Config object stays pinned to ``cog_name="ExtendedModLog"``. Config
+      keys storage on the cog class name, so without the pin every server's
+      logging settings would be looked up under "Mod" and read back empty.
+    * The lifecycle hooks are named ``_eventlog_*`` and called from ``Mod``.
+      ``__init__``, ``cog_load`` and ``cog_unload`` exist on Mod as well, and
+      only one of each survives the MRO.
     """
 
     __author__ = ["RePulsar", "TrustyJAID"]
-    __version__ = "2.13.1"
+    __eventlog_version__ = "2.13.1"
 
-    def __init__(self, bot):
-        self.bot = bot
-        self.config = Config.get_conf(self, 154457677895, force_registration=True)
-        self.config.register_guild(**inv_settings)
-        self.config.register_global(version="0.0.0")
+    def _eventlog_init(self) -> None:
+        self.eventlog_config = Config.get_conf(
+            None, 154457677895, cog_name="ExtendedModLog", force_registration=True
+        )
+        self.eventlog_config.register_guild(**inv_settings)
+        self.eventlog_config.register_global(version="0.0.0")
         self.settings = {}
         self._ban_cache = {}
         self.invite_links_loop.start()
         self.allowed_mentions = discord.AllowedMentions(users=False, roles=False, everyone=False)
         self.audit_log: Dict[int, Deque[discord.AuditLogEntry]] = {}
 
-    def format_help_for_context(self, ctx: commands.Context):
-        """
-        Thanks Sinbad!
-        """
-        pre_processed = super().format_help_for_context(ctx)
-        return f"{pre_processed}\n\nCog Version: {self.__version__}"
-
-    async def cog_unload(self):
+    def _eventlog_unload(self) -> None:
         self.invite_links_loop.stop()
 
-    async def red_delete_data_for_user(self, **kwargs):
-        """
-        Nothing to delete
-        """
-        return
-
-    async def cog_load(self) -> None:
-        if await self.config.version() < "2.8.5":
+    async def _eventlog_load(self) -> None:
+        if await self.eventlog_config.version() < "2.8.5":
             await self.migrate_2_8_5_settings()
-        for guild_id in await self.config.all_guilds():
-            self.settings[int(guild_id)] = await self.config.guild_from_id(guild_id).all()
+        for guild_id in await self.eventlog_config.all_guilds():
+            self.settings[int(guild_id)] = await self.eventlog_config.guild_from_id(
+                guild_id
+            ).all()
 
     async def migrate_2_8_5_settings(self):
-        all_data = await self.config.all_guilds()
+        all_data = await self.eventlog_config.all_guilds()
         for guild_id, data in all_data.items():
             for entry, default in inv_settings.items():
                 if entry not in data:
@@ -116,8 +117,8 @@ class ExtendedModLog(DashboardIntegration, EventMixin, commands.Cog):
                             logger.error("Somehow your dict was invalid.")
                             continue
             logger.info("Saving guild %s data to new version type", guild_id)
-            await self.config.guild_from_id(guild_id).set(all_data[guild_id])
-        await self.config.version.set("2.8.5")
+            await self.eventlog_config.guild_from_id(guild_id).set(all_data[guild_id])
+        await self.eventlog_config.version.set("2.8.5")
 
     async def modlog_settings(self, ctx: commands.Context) -> None:
         if ctx.guild is None:
@@ -155,7 +156,7 @@ class ExtendedModLog(DashboardIntegration, EventMixin, commands.Cog):
             guild=guild.name, channel=modlog_channel
         )
         if guild.id not in self.settings:
-            self.settings[guild.id] = await self.config.guild(guild).all()
+            self.settings[guild.id] = await self.eventlog_config.guild(guild).all()
 
         data = self.settings[guild.id]
         ign_chans = data["ignored_channels"]
@@ -196,7 +197,7 @@ class ExtendedModLog(DashboardIntegration, EventMixin, commands.Cog):
             msg += _("Ignored Users: ") + humanize_list(ignored_users)
         if ignored_mods:
             msg += _("Ignored Mods: ") + humanize_list(ignored_mods)
-        await self.config.guild(ctx.guild).set(data)
+        await self.eventlog_config.guild(ctx.guild).set(data)
         # save the data back to config incase we had some deleted channels
         if await ctx.embed_requested():
             em = discord.Embed(description=msg)

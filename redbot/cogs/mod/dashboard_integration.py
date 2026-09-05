@@ -50,8 +50,8 @@ SPAM_ACTIONS = ("warn", "kick", "ban")
 class DashboardIntegration(ModLogDashboardMixin):
     """Moderation actions and settings.
 
-    The modlog is a second page of this module rather than a module of its own;
-    see ``dashboard_modlog.py``.
+    The modlog and the event log are further pages of this module rather than
+    modules of their own; see ``dashboard_modlog.py`` and ``eventlog/dashboard.py``.
 
     Runs the moderation commands themselves - kick, ban, tempban, softban,
     massban, unban, the voice actions, rename and slowmode - alongside every
@@ -581,7 +581,8 @@ MOD_TEMPLATE = (
   </div>
 
   {{ subnav(name, [(none, 'Moderation', 'fa-gavel'),
-                   ('modlog', 'Modlog', 'fa-book')], none, guild) }}
+                   ('modlog', 'Modlog', 'fa-book'),
+                   ('eventlog', 'Event log', 'fa-file-text-o')], none, guild) }}
 
   {% if lookup %}
     <div class="dz-panel">

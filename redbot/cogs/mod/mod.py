@@ -11,7 +11,9 @@ from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils import AsyncIter
 from redbot.core.utils._internal_utils import send_to_owners_with_prefix_replaced
 from redbot.core.utils.chat_formatting import inline
+from .cases import CaseCommands
 from .events import Events
+from .eventlog import EventLogMixin
 from .kickban import KickBanMixin
 from .names import ModInfo
 from .slowmode import Slowmode
@@ -32,6 +34,15 @@ class CompositeMetaClass(type(commands.Cog), type(ABC)):
     pass
 
 
+# Mod, ModLog and ExtendedModLog were three cogs sharing one modlog channel and
+# a settings page each, so they are one module now. Two things to know when
+# adding to it:
+#
+# * `EventLogMixin` keeps its own Config, pinned to cog_name="ExtendedModLog"
+#   so the logging settings servers already have are still found.
+# * Its lifecycle hooks are `_eventlog_*` and are called from `__init__`,
+#   `cog_load` and `cog_unload` below. Mod defines all three itself, and only
+#   one of each survives the MRO.
 @cog_i18n(_)
 class Mod(
     DashboardIntegration,
@@ -40,10 +51,12 @@ class Mod(
     KickBanMixin,
     ModInfo,
     Slowmode,
+    CaseCommands,
+    EventLogMixin,
     commands.Cog,
     metaclass=CompositeMetaClass,
 ):
-    """Moderation tools."""
+    """Moderation tools, modlog cases, and server event logging."""
 
     default_global_settings = {
         "version": "",
@@ -87,6 +100,7 @@ class Mod(
         self.cache: dict = {}
         self.tban_expiry_task = asyncio.create_task(self.tempban_expirations_task())
         self.last_case: dict = defaultdict(dict)
+        self._eventlog_init()
 
     async def red_delete_data_for_user(
         self,
@@ -118,9 +132,11 @@ class Mod(
 
     async def cog_load(self) -> None:
         await self._maybe_update_config()
+        await self._eventlog_load()
 
     def cog_unload(self):
         self.tban_expiry_task.cancel()
+        self._eventlog_unload()
 
     async def _maybe_update_config(self):
         """Maybe update `delete_delay` value set by Config prior to Mod 1.0.0."""

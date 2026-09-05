@@ -4,7 +4,6 @@ import logging
 import typing as t
 
 import discord
-from redbot.core import commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
@@ -17,7 +16,7 @@ from redbot.core.utils.dashboard_helpers import (
     role_options,
 )
 
-log = logging.getLogger("red.extendedmodlog.dashboard")
+log = logging.getLogger("red.mod.eventlog.dashboard")
 
 # Config keys that hold lists rather than an event definition.
 NON_EVENT_KEYS = {"ignored_channels", "ignored_users", "ignored_mods", "invite_links"}
@@ -50,24 +49,23 @@ EXTRA_LABELS = {
 }
 
 
-class DashboardIntegration:
-    """Per-event logging configuration."""
+class EventLogDashboard:
+    """Per-event logging configuration.
+
+    A page of the Mod module rather than a module of its own. Mod registers the
+    third party for the whole cog, so there is no ``on_dashboard_cog_add`` here.
+    """
 
     bot: t.Any
-    config: t.Any
-
-    @commands.Cog.listener()
-    async def on_dashboard_cog_add(self, dashboard_cog) -> None:  # noqa: D401
-        log.info("Dashboard cog found, registering ExtendedModLog as a third party.")
-        dashboard_cog.rpc.third_parties_handler.add_third_party(self)
+    eventlog_config: t.Any
 
     @dashboard_page(
-        name=None,
+        name="eventlog",
         description="Choose which events are logged and where.",
         methods=("GET", "POST"),
         context_ids=["guild_id", "user_id"],
     )
-    async def dashboard_modlog_page(
+    async def dashboard_eventlog_page(
         self, user: discord.User, guild: discord.Guild, **kwargs: t.Any
     ) -> dict[str, t.Any]:
         member, error = guild_member(user, guild)
@@ -84,7 +82,7 @@ class DashboardIntegration:
         if kwargs.get("method") == "POST":
             notifications = await self._eml_handle_post(guild, kwargs)
 
-        settings = await self.config.guild(guild).all()
+        settings = await self.eventlog_config.guild(guild).all()
         groups = []
         active = 0
         for title, keys in EVENT_GROUPS:
@@ -117,7 +115,7 @@ class DashboardIntegration:
             "status": 0,
             "notifications": notifications,
             "web_content": {
-                "source": MODLOG_TEMPLATE,
+                "source": EVENTLOG_TEMPLATE,
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "groups": groups,
@@ -195,7 +193,7 @@ class DashboardIntegration:
     async def _eml_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
         field = form_reader(kwargs)
         action = field("action")
-        conf = self.config.guild(guild)
+        conf = self.eventlog_config.guild(guild)
 
         try:
             if action == "save_group":
@@ -267,7 +265,7 @@ class DashboardIntegration:
         ]
 
 
-MODLOG_TEMPLATE = (
+EVENTLOG_TEMPLATE = (
     BASE_CSS
     + MACROS
     + """
@@ -276,6 +274,10 @@ MODLOG_TEMPLATE = (
     <h4><i class="fa fa-file-text-o"></i> Event logging in {{ guild_name }}</h4>
     <p>{{ active }} of {{ total }} events are being logged.</p>
   </div>
+
+  {{ subnav(name, [(none, 'Moderation', 'fa-gavel'),
+                   ('modlog', 'Modlog', 'fa-book'),
+                   ('eventlog', 'Event log', 'fa-file-text-o')], 'eventlog', guild) }}
 
   {{ stats(stat_items) }}
 

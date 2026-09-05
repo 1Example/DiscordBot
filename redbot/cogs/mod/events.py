@@ -185,8 +185,14 @@ class Events(MixinMeta):
             async with self.config.user(before).past_display_names() as name_list:
                 self._update_past_names(before.display_name, name_list)
 
-    @commands.Cog.listener()
-    async def on_member_update(self, before: discord.Member, after: discord.Member):
+    @commands.Cog.listener("on_member_update")
+    async def _mod_track_nicknames(self, before: discord.Member, after: discord.Member):
+        """Record a nickname the member used to have, for `[p]names`.
+
+        The event log subscribes to the same event from `eventlog.EventMixin`;
+        listeners are keyed by method name, so this one cannot also be called
+        `on_member_update` or only one of the two would ever run.
+        """
         if before.nick != after.nick and before.nick is not None:
             guild = after.guild
             if (not guild) or await self.bot.cog_disabled_in_guild(self, guild):

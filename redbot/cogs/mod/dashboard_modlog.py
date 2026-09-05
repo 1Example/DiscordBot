@@ -260,7 +260,8 @@ MODLOG_TEMPLATE = (
   </div>
 
   {{ subnav(name, [(none, 'Moderation', 'fa-gavel'),
-                   ('modlog', 'Modlog', 'fa-book')], 'modlog', guild) }}
+                   ('modlog', 'Modlog', 'fa-book'),
+                   ('eventlog', 'Event log', 'fa-file-text-o')], 'modlog', guild) }}
 
   {{ stats([('Cases', all_total),
             ('Matching filter', total),

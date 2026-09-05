@@ -118,7 +118,7 @@ class EventMixin:
     Handles all the on_event data
     """
 
-    config: Config
+    eventlog_config: Config
     bot: Red
     settings: Dict[int, Any]
     _ban_cache: Dict[int, List[int]]
@@ -126,7 +126,7 @@ class EventMixin:
     audit_log: Dict[int, Deque[discord.AuditLogEntry]]
 
     async def save(self, guild: discord.Guild) -> None:
-        async with self.config.guild(guild).all() as all_settings:
+        async with self.eventlog_config.guild(guild).all() as all_settings:
             for key, value in self.settings[guild.id].items():
                 all_settings[key] = value
 

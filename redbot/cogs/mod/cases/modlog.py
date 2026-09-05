@@ -1,31 +1,28 @@
 from datetime import datetime, timezone
 
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import discord
 
 from redbot.core import commands, modlog
-from redbot.core.bot import Red
-from redbot.core.i18n import Translator, cog_i18n
-from redbot.core.utils.chat_formatting import bold, box, pagify
+from redbot.core.i18n import Translator
+from redbot.core.utils.chat_formatting import bold, pagify
 from redbot.core.utils.menus import menu
-from redbot.core.utils.predicates import MessagePredicate
 
 
 _ = Translator("ModLog", __file__)
 
 
-@cog_i18n(_)
-class ModLog(commands.Cog):
-    """Browse and manage modlog cases. To manage modlog settings, use `[p]modlogset`."""
+class CaseCommands:
+    """Browsing and amending modlog cases, as part of the Mod cog.
 
-    def __init__(self, bot: Red):
-        super().__init__()
-        self.bot = bot
+    These were the ModLog cog. They read and write through
+    ``redbot.core.modlog``, which is a core API rather than that cog's own
+    state, so they run just as well from Mod - and the cases page sits beside
+    the moderation page instead of in a module of its own.
+    """
 
-    async def red_delete_data_for_user(self, **kwargs):
-        """Nothing to delete"""
-        return
+    bot: Any
 
     @commands.command()
     @commands.guild_only()
