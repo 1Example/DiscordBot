@@ -6,6 +6,7 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -76,6 +77,7 @@ class NodesDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": PLNODES_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "nodes": nodes,
                 "sources": KNOWN_SOURCES,
@@ -254,6 +256,8 @@ PLNODES_TEMPLATE = (
     <p>Everything the <code>[p]plnode</code> menus do, as a form. Nodes PyLav
        manages itself are shown but cannot be edited.</p>
   </div>
+
+  {{ subnav(name, audio_pages, 'nodes', guild) }}
 
   {{ stats([('Nodes', nodes|length),
             ('Online', available),

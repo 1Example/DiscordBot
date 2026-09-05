@@ -8,6 +8,7 @@ from redbot.core import commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     dashboard_page,
     form_reader,
     guild_member,
@@ -27,6 +28,34 @@ def _fmt_ms(milliseconds: float | int | None) -> str:
     minutes, seconds = divmod(rest, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
 
+
+# The pages of this module, in the order the subnav shows them. Owner-only ones
+# are dropped for everybody else, so nobody is offered a link to a 403.
+AUDIO_PAGES = (
+    (None, "Now playing", "fa-music", False),
+    ("player", "Player", "fa-play-circle", False),
+    ("player-settings", "Player settings", "fa-sliders", False),
+    ("playlists", "Playlists", "fa-list", False),
+    ("effects", "Effects", "fa-sliders", False),
+    ("radio", "Radio", "fa-broadcast-tower", False),
+    ("youtube-radio", "YouTube radio", "fa-youtube-play", False),
+    ("lyrics", "Lyrics", "fa-align-left", False),
+    ("local-files", "Local files", "fa-folder-open-o", False),
+    ("notifications", "Notifications", "fa-bell-o", False),
+    ("nodes", "Nodes", "fa-server", True),
+    ("managed-node", "Managed node", "fa-cogs", True),
+    ("pylav", "PyLav", "fa-wrench", True),
+    ("diagnostics", "Diagnostics", "fa-stethoscope", False),
+)
+
+
+def audio_pages(is_owner: bool) -> list:
+    """The subnav entries this viewer should see."""
+    return [
+        (slug, label, icon)
+        for slug, label, icon, owner_only in AUDIO_PAGES
+        if not owner_only or is_owner
+    ]
 
 class DashboardIntegration:
     """Player status, queue overview and per-server command settings."""
@@ -72,6 +101,7 @@ class DashboardIntegration:
             "notifications": notifications,
             "web_content": {
                 "source": AUDIO_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "is_staff": staff,
@@ -173,6 +203,7 @@ class DashboardIntegration:
 
 AUDIO_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -185,6 +216,8 @@ AUDIO_TEMPLATE = (
       {% else %}Not connected to a voice channel.{% endif %}
     </p>
   </div>
+
+  {{ subnav(name, audio_pages, none, guild) }}
 
   {% if state.current %}
     <div class="dz-panel">

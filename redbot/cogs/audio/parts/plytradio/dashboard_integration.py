@@ -6,8 +6,10 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     dashboard_page,
     form_reader,
     guild_member,
@@ -69,6 +71,7 @@ class YouTubeRadioDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": YTRADIO_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "is_staff": staff,
@@ -143,6 +146,7 @@ class YouTubeRadioDashboard:
 
 YTRADIO_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -153,6 +157,8 @@ YTRADIO_TEMPLATE = (
       {% if connected %} &middot; {{ queue_length }} track(s) queued{% endif %}
     </p>
   </div>
+
+  {{ subnav(name, audio_pages, 'youtube-radio', guild) }}
 
   {% if current %}
     <div class="dz-panel">

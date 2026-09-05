@@ -7,6 +7,7 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -87,6 +88,7 @@ class UtilsDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": PLUTILS_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "is_owner": owner,
@@ -222,6 +224,8 @@ PLUTILS_TEMPLATE = (
     <h4><i class="fa fa-wrench"></i> PyLav utilities</h4>
     <p>Track details, the query cache and diagnostics for {{ guild_name }}.</p>
   </div>
+
+  {{ subnav(name, audio_pages, 'diagnostics', guild) }}
 
   {% if result %}
     <div class="dz-panel">

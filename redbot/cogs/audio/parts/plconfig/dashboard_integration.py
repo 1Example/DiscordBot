@@ -6,6 +6,7 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -91,6 +92,7 @@ class PyLavConfigDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": PLCONFIG_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "lib_version": str(self.pylav.lib_version),
                 "cog_version": getattr(self, "__version__", ""),
@@ -231,6 +233,8 @@ PLCONFIG_TEMPLATE = (
     <p>Library {{ lib_version }}{% if cog_version %}, cog {{ cog_version }}{% endif %}.
        Node changes apply after a restart.</p>
   </div>
+
+  {{ subnav(name, audio_pages, 'pylav', guild) }}
 
   {{ stats([('Nodes', nodes|length),
             ('Active players', players|length),

@@ -11,6 +11,7 @@ import discord
 from redbot.core import bank, commands
 from redbot.core.errors import BalanceTooHigh  # noqa: F401
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -862,7 +863,7 @@ class ControllerDashboard:
     # ---------- settings page ----------
 
     @dashboard_page(
-        name="settings",
+        name="player-settings",
         description="Buttons, icons and what each action costs.",
         methods=("GET", "POST"),
     )
@@ -890,6 +891,7 @@ class ControllerDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": SETTINGS_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "button_rows": self._dash_button_rows(settings),
@@ -2985,18 +2987,7 @@ SETTINGS_TEMPLATE = (
       {% else %}No controller has been posted yet.{% endif %}
     </p>
   </div>
-<div class="dz-subnav">
-  <a class="dz-subnav-item"
-     href="{{ url_for('third_parties_blueprint.third_party', name=name,
-                        page=none, guild_id=guild.id if guild else none) }}">
-    <i class="fa fa-play-circle"></i> Player
-  </a>
-  <a class="dz-subnav-item active"
-     href="{{ url_for('third_parties_blueprint.third_party', name=name,
-                        page='settings', guild_id=guild.id if guild else none) }}">
-    <i class="fa fa-sliders"></i> Settings
-  </a>
-</div>
+  {{ subnav(name, audio_pages, 'player-settings', guild) }}
 
 
   <form method="POST">

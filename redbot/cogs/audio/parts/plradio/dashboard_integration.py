@@ -6,6 +6,7 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -57,6 +58,7 @@ class RadioDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": PLRADIO_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "available": browser is not None,
@@ -187,6 +189,8 @@ PLRADIO_TEMPLATE = (
       {% if connected %} Player connected to {{ channel }}.{% endif %}
     </p>
   </div>
+
+  {{ subnav(name, audio_pages, 'radio', guild) }}
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />

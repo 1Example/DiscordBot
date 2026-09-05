@@ -6,6 +6,7 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -55,6 +56,7 @@ class LyricsDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": PLLYRICS_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "supported": node is not None,
@@ -182,6 +184,8 @@ PLLYRICS_TEMPLATE = (
         Lavalink node with the <code>lavalyrics</code> plugin enabled.{% endif %}
     </p>
   </div>
+
+  {{ subnav(name, audio_pages, 'lyrics', guild) }}
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />

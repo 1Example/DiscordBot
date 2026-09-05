@@ -6,8 +6,10 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    MACROS,
     dashboard_page,
     form_reader,
     guild_member,
@@ -49,6 +51,7 @@ class PlaylistsDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": PLAYLISTS_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "is_staff": staff,
@@ -190,12 +193,15 @@ class PlaylistsDashboard:
 
 PLAYLISTS_TEMPLATE = (
     BASE_CSS
+    + MACROS
     + """
 <div class="dz">
   <div class="dz-head">
     <h4><i class="fa fa-list-ul"></i> Playlists for {{ guild_name }}</h4>
     <p>Queue a saved playlist, or open one to see what is in it.</p>
   </div>
+
+  {{ subnav(name, audio_pages, 'playlists', guild) }}
 
   {% if detail %}
     <div class="dz-panel">

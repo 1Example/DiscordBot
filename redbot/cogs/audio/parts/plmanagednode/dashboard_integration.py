@@ -7,6 +7,7 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -140,6 +141,7 @@ class ManagedNodeDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": PLMANAGED_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "enabled": bool(await global_config.fetch_enable_managed_node()),
                 "auto_update": bool(await global_config.fetch_auto_update_managed_nodes()),
@@ -421,6 +423,8 @@ PLMANAGED_TEMPLATE = (
     <p>The node the bot runs itself. Almost everything here takes effect after a
        restart.</p>
   </div>
+
+  {{ subnav(name, audio_pages, 'managed-node', guild) }}
 
   {{ stats([('Node', 'enabled' if enabled else 'disabled'),
             ('Auto update', 'on' if auto_update else 'off'),

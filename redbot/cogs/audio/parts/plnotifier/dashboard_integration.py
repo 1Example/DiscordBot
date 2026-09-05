@@ -6,6 +6,7 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     MACROS,
@@ -157,6 +158,7 @@ class NotifierDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": PLNOTIFIER_TEMPLATE,
+                "audio_pages": audio_pages(await self.bot.is_owner(user)),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "groups": grouped,
@@ -339,6 +341,8 @@ PLNOTIFIER_TEMPLATE = (
                {% else %}kept indefinitely{% endif %}
     </p>
   </div>
+
+  {{ subnav(name, audio_pages, 'notifications', guild) }}
 
   <div class="dz-panel">
     <h5><i class="fa fa-eye"></i> What they look like</h5>
