@@ -13,14 +13,6 @@ import yaml
 _: Translator = Translator("Tickets", __file__)
 
 
-class ProfileConverter(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> str:
-        profiles = await ctx.cog.config.guild(ctx.guild).profiles()
-        if argument not in profiles:
-            raise commands.BadArgument(_("This profile doesn't exist."))
-        return argument
-
-
 class ForumTagConverter(commands.Converter):
     async def convert(self, ctx: commands.Context, argument: str) -> int:
         cog = ctx.bot.get_cog("Tickets")
@@ -98,18 +90,6 @@ class Emoji(commands.EmojiConverter):
         }:
             return argument
         return await super().convert(ctx, argument=argument)
-
-
-class MyMessageConverter(commands.MessageConverter):
-    async def convert(self, ctx: commands.Context, argument: str) -> discord.Message:
-        message = await super().convert(ctx, argument=argument)
-        if message.author != ctx.me:
-            raise commands.UserFeedbackCheckFailure(
-                _(
-                    "I have to be the author of the message. You can use EmbedUtils by AAA3A to send one.",
-                ),
-            )
-        return message
 
 
 class ModalConverter(commands.Converter):

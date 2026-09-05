@@ -4,19 +4,14 @@ import typing
 
 import discord
 
-from AAA3A_utils import Cog, CogsUtils, Loop, Menu, Settings
-from redbot.core import Config, commands, modlog
+from AAA3A_utils import Cog, Loop, Menu, Settings
+from redbot.core import Config, app_commands, commands, modlog
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import humanize_list, pagify
 
-from .converters import (
-    Emoji,
-    ForumTagConverter,
-    ModalConverter,
-    MyMessageConverter,
-    ProfileConverter,
-)
+from .converters import Emoji, ForumTagConverter, ModalConverter
 from .dashboard_integration import DashboardIntegration
 from .types import Ticket, get_non_animated_asset
 from .views import (
@@ -34,32 +29,65 @@ _: Translator = Translator("Tickets", __file__)
 DANK_MEMER_BOT_ID: int = 270904126974590976
 
 
-class TicketConverter(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> Ticket:
-        cog = ctx.bot.get_cog("Tickets")
-        try:
-            arg = int(argument)
-        except ValueError:
-            ticket = None
-        else:
-            ticket = discord.utils.get(
-                cog.tickets.get(ctx.guild.id, {}).values(),
-                channel_id=arg,
-            ) or discord.utils.get(cog.tickets.get(ctx.guild.id, {}).values(), message_id=arg)
-        if ticket is None:
-            try:
-                ticket = cog.tickets[ctx.guild.id][int(argument.removeprefix("#"))]
-            except (ValueError, KeyError):
-                raise commands.BadArgument(_("Event not found."))
-        if (
-            not ticket.channel.permissions_for(ctx.author).view_channel
-            and ctx.author.id not in ctx.bot.owner_ids
-        ):
-            raise commands.UserFeedbackCheckFailure(
-                _("You don't have permission to view the channel of this ticket."),
-            )
-        return ticket
+def support_predicate(ignore_owner: bool = False):
+    """May this person act on the ticket in this channel?
 
+    Takes a Context or an Interaction, since the same rule guards the
+    application commands and the buttons on a ticket.
+    """
+
+    async def predicate(ctx: commands.Context | discord.Interaction) -> bool:
+        bot = ctx.client if isinstance(ctx, discord.Interaction) else ctx.bot
+        author = ctx.user if isinstance(ctx, discord.Interaction) else ctx.author
+        if (
+            not ctx.channel.permissions_for(author).view_channel
+            or not ctx.channel.permissions_for(ctx.guild.me).send_messages
+        ) and author.id not in bot.owner_ids:
+            return False
+        cog = bot.get_cog("Tickets")
+        if (
+            ticket := (ctx.data if isinstance(ctx, discord.Interaction) else ctx.kwargs).get(
+                "ticket",
+            )
+        ) is not None or (
+            ticket := discord.utils.get(
+                cog.tickets.get(ctx.guild.id, {}).values(),
+                channel=ctx.channel,
+            )
+        ) is not None:
+            profile = ticket.profile
+        else:
+            profile = "main"
+        return (
+            (ticket is not None and ticket.owner == author and not ignore_owner)
+            or await bot.is_admin(author)
+            or author.guild_permissions.manage_guild
+            or any(
+                author.get_role(role_id) is not None
+                for role_id in await cog.config.guild(ctx.guild).profiles.get_raw(
+                    profile,
+                    "support_roles",
+                    default=[],
+                )
+            )
+        )
+
+    return predicate
+
+def support_any_profile_predicate():
+    """As above, but a support role on any profile is enough."""
+
+    async def predicate(ctx: commands.Context | discord.Interaction) -> bool:
+        bot = ctx.client if isinstance(ctx, discord.Interaction) else ctx.bot
+        author = ctx.user if isinstance(ctx, discord.Interaction) else ctx.author
+        cog = bot.get_cog("Tickets")
+        return await cog.support_predicate.__func__()(ctx) or any(
+            author.get_role(role_id) is not None
+            for data in (await cog.config.guild(ctx.guild).profiles()).values()
+            for role_id in data["support_roles"]
+        )
+
+    return predicate
 
 @cog_i18n(_)
 class Tickets(DashboardIntegration, Cog):
@@ -540,56 +568,15 @@ class Tickets(DashboardIntegration, Cog):
         await ticket.close(message.interaction_metadata.user)
 
     def is_support(ignore_owner: bool = False):  # noqa: N805
-        async def predicate(ctx: commands.Context | discord.Interaction) -> bool:
-            bot = ctx.client if isinstance(ctx, discord.Interaction) else ctx.bot
-            author = ctx.user if isinstance(ctx, discord.Interaction) else ctx.author
-            if (
-                not ctx.channel.permissions_for(author).view_channel
-                or not ctx.channel.permissions_for(ctx.guild.me).send_messages
-            ) and author.id not in bot.owner_ids:
-                return False
-            cog = bot.get_cog("Tickets")
-            if (
-                ticket := (ctx.data if isinstance(ctx, discord.Interaction) else ctx.kwargs).get(
-                    "ticket",
-                )
-            ) is not None or (
-                ticket := discord.utils.get(
-                    cog.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            ) is not None:
-                profile = ticket.profile
-            else:
-                profile = "main"
-            return (
-                (ticket is not None and ticket.owner == author and not ignore_owner)
-                or await bot.is_admin(author)
-                or author.guild_permissions.manage_guild
-                or any(
-                    author.get_role(role_id) is not None
-                    for role_id in await cog.config.guild(ctx.guild).profiles.get_raw(
-                        profile,
-                        "support_roles",
-                        default=[],
-                    )
-                )
-            )
+        """Text-command flavour. `types.py` reads `.predicate` off this."""
+        return commands.check(support_predicate(ignore_owner))
 
-        return commands.check(predicate)
+    def is_support_app(ignore_owner: bool = False):  # noqa: N805
+        """Application-command flavour of the same rule."""
+        return app_commands.check(support_predicate(ignore_owner))
 
-    def is_support_any_profile():
-        async def predicate(ctx: commands.Context | discord.Interaction) -> bool:
-            bot = ctx.client if isinstance(ctx, discord.Interaction) else ctx.bot
-            author = ctx.user if isinstance(ctx, discord.Interaction) else ctx.author
-            cog = bot.get_cog("Tickets")
-            return await cog.is_support.__func__().predicate(ctx) or any(
-                author.get_role(role_id) is not None
-                for data in (await cog.config.guild(ctx.guild).profiles()).values()
-                for role_id in data["support_roles"]
-            )
-
-        return commands.check(predicate)
+    def is_support_any_profile_app():
+        return app_commands.check(support_any_profile_predicate())
 
     async def send_ticket_log(self, ticket: Ticket) -> None:
         if (
@@ -763,41 +750,137 @@ class Tickets(DashboardIntegration, Cog):
             )
         return ticket
 
-    @commands.guild_only()
-    @commands.hybrid_group(aliases=["tickets"])
-    async def ticket(self, ctx: commands.Context) -> None:
-        """Create, manage and list tickets."""
-        pass
+    # ---------------------------------------------------------------------
+    # /ticket
+    # ---------------------------------------------------------------------
 
-    @ticket.command(aliases=["+"])
+    ticket = app_commands.Group(
+        name="ticket",
+        description="Open a support ticket, and manage the ones you can see.",
+        guild_only=True,
+        extras={"red_force_enable": True},
+    )
+
+    async def _profile_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> typing.List[app_commands.Choice]:
+        profiles = await self.config.guild(interaction.guild).profiles()
+        return [
+            app_commands.Choice(name=name, value=name)
+            for name in sorted(profiles)
+            if current.lower() in name.lower()
+        ][:25]
+
+    async def _ticket_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> typing.List[app_commands.Choice]:
+        """Tickets this person can see, newest first."""
+        choices = []
+        for number, ticket in sorted(
+            (self.tickets.get(interaction.guild.id) or {}).items(), reverse=True
+        ):
+            channel = ticket.channel
+            if channel is not None and not channel.permissions_for(
+                interaction.user
+            ).view_channel:
+                continue
+            owner = ticket.owner
+            label = f"#{number} - {getattr(owner, 'display_name', 'unknown')}"
+            if ticket.is_closed:
+                label += " (closed)"
+            if current and current.lstrip("#").lower() not in label.lower():
+                continue
+            choices.append(app_commands.Choice(name=label[:100], value=number))
+            if len(choices) == 25:
+                break
+        return choices
+
+    async def _resolve_profile(self, guild: discord.Guild, name: typing.Optional[str]) -> str:
+        """A profile name, checked the way the text converter used to."""
+        name = (name or "main").strip()
+        profiles = await self.config.guild(guild).profiles()
+        if name not in profiles:
+            raise commands.UserFeedbackCheckFailure(_("This profile doesn't exist."))
+        return name
+
+    async def _resolve_ticket(
+        self, interaction: discord.Interaction, number: typing.Optional[int]
+    ) -> Ticket:
+        """A ticket by number, or the one this channel belongs to.
+
+        The text converter also took a channel or message ID; the autocomplete
+        offers numbers, and leaving it empty picks up the current channel,
+        which is how these were used in practice.
+        """
+        guild_tickets = self.tickets.get(interaction.guild.id, {})
+        if number is None:
+            ticket = discord.utils.get(guild_tickets.values(), channel=interaction.channel)
+        else:
+            ticket = guild_tickets.get(number) or discord.utils.get(
+                guild_tickets.values(), channel_id=number
+            ) or discord.utils.get(guild_tickets.values(), message_id=number)
+        if ticket is None:
+            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+        if (
+            ticket.channel is not None
+            and not ticket.channel.permissions_for(interaction.user).view_channel
+            and interaction.user.id not in self.bot.owner_ids
+        ):
+            raise commands.UserFeedbackCheckFailure(
+                _("You don't have permission to view the channel of this ticket."),
+            )
+        return ticket
+
+    @ticket.command(name="create", description="Open a ticket.")
+    @app_commands.describe(
+        profile="Which kind of ticket. Defaults to the main one.",
+        reason="What it is about.",
+    )
+    @app_commands.autocomplete(profile=_profile_autocomplete)
     async def create(
         self,
-        ctx: commands.Context,
-        profile: ProfileConverter | None = "main",
-        *,
-        reason: commands.Range[str, 1, 1000] = None,
+        interaction: discord.Interaction,
+        profile: str = "main",
+        reason: app_commands.Range[str, 1, 1000] = None,
     ) -> None:
-        """Create a ticket."""
+        """Open a ticket."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        profile = await self._resolve_profile(interaction.guild, profile)
         await self.create_ticket(ctx, profile, ctx.author, reason=reason)
 
-    @commands.admin_or_permissions(manage_guild=True)
-    @ticket.command()
+    @ticket.command(name="createfor", description="Open a ticket on someone's behalf.")
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_commands.describe(
+        owner="Who the ticket is for.",
+        profile="Which kind of ticket. Defaults to the main one.",
+        reason="What it is about.",
+    )
+    @app_commands.autocomplete(profile=_profile_autocomplete)
     async def createfor(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         owner: discord.Member,
-        profile: ProfileConverter | None = "main",
-        *,
-        reason: commands.Range[str, 1, 1000] = None,
+        profile: str = "main",
+        reason: app_commands.Range[str, 1, 1000] = None,
     ) -> None:
-        """Create a ticket for a member."""
+        """Open a ticket on someone's behalf."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        profile = await self._resolve_profile(interaction.guild, profile)
         await self.create_ticket(ctx, profile, owner, reason=reason)
 
-    @commands.bot_has_permissions(embed_links=True)
-    @is_support(ignore_owner=True)
-    @ticket.command()
-    async def settings(self, ctx: commands.Context, profile: str = None) -> None:
-        """Show Tickets settings."""
+    @ticket.command(name="settings", description="Show how a ticket profile is set up.")
+    @app_checks.bot_has_permissions(embed_links=True)
+    @is_support_app(ignore_owner=True)
+    @app_commands.describe(profile="Which profile. Leave empty to list them all.")
+    @app_commands.autocomplete(profile=_profile_autocomplete)
+    async def settings(
+        self, interaction: discord.Interaction, profile: str = None
+    ) -> None:
+        """Show how a ticket profile is set up."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         profiles = await self.config.guild(ctx.guild).profiles()
         if profile is None:
             embed: discord.Embed = discord.Embed(
@@ -975,32 +1058,34 @@ class Tickets(DashboardIntegration, Cog):
         )
         await Menu(pages=[{"embeds": embeds}]).start(ctx)
 
-    @is_support_any_profile()
-    @ticket.command(aliases=["infos"])
+    @ticket.command(name="show", description="Show a ticket's details.")
+    @is_support_any_profile_app()
+    @app_commands.describe(
+        ticket="Which ticket. Defaults to the one this channel belongs to."
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def show(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
+        interaction: discord.Interaction,
+        ticket: typing.Optional[int] = None,
     ) -> None:
-        """Show a ticket."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+        """Show a ticket's details."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         await ctx.send(embed=await ticket.get_embed(for_logging=True))
 
-    @is_support_any_profile()
-    @ticket.command()
+    @ticket.command(name="list", description="List this server's tickets.")
+    @is_support_any_profile_app()
+    @app_commands.describe(
+        short="One line per ticket instead of a full card.",
+        claimed="Only tickets you have claimed.",
+        status="Which tickets to include.",
+        owner="Only tickets opened by this member.",
+    )
     async def list(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         short: bool = False,
         claimed: bool = False,
         status: typing.Literal[
@@ -1011,10 +1096,11 @@ class Tickets(DashboardIntegration, Cog):
             "closed",
             "appeal_approved",
         ] = "open",
-        *,
-        owner: discord.Member | None = None,
+        owner: typing.Optional[discord.Member] = None,
     ) -> None:
-        """List tickets."""
+        """List this server's tickets."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
         if not (tickets := self.tickets.get(ctx.guild.id)):
             raise commands.UserFeedbackCheckFailure(_("No ticket found."))
         tickets_to_display = []
@@ -1071,183 +1157,144 @@ class Tickets(DashboardIntegration, Cog):
                 embeds.append(e)
         await Menu(pages=embeds, page_start=-1).start(ctx)
 
-    @is_support()
-    @ticket.command()
+    @ticket.command(name="close", description="Close a ticket.")
+    @is_support_app()
+    @app_commands.describe(
+        ticket="Which ticket. Defaults to the one this channel belongs to."
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def close(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
+        interaction: discord.Interaction,
+        ticket: typing.Optional[int] = None,
     ) -> None:
         """Close a ticket."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         try:
             await ticket.close(ctx.author)
         except RuntimeError as e:
             raise commands.UserFeedbackCheckFailure(str(e))
 
-    @is_support()
-    @ticket.command(aliases=["open"])
+    @ticket.command(name="reopen", description="Reopen a closed ticket.")
+    @is_support_app()
+    @app_commands.describe(
+        ticket="Which ticket. Defaults to the one this channel belongs to."
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def reopen(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
+        interaction: discord.Interaction,
+        ticket: typing.Optional[int] = None,
     ) -> None:
-        """Reopen a ticket."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+        """Reopen a closed ticket."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         try:
             await ticket.reopen(ctx.author)
         except RuntimeError as e:
             raise commands.UserFeedbackCheckFailure(str(e))
 
-    @is_support(ignore_owner=True)
-    @ticket.command()
+    @ticket.command(name="claim", description="Claim a ticket as yours to handle.")
+    @is_support_app(ignore_owner=True)
+    @app_commands.describe(
+        ticket="Which ticket. Defaults to the one this channel belongs to."
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def claim(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
+        interaction: discord.Interaction,
+        ticket: typing.Optional[int] = None,
     ) -> None:
-        """Claim a ticket."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+        """Claim a ticket as yours to handle."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         try:
             await ticket.claim(ctx.author)
         except RuntimeError as e:
             raise commands.UserFeedbackCheckFailure(str(e))
 
-    @is_support(ignore_owner=True)
-    @ticket.command()
+    @ticket.command(name="unclaim", description="Give up a ticket you claimed.")
+    @is_support_app(ignore_owner=True)
+    @app_commands.describe(
+        ticket="Which ticket. Defaults to the one this channel belongs to."
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def unclaim(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
+        interaction: discord.Interaction,
+        ticket: typing.Optional[int] = None,
     ) -> None:
-        """Unclaim a ticket."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+        """Give up a ticket you claimed."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         try:
             await ticket.unclaim()
         except RuntimeError as e:
             raise commands.UserFeedbackCheckFailure(str(e))
 
-    @is_support(ignore_owner=True)
-    async def lock(
-        self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
-    ) -> None:
-        """Lock a ticket."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
-        try:
-            await ticket.lock(ctx.author)
-        except RuntimeError as e:
-            raise commands.UserFeedbackCheckFailure(str(e))
 
-    @is_support(ignore_owner=True)
-    @ticket.command()
+    @ticket.command(name="unlock", description="Unlock a locked ticket.")
+    @is_support_app(ignore_owner=True)
+    @app_commands.describe(
+        ticket="Which ticket. Defaults to the one this channel belongs to."
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def unlock(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
+        interaction: discord.Interaction,
+        ticket: typing.Optional[int] = None,
     ) -> None:
-        """Unlock a ticket."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+        """Unlock a locked ticket."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         try:
             await ticket.unlock(ctx.author)
         except RuntimeError as e:
             raise commands.UserFeedbackCheckFailure(str(e))
 
-    @is_support(ignore_owner=True)
-    @ticket.command()
+    @ticket.command(name="approveappeal", description="Approve a ban appeal and lift the ban.")
+    @is_support_app(ignore_owner=True)
+    @app_commands.describe(
+        ticket="Which ticket. Defaults to the one this channel belongs to."
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def approveappeal(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
+        interaction: discord.Interaction,
+        ticket: typing.Optional[int] = None,
     ) -> None:
-        """Approve an appeal."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+        """Approve a ban appeal and lift the ban."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         try:
             await ticket.approve_appeal(ctx.author)
         except RuntimeError as e:
             raise commands.UserFeedbackCheckFailure(str(e))
 
-    @is_support()
-    @ticket.command(aliases=["add"])
+    @ticket.command(name="addmember", description="Give a member access to a ticket.")
+    @is_support_app()
+    @app_commands.describe(
+        member="Who to add.",
+        ticket="Which ticket. Defaults to the one this channel belongs to.",
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def addmember(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
-        *,
+        interaction: discord.Interaction,
         member: discord.Member,
+        ticket: typing.Optional[int] = None,
     ) -> None:
-        """Add a member to a ticket."""
+        """Give a member access to a ticket."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         if (
             ticket is None
             and (
@@ -1264,16 +1311,23 @@ class Tickets(DashboardIntegration, Cog):
         except RuntimeError as e:
             raise commands.UserFeedbackCheckFailure(str(e))
 
-    @is_support()
-    @ticket.command(aliases=["remove"])
+    @ticket.command(name="removemember", description="Take a member off a ticket.")
+    @is_support_app()
+    @app_commands.describe(
+        member="Who to remove.",
+        ticket="Which ticket. Defaults to the one this channel belongs to.",
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def removemember(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
-        *,
+        interaction: discord.Interaction,
         member: discord.Member,
+        ticket: typing.Optional[int] = None,
     ) -> None:
-        """Remove a member from a ticket."""
+        """Take a member off a ticket."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         if (
             ticket is None
             and (
@@ -1290,25 +1344,21 @@ class Tickets(DashboardIntegration, Cog):
         except RuntimeError as e:
             raise commands.UserFeedbackCheckFailure(str(e))
 
-    @is_support()
-    @ticket.command(aliases=["transcript"])
+    @ticket.command(name="export", description="Export a ticket's transcript.")
+    @is_support_app()
+    @app_commands.describe(
+        ticket="Which ticket. Defaults to the one this channel belongs to."
+    )
+    @app_commands.autocomplete(ticket=_ticket_autocomplete)
     async def export(
         self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
+        interaction: discord.Interaction,
+        ticket: typing.Optional[int] = None,
     ) -> None:
-        """Export a ticket."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+        """Export a ticket's transcript."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        ticket = await self._resolve_ticket(interaction, ticket)
         transcript = await ticket.export()
         message = await ctx.send(
             _("📜 Here is the transcript of this ticket!"),
@@ -1324,44 +1374,31 @@ class Tickets(DashboardIntegration, Cog):
         )
         await message.edit(view=view)
 
-    @is_support(ignore_owner=True)
-    async def delete(
-        self,
-        ctx: commands.Context,
-        ticket: TicketConverter | None = None,
-    ) -> None:
-        """Delete a ticket."""
-        if (
-            ticket is None
-            and (
-                ticket := discord.utils.get(
-                    self.tickets.get(ctx.guild.id, {}).values(),
-                    channel=ctx.channel,
-                )
-            )
-            is None
-        ):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
-        await ticket.delete_channel(ctx.author)
 
-    @commands.admin_or_permissions(manage_guild=True)
-    @ticket.command()
+    @ticket.command(
+        name="recover",
+        description="Rebuild a ticket I lost track of, from its channel.",
+    )
+    @app_checks.admin_or_permissions(manage_guild=True)
+    @app_commands.describe(channel="The ticket channel. Defaults to this one.")
     async def recover(
         self,
-        ctx: commands.Context,
-        *,
-        channel: discord.TextChannel | discord.Thread = commands.CurrentChannel,
+        interaction: discord.Interaction,
+        channel: typing.Union[discord.TextChannel, discord.Thread] = None,
     ) -> None:
-        """Recover a ticket from a channel."""
+        """Rebuild a ticket I lost track of, from its channel."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        channel = channel or interaction.channel
         if (
             discord.utils.get(
                 self.tickets.get(ctx.guild.id, {}).values(),
-                channel=ctx.channel,
+                channel=channel,
             )
             is not None
         ):
             raise commands.UserFeedbackCheckFailure(
-                _("This channel is already linked to a ticket."),
+                _("That channel is already linked to a ticket."),
             )
         if (
             first_message := await anext(
@@ -1440,300 +1477,4 @@ class Tickets(DashboardIntegration, Cog):
             pass
         await ticket.save()
 
-    @commands.guild_only()
-    @commands.admin_or_permissions(manage_guild=True)
-    @commands.hybrid_group()
-    async def settickets(self, ctx: commands.Context) -> None:
-        """Commands to configure Tickets."""
-        pass
 
-    @commands.bot_has_permissions(embed_links=True)
-    @settickets.command()
-    async def setup(self, ctx: commands.Context) -> None:
-        """Help to setup Tickets."""
-        embeds = []
-        embeds.append(
-            discord.Embed(
-                title=_("Getting Started (Required Steps):"),
-                description=_(
-                    "**1.** Enable the profile system with `{ctx.prefix}settickets enabled <profile> True`.\n"
-                    "**2.** Set the support roles with `{ctx.prefix}settickets supportroles <profile> <roles...>`.\n"
-                    "**3.** Set the forum channel/text channel with `{ctx.prefix}settickets forumchannel <profile> <channel>`.\n"
-                    "   **Or** set the open and closed (optional) categories with `{ctx.prefix}settickets categoryopen <profile> <category>` and `{ctx.prefix}settickets categoryclosed <profile> <category>`.\n"
-                    "**4.** Eventually, set the ping roles with `{ctx.prefix}settickets pingroles <profile> <roles...>`.\n"
-                    "**5.** Eventually, set the logs channel with `{ctx.prefix}settickets logschannel <profile> <channel>`.\n"
-                    "**6.** Eventually, set the whitelist or blacklist roles with `{ctx.prefix}settickets whitelistroles <profile> <roles...>` and `{ctx.prefix}settickets blacklistroles <profile> <roles...>`.\n"
-                    "**7.** Eventually, set the forum tags with `{ctx.prefix}settickets forumtags <profile> <tags...>`.\n"
-                    "**8.** Eventually, set the custom message with `{ctx.prefix}settickets custommessage <profile> <message>`.\n"
-                    "**9.** Eventually, set a creating modal with `{ctx.prefix}settickets creatingmodal <profile> <modal>`.",
-                ).format(ctx=ctx),
-                color=await ctx.embed_color(),
-            ),
-        )
-        embeds.append(
-            discord.Embed(
-                title=_(
-                    "Look at all the different settings with `{ctx.prefix}tickets settings`.",
-                ).format(ctx=ctx),
-                color=await ctx.embed_color(),
-            ),
-        )
-        embeds.append(
-            discord.Embed(
-                title=_("Buttons & Dropdowns:"),
-                description=_(
-                    "You can add buttons and dropdowns to messages to create tickets.\n"
-                    "- Use `{ctx.clean_prefix}settickets addbutton <message> [profile=main] [emoji] [style=secondary] <label>` to add a button to a message.\n"
-                    "- Use `{ctx.clean_prefix}settickets adddropdownoption <message> [profile=main] [emoji] <label> [description]` to add an option to a dropdown.\n"
-                    "- Use `{ctx.clean_prefix}settickets clearmessage <message>` to remove them.",
-                ).format(ctx=ctx),
-                color=await ctx.embed_color(),
-            ),
-        )
-        await Menu(pages=[{"embeds": embeds}]).start(ctx)
-
-    @settickets.command()
-    async def addbutton(
-        self,
-        ctx: commands.Context,
-        message: MyMessageConverter,
-        profile: ProfileConverter | None,
-        emoji: Emoji | None,
-        style: typing.Literal["1", "2", "3", "4"] | None = "2",
-        *,
-        label: commands.Range[str, 1, 100] | None = None,
-    ) -> None:
-        """Add a button to a message.
-
-        (Use the number for the color.)
-        • `primary`: 1
-        • `secondary`: 2
-        • `success`: 3
-        • `danger`: 4
-        # Aliases
-        • `blurple`: 1
-        • `grey`: 2
-        • `gray`: 2
-        • `green`: 3
-        • `red`: 4
-        """
-        profile = profile or "main"
-        if emoji is None and label is None:
-            raise commands.UserFeedbackCheckFailure(
-                _("You have to specify at least an emoji or a label."),
-            )
-        buttons_dropdowns = await self.config.guild(ctx.guild).buttons_dropdowns()
-        if f"{message.channel.id}-{message.id}" not in buttons_dropdowns:
-            if message.components:
-                raise commands.UserFeedbackCheckFailure(_("This message already has components."))
-            components = buttons_dropdowns[f"{message.channel.id}-{message.id}"] = {
-                "buttons": {},
-                "dropdown_options": {},
-            }
-        else:
-            components = buttons_dropdowns[f"{message.channel.id}-{message.id}"]
-        if len(components["buttons"]) >= 20:
-            raise commands.UserFeedbackCheckFailure(
-                _("You can't add more than 20 buttons for one message."),
-            )
-        config_identifier = CogsUtils.generate_key(length=5, existing_keys=components["buttons"])
-        components["buttons"][config_identifier] = {
-            "emoji": f"{getattr(emoji, 'id', emoji)}" if emoji is not None else None,
-            "label": label,
-            "style": int(style),
-            "profile": profile,
-        }
-        if message in self.views:
-            self.views.pop(message).stop()
-        view: CreateTicketView = CreateTicketView(
-            cog=self,
-            components=components,
-        )
-        message = await message.edit(view=view)
-        self.views[message] = view
-        await self.config.guild(ctx.guild).buttons_dropdowns.set(buttons_dropdowns)
-
-    @settickets.command()
-    async def adddropdownoption(
-        self,
-        ctx: commands.Context,
-        message: MyMessageConverter,
-        profile: ProfileConverter | None,
-        emoji: Emoji | None,
-        label: commands.Range[str, 1, 100],
-        description: commands.Range[str, 1, 100] = None,
-    ) -> None:
-        """Add an option to the dropdown of a message."""
-        profile = profile or "main"
-        buttons_dropdowns = await self.config.guild(ctx.guild).buttons_dropdowns()
-        if f"{message.channel.id}-{message.id}" not in buttons_dropdowns:
-            if message.components:
-                raise commands.UserFeedbackCheckFailure(_("This message already has components."))
-            components = buttons_dropdowns[f"{message.channel.id}-{message.id}"] = {
-                "buttons": {},
-                "dropdown_options": {},
-            }
-        else:
-            components = buttons_dropdowns[f"{message.channel.id}-{message.id}"]
-        if len(components["dropdown_options"]) >= 25:
-            raise commands.UserFeedbackCheckFailure(
-                _("I can't add more than 25 options for one dropdown."),
-            )
-        config_identifier = CogsUtils.generate_key(
-            length=5,
-            existing_keys=components["dropdown_options"],
-        )
-        components["dropdown_options"][config_identifier] = {
-            "emoji": f"{getattr(emoji, 'id', emoji)}" if emoji is not None else None,
-            "label": label,
-            "description": description,
-            "profile": profile,
-        }
-        if message in self.views:
-            self.views.pop(message).stop()
-        view: CreateTicketView = CreateTicketView(
-            cog=self,
-            components=components,
-        )
-        message = await message.edit(view=view)
-        self.views[message] = view
-        await self.config.guild(ctx.guild).buttons_dropdowns.set(buttons_dropdowns)
-
-    @settickets.command()
-    async def clearmessage(self, ctx: commands.Context, message: MyMessageConverter) -> None:
-        """Clear the components of a message."""
-        buttons_dropdowns = await self.config.guild(ctx.guild).buttons_dropdowns()
-        if f"{message.channel.id}-{message.id}" not in buttons_dropdowns:
-            raise commands.UserFeedbackCheckFailure(
-                _("This message doesn't have components added with Tickets."),
-            )
-        buttons_dropdowns.pop(f"{message.channel.id}-{message.id}")
-        if message in self.views:
-            self.views.pop(message).stop()
-        await message.edit(view=None)
-        await self.config.guild(ctx.guild).buttons_dropdowns.set(buttons_dropdowns)
-
-    @settickets.command(with_app_command=False)
-    async def configureappeals(
-        self,
-        ctx: commands.Context,
-        profile: ProfileConverter | None,
-        guild_id: int,
-        invite_code: str,
-        moderator_role: discord.Role | None = None,
-        category_open: discord.CategoryChannel | None = None,
-        category_closed: discord.CategoryChannel | None = None,
-        logs_channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | None = None,
-        button_channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | None = None,
-    ) -> None:
-        """Configure the appeal feature."""
-        profile = profile or "main"
-        if (guild := self.bot.get_guild(guild_id)) is None:
-            raise commands.UserFeedbackCheckFailure(
-                _("This guild doesn't exist or the bot isn't in it."),
-            )
-        if guild.id == ctx.guild.id:
-            raise commands.UserFeedbackCheckFailure(
-                _("You can't configure appeal tickets for the same guild."),
-            )
-        if (member := guild.get_member(ctx.author.id)) is None:
-            raise commands.UserFeedbackCheckFailure(
-                _("You must be in the guild to configure the appeal feature."),
-            )
-        if not member.guild_permissions.manage_guild or not member.guild_permissions.ban_members:
-            raise commands.UserFeedbackCheckFailure(
-                _(
-                    "You must have the `Manage Server` and `Ban Members` permissions in the guild to configure the appeal feature.",
-                ),
-            )
-        if not guild.me.guild_permissions.ban_members:
-            raise commands.UserFeedbackCheckFailure(
-                _("I need the `Ban Members` permission in the guild to unban users."),
-            )
-        if (
-            invite := await self.bot.fetch_invite(
-                invite_code.removeprefix("https://").removeprefix("discord.gg/"),
-            )
-        ) is None:
-            raise commands.UserFeedbackCheckFailure(_("This invite doesn't exist."))
-        if invite.guild.id != guild.id:
-            raise commands.UserFeedbackCheckFailure(_("This invite doesn't belong to the guild."))
-        config = await self.config.guild(ctx.guild).profiles.get_raw(profile)
-        config["enabled"] = True
-        config["max_open_tickets_by_member"] = 1
-        config["creating_modal"] = [
-            {
-                "label": "Why were you banned?",
-                "style": 2,
-                "required": True,
-                "default": "",
-                "placeholder": "",
-                "min_length": None,
-                "max_length": None,
-            },
-            {
-                "label": "Why should we unban you?",
-                "style": 2,
-                "required": True,
-                "default": "",
-                "placeholder": "",
-                "min_length": None,
-                "max_length": None,
-            },
-            {
-                "label": "How can you guarantee it won't happen again?",
-                "style": 2,
-                "required": True,
-                "default": "",
-                "placeholder": "",
-                "min_length": None,
-                "max_length": None,
-            },
-        ]
-        if moderator_role is not None:
-            if moderator_role.id not in config["support_roles"]:
-                config["support_roles"].append(moderator_role.id)
-            if moderator_role.id not in config["ping_roles"]:
-                config["ping_roles"].append(moderator_role.id)
-        if category_open is not None:
-            config["category_open"] = category_open.id
-            category_closed = category_closed or category_open
-            config["category_closed"] = category_closed.id
-        config["owner_close_confirmation"] = False
-        config["owner_can_reopen"] = False
-        config["close_on_leave"] = True
-        config["transcripts"] = True
-        if logs_channel is not None:
-            config["logs_channel"] = logs_channel.id
-        config["appeals"] = {
-            "enabled": True,
-            "guild_id": guild.id,
-            "invite_code": invite.code,
-        }
-        await self.config.guild(ctx.guild).profiles.set_raw(profile, value=config)
-        if button_channel is not None:
-            embed: discord.Embed = discord.Embed(
-                title=_("Appeal Ticket"),
-                description=_(
-                    "Click the button below to create an appeal ticket. If our team accepts your appeal, you will be unbanned from the server.",
-                ),
-                color=discord.Color.red(),
-            )
-            embed.set_footer(text=guild.name, icon_url=get_non_animated_asset(guild.icon))
-            message = await button_channel.send(embed=embed)
-            await self.addbutton(
-                ctx,
-                message=message,
-                profile=profile,
-                emoji="🛡️",
-                style="4",
-                label=_("Appeal"),
-            )
-
-    @commands.is_owner()
-    @commands.bot_has_permissions(embed_links=True)
-    @settickets.command(hidden=True)
-    async def getdebugloopstatus(self, ctx: commands.Context) -> None:
-        """Get an embed for check loop status."""
-        embeds = [loop.get_debug_embed() for loop in self.loops]
-        await Menu(pages=embeds).start(ctx)

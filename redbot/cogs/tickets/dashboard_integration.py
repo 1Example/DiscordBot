@@ -171,16 +171,28 @@ class DashboardIntegration:
                     "channel": channel.name,
                     "link": f"https://discord.com/channels/{guild.id}/"
                     f"{channel_id}/{message_id}",
+                    # A panel is {"buttons": {...}, "dropdown_options": {...}};
+                    # iterating the outer dict listed those two containers
+                    # rather than the items on them.
                     "items": [
                         {
-                            "label": data.get("label") or data.get("emoji") or "item",
+                            "key": identifier,
+                            "kind": kind,
+                            "label": data.get("label")
+                            or data.get("emoji")
+                            or "(no label)",
+                            "emoji": data.get("emoji") or "",
                             "profile": data.get("profile", "main"),
-                            "kind": "dropdown" if data.get("placeholder") else "button",
+                            "style": self.BUTTON_STYLES.get(
+                                str(data.get("style", "")), ""
+                            ),
+                            "description": data.get("description") or "",
                         }
-                        for data in (
-                            components.values()
+                        for kind in ("buttons", "dropdown_options")
+                        for identifier, data in (
+                            (components.get(kind) or {}).items()
                             if isinstance(components, dict)
-                            else components
+                            else []
                         )
                         if isinstance(data, dict)
                     ],
@@ -207,6 +219,11 @@ class DashboardIntegration:
                 "closed_count": sum(1 for t_ in tickets if t_["closed"]),
                 "claimed_count": sum(1 for t_ in tickets if t_["claimed"]),
                 "panels": panels,
+                "button_styles": [
+                    {"value": value, "label": label}
+                    for value, label in self.BUTTON_STYLES.items()
+                ],
+                "channel_options": channel_options(guild),
                 "member_options": member_options(guild, humans_only=True),
                 "toggles": TOGGLES,
                 "texts": TEXTS,
@@ -350,6 +367,15 @@ class DashboardIntegration:
             if action == "profile_save":
                 return await self._tk_save_profile(guild, field)
 
+            if action == "panel_add_button":
+                return await self._tk_add_panel_item(guild, field, dropdown=False)
+            if action == "panel_add_option":
+                return await self._tk_add_panel_item(guild, field, dropdown=True)
+            if action == "panel_item_remove":
+                return await self._tk_remove_panel_item(guild, field)
+            if action == "appeals_configure":
+                return await self._tk_configure_appeals(member, guild, field)
+
             if action == "panel_remove":
                 key = field("panel_key")
                 async with self.config.guild(guild).buttons_dropdowns() as panels:
@@ -472,6 +498,384 @@ class DashboardIntegration:
             ]
 
         return [{"message": f"Unknown ticket action: {what}", "category": "warning"}]
+
+
+    # ------------------------------------------------------------- panels
+
+    BUTTON_STYLES = {
+        "1": "Blurple",
+        "2": "Grey",
+        "3": "Green",
+        "4": "Red",
+    }
+
+    async def _tk_resolve_message(self, guild: discord.Guild, field):
+        """The message a panel is attached to, from a link or a pair of IDs.
+
+        The commands took a message converter; a link is the equivalent here,
+        since it is what Discord's own "Copy Message Link" puts on the
+        clipboard.
+        """
+        raw = (field("message_link") or "").strip()
+        channel_id = message_id = 0
+        if raw:
+            parts = [p for p in raw.rstrip("/").split("/") if p.isdigit()]
+            if len(parts) >= 3:
+                _guild_id, channel_id, message_id = (int(p) for p in parts[-3:])
+        else:
+            channel_id = field.integer("panel_channel", 0) or 0
+            message_id = field.integer("panel_message", 0) or 0
+        if not channel_id or not message_id:
+            return None, [
+                {
+                    "message": "Paste the message link, or give a channel and message ID.",
+                    "category": "warning",
+                }
+            ]
+
+        channel = guild.get_channel_or_thread(channel_id)
+        if channel is None:
+            return None, [
+                {"message": "That channel is not in this server.", "category": "warning"}
+            ]
+        try:
+            message = await channel.fetch_message(message_id)
+        except discord.NotFound:
+            return None, [{"message": "No such message there.", "category": "warning"}]
+        except discord.Forbidden:
+            return None, [
+                {"message": f"I cannot read #{channel.name}.", "category": "danger"}
+            ]
+        if message.author.id != self.bot.user.id:
+            return None, [
+                {
+                    "message": "The message has to be one I posted - Discord only lets a "
+                    "bot put components on its own messages.",
+                    "category": "warning",
+                }
+            ]
+        return message, None
+
+    async def _tk_panel_write(
+        self,
+        guild: discord.Guild,
+        message: discord.Message,
+        *,
+        profile: str,
+        emoji: str | None = None,
+        label: str | None = None,
+        style: int = 2,
+        description: str | None = None,
+        dropdown: bool = False,
+    ) -> str:
+        """Put one button or dropdown option on a message.
+
+        This is what `[p]settickets addbutton` and `adddropdownoption` did, and
+        the appeal setup uses it for the button it posts.
+
+        Raises
+        ------
+        ValueError
+            With the reason, for anything Discord or the cog will not accept.
+        """
+        from AAA3A_utils import CogsUtils
+
+        from .views import CreateTicketView
+
+        if emoji is None and label is None:
+            raise ValueError("Give the item an emoji, a label, or both.")
+        if label is not None and len(label) > 100:
+            raise ValueError("A label is at most 100 characters.")
+
+        key = f"{message.channel.id}-{message.id}"
+        async with self.config.guild(guild).buttons_dropdowns() as panels:
+            if key not in panels:
+                if message.components:
+                    raise ValueError(
+                        "That message already has components on it that Tickets did"
+                        " not add."
+                    )
+                panels[key] = {"buttons": {}, "dropdown_options": {}}
+            components = panels[key]
+
+            if dropdown:
+                if label is None:
+                    raise ValueError("A dropdown option needs a label.")
+                if len(components["dropdown_options"]) >= 25:
+                    raise ValueError("A dropdown holds at most 25 options.")
+                if description is not None and len(description) > 100:
+                    raise ValueError("A description is at most 100 characters.")
+                identifier = CogsUtils.generate_key(
+                    length=5, existing_keys=components["dropdown_options"]
+                )
+                components["dropdown_options"][identifier] = {
+                    "emoji": emoji,
+                    "label": label,
+                    "description": description,
+                    "profile": profile,
+                }
+                added = f"Dropdown option {label}"
+            else:
+                if len(components["buttons"]) >= 20:
+                    raise ValueError("A message holds at most 20 buttons.")
+                identifier = CogsUtils.generate_key(
+                    length=5, existing_keys=components["buttons"]
+                )
+                components["buttons"][identifier] = {
+                    "emoji": emoji,
+                    "label": label,
+                    "style": int(style),
+                    "profile": profile,
+                }
+                added = f"Button {label or emoji}"
+
+            snapshot = {
+                "buttons": dict(components["buttons"]),
+                "dropdown_options": dict(components["dropdown_options"]),
+            }
+
+        # Rebuilding the view is what actually puts it on the message; the
+        # stored copy alone would only take effect after a restart.
+        if message in self.views:
+            self.views.pop(message).stop()
+        view = CreateTicketView(cog=self, components=snapshot)
+        message = await message.edit(view=view)
+        self.views[message] = view
+        return added
+
+    async def _tk_add_panel_item(
+        self, guild: discord.Guild, field, *, dropdown: bool
+    ) -> list[dict]:
+        """The page's form around `_tk_panel_write`."""
+        message, warning = await self._tk_resolve_message(guild, field)
+        if warning:
+            return warning
+
+        profile = (field("panel_profile") or "main").strip() or "main"
+        profiles = await self.config.guild(guild).profiles()
+        if profile not in profiles:
+            return [{"message": f"No profile named {profile}.", "category": "warning"}]
+
+        style = (field("panel_style") or "2").strip()
+        if not dropdown and style not in self.BUTTON_STYLES:
+            return [{"message": "Pick a button colour.", "category": "warning"}]
+
+        try:
+            added = await self._tk_panel_write(
+                guild,
+                message,
+                profile=profile,
+                emoji=(field("panel_emoji") or "").strip() or None,
+                label=(field("panel_label") or "").strip() or None,
+                style=int(style),
+                description=(field("panel_description") or "").strip() or None,
+                dropdown=dropdown,
+            )
+        except ValueError as exc:
+            return [{"message": str(exc), "category": "warning"}]
+        return [{"message": f"{added} added to that message.", "category": "success"}]
+
+    async def _tk_remove_panel_item(self, guild: discord.Guild, field) -> list[dict]:
+        """Take one button or option off a panel, leaving the rest."""
+        from .views import CreateTicketView
+
+        key = field("panel_key")
+        kind = field("item_kind")
+        identifier = field("item_key")
+        if kind not in ("buttons", "dropdown_options"):
+            return [{"message": "Unknown item type.", "category": "warning"}]
+
+        async with self.config.guild(guild).buttons_dropdowns() as panels:
+            if key not in panels or identifier not in panels[key].get(kind, {}):
+                return [{"message": "That item is already gone.", "category": "info"}]
+            del panels[key][kind][identifier]
+            empty = not panels[key]["buttons"] and not panels[key]["dropdown_options"]
+            if empty:
+                del panels[key]
+                snapshot = None
+            else:
+                snapshot = {
+                    "buttons": dict(panels[key]["buttons"]),
+                    "dropdown_options": dict(panels[key]["dropdown_options"]),
+                }
+
+        channel_id, message_id = (int(x) for x in str(key).split("-"))
+        channel = guild.get_channel_or_thread(channel_id)
+        if channel is not None:
+            try:
+                message = await channel.fetch_message(message_id)
+            except (discord.NotFound, discord.Forbidden):
+                message = None
+            if message is not None:
+                if message in self.views:
+                    self.views.pop(message).stop()
+                if snapshot is None:
+                    await message.edit(view=None)
+                else:
+                    view = CreateTicketView(cog=self, components=snapshot)
+                    message = await message.edit(view=view)
+                    self.views[message] = view
+        return [{"message": "Item removed.", "category": "success"}]
+
+    # ------------------------------------------------------------ appeals
+
+    async def _tk_configure_appeals(
+        self, member: discord.Member, guild: discord.Guild, field
+    ) -> list[dict]:
+        """The appeal feature, as `[p]settickets configureappeals` set it up.
+
+        The checks are the command's, in the same order: the appeal server has
+        to be one the bot is in and the operator can moderate, and the invite
+        has to point at it.
+        """
+        profile = (field("appeal_profile") or "main").strip() or "main"
+        profiles = await self.config.guild(guild).profiles()
+        if profile not in profiles:
+            return [{"message": f"No profile named {profile}.", "category": "warning"}]
+
+        appeal_guild_id = field.integer("appeal_guild_id", 0) or 0
+        appeal_guild = self.bot.get_guild(appeal_guild_id)
+        if appeal_guild is None:
+            return [
+                {"message": "I am not in a server with that ID.", "category": "warning"}
+            ]
+        if appeal_guild.id == guild.id:
+            return [
+                {
+                    "message": "Appeals are for a different server - the one people are "
+                    "banned from cannot be the one they appeal in.",
+                    "category": "warning",
+                }
+            ]
+        operator = appeal_guild.get_member(member.id)
+        if operator is None:
+            return [
+                {"message": "You are not in that server.", "category": "warning"}
+            ]
+        if not (
+            operator.guild_permissions.manage_guild
+            and operator.guild_permissions.ban_members
+        ):
+            return [
+                {
+                    "message": "You need Manage Server and Ban Members there.",
+                    "category": "warning",
+                }
+            ]
+        if not appeal_guild.me.guild_permissions.ban_members:
+            return [
+                {
+                    "message": "I need Ban Members there, to lift the ban when an "
+                    "appeal is approved.",
+                    "category": "warning",
+                }
+            ]
+
+        code = (field("appeal_invite") or "").strip()
+        code = code.removeprefix("https://").removeprefix("http://")
+        code = code.removeprefix("discord.gg/").removeprefix("discord.com/invite/")
+        if not code:
+            return [{"message": "Enter an invite to the appeal server.", "category": "warning"}]
+        try:
+            invite = await self.bot.fetch_invite(code)
+        except discord.NotFound:
+            return [{"message": "That invite does not exist.", "category": "warning"}]
+        except discord.HTTPException as exc:
+            return [{"message": f"Discord refused that invite: {exc}", "category": "danger"}]
+        if invite.guild is None or invite.guild.id != appeal_guild.id:
+            return [
+                {"message": "That invite is not for the appeal server.", "category": "warning"}
+            ]
+
+        moderator_role = appeal_guild.get_role(
+            field.integer("appeal_moderator_role", 0) or 0
+        )
+        category_open = appeal_guild.get_channel(field.integer("appeal_category_open", 0) or 0)
+        category_closed = (
+            appeal_guild.get_channel(field.integer("appeal_category_closed", 0) or 0)
+            or category_open
+        )
+        logs_channel = appeal_guild.get_channel(field.integer("appeal_logs_channel", 0) or 0)
+        button_channel = appeal_guild.get_channel(
+            field.integer("appeal_button_channel", 0) or 0
+        )
+
+        # The shape the command wrote, unchanged - an appeal profile is one
+        # open ticket per person, with a fixed three-question modal.
+        config = await self.config.guild(guild).profiles.get_raw(profile)
+        config["enabled"] = True
+        config["max_open_tickets_by_member"] = 1
+        config["creating_modal"] = [
+            {
+                "label": question,
+                "style": 2,
+                "required": True,
+                "default": "",
+                "placeholder": "",
+                "min_length": None,
+                "max_length": None,
+            }
+            for question in (
+                "Why were you banned?",
+                "Why should we unban you?",
+                "How can you guarantee it won't happen again?",
+            )
+        ]
+        if moderator_role is not None:
+            if moderator_role.id not in config["support_roles"]:
+                config["support_roles"].append(moderator_role.id)
+            if moderator_role.id not in config["ping_roles"]:
+                config["ping_roles"].append(moderator_role.id)
+        if category_open is not None:
+            config["category_open"] = category_open.id
+            config["category_closed"] = category_closed.id
+        config["owner_close_confirmation"] = False
+        config["owner_can_reopen"] = False
+        config["close_on_leave"] = True
+        config["transcripts"] = True
+        if logs_channel is not None:
+            config["logs_channel"] = logs_channel.id
+        config["appeals"] = {
+            "enabled": True,
+            "guild_id": appeal_guild.id,
+            "invite_code": invite.code,
+        }
+        await self.config.guild(guild).profiles.set_raw(profile, value=config)
+
+        notes = [
+            {
+                "message": f"Appeals configured on {profile}, for {appeal_guild.name}.",
+                "category": "success",
+            }
+        ]
+        if button_channel is not None:
+            embed = discord.Embed(
+                title="Appeal Ticket",
+                description=(
+                    "Click the button below to create an appeal ticket. If our team"
+                    " accepts your appeal, you will be unbanned from the server."
+                ),
+                color=discord.Color.red(),
+            )
+            embed.set_footer(text=guild.name)
+            try:
+                posted = await button_channel.send(embed=embed)
+                await self._tk_panel_write(
+                    guild,
+                    posted,
+                    profile=profile,
+                    emoji="\N{SHIELD}",
+                    label="Appeal",
+                    style=4,
+                )
+            except (discord.Forbidden, ValueError) as exc:
+                notes.append(
+                    {
+                        "message": f"Configured, but the appeal button could not be posted: {exc}",
+                        "category": "warning",
+                    }
+                )
+        return notes
 
     async def _tk_save_profile(self, guild: discord.Guild, field) -> list[dict]:
         name = field("profile_name")
@@ -689,22 +1093,44 @@ TICKETS_TEMPLATE = (
     {% endif %}
   </div>
 
-  {% if panels %}
-    <div class="dz-panel">
-      <h5><i class="fa fa-th-large"></i> Ticket panels</h5>
-      <p class="dz-hint">Messages carrying the open-a-ticket buttons and dropdowns.
-         Panels are created in Discord with <code>[p]settickets addbutton</code>.</p>
+  <div class="dz-panel">
+    <h5><i class="fa fa-th-large"></i> Ticket panels</h5>
+    <p class="dz-hint">
+      The messages carrying the open-a-ticket buttons and dropdowns. Members
+      use these; without one there is no way into a ticket.
+    </p>
+
+    {% if panels %}
       <table class="dz-t">
         <tr><th>Channel</th><th>Items</th><th></th></tr>
         {% for p in panels %}
           <tr>
             <td><a href="{{ p.link }}" target="_blank" rel="noopener">#{{ p.channel }}</a></td>
             <td>
+              {% if not p.items %}
+                <span class="dz-hint" style="margin:0;">empty</span>
+              {% endif %}
               {% for item in p.items %}
-                <span class="dz-tag">{{ item.label }} &rarr; {{ item.profile }}</span>
+                <span class="dz-tag" title="{{ item.description }}">
+                  {% if item.emoji %}{{ item.emoji }} {% endif %}{{ item.label }}
+                  &rarr; {{ item.profile }}
+                  {% if item.style %}({{ item.style }}){% endif %}
+                  {% if is_admin %}
+                    <form method="POST" style="display:inline;">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+                      <input type="hidden" name="panel_key" value="{{ p.key }}" />
+                      <input type="hidden" name="item_kind" value="{{ item.kind }}" />
+                      <input type="hidden" name="item_key" value="{{ item.key }}" />
+                      <button class="dz-btn round danger" name="action"
+                              value="panel_item_remove" title="Remove this item">
+                        <i class="fa fa-times"></i>
+                      </button>
+                    </form>
+                  {% endif %}
+                </span>
               {% endfor %}
             </td>
-            <td>
+            <td style="white-space:nowrap; width:1%;">
               {% if is_admin %}
                 <form method="POST">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
@@ -717,7 +1143,137 @@ TICKETS_TEMPLATE = (
           </tr>
         {% endfor %}
       </table>
-    </div>
+    {% else %}
+      <p class="dz-empty">No panels yet.</p>
+    {% endif %}
+
+    {% if is_admin %}
+      <form method="POST" style="margin-top:12px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+        <div class="dz-label">Add to a message</div>
+        <p class="dz-hint">
+          Paste the link to a message I posted &mdash; right-click it in Discord
+          and choose Copy Message Link. Discord only lets a bot put buttons on
+          its own messages.
+        </p>
+        <input class="dz-input" type="text" name="message_link"
+               placeholder="https://discord.com/channels/.../.../..." />
+        <div class="dz-grid two" style="margin-top:9px;">
+          <div>
+            <div class="dz-label">Profile</div>
+            <select class="dz-select" name="panel_profile">
+              {% for name in profile_names %}
+                <option value="{{ name }}">{{ name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <div class="dz-label">Button colour</div>
+            <select class="dz-select" name="panel_style">
+              {% for s in button_styles %}
+                <option value="{{ s.value }}"
+                        {% if s.value == '2' %}selected{% endif %}>{{ s.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="dz-grid two" style="margin-top:9px;">
+          <div>
+            <div class="dz-label">Emoji</div>
+            <input class="dz-input" type="text" name="panel_emoji" placeholder="\N{TICKET}" />
+          </div>
+          <div>
+            <div class="dz-label">Label</div>
+            <input class="dz-input" type="text" name="panel_label" maxlength="100"
+                   placeholder="Open a ticket" />
+          </div>
+        </div>
+        <div class="dz-label" style="margin-top:9px;">Description (dropdown options only)</div>
+        <input class="dz-input" type="text" name="panel_description" maxlength="100"
+               placeholder="Shown under the option in the dropdown" />
+        <div class="dz-row" style="margin-top:11px;">
+          <button class="dz-btn primary" name="action" value="panel_add_button">
+            <i class="fa fa-hand-pointer-o"></i> Add a button
+          </button>
+          <button class="dz-btn" name="action" value="panel_add_option">
+            <i class="fa fa-caret-square-o-down"></i> Add a dropdown option
+          </button>
+          <span class="dz-hint" style="margin:0 0 0 6px;">
+            An item needs an emoji or a label; a dropdown option needs a label.
+          </span>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if is_admin %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-gavel"></i> Ban appeals</h5>
+        <p class="dz-hint">
+          Lets people banned from another server appeal from this one. Pick the
+          profile to turn into an appeal profile: it gets a three-question form,
+          one open ticket per person, transcripts on, and approving the appeal
+          lifts the ban over there. You need Manage Server and Ban Members in
+          the other server, and so does the bot.
+        </p>
+        <div class="dz-grid two">
+          <div>
+            <div class="dz-label">Profile to use</div>
+            <select class="dz-select" name="appeal_profile">
+              {% for name in profile_names %}
+                <option value="{{ name }}">{{ name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <div class="dz-label">Server people are banned from (ID)</div>
+            <input class="dz-input" type="text" name="appeal_guild_id"
+                   placeholder="000000000000000000" />
+          </div>
+        </div>
+        <div class="dz-label" style="margin-top:9px;">Invite back to that server</div>
+        <input class="dz-input" type="text" name="appeal_invite"
+               placeholder="discord.gg/example" />
+        <div class="dz-grid two" style="margin-top:9px;">
+          <div>
+            <div class="dz-label">Moderator role there (ID)</div>
+            <input class="dz-input" type="text" name="appeal_moderator_role"
+                   placeholder="optional" />
+          </div>
+          <div>
+            <div class="dz-label">Logs channel there (ID)</div>
+            <input class="dz-input" type="text" name="appeal_logs_channel"
+                   placeholder="optional" />
+          </div>
+        </div>
+        <div class="dz-grid two" style="margin-top:9px;">
+          <div>
+            <div class="dz-label">Open category there (ID)</div>
+            <input class="dz-input" type="text" name="appeal_category_open"
+                   placeholder="optional" />
+          </div>
+          <div>
+            <div class="dz-label">Closed category there (ID)</div>
+            <input class="dz-input" type="text" name="appeal_category_closed"
+                   placeholder="optional, defaults to the open one" />
+          </div>
+        </div>
+        <div class="dz-label" style="margin-top:9px;">Post an appeal button in (ID)</div>
+        <input class="dz-input" type="text" name="appeal_button_channel"
+               placeholder="optional, a channel in the appeal server" />
+        <p class="dz-hint" style="margin-top:7px;">
+          These are IDs rather than pickers because they name channels and roles
+          in the other server, which this page cannot list.
+        </p>
+        <div class="dz-save">
+          <button class="dz-btn primary" name="action" value="appeals_configure">
+            <i class="fa fa-check"></i> Configure appeals
+          </button>
+        </div>
+      </div>
+    </form>
   {% endif %}
 
   {% if is_admin %}
