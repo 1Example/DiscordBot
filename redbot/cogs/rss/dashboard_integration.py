@@ -6,6 +6,7 @@ import typing as t
 import discord
 from redbot.core import commands
 
+from .tag_type import INTERNAL_TAGS
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
     channel_options,
@@ -19,7 +20,14 @@ log = logging.getLogger("red.rss.dashboard")
 
 
 class DashboardIntegration:
-    """Feed management: browse, add, remove and inspect RSS feeds."""
+    """Feed management: add, format, inspect and remove RSS feeds.
+
+    The only place these can be changed - the ``[p]rss`` group is gone. So
+    everything it did has to stay here: adding and removing feeds, forcing
+    a post, the character limit, the tag allow list, the message template,
+    the embed colour and image tags, listing what tags a feed offers,
+    finding feeds on a website, and the owner's parsing overrides.
+    """
 
     bot: t.Any
     config: t.Any
@@ -50,9 +58,14 @@ class DashboardIntegration:
                 "error_message": "Only server administrators can manage feeds.",
             }
 
+        owner = await self.bot.is_owner(user)
         notifications: list[dict] = []
+        tags: dict = {}
+        found: list[dict] = []
         if kwargs.get("method") == "POST":
-            notifications = await self._rss_handle_post(guild, kwargs)
+            notifications, tags, found = await self._rss_handle_post(
+                guild, owner, kwargs
+            )
 
         channels = await self._rss_collect(guild)
         total = sum(len(c["feeds"]) for c in channels)
@@ -67,6 +80,10 @@ class DashboardIntegration:
                 "channels": channels,
                 "total": total,
                 "channel_options": channel_options(guild),
+                "is_owner": owner,
+                "tags": tags,
+                "found": found,
+                "parse_overrides": (await self.config.use_published()) if owner else [],
             },
         }
 
@@ -92,8 +109,15 @@ class DashboardIntegration:
                         "url": data.get("url") or "",
                         "title": data.get("title") or "",
                         "last_post": str(data.get("last_title") or "")[:90],
-                        "template": (data.get("template") or "")[:120],
+                        # The whole template, not a preview: this page is
+                        # the only place it can be edited now.
+                        "template": data.get("template") or "",
                         "embed": bool(data.get("embed", True)),
+                        "embed_color": (data.get("embed_color") or "").replace(
+                            "0x", "#"
+                        ),
+                        "embed_image": data.get("embed_image") or "",
+                        "embed_thumbnail": data.get("embed_thumbnail") or "",
                         "tag_count": len(data.get("tags") or []),
                         "limit": data.get("limit") or 0,
                         "allowed_tags": sorted(data.get("allowed_tags") or []),
@@ -110,32 +134,262 @@ class DashboardIntegration:
 
     # ------------------------------------------------------------- post logic
 
-    async def _rss_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+    async def _rss_handle_post(
+        self, guild: discord.Guild, owner: bool, kwargs: dict
+    ) -> tuple[list[dict], dict, list[dict]]:
         field = form_reader(kwargs)
         action = field("action")
 
+        # These three are not about one feed in one channel.
+        if action == "find":
+            notes, found = await self._rss_find_feeds(field)
+            return notes, {}, found
+        if action in ("parse_add", "parse_remove"):
+            if not owner:
+                return [
+                    {
+                        "message": "Only the bot owner can change parsing overrides.",
+                        "category": "danger",
+                    }
+                ], {}, []
+            return await self._rss_parse_override(action, field), {}, []
+
         channel = guild.get_channel(int(field("channel") or 0) or 0)
         if channel is None or not isinstance(channel, discord.TextChannel):
-            return [{"message": "Pick a valid text channel.", "category": "warning"}]
+            return [
+                {"message": "Pick a valid text channel.", "category": "warning"}
+            ], {}, []
 
         try:
+            if action == "list_tags":
+                notes, tags = await self._rss_list_tags(channel, field("name"))
+                return notes, tags, []
+            if action == "save_template":
+                return await self._rss_save_template(channel, field("name"), field), {}, []
+            if action == "save_embed":
+                return await self._rss_save_embed(channel, field("name"), field), {}, []
             if action == "add":
-                return await self._rss_add(channel, field("name"), field("url"))
+                return await self._rss_add(channel, field("name"), field("url")), {}, []
             if action == "remove":
-                return await self._rss_remove(channel, field("name"))
+                return await self._rss_remove(channel, field("name")), {}, []
             if action == "toggle_embed":
-                return await self._rss_toggle_embed(channel, field("name"))
+                return await self._rss_toggle_embed(channel, field("name")), {}, []
             if action == "force":
-                return await self._rss_force_post(channel, field("name"))
+                return await self._rss_force_post(channel, field("name")), {}, []
             if action == "limit":
-                return await self._rss_set_limit(channel, field("name"), field)
+                return await self._rss_set_limit(channel, field("name"), field), {}, []
             if action in ("tag_allow", "tag_deny"):
-                return await self._rss_tag(action, channel, field("name"), field)
+                return await self._rss_tag(action, channel, field("name"), field), {}, []
         except Exception as exc:  # noqa: BLE001
             log.exception("RSS dashboard action %r failed", action)
-            return [{"message": f"Action failed: {exc}", "category": "danger"}]
+            return [{"message": f"Action failed: {exc}", "category": "danger"}], {}, []
 
-        return [{"message": f"Unknown action: {action}", "category": "warning"}]
+        return [
+            {"message": f"Unknown action: {action}", "category": "warning"}
+        ], {}, []
+
+    async def _rss_feed_or_warning(self, channel, name: str | None):
+        """(feed, None) or (None, the warning to show)."""
+        name = (name or "").strip().lower()
+        feed = await self.config.channel(channel).feeds.get_raw(name, default=None)
+        if not feed:
+            return None, [
+                {
+                    "message": f"'{name}' is not a feed in {channel.mention}.",
+                    "category": "warning",
+                }
+            ]
+        return feed, None
+
+    async def _rss_save_template(self, channel, name: str | None, field) -> list[dict]:
+        """The message template for a feed, as `[p]rss template` set it.
+
+        The command took \\n and \\t as escapes because a prefix invocation
+        cannot contain real newlines. A textarea can, so both are accepted.
+        """
+        feed, warning = await self._rss_feed_or_warning(channel, name)
+        if warning:
+            return warning
+        name = (name or "").strip().lower()
+        template = (field("template") or "").replace("\\t", "\t").replace("\\n", "\n")
+        if not template.strip():
+            return [{"message": "A template cannot be empty.", "category": "warning"}]
+        async with self.config.channel(channel).feeds() as feeds:
+            feeds[name]["template"] = template
+        return [{"message": f"Template saved for '{name}'.", "category": "success"}]
+
+    async def _rss_save_embed(self, channel, name: str | None, field) -> list[dict]:
+        """Embed on/off, colour, image tag and thumbnail tag in one save."""
+        feed, warning = await self._rss_feed_or_warning(channel, name)
+        if warning:
+            return warning
+        name = (name or "").strip().lower()
+        notes: list[dict] = []
+
+        embed_on = field.checked("embed")
+        raw_colour = (field("embed_color") or "").strip()
+        hex_code = None
+        if raw_colour:
+            from .color import Color
+
+            hex_code = await Color()._color_converter(raw_colour.replace(" ", "_"))
+            if not hex_code:
+                return [
+                    {
+                        "message": f"'{raw_colour}' is not a colour. Use a hex code like "
+                        "#990000, a Discord colour name, or a CSS3 colour name.",
+                        "category": "warning",
+                    }
+                ]
+            # 0xFFFFFF does not render as white in an embed, so nudge it.
+            if hex_code == "0xFFFFFF":
+                hex_code = "0xFFFFFE"
+
+        image = (field("embed_image") or "").strip().lstrip("$")
+        thumbnail = (field("embed_thumbnail") or "").strip().lstrip("$")
+
+        async with self.config.channel(channel).feeds() as feeds:
+            feeds[name]["embed"] = embed_on
+            feeds[name]["embed_color"] = hex_code
+            feeds[name]["embed_image"] = image or None
+            feeds[name]["embed_thumbnail"] = thumbnail or None
+
+        if hex_code:
+            from .color import Color
+
+            colour_name = await Color()._hex_to_css3_name(hex_code)
+            notes.append(
+                {
+                    "message": f"Colour read as {hex_code.replace('0x', '#')} ({colour_name}).",
+                    "category": "info",
+                }
+            )
+        if not embed_on and (hex_code or image or thumbnail):
+            notes.append(
+                {
+                    "message": "Embeds are off for this feed, so the colour and image "
+                    "settings will not show until you turn them on.",
+                    "category": "info",
+                }
+            )
+        return notes + [{"message": f"Embed settings saved for '{name}'.", "category": "success"}]
+
+    async def _rss_list_tags(self, channel, name: str | None) -> tuple[list[dict], dict]:
+        """The tags this feed offers, with a preview - `[p]rss listtags`.
+
+        Needs a live fetch: the tag set comes from the feed's newest entry, or
+        from its channel header when the feed has no entries yet.
+        """
+
+        feed, warning = await self._rss_feed_or_warning(channel, name)
+        if warning:
+            return warning, {}
+        name = (name or "").strip().lower()
+
+        parsed = await self._fetch_feedparser_object(feed["url"])
+        if not parsed or parsed.entries is None:
+            return [
+                {
+                    "message": f"Could not fetch '{name}'. "
+                    f"{getattr(parsed, 'error', '') or ''}".strip(),
+                    "category": "danger",
+                }
+            ], {}
+        source = parsed.entries[0] if parsed.entries else parsed.feed
+        obj = await self._add_to_feedparser_object(source, feed["url"])
+
+        rows = []
+        for tag_name, content in sorted(obj.items()):
+            if tag_name in INTERNAL_TAGS:
+                continue
+            kind = await self._get_tag_content_type(content)
+            preview = str(content)
+            rows.append(
+                {
+                    "tag": tag_name,
+                    "kind": kind.name.lower() if hasattr(kind, "name") else str(kind),
+                    "preview": preview[:220] + ("..." if len(preview) > 220 else ""),
+                }
+            )
+        return [], {"feed": name, "channel": channel.mention, "rows": rows}
+
+    async def _rss_find_feeds(self, field) -> tuple[list[dict], list[dict]]:
+        """Feeds advertised in a page's HTML - `[p]rss find`."""
+        import aiohttp
+        from bs4 import BeautifulSoup
+
+        url = (field("website_url") or "").strip()
+        if not url:
+            return [{"message": "Enter a website address.", "category": "warning"}], []
+        if not url.startswith(("http://", "https://")):
+            url = f"https://{url}"
+
+        timeout = aiohttp.ClientTimeout(total=20)
+        try:
+            async with aiohttp.ClientSession(headers=self._headers, timeout=timeout) as session:
+                async with session.get(url) as response:
+                    soup = BeautifulSoup(await response.text(errors="replace"), "html.parser")
+        except aiohttp.ClientError:
+            return [{"message": f"I cannot reach {url}.", "category": "danger"}], []
+        except Exception as exc:  # noqa: BLE001
+            return [{"message": f"{url} could not be read: {exc}", "category": "danger"}], []
+
+        found = []
+        for link in soup.find_all("link"):
+            kind = (link.get("type") or "").lower()
+            if kind not in ("application/rss+xml", "application/atom+xml", "text/xml"):
+                continue
+            href = link.get("href") or ""
+            if href.startswith("/"):
+                from urllib.parse import urljoin
+
+                href = urljoin(url, href)
+            if href:
+                found.append({"title": link.get("title") or href, "url": href})
+        if not found:
+            return [
+                {
+                    "message": f"{url} does not advertise any feeds in its HTML. "
+                    "Some sites have one anyway; try /feed or /rss on the site.",
+                    "category": "info",
+                }
+            ], []
+        return [
+            {"message": f"Found {len(found)} feed(s) on {url}.", "category": "success"}
+        ], found
+
+    async def _rss_parse_override(self, action: str, field) -> list[dict]:
+        """The site list from `[p]rss parse`, which changes how times are read."""
+        raw = (field("website_url") or "").strip()
+        website = self._find_website(raw)
+        if not website:
+            return [
+                {
+                    "message": f"I cannot find a website in '{raw}'. Use something like "
+                    "https://www.website.com/ or www.website.com.",
+                    "category": "warning",
+                }
+            ]
+        overrides = await self.config.use_published()
+        if action == "parse_add":
+            if website in overrides:
+                return [
+                    {"message": f"{website} is already overridden.", "category": "info"}
+                ]
+            overrides.append(website)
+            await self.config.use_published.set(overrides)
+            return [
+                {
+                    "message": f"{website} will now use the published date rather than "
+                    "the updated date.",
+                    "category": "success",
+                }
+            ]
+        if website not in overrides:
+            return [{"message": f"{website} is not overridden.", "category": "info"}]
+        overrides.remove(website)
+        await self.config.use_published.set(overrides)
+        return [{"message": f"{website} is no longer overridden.", "category": "success"}]
 
     async def _rss_force_post(self, channel, name: str | None) -> list[dict]:
         """Post the newest entry now, the way `[p]rss force` does."""
@@ -373,27 +627,88 @@ RSS_TEMPLATE = (
             </tr>
             <tr>
               <td colspan="5" style="padding-top:0;">
-                <form method="POST" class="dz-row" style="gap:6px;">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
-                  <input type="hidden" name="channel" value="{{ ch.id }}" />
-                  <input type="hidden" name="name" value="{{ f.name }}" />
-                  <input class="dz-input" type="number" min="0" name="limit"
-                         value="{{ f.limit }}" placeholder="character limit (0 = none)"
-                         style="max-width:210px;" />
-                  <button class="dz-btn" name="action" value="limit" title="Save the limit">
-                    <i class="fa fa-text-width"></i>
-                  </button>
-                  <input class="dz-input" type="text" name="tag"
-                         placeholder="tag to allow or remove" style="max-width:220px;" />
-                  <button class="dz-btn" name="action" value="tag_allow"
-                          title="Only post entries with this tag">
-                    <i class="fa fa-filter"></i> Allow
-                  </button>
-                  <button class="dz-btn" name="action" value="tag_deny"
-                          title="Stop requiring this tag">
-                    <i class="fa fa-times"></i> Unallow
-                  </button>
-                </form>
+                <details>
+                  <summary style="cursor:pointer; opacity:.8;">
+                    Edit {{ f.name }} &mdash; template, embed, limit, tags
+                  </summary>
+
+                  <div class="dz-grid two" style="margin-top:10px;">
+                    <form method="POST">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+                      <input type="hidden" name="channel" value="{{ ch.id }}" />
+                      <input type="hidden" name="name" value="{{ f.name }}" />
+                      <div class="dz-label">Message template</div>
+                      <p class="dz-hint">
+                        Each variable starts with <code>$</code>. Use the button below to
+                        see which ones this feed offers.
+                      </p>
+                      <textarea class="dz-area" name="template" rows="5"
+                                placeholder="$title\n$link">{{ f.template }}</textarea>
+                      <div class="dz-row" style="margin-top:8px;">
+                        <button class="dz-btn primary" name="action" value="save_template">
+                          <i class="fa fa-save"></i> Save template
+                        </button>
+                        <button class="dz-btn" name="action" value="list_tags">
+                          <i class="fa fa-tags"></i> Show available tags
+                        </button>
+                      </div>
+                    </form>
+
+                    <form method="POST">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+                      <input type="hidden" name="channel" value="{{ ch.id }}" />
+                      <input type="hidden" name="name" value="{{ f.name }}" />
+                      <div class="dz-label">Embed</div>
+                      <label class="dz-toggle">
+                        <input type="checkbox" name="embed" {% if f.embed %}checked{% endif %} />
+                        <span>Post this feed as an embed</span>
+                      </label>
+                      <div class="dz-label" style="margin-top:8px;">Colour</div>
+                      <input class="dz-input" type="text" name="embed_color"
+                             value="{{ f.embed_color }}"
+                             placeholder="#990000, blurple, or a CSS colour name" />
+                      <div class="dz-grid two" style="margin-top:8px;">
+                        <div>
+                          <div class="dz-label">Large image tag</div>
+                          <input class="dz-input" type="text" name="embed_image"
+                                 value="{{ f.embed_image }}" placeholder="content_image01" />
+                        </div>
+                        <div>
+                          <div class="dz-label">Thumbnail tag</div>
+                          <input class="dz-input" type="text" name="embed_thumbnail"
+                                 value="{{ f.embed_thumbnail }}" placeholder="media_thumbnail" />
+                        </div>
+                      </div>
+                      <div class="dz-save">
+                        <button class="dz-btn primary" name="action" value="save_embed">
+                          <i class="fa fa-save"></i> Save embed settings
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  <form method="POST" class="dz-row" style="gap:6px; margin-top:10px;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+                    <input type="hidden" name="channel" value="{{ ch.id }}" />
+                    <input type="hidden" name="name" value="{{ f.name }}" />
+                    <input class="dz-input" type="number" min="0" name="limit"
+                           value="{{ f.limit }}" placeholder="character limit (0 = none)"
+                           style="max-width:210px;" />
+                    <button class="dz-btn" name="action" value="limit" title="Save the limit">
+                      <i class="fa fa-text-width"></i> Limit
+                    </button>
+                    <input class="dz-input" type="text" name="tag"
+                           placeholder="tag to allow or remove" style="max-width:220px;" />
+                    <button class="dz-btn" name="action" value="tag_allow"
+                            title="Only post entries carrying this tag">
+                      <i class="fa fa-filter"></i> Allow
+                    </button>
+                    <button class="dz-btn" name="action" value="tag_deny"
+                            title="Stop requiring this tag">
+                      <i class="fa fa-times"></i> Unallow
+                    </button>
+                  </form>
+                </details>
               </td>
             </tr>
           {% endfor %}
@@ -401,6 +716,89 @@ RSS_TEMPLATE = (
       </table>
     </div>
   {% endfor %}
+
+  {% if tags.rows %}
+    <div class="dz-panel">
+      <h5><i class="fa fa-tags"></i> Tags available from {{ tags.feed }}</h5>
+      <p class="dz-hint">
+        Use any of these in the template with a <code>$</code> in front. The
+        preview is from the feed's newest entry, so it changes as the feed does.
+      </p>
+      <table class="dz-t">
+        <thead><tr><th>Tag</th><th>Type</th><th>Preview</th></tr></thead>
+        <tbody>
+          {% for row in tags.rows %}
+            <tr>
+              <td><code>${{ row.tag }}</code></td>
+              <td style="opacity:.7;">{{ row.kind }}</td>
+              <td style="opacity:.8; word-break:break-word;">{{ row.preview }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-search"></i> Find a feed on a website</h5>
+    <p class="dz-hint">
+      Reads the page's HTML for a declared feed. Sites that have one without
+      declaring it will not show up here.
+    </p>
+    <form method="POST" class="dz-row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <input class="dz-input" style="flex:1 1 300px;" type="text" name="website_url"
+             placeholder="https://www.example.com/" />
+      <button class="dz-btn" name="action" value="find">
+        <i class="fa fa-search"></i> Find feeds
+      </button>
+    </form>
+    {% if found %}
+      <table class="dz-t" style="margin-top:10px;">
+        <thead><tr><th>Title</th><th>Feed URL</th></tr></thead>
+        <tbody>
+          {% for item in found %}
+            <tr>
+              <td>{{ item.title }}</td>
+              <td style="word-break:break-all;">
+                <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.url }}</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="dz-hint">Copy one into the Add a feed box above.</p>
+    {% endif %}
+  </div>
+
+  {% if is_owner %}
+    <div class="dz-panel">
+      <h5><i class="fa fa-clock-o"></i> Date parsing overrides</h5>
+      <p class="dz-hint">
+        Some sites set an updated date that moves, which makes old entries look
+        new. For a site listed here the published date is used instead. This
+        applies to every server the bot is in.
+      </p>
+      {% if parse_overrides %}
+        <ul class="dz-hint" style="margin:0 0 10px 18px;">
+          {% for site in parse_overrides %}<li><code>{{ site }}</code></li>{% endfor %}
+        </ul>
+      {% else %}
+        <p class="dz-empty">No overrides.</p>
+      {% endif %}
+      <form method="POST" class="dz-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+        <input class="dz-input" style="flex:1 1 280px;" type="text" name="website_url"
+               placeholder="www.example.com" />
+        <button class="dz-btn" name="action" value="parse_add">
+          <i class="fa fa-plus"></i> Add
+        </button>
+        <button class="dz-btn danger" name="action" value="parse_remove">
+          <i class="fa fa-minus"></i> Remove
+        </button>
+      </form>
+    </div>
+  {% endif %}
 </div>
 """
 )
