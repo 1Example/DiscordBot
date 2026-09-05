@@ -19,13 +19,51 @@ from .player_commands import PlayerCommands
 from .slash_commands import SlashCommands
 from .utility_commands import UtilityCommands
 from .dashboard_integration import DashboardIntegration
+from .parts.plconfig import PyLavConfigurator
+from .parts.plcontroller import PyLavController
+from .parts.pleffects import PyLavEffects
+from .parts.pllocal import PyLavLocalFiles
+from .parts.pllyrics import PyLavLyrics
+from .parts.plmanagednode import PyLavManagedNode
+from .parts.plnodes import PyLavNodes
+from .parts.plnotifier import PyLavNotifier
+from .parts.plplaylists import PyLavPlaylists
+from .parts.plradio import PyLavRadio
+from .parts.plutils import PyLavUtils
+from .parts.plytradio import PyLavYouTubeRadio
 
 _ = Translator("PyLavPlayer", Path(__file__))
 
 
+# Everything PyLav does lives here now: what were thirteen separate cogs
+# sharing one Lavalink client are mixins of this one. Three things about
+# them are worth knowing before adding another.
+#
+# * Each part keeps its own package under parts/ so that its
+#   Translator(..., Path(__file__)) still resolves to the locales it was
+#   translated into.
+# * The four parts with a Config of their own pin cog_name to the class
+#   they used to be. Config keys storage on the cog class name, and they
+#   share this cog's identifier, so without the pin their settings would
+#   both move and collide.
+# * __init__, cog_unload, initialize and red_delete_data_for_user were
+#   defined by several of them. Only one of each survives the MRO, so
+#   each part's is named for itself and called below.
 @cog_i18n(_)
 class PyLavPlayer(
     DashboardIntegration,
+    PyLavController,
+    PyLavPlaylists,
+    PyLavEffects,
+    PyLavRadio,
+    PyLavYouTubeRadio,
+    PyLavLyrics,
+    PyLavLocalFiles,
+    PyLavNotifier,
+    PyLavNodes,
+    PyLavManagedNode,
+    PyLavConfigurator,
+    PyLavUtils,
     HybridCommands,
     UtilityCommands,
     PlayerCommands,
@@ -34,7 +72,11 @@ class PyLavPlayer(
     SlashCommands,
     metaclass=CompositeMetaClass,
 ):
-    """A Media player using the PyLav library"""
+    """A media player using the PyLav library.
+
+    Playback, playlists, effects, radio, lyrics, local files, event
+    notifications, nodes and the PyLav library settings - all of it.
+    """
 
     __version__ = "1.0.0"
 
@@ -63,9 +105,24 @@ class PyLavPlayer(
         self.bot.tree.add_command(self.context_message_play)
         self._track_cache = ExpiringDict(max_len=float("inf"), max_age_seconds=60)  # type: ignore
 
+        # The parts that set up more than self.bot.
+        self._controller_init()
+        self._playlists_init()
+        self._effects_init()
+        self._notifier_init()
+        self._ytradio_init()
+
+    async def initialize(self, *args: Any, **kwargs: Any) -> None:
+        """Called by PyLav once the client is up."""
+        await self._controller_initialize()
+        await self._notifier_initialize()
+
     async def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.context_user_play, type=AppCommandType.user)
         self.bot.tree.remove_command(self.context_message_play, type=AppCommandType.message)
+        await self._controller_unload()
+        await self._notifier_unload()
+        await self._ytradio_unload()
 
     async def red_delete_data_for_user(
         self,
@@ -73,4 +130,11 @@ class PyLavPlayer(
         requester: Literal["discord_deleted_user", "owner", "user", "user_strict"],
         user_id: int,
     ) -> None:
+        # One call per store: the parts that kept a Config of their own
+        # still have it, pinned to the name it was written under.
         await self._config.user_from_id(user_id).clear()
+        await self._controller_config.user_from_id(user_id).clear()
+        await self._playlists_config.user_from_id(user_id).clear()
+        await self._effects_config.user_from_id(user_id).clear()
+        await self._notifier_config.user_from_id(user_id).clear()
+        await self._ytradio_config.user_from_id(user_id).clear()
