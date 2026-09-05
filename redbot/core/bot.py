@@ -1989,6 +1989,43 @@ class Red(
 
         return cog
 
+    async def enable_app_command(
+        self,
+        command_name: str,
+        command_type: discord.AppCommandType = discord.AppCommandType.chat_input,
+    ) -> None:
+        """Kept for callers outside this repository; it has nothing to do.
+
+        Application commands are added to the tree as they are registered, so
+        every command this bot has is already enabled.
+        """
+
+    async def disable_app_command(
+        self,
+        command_name: str,
+        command_type: discord.AppCommandType = discord.AppCommandType.chat_input,
+    ) -> None:
+        """Kept for callers outside this repository; it has nothing to do.
+
+        There is no longer a store to hold a command back from the tree. To
+        take one away, remove it: ``bot.tree.remove_command(name, type=...)``.
+        """
+
+    async def list_enabled_app_commands(self) -> Dict[str, Dict[str, Optional[int]]]:
+        """The application commands this bot has, by type, with their IDs.
+
+        The IDs come from the last sync and are ``None`` for anything added
+        since. Everything registered is enabled, so this is the whole tree.
+        """
+        curr_slash_commands = await self._config.enabled_slash_commands()
+        curr_message_commands = await self._config.enabled_message_commands()
+        curr_user_commands = await self._config.enabled_user_commands()
+        return {
+            "slash": curr_slash_commands,
+            "message": curr_message_commands,
+            "user": curr_user_commands,
+        }
+
     async def get_app_command_id(
         self,
         command_name: str,

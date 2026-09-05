@@ -48,6 +48,18 @@ class RedTree(CommandTree):
     See ``discord.app_commands.CommandTree`` for more information.
     """
 
+    async def red_check_enabled(self) -> None:
+        """Kept for callers outside this repository; it has nothing to do.
+
+        Commands used to be held back until they were enabled, and this moved
+        the enabled ones into the tree. They are added when they are
+        registered now, so by the time anyone can call this the tree is
+        already what it is going to be.
+
+        AAA3A_utils calls this from ``add_hybrid_commands``, which is why it
+        is still here rather than deleted.
+        """
+
     async def sync(self, *args, guild: Optional[Snowflake] = None, **kwargs) -> List[AppCommand]:
         """Wrapper to store command IDs when commands are synced."""
         commands = await super().sync(*args, guild=guild, **kwargs)
