@@ -172,6 +172,14 @@ class Red(
             # it. `RedTree.red_auto_sync` compares against it so the bot can
             # publish its own commands instead of waiting to be told to.
             app_command_fingerprint="",
+            # The presence to put back on after every reconnect. Discord
+            # clears a bot's activity whenever it identifies afresh, so
+            # `[p]set status ...` on its own lasts only until the next
+            # restart. Empty type means no saved presence.
+            status__type="",
+            status__presence="online",
+            status__text="",
+            status__stream_url="",
         )
 
         self._config.register_guild(
@@ -1107,6 +1115,111 @@ class Red(
 
     get_embed_colour = get_embed_color
 
+    # The activity kinds `set_saved_presence` accepts, mapped to the
+    # discord.ActivityType member each one builds. "streaming" and
+    # "custom" are not ActivityType lookups, so they are handled apart.
+    SAVED_ACTIVITY_TYPES = (
+        "playing",
+        "listening",
+        "watching",
+        "competing",
+        "streaming",
+        "custom",
+    )
+
+    async def get_saved_presence(self) -> dict:
+        """The presence reapplied after each reconnect.
+
+        Returns
+        -------
+        dict
+            ``type`` (one of `SAVED_ACTIVITY_TYPES`, or an empty string
+            when nothing is saved), ``presence``, ``text`` and
+            ``stream_url``.
+        """
+        saved = await self._config.status()
+        return {
+            "type": saved.get("type") or "",
+            "presence": saved.get("presence") or "online",
+            "text": saved.get("text") or "",
+            "stream_url": saved.get("stream_url") or "",
+        }
+
+    async def set_saved_presence(
+        self,
+        *,
+        activity_type: str = "",
+        presence: str = "online",
+        text: str = "",
+        stream_url: str = "",
+    ) -> None:
+        """Save a presence and apply it now.
+
+        An empty ``activity_type`` clears the saved presence and puts the
+        bot back to plain online, which is what the old cog's ``clear``
+        did.
+
+        Raises
+        ------
+        ValueError
+            If the activity type or presence state is not one Discord
+            has, or the text is longer than Discord accepts.
+        """
+        activity_type = (activity_type or "").lower()
+        presence = (presence or "online").lower()
+        text = (text or "").strip()
+        stream_url = (stream_url or "").strip()
+
+        if activity_type and activity_type not in self.SAVED_ACTIVITY_TYPES:
+            raise ValueError(f"{activity_type!r} is not an activity type.")
+        if presence not in (s.name for s in discord.Status):
+            raise ValueError(f"{presence!r} is not a presence state.")
+        if len(text) > 128:
+            raise ValueError("Status text is limited to 128 characters.")
+        if len(stream_url) > 511:
+            raise ValueError("A stream URL is limited to 511 characters.")
+        if activity_type and not text:
+            raise ValueError("An activity needs some text to show.")
+
+        async with self._config.status() as saved:
+            saved["type"] = activity_type
+            saved["presence"] = presence
+            saved["text"] = text
+            saved["stream_url"] = stream_url
+        await self._apply_saved_presence()
+
+    async def _apply_saved_presence(self) -> None:
+        """Send the saved presence to Discord, if there is one.
+
+        Called on every ready, not only the first: Discord drops the
+        activity when the gateway identifies again, so reconnecting is
+        exactly when it needs sending back.
+        """
+        # Runs on the way to being ready, so nothing here may raise.
+        try:
+            saved = await self.get_saved_presence()
+            status = getattr(
+                discord.Status, saved["presence"], discord.Status.online
+            )
+            if not saved["type"]:
+                # No saved activity: plain presence, no game. Reached both
+                # on ready and the moment the owner clears it.
+                activity = None
+            elif saved["type"] == "streaming":
+                activity = discord.Streaming(
+                    name=saved["text"], url=saved["stream_url"] or None
+                )
+            elif saved["type"] == "custom":
+                activity = discord.CustomActivity(name=saved["text"])
+            else:
+                activity = discord.Activity(
+                    name=saved["text"],
+                    type=getattr(discord.ActivityType, saved["type"]),
+                )
+            await self.change_presence(status=status, activity=activity)
+        except Exception:
+            log.exception("Could not reapply the saved presence")
+
     # start config migrations
     async def _maybe_update_config(self):
         """
@@ -1126,6 +1239,44 @@ class Red(
             await self._schema_2_to_3()
             schema_version += 1
             await self._config.schema_version.set(schema_version)
+        if schema_version == 3:
+            await self._schema_3_to_4()
+            schema_version += 1
+            await self._config.schema_version.set(schema_version)
+
+    async def _schema_3_to_4(self):
+        """Adopt the presence the Botstatus cog used to keep.
+
+        It stored a 3-tuple of (activity, presence-or-stream-url, text)
+        under its own Config, so this reads that once and writes it where
+        core keeps it now. The cog is gone, hence the pinned cog_name.
+        """
+        botstatus = Config.get_conf(
+            None, 30052000, cog_name="Botstatus", force_registration=False
+        )
+        try:
+            saved = await botstatus.get_raw("status", default=None)
+        except Exception:  # noqa: BLE001 - never block startup on this
+            log.exception("Could not read the old Botstatus configuration")
+            return
+        if not saved or len(saved) != 3 or not all(saved):
+            return
+
+        activity, second, text = saved
+        activity = "playing" if activity == "game" else activity
+        if activity == "streaming":
+            # Botstatus reused the middle slot for the stream URL.
+            presence, stream_url = "online", second
+        else:
+            # `competing away` saved a state discord.Status does not have.
+            presence, stream_url = ("idle" if second == "away" else second), ""
+
+        log.info("Adopting the presence previously kept by the Botstatus cog")
+        async with self._config.status() as status:
+            status["type"] = activity
+            status["presence"] = presence
+            status["text"] = text
+            status["stream_url"] = stream_url
 
     async def _schema_2_to_3(self):
         log.info("Migrating help menus to enum values")

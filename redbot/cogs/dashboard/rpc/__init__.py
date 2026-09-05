@@ -1737,6 +1737,11 @@ class DashboardRPC:
             # Locale.
             "locale": await config_group.locale(),
             "regional_format": await config_group.regional_format(),
+            # Presence. Kept by the bot rather than a cog, so it goes
+            # back on after a restart.
+            "status": await self.bot.get_saved_presence(),
+            "status_activity_types": list(self.bot.SAVED_ACTIVITY_TYPES),
+            "status_presence_states": [s.name for s in discord.Status],
         }
 
     @rpc_check()
@@ -1801,6 +1806,19 @@ class DashboardRPC:
         await self.bot._i18n_cache.set_locale(None, settings["locale"])
         i18n.set_contextual_regional_format(settings["regional_format"])
         await self.bot._i18n_cache.set_regional_format(None, settings["regional_format"])
+        # The presence is applied as well as stored, so it takes effect
+        # without waiting for a reconnect.
+        status = settings.get("status")
+        if status is not None:
+            try:
+                await self.bot.set_saved_presence(
+                    activity_type=status.get("type") or "",
+                    presence=status.get("presence") or "online",
+                    text=status.get("text") or "",
+                    stream_url=status.get("stream_url") or "",
+                )
+            except ValueError as exc:
+                return {"status": 1, "error": str(exc)}
         return {"status": 0}
 
     @rpc_check()

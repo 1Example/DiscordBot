@@ -92,6 +92,11 @@ def init_events(bot, cli_flags):
 
     @bot.event
     async def on_ready():
+        # Discord clears a bot's activity every time the gateway identifies
+        # afresh, so the saved presence goes back on at each ready rather than
+        # only the first.
+        await bot._apply_saved_presence()
+
         try:
             await _on_ready()
         except Exception as exc:
