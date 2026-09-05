@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import tracemalloc
 import typing as t
 
 import discord
 from redbot.core import commands
 
+from .cog import get_top
 from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
@@ -88,7 +91,9 @@ class UtilsDashboard:
             "notifications": notifications,
             "web_content": {
                 "source": PLUTILS_TEMPLATE,
-                "audio_pages": audio_pages(await self.bot.is_owner(user)),
+                "audio_pages": audio_pages(owner),
+                "tracing": tracemalloc.is_tracing(),
+                "trace": getattr(self, "_plu_trace", ""),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
                 "is_owner": owner,
@@ -190,6 +195,32 @@ class UtilsDashboard:
                     {"message": f"Cache cleared for {raw}.", "category": "success"}
                 ], {}
 
+            if action in ("trace_start", "trace_stop", "trace_snapshot"):
+                if action == "trace_start":
+                    if tracemalloc.is_tracing():
+                        return [
+                            {"message": "Already tracing.", "category": "info"}
+                        ]
+                    tracemalloc.start(25)
+                    return [
+                        {
+                            "message": "Memory tracing started. It costs some speed and memory while it runs, so stop it when you are done.",
+                            "category": "success",
+                        }
+                    ]
+                if not tracemalloc.is_tracing():
+                    return [
+                        {"message": "Tracing is not running.", "category": "warning"}
+                    ]
+                snapshot = await asyncio.to_thread(tracemalloc.take_snapshot)
+                if action == "trace_stop":
+                    tracemalloc.stop()
+                    return [
+                        {"message": "Memory tracing stopped.", "category": "success"}
+                    ]
+                self._plu_trace = await asyncio.to_thread(get_top, snapshot, limit=10)
+                return [{"message": "Snapshot taken.", "category": "success"}]
+
             if action == "set_level":
                 level = field.integer("level", -1)
                 mapping = {
@@ -226,6 +257,35 @@ PLUTILS_TEMPLATE = (
   </div>
 
   {{ subnav(name, audio_pages, 'diagnostics', guild) }}
+
+  {% if is_owner %}
+    <div class="dz-panel">
+      <h5><i class="fa fa-microchip"></i> Memory tracing</h5>
+      <p class="dz-hint">
+        Records where memory is being allocated. It slows the bot down and uses
+        memory of its own while it runs, so turn it off when you are done.
+        Currently <b>{{ 'on' if tracing else 'off' }}</b>.
+      </p>
+      <form method="POST" class="dz-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+        {% if tracing %}
+          <button class="dz-btn" name="action" value="trace_snapshot">
+            <i class="fa fa-camera"></i> Take a snapshot
+          </button>
+          <button class="dz-btn danger" name="action" value="trace_stop">
+            <i class="fa fa-stop"></i> Stop tracing
+          </button>
+        {% else %}
+          <button class="dz-btn" name="action" value="trace_start">
+            <i class="fa fa-play"></i> Start tracing
+          </button>
+        {% endif %}
+      </form>
+      {% if trace %}
+        <pre class="dz-pre" style="margin-top:10px; white-space:pre-wrap;">{{ trace }}</pre>
+      {% endif %}
+    </div>
+  {% endif %}
 
   {% if result %}
     <div class="dz-panel">

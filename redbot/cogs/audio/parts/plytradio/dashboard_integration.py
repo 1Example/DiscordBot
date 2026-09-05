@@ -44,6 +44,7 @@ class YouTubeRadioDashboard:
         staff = await is_staff(self.bot, user, member, guild)
 
         notifications: list[dict] = []
+        diagnosis: list[str] = []
         if kwargs.get("method") == "POST":
             if not staff:
                 return {
@@ -51,7 +52,7 @@ class YouTubeRadioDashboard:
                     "error_title": "Forbidden",
                     "error_message": "Only server administrators can change the radio.",
                 }
-            notifications = await self._ytr_handle_post(guild, kwargs)
+            notifications, diagnosis = await self._ytr_handle_post(guild, kwargs)
 
         settings = await self._ytradio_config.guild(guild).all()
         player = self.pylav.get_player(guild)
@@ -85,15 +86,20 @@ class YouTubeRadioDashboard:
                 # The cog keeps its own memory of what it has already served.
                 "seen": len(getattr(self, "_played", {}).get(guild.id, []) or []),
                 "seeds": len(getattr(self, "_seeds", {}).get(guild.id, []) or []),
+                "diagnosis": diagnosis,
             },
         }
 
-    async def _ytr_handle_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+    async def _ytr_handle_post(
+        self, guild: discord.Guild, kwargs: dict
+    ) -> tuple[list[dict], list[str]]:
         field = form_reader(kwargs)
         action = field("action")
         conf = self._ytradio_config.guild(guild)
 
         try:
+            if action == "diagnose":
+                return [], await self._ytradio_diagnosis(guild.id)
             if action == "save":
                 enabled = field.checked("enabled")
                 raw = (field("buffer") or "").strip()
@@ -128,7 +134,7 @@ class YouTubeRadioDashboard:
                         "message": f"Radio {'enabled' if enabled else 'disabled'}.",
                         "category": "success",
                     }
-                ]
+                ], []
 
             if action == "clear_memory":
                 # Lets the radio revisit tracks it has already played.
@@ -136,12 +142,12 @@ class YouTubeRadioDashboard:
                     store = getattr(self, attr, None)
                     if store is not None and guild.id in store:
                         store[guild.id].clear()
-                return [{"message": "Radio history cleared.", "category": "success"}]
+                return [{"message": "Radio history cleared.", "category": "success"}], []
         except Exception as exc:  # noqa: BLE001
             log.exception("PyLavYouTubeRadio dashboard action %r failed", action)
-            return [{"message": f"Action failed: {exc}", "category": "danger"}]
+            return [{"message": f"Action failed: {exc}", "category": "danger"}], []
 
-        return [{"message": f"Unknown action: {action}", "category": "warning"}]
+        return [{"message": f"Unknown action: {action}", "category": "warning"}], []
 
 
 YTRADIO_TEMPLATE = (
@@ -159,6 +165,27 @@ YTRADIO_TEMPLATE = (
   </div>
 
   {{ subnav(name, audio_pages, 'youtube-radio', guild) }}
+
+  <div class="dz-panel">
+    <h5><i class="fa fa-stethoscope"></i> Why is the radio not playing?</h5>
+    <p class="dz-hint">
+      Walks the whole pipeline against whatever is playing right now and reports
+      each step. Play something first, or it can only get as far as the player.
+    </p>
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <button class="dz-btn" name="action" value="diagnose">
+        <i class="fa fa-play"></i> Run the checks
+      </button>
+    </form>
+    {% if diagnosis %}
+      <pre class="dz-pre" style="margin-top:10px; white-space:pre-wrap;">
+{%- for line in diagnosis %}
+{{ line }}
+{%- endfor %}
+      </pre>
+    {% endif %}
+  </div>
 
   {% if current %}
     <div class="dz-panel">

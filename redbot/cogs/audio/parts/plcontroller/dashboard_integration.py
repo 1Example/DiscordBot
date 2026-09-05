@@ -882,18 +882,32 @@ class ControllerDashboard:
 
         notifications: list[dict] = []
         if kwargs.get("method") == "POST":
-            notifications = await self._dash_settings_post(guild, kwargs)
+            notifications = await self._dash_settings_post(user, guild, kwargs)
 
         settings = await self._controller_config.guild(guild).all()
         currency = await self._dash_currency(guild)
+        is_owner = await self.bot.is_owner(user)
+        behaviour = [
+            {
+                "key": form_key,
+                "label": label,
+                "help": help_text,
+                "on": bool(settings.get(config_key)),
+            }
+            for form_key, config_key, _cache, label, help_text
+            in self.CONTROLLER_BEHAVIOUR
+        ]
         return {
             "status": 0,
             "notifications": notifications,
             "web_content": {
                 "source": SETTINGS_TEMPLATE,
-                "audio_pages": audio_pages(await self.bot.is_owner(user)),
+                "audio_pages": audio_pages(is_owner),
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "guild_name": guild.name,
+                "is_owner": is_owner,
+                "behaviour": behaviour,
+                "greedy": bool(await self._controller_config.listen_to_any_message()),
                 "button_rows": self._dash_button_rows(settings),
                 "upload_target": settings.get("upload_target") or "guild",
                 "style_options": ("secondary", "primary", "success", "danger"),
@@ -968,13 +982,24 @@ class ControllerDashboard:
             for key, value in sorted(costs.items())
         ]
 
-    async def _dash_settings_post(self, guild: discord.Guild, kwargs: dict) -> list[dict]:
+    async def _dash_settings_post(
+        self, user: discord.User, guild: discord.Guild, kwargs: dict
+    ) -> list[dict]:
         field = form_reader(kwargs)
         action = field("action")
         conf = self._controller_config.guild(guild)
         try:
             if action == "save_buttons":
                 return await self._dash_save_buttons(guild, conf, field)
+            if action == "save_behaviour":
+                return await self._dash_save_behaviour(guild, conf, field)
+            if action == "save_greedy":
+                if not await self.bot.is_owner(user):
+                    return [
+                        {"message": "Only the bot owner can change that.",
+                         "category": "danger"}
+                    ]
+                return await self._dash_save_greedy(field)
             if action == "save_costs":
                 return await self._dash_save_costs(conf, field)
             if action == "reset_buttons":
@@ -991,6 +1016,52 @@ class ControllerDashboard:
             log.exception("Controller settings action %r failed", action)
             return [{"message": f"Action failed: {exc}", "category": "danger"}]
         return [{"message": f"Unknown action: {action}", "category": "warning"}]
+
+
+    # Each of these is a guild setting plus the cache the live controller reads
+    # from, so both are written - config alone would not change behaviour until
+    # the next restart. (form field, config key, cache attribute)
+    CONTROLLER_BEHAVIOUR = (
+        ("list_for_requests", "list_for_requests", "_list_for_command_cache",
+         "Queue from messages",
+         "Treat a plain message in the controller channel as a request."),
+        ("list_for_searches", "list_for_searches", "_list_for_search_cache",
+         "Search from messages",
+         "Treat a plain message as a search rather than a direct query."),
+        ("enable_antispam", "enable_antispam", "_enable_antispam_cache",
+         "Rate limit requests",
+         "Ignore someone flooding the channel with requests."),
+        ("use_slow_mode", "use_slow_mode", "_use_slow_mode_cache",
+         "Set the channel to slow mode",
+         "Apply Discord slow mode to the controller channel."),
+    )
+
+    async def _dash_save_behaviour(self, guild, conf, field) -> list[dict]:
+        """[p]plcontrollerset acceptrequests / acceptsearches / antispam / slowmode."""
+        for form_key, config_key, cache_attr, _label, _help in self.CONTROLLER_BEHAVIOUR:
+            value = field.checked(form_key)
+            await conf.get_attr(config_key).set(value)
+            getattr(self, cache_attr)[guild.id] = value
+        pushed = await self._dash_refresh_controller(guild)
+        return [{"message": "Controller behaviour saved." + pushed, "category": "success"}]
+
+    async def _dash_save_greedy(self, field) -> list[dict]:
+        """[p]plcontrollerset greedy - bot-wide, so owner only."""
+        value = field.checked("listen_to_any_message")
+        await self._controller_config.listen_to_any_message.set(value)
+        self._greedy_cache = value
+        if value:
+            return [
+                {
+                    "message": "I will now read every message in a controller channel, "
+                    "in every server.",
+                    "category": "success",
+                }
+            ]
+        return [
+            {"message": "I will only read messages in a controller channel when that "
+                        "server has asked me to.", "category": "success"}
+        ]
 
     # Discord caps an emoji image at 256 KB. The browser sends base64, which is
     # about a third larger, so the raw form value runs a little over that.
@@ -2988,6 +3059,52 @@ SETTINGS_TEMPLATE = (
     </p>
   </div>
   {{ subnav(name, audio_pages, 'player-settings', guild) }}
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-comments-o"></i> How the channel behaves</h5>
+      <p class="dz-hint">
+        What I do with messages people type in the controller channel, besides
+        the buttons on the panel itself.
+      </p>
+      {% for b in behaviour %}
+        <label class="dz-toggle">
+          <input type="checkbox" name="{{ b.key }}" {% if b.on %}checked{% endif %} />
+          <span>{{ b.label }}</span>
+        </label>
+        <div class="dz-hint" style="margin:0 0 7px 30px;">{{ b.help }}</div>
+      {% endfor %}
+      <div class="dz-save">
+        <button class="dz-btn primary" name="action" value="save_behaviour">
+          <i class="fa fa-save"></i> Save behaviour
+        </button>
+      </div>
+    </div>
+  </form>
+
+  {% if is_owner %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-globe"></i> Read every message</h5>
+        <p class="dz-hint">
+          Owner only, and it applies to every server. On, I read every message
+          in a controller channel whether or not that server asked me to.
+        </p>
+        <label class="dz-toggle">
+          <input type="checkbox" name="listen_to_any_message"
+                 {% if greedy %}checked{% endif %} />
+          <span>Read every message in a controller channel</span>
+        </label>
+        <div class="dz-save">
+          <button class="dz-btn primary" name="action" value="save_greedy">
+            <i class="fa fa-save"></i> Save
+          </button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
 
 
   <form method="POST">
