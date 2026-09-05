@@ -115,7 +115,7 @@ python -m pip install -U pip wheel
 python -m pip install "Red-DiscordBot @ git+https://github.com/1Example/DiscordBot@V3/develop"
 ```
 
-This takes several minutes. It clones PyLav and AAA3A_utils, and compiles anything
+This takes several minutes. It clones PyLav and compiles anything
 lacking a Windows wheel. pip downgrading itself mid-install is expected — PyLav
 declares `pip` and `wheel` as runtime dependencies.
 
@@ -218,7 +218,7 @@ python -m pip install -U --force-reinstall "Red-DiscordBot @ git+https://github.
 
 Bundled cogs do not update through `[p]cog update` — they ship with the package.
 
-PyLav and AAA3A_utils are pinned to exact commits in `requirements/base.in`, so
-rebuilds are reproducible. Bump those pins deliberately when you want new upstream
-code; leaving them on a moving branch means a reinstall months from now can pull
-different code with no change on your side.
+PyLav is pinned to an exact commit in `requirements/base.in`, so rebuilds are
+reproducible. Bump that pin deliberately when you want new upstream code; leaving
+it on a moving branch means a reinstall months from now can pull different code
+with no change on your side.

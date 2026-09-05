@@ -88,7 +88,7 @@ if (Test-Path $BotEnv) {
 $BotPython = Join-Path $BotEnv 'Scripts\python.exe'
 if (-not (Test-Path $BotPython)) { throw "No interpreter at $BotPython - venv creation failed." }
 
-Write-Step 'Installing the bot (several minutes; clones PyLav and AAA3A_utils)'
+Write-Step 'Installing the bot (several minutes; clones PyLav)'
 & $BotPython -m pip install -U pip wheel
 & $BotPython -m pip install $BotRepo
 if ($LASTEXITCODE -ne 0) { throw 'Bot install failed. See the pip output above.' }
