@@ -8,9 +8,9 @@ from math import ceil
 from typing import Literal
 
 import discord
+from discord import app_commands
 
 from redbot.core import Config, bank, commands, errors
-from redbot.core.commands.converter import TimedeltaConverter, positive_int
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils import AsyncIter
@@ -56,8 +56,6 @@ DEFAULT_VOICE_PAYDAY_MESSAGE = (
 NUM_ENC = "\N{COMBINING ENCLOSING KEYCAP}"
 VARIATION_SELECTOR = "\N{VARIATION SELECTOR-16}"
 MOCK_MEMBER = namedtuple("Member", "id guild")
-
-
 
 
 def guild_only_check():
@@ -644,14 +642,16 @@ class Economy(DashboardIntegration, commands.Cog):
             if user_id in guild_data:
                 await self.config.member_from_ids(guild_id, user_id).clear()
 
-    @guild_only_check()
-    @commands.group(name="bank")
-    async def _bank(self, ctx: commands.Context):
-        """Base command to manage the bank."""
-        pass
-
-    @_bank.command()
-    async def balance(self, ctx: commands.Context, user: discord.Member = commands.Author):
+    @app_commands.command(
+        name="balance",
+        description="Show an account balance.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_commands.describe(user="Whose balance to show. Defaults to yours.")
+    async def balance(
+        self, interaction: discord.Interaction, user: discord.Member = None
+    ):
         """Show the user's account balance.
 
         Example:
@@ -662,6 +662,8 @@ class Economy(DashboardIntegration, commands.Cog):
 
         - `<user>` The user to check the balance of. If omitted, defaults to your own balance.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        user = user or interaction.user
         bal = await bank.get_balance(user)
         currency = await bank.get_currency_name(ctx.guild)
         max_bal = await bank.get_max_balance(ctx.guild)
@@ -674,8 +676,22 @@ class Economy(DashboardIntegration, commands.Cog):
             )
         )
 
-    @_bank.command()
-    async def transfer(self, ctx: commands.Context, to: discord.Member, amount: int):
+    @app_commands.command(
+        name="transfer",
+        description="Send some of your currency to someone else.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_commands.describe(
+        to="Who to send it to.",
+        amount="How much to send.",
+    )
+    async def transfer(
+        self,
+        interaction: discord.Interaction,
+        to: discord.Member,
+        amount: app_commands.Range[int, 1, None],
+    ):
         """Transfer currency to other users.
 
         This will come out of your balance, so make sure you have enough.
@@ -688,6 +704,7 @@ class Economy(DashboardIntegration, commands.Cog):
         - `<to>` The user to give currency to.
         - `<amount>` The amount of currency to give.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         from_ = ctx.author
         currency = await bank.get_currency_name(ctx.guild)
 
@@ -705,137 +722,18 @@ class Economy(DashboardIntegration, commands.Cog):
             )
         )
 
-    @bank.is_owner_if_bank_global()
-    @commands.admin_or_permissions(manage_guild=True)
-    @_bank.command(name="set")
-    async def _set(self, ctx: commands.Context, to: discord.Member, creds: SetParser):
-        """Set the balance of a user's bank account.
-
-        Putting + or - signs before the amount will add/remove currency on the user's bank account instead.
-
-        Examples:
-        - `[p]bank set @Twentysix 26` - Sets balance to 26
-        - `[p]bank set @Twentysix +2` - Increases balance by 2
-        - `[p]bank set @Twentysix -6` - Decreases balance by 6
-
-        **Arguments**
-
-        - `<to>` The user to set the currency of.
-        - `<creds>` The amount of currency to set their balance to.
-        """
-        author = ctx.author
-        currency = await bank.get_currency_name(ctx.guild)
-
-        try:
-            if creds.operation == "deposit":
-                await bank.deposit_credits(to, creds.sum)
-                msg = _("{author} added {num} {currency} to {user}'s account.").format(
-                    author=author.display_name,
-                    num=humanize_number(creds.sum),
-                    currency=currency,
-                    user=to.display_name,
-                )
-            elif creds.operation == "withdraw":
-                await bank.withdraw_credits(to, creds.sum)
-                msg = _("{author} removed {num} {currency} from {user}'s account.").format(
-                    author=author.display_name,
-                    num=humanize_number(creds.sum),
-                    currency=currency,
-                    user=to.display_name,
-                )
-            else:
-                await bank.set_balance(to, creds.sum)
-                msg = _("{author} set {user}'s account balance to {num} {currency}.").format(
-                    author=author.display_name,
-                    num=humanize_number(creds.sum),
-                    currency=currency,
-                    user=to.display_name,
-                )
-        except (ValueError, errors.BalanceTooHigh) as e:
-            await ctx.send(str(e))
-        else:
-            await ctx.send(msg)
-
-    @bank.is_owner_if_bank_global()
-    @commands.admin_or_permissions(manage_guild=True)
-    @_bank.command(name="add")
-    async def _add(self, ctx: commands.Context, to: discord.Member, creds: positive_int):
-        """Add currency to a user's bank account.
-
-        Example:
-        - `[p]bank add @Twentysix 100` - Increases balance by 100
-
-        **Arguments**
-
-        - `<to>` The user to give currency to.
-        - `<creds>` The amount of currency to add.
-        """
-        author = ctx.author
-        currency = await bank.get_currency_name(ctx.guild)
-
-        try:
-            await bank.deposit_credits(to, creds)
-        except (ValueError, errors.BalanceTooHigh) as e:
-            await ctx.send(str(e))
-        else:
-            await ctx.send(
-                _("{author} added {num} {currency} to {user}'s account.").format(
-                    author=author.display_name,
-                    num=humanize_number(creds),
-                    currency=currency,
-                    user=to.display_name,
-                )
-            )
-
-    @bank.is_owner_if_bank_global()
-    @commands.admin_or_permissions(manage_guild=True)
-    @_bank.command(name="sub", aliases=["subtract"])
-    async def _sub(self, ctx: commands.Context, to: discord.Member, creds: positive_int):
-        """Remove currency from a user's bank account.
-
-        Example:
-        - `[p]bank sub @Twentysix 50` - Decreases balance by 50
-
-        **Arguments**
-
-        - `<to>` The user to remove currency from.
-        - `<creds>` The amount of currency to remove.
-        """
-        author = ctx.author
-        currency = await bank.get_currency_name(ctx.guild)
-
-        try:
-            await bank.withdraw_credits(to, creds)
-        except ValueError as e:
-            await ctx.send(str(e))
-        else:
-            await ctx.send(
-                _("{author} removed {num} {currency} from {user}'s account.").format(
-                    author=author.display_name,
-                    num=humanize_number(creds),
-                    currency=currency,
-                    user=to.display_name,
-                )
-            )
-
-    async def _too_soon(self, ctx: commands.Context, relative_time: str) -> str:
-        """Explain the wait, and say so differently when payday is automatic."""
-        if ctx.guild is not None and await self.config.guild(ctx.guild).AUTO_PAYDAY():
-            return _(
-                "{author.mention} You do not need this command here — the whole "
-                "server is paid together. The next payslip lands {relative_time}."
-            ).format(author=ctx.author, relative_time=relative_time)
-        return _("{author.mention} Too soon. Your next payday is {relative_time}.").format(
-            author=ctx.author, relative_time=relative_time
-        )
-
-    @guild_only_check()
-    @commands.command()
-    async def payday(self, ctx: commands.Context):
+    @app_commands.command(
+        name="payday",
+        description="Claim your free currency.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    async def payday(self, interaction: discord.Interaction):
         """Get some free currency.
 
         The amount awarded and frequency can be configured.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         author = ctx.author
         guild = ctx.guild
 
@@ -956,9 +854,22 @@ class Economy(DashboardIntegration, commands.Cog):
                 )
                 await ctx.send(await self._too_soon(ctx, relative_time))
 
-    @commands.command()
-    @guild_only_check()
-    async def leaderboard(self, ctx: commands.Context, top: int = 10, show_global: bool = False):
+    @app_commands.command(
+        name="leaderboard",
+        description="Show the richest members.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_commands.describe(
+        top="How many places to show. Defaults to 10.",
+        show_global="Show the whole bot rather than this server.",
+    )
+    async def leaderboard(
+        self,
+        interaction: discord.Interaction,
+        top: app_commands.Range[int, 1, 100] = 10,
+        show_global: bool = False,
+    ):
         """Print the leaderboard.
 
         Defaults to top 10.
@@ -973,6 +884,7 @@ class Economy(DashboardIntegration, commands.Cog):
         - `<top>` How many positions on the leaderboard to show. Defaults to 10 if omitted.
         - `<show_global>` Whether to include results from all servers. This will default to false unless specified.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         guild = ctx.guild
         author = ctx.author
         embed_requested = await ctx.embed_requested()
@@ -1073,147 +985,3 @@ class Economy(DashboardIntegration, commands.Cog):
             await menu(ctx, highscores)
         else:
             await ctx.send(_("No balances found."))
-
-    @guild_only_check()
-    @bank.is_owner_if_bank_global()
-    @commands.admin_or_permissions(manage_guild=True)
-    @commands.group()
-    async def economyset(self, ctx: commands.Context):
-        """Base command to manage Economy settings."""
-
-    @economyset.command(name="showsettings")
-    async def economyset_showsettings(self, ctx: commands.Context):
-        """
-        Shows the current economy settings
-        """
-        role_paydays = []
-        guild = ctx.guild
-        if await bank.is_global():
-            conf = self.config
-        else:
-            conf = self.config.guild(guild)
-            for role in guild.roles:
-                rolepayday = await self.config.role(role).PAYDAY_CREDITS()
-                if rolepayday:
-                    role_paydays.append(f"{role}: {rolepayday}")
-        await ctx.send(
-            box(
-                _(
-                    "---Economy Settings---\n"
-                    "Payday amount: {payday_amount}\n"
-                    "Payday cooldown: {payday_time}\n"
-                ).format(
-                    payday_time=humanize_number(await conf.PAYDAY_TIME()),
-                    payday_amount=humanize_number(await conf.PAYDAY_CREDITS()),
-                )
-            )
-        )
-        if role_paydays:
-            await ctx.send(box(_("---Role Payday Amounts---\n") + "\n".join(role_paydays)))
-
-    @economyset.command()
-    async def paydaytime(
-        self, ctx: commands.Context, *, duration: TimedeltaConverter(default_unit="seconds")
-    ):
-        """Set the cooldown for the payday command.
-
-        Examples:
-        - `[p]economyset paydaytime 86400`
-        - `[p]economyset paydaytime 1d`
-
-        **Arguments**
-
-        - `<duration>` The new duration to wait in between uses of payday. Default is 5 minutes.
-        Accepts: seconds, minutes, hours, days, weeks (if no unit is specified, the duration is assumed to be given in seconds)
-        """
-        seconds = int(duration.total_seconds())
-        guild = ctx.guild
-        if await bank.is_global():
-            await self.config.PAYDAY_TIME.set(seconds)
-        else:
-            await self.config.guild(guild).PAYDAY_TIME.set(seconds)
-        await ctx.send(
-            _("Value modified. At least {num} seconds must pass between each payday.").format(
-                num=seconds
-            )
-        )
-
-    @economyset.command()
-    async def paydayamount(self, ctx: commands.Context, creds: int):
-        """Set the amount earned each payday.
-
-        Example:
-        - `[p]economyset paydayamount 400`
-
-        **Arguments**
-
-        - `<creds>` The new amount to give when using the payday command. Default is 120.
-        """
-        guild = ctx.guild
-        max_balance = await bank.get_max_balance(ctx.guild)
-        if creds <= 0 or creds > max_balance:
-            return await ctx.send(
-                _("Amount must be greater than zero and less than {maxbal}.").format(
-                    maxbal=humanize_number(max_balance)
-                )
-            )
-        credits_name = await bank.get_currency_name(guild)
-        if await bank.is_global():
-            await self.config.PAYDAY_CREDITS.set(creds)
-        else:
-            await self.config.guild(guild).PAYDAY_CREDITS.set(creds)
-        await ctx.send(
-            _("Every payday will now give {num} {currency}.").format(
-                num=humanize_number(creds), currency=credits_name
-            )
-        )
-
-    @economyset.command()
-    async def rolepaydayamount(self, ctx: commands.Context, role: discord.Role, creds: int):
-        """Set the amount earned each payday for a role.
-
-        Set to `0` to remove the payday amount you set for that role.
-
-        Only available when not using a global bank.
-
-        Example:
-        - `[p]economyset rolepaydayamount @Members 400`
-
-        **Arguments**
-
-        - `<role>` The role to assign a custom payday amount to.
-        - `<creds>` The new amount to give when using the payday command.
-        """
-        guild = ctx.guild
-        max_balance = await bank.get_max_balance(ctx.guild)
-        if creds >= max_balance:
-            return await ctx.send(
-                _(
-                    "The bank requires that you set the payday to be less than"
-                    " its maximum balance of {maxbal}."
-                ).format(maxbal=humanize_number(max_balance))
-            )
-        credits_name = await bank.get_currency_name(guild)
-        if await bank.is_global():
-            await ctx.send(_("The bank must be per-server for per-role paydays to work."))
-        else:
-            if creds <= 0:  # Because I may as well...
-                default_creds = await self.config.guild(guild).PAYDAY_CREDITS()
-                await self.config.role(role).clear()
-                await ctx.send(
-                    _(
-                        "The payday value attached to role has been removed. "
-                        "Users with this role will now receive the default pay "
-                        "of {num} {currency}."
-                    ).format(num=humanize_number(default_creds), currency=credits_name)
-                )
-            else:
-                await self.config.role(role).PAYDAY_CREDITS.set(creds)
-                await ctx.send(
-                    _(
-                        "Every payday will now give {num} {currency} "
-                        "to people with the role {role_name}."
-                    ).format(
-                        num=humanize_number(creds), currency=credits_name, role_name=role.name
-                    )
-                )
