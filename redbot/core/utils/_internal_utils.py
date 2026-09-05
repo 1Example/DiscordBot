@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import collections.abc
-import contextlib
 import importlib.metadata
 import json
 import logging
@@ -16,26 +15,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from tarfile import TarInfo
-from typing import (
-    Any,
-    AsyncIterable,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Dict,
-    Generator,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Union,
-    TypedDict,
-    TypeVar,
-    TypedDict,
-    TYPE_CHECKING,
-    Tuple,
-    cast,
-)
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional, Union, TypedDict, TypeVar, TypedDict, TYPE_CHECKING
 
 import aiohttp
 import discord

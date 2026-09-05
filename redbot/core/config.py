@@ -4,19 +4,7 @@ import json
 import logging
 import pickle
 import weakref
-from typing import (
-    Any,
-    AsyncContextManager,
-    Awaitable,
-    Dict,
-    Generator,
-    MutableMapping,
-    Optional,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-)
+from typing import Any, AsyncContextManager, Awaitable, Dict, Generator, MutableMapping, Optional, Type, TypeVar, Union
 
 import discord
 

@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import platform
 import shlex
 import sys
@@ -11,7 +10,6 @@ from typing import Tuple
 import aiohttp
 import discord
 import redbot_update
-from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from redbot.core import data_manager
 

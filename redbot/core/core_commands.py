@@ -8,38 +8,23 @@ import logging
 import io
 import random
 import markdown
-import os
 import re
 import sys
 import platform
-import psutil
-import getpass
-import pip
 import traceback
 from pathlib import Path
 from collections import defaultdict
-from redbot.core import app_commands, data_manager
+from redbot.core import app_commands
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.utils.menus import menu
 from redbot.core.utils.views import SetApiView
 from redbot.core.commands import GuildConverter, RawUserIdConverter
 from string import ascii_letters, digits
-from typing import (
-    TYPE_CHECKING,
-    Union,
-    Tuple,
-    List,
-    Optional,
-    Iterable,
-    Sequence,
-    Dict,
-    Set,
-    Literal,
-)
+from typing import TYPE_CHECKING, Union, List, Optional, Iterable, Sequence, Dict, Set, Literal
 
 import aiohttp
 import discord
 from packaging.version import Version
-from redbot.core.data_manager import storage_type
 
 from . import (
     __version__,
@@ -56,19 +41,9 @@ from ._diagnoser import IssueDiagnoser
 from .utils import AsyncIter, can_user_send_messages_in
 from .utils._internal_utils import fetch_latest_red_version
 from .utils.predicates import MessagePredicate
-from .utils.chat_formatting import (
-    box,
-    escape,
-    humanize_list,
-    humanize_number,
-    humanize_timedelta,
-    inline,
-    pagify,
-    warning,
-)
+from .utils.chat_formatting import box, humanize_list, humanize_number, humanize_timedelta, inline, pagify, warning
 from .commands import CommandConverter, CogConverter
 from .commands.requires import PrivilegeLevel
-from .commands.help import HelpMenuSetting
 
 _entities = {
     "*": "&midast;",
@@ -396,14 +371,69 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         """Nothing to delete (Core Config is handled in a bot method)"""
         return
 
-    @commands.command(hidden=True)
-    async def ping(self, ctx: commands.Context):
+    async def _resolve_guilds(self, ctx, raw: str):
+        """The guilds `raw` names, or None once the complaint is sent.
+
+        `leave` took *servers: GuildConverter, which a slash command cannot
+        express; this reads the same IDs and names out of one string. An empty
+        string means the server the command was run in, which is what leaving
+        with no arguments did.
+        """
+        wanted = raw.split()
+        if not wanted:
+            return []
+        found = []
+        for item in wanted:
+            guild = None
+            if item.isdigit():
+                guild = self.bot.get_guild(int(item))
+            if guild is None:
+                guild = discord.utils.get(self.bot.guilds, name=item)
+            if guild is None:
+                await ctx.send(
+                    _("I could not find a server called `{name}`.").format(name=item[:100])
+                )
+                return None
+            found.append(guild)
+        return found
+
+    @staticmethod
+    async def _as_id(ctx, raw: str):
+        """A snowflake from a string, or None once the complaint is sent.
+
+        Discord IDs are larger than a slash command's integer option holds, so
+        they arrive as text.
+        """
+        try:
+            return int(raw.strip())
+        except ValueError:
+            await ctx.send(_("`{value}` is not a user ID.").format(value=raw[:100]))
+            return None
+
+    @app_commands.command(
+        name="ping",
+        description="Check how fast I answer Discord.",
+        extras={"red_force_enable": True},
+    )
+    async def ping(
+        self,
+        interaction: discord.Interaction,
+    ):
         """Pong."""
+        ctx = await commands.Context.from_interaction(interaction)
         await ctx.send("Pong.")
 
-    @commands.command()
-    async def info(self, ctx: commands.Context):
+    @app_commands.command(
+        name="info",
+        description="Show information about me.",
+        extras={"red_force_enable": True},
+    )
+    async def info(
+        self,
+        interaction: discord.Interaction,
+    ):
         """Shows info about [botname]."""
+        ctx = await commands.Context.from_interaction(interaction)
         embed_links = await ctx.embed_requested()
         author_repo = "https://github.com/Twentysix26"
         red_repo = "https://github.com/Cog-Creators/Red-DiscordBot"
@@ -552,9 +582,17 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             )
             await ctx.send(refs)
 
-    @commands.command()
-    async def uptime(self, ctx: commands.Context):
+    @app_commands.command(
+        name="uptime",
+        description="Show how long I have been running.",
+        extras={"red_force_enable": True},
+    )
+    async def uptime(
+        self,
+        interaction: discord.Interaction,
+    ):
         """Shows [botname]'s uptime."""
+        ctx = await commands.Context.from_interaction(interaction)
         delta = datetime.datetime.utcnow() - self.bot.uptime
         uptime = self.bot.uptime.replace(tzinfo=datetime.timezone.utc)
         uptime_str = humanize_timedelta(timedelta=delta) or _("Less than one second.")
@@ -1444,9 +1482,18 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             else _("Embeds are now disabled for you in DMs.")
         )
 
-    @commands.command()
-    @commands.is_owner()
-    async def traceback(self, ctx: commands.Context, public: bool = False):
+    @app_commands.command(
+        name="traceback",
+        description="Show the last exception I hit.",
+        extras={"red_force_enable": True},
+    )
+    @app_checks.is_owner()
+    @app_commands.describe(public="Post it in the channel instead of your DMs.")
+    async def traceback(
+        self,
+        interaction: discord.Interaction,
+        public: bool = False,
+    ):
         """Sends to the owner the last command exception that has occurred.
 
         If public (yes is specified), it will be sent to the chat instead.
@@ -1460,6 +1507,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `[public]` - Whether to send the traceback to the current context. Leave blank to send to your DMs.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         channel = ctx.channel if public else ctx.author
 
         if self.bot._last_exception:
@@ -1481,9 +1529,15 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         else:
             await ctx.send(_("No exception has occurred yet."))
 
-    @commands.command()
-    @commands.check(CoreLogic._can_get_invite_url)
-    async def invite(self, ctx):
+    @app_commands.command(
+        name="invite",
+        description="Get a link to add me to a server.",
+        extras={"red_force_enable": True},
+    )
+    async def invite(
+        self,
+        interaction: discord.Interaction,
+    ):
         """Shows [botname]'s invite url.
 
         This will always send the invite to DMs to keep it private.
@@ -1493,6 +1547,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Example:**
         - `[p]invite`
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        if not await self._can_get_invite_url(ctx):
+            await ctx.send(_("I cannot let you do that."))
+            return
         message = await self.bot.get_invite_url()
         if (admin := self.bot.get_cog("Admin")) and await admin.config.serverlocked():
             message += "\n\n" + warning(
@@ -1594,9 +1652,18 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 _("The `applications.commands` scope has been removed from the invite URL.")
             )
 
-    @commands.command()
-    @commands.is_owner()
-    async def leave(self, ctx: commands.Context, *servers: GuildConverter):
+    @app_commands.command(
+        name="leave",
+        description="Make me leave a server.",
+        extras={"red_force_enable": True},
+    )
+    @app_checks.is_owner()
+    @app_commands.describe(servers="Server IDs or names, separated by spaces. Empty means this one.")
+    async def leave(
+        self,
+        interaction: discord.Interaction,
+        servers: str = "",
+    ):
         """
         Leaves servers.
 
@@ -1612,6 +1679,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `[servers...]` - The servers to leave. When blank, attempts to leave the current server.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        servers = await self._resolve_guilds(ctx, servers)
+        if servers is None:
+            return
         guilds = servers
         if ctx.guild is None and not guilds:
             return await ctx.send(_("You need to specify at least one server ID."))
@@ -1678,14 +1749,22 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                     else:
                         await ctx.send(_("Alright, I'm not leaving that server."))
 
-    @commands.command()
-    @commands.is_owner()
-    async def servers(self, ctx: commands.Context):
+    @app_commands.command(
+        name="servers",
+        description="List the servers I am in.",
+        extras={"red_force_enable": True},
+    )
+    @app_checks.is_owner()
+    async def servers(
+        self,
+        interaction: discord.Interaction,
+    ):
         """
         Lists the servers [botname] is currently in.
 
         Note: This command is interactive.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         guilds = sorted(self.bot.guilds, key=lambda s: s.name.lower())
         msg = "\n".join(
             f"{discord.utils.escape_markdown(guild.name)} (`{guild.id}`)\n" for guild in guilds
@@ -4675,9 +4754,18 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         await ctx.bot._config.help.tagline.set(tagline)
         await ctx.send(_("The tagline has been set."))
 
-    @commands.command(cooldown_after_parsing=True)
-    @commands.cooldown(1, 60, commands.BucketType.user)
-    async def contact(self, ctx: commands.Context, *, message: str):
+    @app_commands.command(
+        name="contact",
+        description="Send a message to my owner.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.checks.cooldown(1, 60)
+    @app_commands.describe(message="What to tell them.")
+    async def contact(
+        self,
+        interaction: discord.Interaction,
+        message: str,
+    ):
         """Sends a message to the owner.
 
         This is limited to one message every 60 seconds per person.
@@ -4688,6 +4776,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `[message]` - The message to send to the owner.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         guild = ctx.message.guild
         author = ctx.message.author
         footer = _("User ID: {}").format(author.id)
@@ -4758,9 +4847,22 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         else:
             await ctx.send(_("I'm unable to deliver your message. Sorry."))
 
-    @commands.command()
-    @commands.is_owner()
-    async def dm(self, ctx: commands.Context, user_id: int, *, message: str):
+    @app_commands.command(
+        name="dm",
+        description="Send a direct message as me.",
+        extras={"red_force_enable": True},
+    )
+    @app_checks.is_owner()
+    @app_commands.describe(
+        user_id="The recipient's user ID.",
+        message="What to send.",
+    )
+    async def dm(
+        self,
+        interaction: discord.Interaction,
+        user_id: str,
+        message: str,
+    ):
         """Sends a DM to a user.
 
         This command needs a user ID to work.
@@ -4774,6 +4876,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `[message]` - The message to dm to the user.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        user_id = await self._as_id(ctx, user_id)
+        if user_id is None:
+            return
         destination = self.bot.get_user(user_id)
         if destination is None or destination.bot:
             await ctx.send(
@@ -4814,20 +4920,36 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             else:
                 await ctx.send(_("Message delivered to {}").format(destination))
 
-    @commands.command(hidden=True)
-    @commands.is_owner()
-    async def datapath(self, ctx: commands.Context):
+    @app_commands.command(
+        name="datapath",
+        description="Show where my data is kept.",
+        extras={"red_force_enable": True},
+    )
+    @app_checks.is_owner()
+    async def datapath(
+        self,
+        interaction: discord.Interaction,
+    ):
         """Prints the bot's data path."""
+        ctx = await commands.Context.from_interaction(interaction)
         from redbot.core.data_manager import basic_config
 
         data_dir = Path(basic_config["DATA_PATH"])
         msg = _("Data path: {path}").format(path=data_dir)
         await ctx.send(box(msg))
 
-    @commands.command(hidden=True)
-    @commands.is_owner()
-    async def debuginfo(self, ctx: commands.Context):
+    @app_commands.command(
+        name="debuginfo",
+        description="Show version and platform information.",
+        extras={"red_force_enable": True},
+    )
+    @app_checks.is_owner()
+    async def debuginfo(
+        self,
+        interaction: discord.Interaction,
+    ):
         """Shows debug information useful for debugging."""
+        ctx = await commands.Context.from_interaction(interaction)
         from redbot.core._debuginfo import DebugInfo
 
         await ctx.send(await DebugInfo(self.bot).get_command_text())
@@ -4837,19 +4959,26 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     # Truth to be told, that would require us to make some part of this
     # more end-user friendly rather than just bot owner friendly - terms like
     # 'global call once checks' are not of any use to someone who isn't bot owner.
-    @commands.is_owner()
-    @commands.command()
+    @app_commands.command(
+        name="diagnoseissues",
+        description="Work out why a command is not available to someone.",
+        extras={"red_force_enable": True},
+    )
+    @app_checks.is_owner()
+    @app_commands.describe(
+        member="Who to check for.",
+        command_name="The command, as you would type it without the leading slash.",
+        channel="Where to check. Defaults to here.",
+    )
     async def diagnoseissues(
         self,
-        ctx: commands.Context,
-        channel: Optional[
-            Union[discord.TextChannel, discord.VoiceChannel, discord.StageChannel, discord.Thread]
-        ] = commands.CurrentChannel,
-        # avoid non-default argument following default argument by using empty param()
-        member: Union[discord.Member, discord.User] = commands.param(),
-        *,
+        interaction: discord.Interaction,
+        member: discord.Member,
         command_name: str,
-    ) -> None:
+        channel: Union[
+            discord.TextChannel, discord.VoiceChannel, discord.StageChannel, discord.Thread
+        ] = None,
+    ):
         """
         Diagnose issues with the command checks with ease!
 
@@ -4864,6 +4993,8 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         - `<member>` - The member that should be considered as the command caller.
         - `<command_name>` - The name of the command to test.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        channel = channel or ctx.channel
         if ctx.guild is None:
             await ctx.send(
                 _(
@@ -5981,17 +6112,20 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
 
     # Removing this command from forks is a violation of the GPLv3 under which it is licensed.
     # Otherwise interfering with the ability for this command to be accessible is also a violation.
-    @commands.cooldown(1, 180, lambda ctx: (ctx.message.channel.id, ctx.message.author.id))
-    @commands.command(
-        cls=commands.commands._AlwaysAvailableCommand,
+    @app_commands.command(
         name="licenseinfo",
-        aliases=["licenceinfo"],
-        i18n=_,
+        description="Show my licence.",
+        extras={"red_force_enable": True},
     )
-    async def license_info_command(self, ctx):
+    @app_commands.checks.cooldown(1, 180)
+    async def license_info_command(
+        self,
+        interaction: discord.Interaction,
+    ):
         """
         Get info about Red's licenses.
         """
+        ctx = await commands.Context.from_interaction(interaction)
 
         message = (
             "This bot is an instance of Red-DiscordBot (hereinafter referred to as Red).\n"

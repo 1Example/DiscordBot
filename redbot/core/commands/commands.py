@@ -8,40 +8,10 @@ from __future__ import annotations
 import inspect
 import io
 import re
-import functools
-import weakref
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    ClassVar,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Tuple,
-    TypeVar,
-    Union,
-    MutableMapping,
-    TYPE_CHECKING,
-)
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union, MutableMapping, TYPE_CHECKING
 
 import discord
-from discord.ext.commands import (
-    BadArgument,
-    CommandError,
-    CheckFailure,
-    DisabledCommand,
-    command as dpy_command_deco,
-    Command as DPYCommand,
-    GroupCog as DPYGroupCog,
-    HybridCommand as DPYHybridCommand,
-    HybridGroup as DPYHybridGroup,
-    Cog as DPYCog,
-    CogMeta as DPYCogMeta,
-    Group as DPYGroup,
-    Greedy,
-)
+from discord.ext.commands import CommandError, CheckFailure, DisabledCommand, command as dpy_command_deco, Command as DPYCommand, GroupCog as DPYGroupCog, HybridCommand as DPYHybridCommand, HybridGroup as DPYHybridGroup, Cog as DPYCog, CogMeta as DPYCogMeta, Group as DPYGroup
 
 from .requires import PermState, PrivilegeLevel, Requires, PermStateAllowedStates
 from .. import app_commands

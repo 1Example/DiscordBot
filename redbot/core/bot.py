@@ -9,7 +9,6 @@ import shutil
 import sys
 import contextlib
 import weakref
-import functools
 from collections import namedtuple, OrderedDict
 from datetime import datetime
 from importlib.machinery import ModuleSpec
@@ -53,7 +52,6 @@ from . import (
 from ._cli import ExitCodes
 from ._cog_manager import CogManager, CogManagerUI
 from .core_commands import Core
-from .data_manager import cog_data_path
 from .dev_commands import Dev
 from ._events import init_events
 from ._global_checks import init_global_checks

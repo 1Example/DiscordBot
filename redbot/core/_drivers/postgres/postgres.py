@@ -10,7 +10,7 @@ try:
 except ModuleNotFoundError:
     asyncpg = None
 
-from ... import data_manager, errors
+from ... import errors
 from ..base import BaseDriver, IdentifierData, ConfigCategory, MissingExtraRequirements
 from ..log import log
 
