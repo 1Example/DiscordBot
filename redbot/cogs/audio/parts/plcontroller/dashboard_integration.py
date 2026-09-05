@@ -9,7 +9,6 @@ import typing as t
 
 import discord
 from redbot.core import bank
-from redbot.core.errors import BalanceTooHigh  # noqa: F401
 
 from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (

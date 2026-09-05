@@ -12,7 +12,6 @@ from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import box
 from tabulate import tabulate
 
-from pylav.core.context import PyLavContext
 from pylav.exceptions.node import NodeHasNoFiltersException
 from pylav.extension.red.converters.equalizer import BassBoostConverter
 from pylav.extension.red.utils.decorators import invoker_is_dj, requires_player
@@ -21,7 +20,7 @@ from pylav.helpers.format.strings import shorten_string
 from pylav.logging import getLogger
 from pylav.players.filters import Equalizer
 from pylav.storage.models.equilizer import Equalizer as Equalizer_namespace_conflict
-from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN, DISCORD_INTERACTION_TYPE
 from pylav.type_hints.dict_typing import JSON_DICT_TYPE
 from .dashboard_integration import EffectsDashboard
 from pylav.constants.misc import EQ_BAND_MAPPING

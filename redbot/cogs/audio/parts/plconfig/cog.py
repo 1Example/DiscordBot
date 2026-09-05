@@ -2,15 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import discord
 from redbot.core.i18n import Translator, cog_i18n
 from tabulate import tabulate
 
-from pylav.helpers.format.strings import shorten_string
 from pylav.logging import getLogger
-from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN
 
-from .view import InfoView
 from pylav.core.client import Client
 from .dashboard_integration import PyLavConfigDashboard
 

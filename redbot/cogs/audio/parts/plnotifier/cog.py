@@ -19,7 +19,6 @@ from tabulate import tabulate
 
 from pylav.compat import json
 from pylav.constants.misc import EQ_BAND_MAPPING
-from pylav.core.context import PyLavContext
 from pylav.events.node import NodeChangedEvent, NodeConnectedEvent, NodeDisconnectedEvent, WebSocketClosedEvent
 from pylav.events.player import (
     FiltersAppliedEvent,
@@ -76,7 +75,7 @@ from pylav.helpers.format.ascii import EightBitANSI
 from pylav.helpers.format.strings import format_time_dd_hh_mm_ss
 from pylav.logging import getLogger
 from pylav.players.filters import Equalizer, Volume
-from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN
 from .dashboard_integration import NotifierDashboard
 
 _ = Translator("PyLavNotifier", Path(__file__))

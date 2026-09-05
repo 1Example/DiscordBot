@@ -5,9 +5,7 @@ from pathlib import Path
 from redbot.core import commands
 from redbot.core.i18n import Translator, cog_i18n
 from tabulate import tabulate
-from pylav.helpers.format.ascii import EightBitANSI
-from pylav.players.tracks.obj import Track
-from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN
 
 from .dashboard_integration import LyricsDashboard
 from pylav.logging import getLogger

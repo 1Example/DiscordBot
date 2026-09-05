@@ -6,10 +6,7 @@ import discord
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import humanize_list
 from tabulate import tabulate
-from pylav.extension.red.ui.prompts.playlists import maybe_prompt_for_playlist
-from pylav.helpers.format.ascii import EightBitANSI
 from pylav.logging import getLogger
-from pylav.storage.models.playlist import Playlist
 from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN
 from pylav.storage.models.player.config import PlayerConfig
 

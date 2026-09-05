@@ -4,12 +4,12 @@ from typing import Collection, Tuple
 
 import discord
 from redbot import __version__
-from redbot.core import _downloader, app_commands, commands
+from redbot.core import _downloader, commands
 from redbot.core._downloader.installable import InstalledModule
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils import can_user_react_in
-from redbot.core.utils.chat_formatting import box, pagify, humanize_list, inline
+from redbot.core.utils.chat_formatting import pagify, humanize_list, inline
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from .converters import Repo
@@ -295,106 +295,6 @@ class Downloader(DashboardIntegration, commands.Cog):
             return node
         return self.bot.all_commands.get(parts[0])
 
-    @app_commands.command(
-        name="findcog",
-        description="Find which cog a command comes from.",
-        extras={"red_force_enable": True},
-    )
-    @app_commands.describe(
-        command_name="The command to look up, with or without a leading slash."
-    )
-    async def findcog(
-        self, interaction: discord.Interaction, command_name: str
-    ) -> None:
-        """Find which cog a command comes from.
-
-        Only finds loaded cogs.
-        """
-        ctx = await commands.Context.from_interaction(interaction)
-        await ctx.typing()
-        command_name = command_name.strip().lstrip('/')
-        command = self._find_command(command_name)
-
-        if command is None:
-            await ctx.send(_("That command doesn't seem to exist."))
-            return
-
-        # Check if in installed cogs
-        cog = command.cog
-        if cog:
-            cog_pkg_name = self.cog_name_from_instance(cog)
-            installed, cog_installable = await _downloader.is_installed(cog_pkg_name)
-            if installed:
-                made_by = (
-                    humanize_list(cog_installable.author)
-                    if cog_installable.author
-                    else _("Missing from info.json")
-                )
-                repo_url = (
-                    _("Missing from installed repos")
-                    if cog_installable.repo is None
-                    else cog_installable.repo.clean_url
-                )
-                repo_name = (
-                    _("Missing from installed repos")
-                    if cog_installable.repo is None
-                    else cog_installable.repo.name
-                )
-                cog_pkg_name = cog_installable.name
-            elif cog.__module__.startswith("redbot."):  # core commands or core cog
-                made_by = "Cog Creators"
-                repo_url = "https://github.com/Cog-Creators/Red-DiscordBot"
-                module_fragments = cog.__module__.split(".")
-                if module_fragments[1] == "core":
-                    cog_pkg_name = "N/A - Built-in commands"
-                else:
-                    cog_pkg_name = module_fragments[2]
-                repo_name = "Red-DiscordBot"
-            else:  # assume not installed via downloader
-                made_by = _("Unknown")
-                repo_url = _("None - this cog wasn't installed via downloader")
-                repo_name = _("Unknown")
-            cog_name = cog.__class__.__name__
-        else:
-            msg = _("This command is not provided by a cog.")
-            await ctx.send(msg)
-            return
-
-        if await ctx.embed_requested():
-            embed = discord.Embed(color=(await ctx.embed_colour()))
-            embed.add_field(name=_("Command:"), value=command_name, inline=False)
-            embed.add_field(name=_("Cog package name:"), value=cog_pkg_name, inline=True)
-            embed.add_field(name=_("Cog name:"), value=cog_name, inline=True)
-            embed.add_field(name=_("Made by:"), value=made_by, inline=False)
-            embed.add_field(name=_("Repo name:"), value=repo_name, inline=False)
-            embed.add_field(name=_("Repo URL:"), value=repo_url, inline=False)
-            if installed and cog_installable.repo is not None and cog_installable.repo.branch:
-                embed.add_field(
-                    name=_("Repo branch:"), value=cog_installable.repo.branch, inline=False
-                )
-            await ctx.send(embed=embed)
-
-        else:
-            msg = _(
-                "Command:          {command}\n"
-                "Cog package name: {cog_pkg}\n"
-                "Cog name:         {cog}\n"
-                "Made by:          {author}\n"
-                "Repo name:        {repo_name}\n"
-                "Repo URL:         {repo_url}\n"
-            ).format(
-                command=command_name,
-                cog_pkg=cog_pkg_name,
-                cog=cog_name,
-                author=made_by,
-                repo_url=repo_url,
-                repo_name=repo_name,
-            )
-            if installed and cog_installable.repo is not None and cog_installable.repo.branch:
-                msg += _("Repo branch: {branch_name}\n").format(
-                    branch_name=cog_installable.repo.branch
-                )
-            await ctx.send(box(msg))
 
     @staticmethod
     def format_failed_repos(failed: Collection[str]) -> str:

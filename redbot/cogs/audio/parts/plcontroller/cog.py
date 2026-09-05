@@ -11,7 +11,7 @@ from typing import Literal
 
 import discord
 from apscheduler.jobstores.base import JobLookupError
-from redbot.core import Config, bank, commands
+from redbot.core import Config, commands
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.antispam import AntiSpam
 from redbot.core.utils.chat_formatting import humanize_number
@@ -26,7 +26,7 @@ from pylav.events.track import TrackStartEvent
 from pylav.helpers.time import get_now_utc
 from pylav.players.player import Player
 from pylav.players.query.obj import Query
-from pylav.type_hints.bot import DISCORD_BOT_TYPE, DISCORD_COG_TYPE_MIXIN
+from pylav.type_hints.bot import DISCORD_COG_TYPE_MIXIN
 
 _ = Translator("PyLavController", Path(__file__))
 

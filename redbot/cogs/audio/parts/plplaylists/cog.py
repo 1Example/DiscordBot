@@ -13,7 +13,7 @@ from dacite import from_dict
 from discord import app_commands
 from redbot.core import Config, commands
 from redbot.core.i18n import Translator, cog_i18n
-from redbot.core.utils.chat_formatting import bold, box, humanize_list
+from redbot.core.utils.chat_formatting import bold, humanize_list
 from tabulate import tabulate
 
 from pylav.constants.playlists import BUNDLED_PLAYLIST_IDS
@@ -29,7 +29,6 @@ from pylav.extension.red.utils import CompositeMetaClass, rgetattr
 from pylav.extension.red.utils.decorators import always_hidden, invoker_is_dj, requires_player
 from pylav.helpers.discord.converters.playlists import PlaylistConverter
 from pylav.helpers.discord.converters.queries import QueryPlaylistConverter
-from pylav.helpers.format.ascii import EightBitANSI
 from pylav.helpers.format.strings import shorten_string
 from pylav.nodes.api.responses.track import Track as Track_namespace_conflict
 from pylav.players.query.obj import Query
@@ -75,35 +74,6 @@ class PyLavPlaylists(
         """
         await self._playlists_config.user_from_id(user_id).clear()
 
-    @slash_playlist.command(name="version")
-    @app_commands.guild_only()
-    async def slash_playlist_version(self, interaction: DISCORD_INTERACTION_TYPE) -> None:
-        """Show the version of the Cog and PyLav"""
-        if not interaction.response.is_done():
-            await interaction.response.defer(ephemeral=True)
-        context = await self.bot.get_context(interaction)
-        data = [
-            (EightBitANSI.paint_white(self.__class__.__name__), EightBitANSI.paint_blue(self.__version__)),
-            (EightBitANSI.paint_white("PyLav"), EightBitANSI.paint_blue(context.pylav.lib_version)),
-        ]
-
-        await context.send(
-            embed=await context.pylav.construct_embed(
-                description=box(
-                    tabulate(
-                        data,
-                        headers=(
-                            EightBitANSI.paint_yellow(_("Library / Cog"), bold=True, underline=True),
-                            EightBitANSI.paint_yellow(_("Version"), bold=True, underline=True),
-                        ),
-                        tablefmt="fancy_grid",
-                    ),
-                    lang="ansi",
-                ),
-                messageable=context,
-            ),
-            ephemeral=True,
-        )
 
     @slash_playlist.command(name="create", description=shorten_string(max_length=100, string=_("Create a playlist")))
     @app_commands.describe(
