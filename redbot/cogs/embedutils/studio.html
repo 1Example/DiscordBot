@@ -14,7 +14,9 @@
   "saved": {{ studio_saved|tojson }},
   "limits": {{ studio_limits|tojson }},
   "bot": {{ studio_bot|tojson }},
-  "guild": {{ studio_guild|tojson }}
+  "guild": {{ studio_guild|tojson }},
+  "savedGlobal": {{ studio_saved_global|tojson }},
+  "isOwner": {{ studio_is_owner|tojson }}
 }
 </script>
 
@@ -301,6 +303,22 @@
         <div class="fl"><span>Channels</span><span class="ct" id="eusChCount">0 selected</span></div>
         <div id="eusChips"></div>
       </div>
+      <div>
+        <div class="fl"><span>Post as</span></div>
+        <div class="two">
+          <input type="text" id="eusHookName" maxlength="80"
+                 placeholder="{{ studio_bot.name }} (leave empty)" />
+          <input type="text" id="eusHookAvatar" placeholder="avatar URL (optional)" />
+        </div>
+        <p class="muted" style="margin-top:8px">
+          Give a name to post through a webhook instead, so the message arrives
+          under that name. I need Manage Webhooks in the channel for it.
+        </p>
+      </div>
+      <div id="eusEditWrap" hidden>
+        <div class="fl"><span>Loaded message</span></div>
+        <p class="muted" id="eusEditNote"></p>
+      </div>
       <div id="eusReportWrap" hidden>
         <div class="fl"><span>Result</span></div>
         <div class="report" id="eusReport"></div>
@@ -308,6 +326,7 @@
     </div>
     <div class="df">
       <button type="button" class="ghost" data-close>Cancel</button>
+      <button type="button" class="ghost" id="eusDoEdit" hidden>Update that message</button>
       <button type="button" class="primary" id="eusDoSend">Send</button>
     </div>
   </dialog>
@@ -323,9 +342,27 @@
           <button type="button" class="ghost" id="eusTplSave">Save template</button>
         </div>
       </div>
+      <div id="eusTplScopeWrap" hidden>
+        <div class="fl"><span>Level</span></div>
+        <div class="seg" role="group" aria-label="Template level">
+          <button type="button" id="eusTplGuild" aria-pressed="true">This server</button>
+          <button type="button" id="eusTplGlobal" aria-pressed="false">Global</button>
+        </div>
+        <p class="muted" style="margin-top:8px">
+          Global templates are shared by every server this bot is in. Owners only.
+        </p>
+      </div>
       <div>
-        <div class="fl"><span>Saved in this server</span></div>
+        <div class="fl"><span id="eusTplListLabel">Saved in this server</span></div>
         <div id="eusTplList"></div>
+      </div>
+      <div id="eusMigrateWrap" hidden>
+        <div class="fl"><span>Migration</span></div>
+        <button type="button" class="ghost" id="eusMigrate">Import from EmbedUtils by Phen</button>
+        <p class="muted" style="margin-top:8px">
+          Copies stored embeds out of the old cog's config. Anything already saved
+          here is left alone, so running it twice is safe.
+        </p>
       </div>
     </div>
     <div class="df"><button type="button" class="ghost" data-close>Done</button></div>
@@ -391,6 +428,8 @@
 
   var state, sel = { part: "content", embed: 0 }, mode = "build";
   var undo = [], redo = [], picked = [];
+  // The message link a load came from, when it is one I can edit in place.
+  var loaded = null, tplScope = "guild";
 
   /* ---------------- persistence ---------------- */
   function loadDraft() {
@@ -913,11 +952,20 @@
       ? "Send to " + picked.length + " channel" + (picked.length === 1 ? "" : "s") : "Send";
   }
 
+  function hookFields() {
+    return {
+      webhook_name: $("eusHookName").value.trim(),
+      webhook_avatar: $("eusHookAvatar").value.trim()
+    };
+  }
+
   $("eusDoSend").onclick = function () {
     var btn = this;
     btn.disabled = true;
     btn.textContent = "Sending…";
-    call("send", { channels: picked }).then(function (res) {
+    var extra = hookFields();
+    extra.channels = picked;
+    call("send", extra).then(function (res) {
       var wrap = $("eusReportWrap"), list = $("eusReport");
       wrap.hidden = false;
       if (!res.results) {
@@ -940,15 +988,33 @@
   };
 
   /* ---------------- templates ---------------- */
+  function currentTemplates() {
+    return tplScope === "global" ? boot.savedGlobal : boot.saved;
+  }
+
+  function storeList(res) {
+    if (res.scope === "global") boot.savedGlobal = res.list;
+    else boot.saved = res.list;
+  }
+
+  function setTplScope(next) {
+    tplScope = next;
+    $("eusTplGuild").setAttribute("aria-pressed", next === "guild" ? "true" : "false");
+    $("eusTplGlobal").setAttribute("aria-pressed", next === "global" ? "true" : "false");
+    $("eusTplListLabel").textContent =
+      next === "global" ? "Saved globally" : "Saved in this server";
+    renderTemplates();
+  }
+
   function renderTemplates() {
     var host = $("eusTplList");
-    if (!boot.saved.length) {
-      host.innerHTML = '<p class="muted">Nothing saved yet. Templates are shared with ' +
-        "<code>[p]embed store</code>.</p>";
+    var items = currentTemplates();
+    if (!items.length) {
+      host.innerHTML = '<p class="muted">Nothing saved here yet.</p>';
       return;
     }
     host.innerHTML = "";
-    boot.saved.forEach(function (t) {
+    items.forEach(function (t) {
       var row = document.createElement("div");
       row.className = "tpl";
       row.innerHTML = "<div><b>" + esc(t.name) + "</b> " +
@@ -971,9 +1037,9 @@
         var del = document.createElement("button");
         del.type = "button"; del.className = "link danger"; del.textContent = "Delete";
         del.onclick = function () {
-          call("delete", { name: t.name }).then(function (res) {
+          call("delete", { name: t.name, scope: tplScope }).then(function (res) {
             if (!res.ok) return toast(res.error, true);
-            boot.saved = res.list; renderTemplates(); toast("Deleted " + t.name);
+            storeList(res); renderTemplates(); toast("Deleted " + t.name);
           }).catch(function (e) { toast(e.message, true); });
         };
         acts.appendChild(del);
@@ -986,14 +1052,30 @@
   $("eusTplSave").onclick = function () {
     var name = $("eusTplName").value.trim();
     if (!name) return toast("Give the template a name.", true);
-    call("save", { name: name }).then(function (res) {
+    call("save", { name: name, scope: tplScope }).then(function (res) {
       if (!res.ok) return toast(res.error, true);
-      boot.saved = res.list;
+      storeList(res);
       $("eusTplName").value = "";
       renderTemplates();
       toast("Saved as " + res.saved);
     }).catch(function (e) { toast(e.message, true); });
   };
+
+  if (boot.isOwner) {
+    $("eusTplScopeWrap").hidden = false;
+    $("eusMigrateWrap").hidden = false;
+    $("eusTplGuild").onclick = function () { setTplScope("guild"); };
+    $("eusTplGlobal").onclick = function () { setTplScope("global"); };
+    $("eusMigrate").onclick = function () {
+      var btn = this;
+      btn.disabled = true;
+      call("migrate", {}).then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) return toast(res.error, true);
+        toast(res.moved + " template" + (res.moved === 1 ? "" : "s") + " imported");
+      }).catch(function (e) { btn.disabled = false; toast(e.message, true); });
+    };
+  }
 
   /* ---------------- load a message ---------------- */
   $("eusDoLoad").onclick = function () {
@@ -1005,9 +1087,42 @@
       state = fromPayload(res.payload);
       sel = { part: "content", embed: 0 };
       renderAll();
+      // Only my own messages can be edited in place; anything else stays a
+      // copy to repost.
+      loaded = res.mine ? ref : null;
+      updateEditBtn();
       $("eusLoadDlg").close();
-      toast("Loaded the message");
+      toast(res.mine ? "Loaded \u2014 you can update it in place" : "Loaded a copy");
     }).catch(function (e) { toast(e.message, true); });
+  };
+
+  function updateEditBtn() {
+    $("eusDoEdit").hidden = !loaded;
+    $("eusEditWrap").hidden = !loaded;
+    if (loaded) {
+      $("eusEditNote").textContent =
+        "Update replaces that message instead of posting a new one.";
+    }
+  }
+
+  $("eusDoEdit").onclick = function () {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = "Updating\u2026";
+    call("edit", { reference: loaded }).then(function (res) {
+      btn.disabled = false;
+      btn.textContent = "Update that message";
+      if (!res.ok) return toast(res.error, true);
+      var wrap = $("eusReportWrap"), list = $("eusReport");
+      wrap.hidden = false;
+      list.innerHTML = "<div class=\"rrow\"><b>&#10003;</b><b>Updated</b>" +
+        "<a href=\"" + esc(res.link) + "\" target=\"_blank\" rel=\"noopener\">Open</a></div>";
+      toast("Message updated");
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = "Update that message";
+      toast(e.message, true);
+    });
   };
 
   /* ---------------- chrome ---------------- */

@@ -19,9 +19,10 @@ import re
 import typing
 
 import discord
-from redbot.core import commands
+from redbot.core import Config, commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator
+from redbot.core.utils import get_or_create_webhook
 
 _: Translator = Translator("EmbedUtils", __file__)
 
@@ -203,6 +204,8 @@ class DashboardIntegration:
                 "csrf_token_value": (kwargs.get("csrf_token") or ("", ""))[1],
                 "studio_channels": channels,
                 "studio_saved": await self._saved(guild),
+                "studio_saved_global": await self._saved(None),
+                "studio_is_owner": is_owner,
                 "studio_limits": LIMITS,
                 "studio_bot": {
                     "name": guild.me.display_name,
@@ -235,6 +238,10 @@ class DashboardIntegration:
                 return {"data": await self._delete(member, guild, form)}
             if action == "load_message":
                 return {"data": await self._load_message(guild, form)}
+            if action == "edit":
+                return {"data": await self._edit(member, guild, payload, form)}
+            if action == "migrate":
+                return {"data": await self._migrate(member)}
         except Exception as error:  # noqa: BLE001
             self.logger.exception("Embed Studio action %r failed", action)
             return {"data": {"ok": False, "error": str(error)}}
@@ -267,6 +274,13 @@ class DashboardIntegration:
         except Exception as error:  # noqa: BLE001
             return {"ok": False, "error": "Discord rejected the embed data: %s" % error}
 
+        # Posting under another name needs a webhook, which needs Manage
+        # Webhooks; without a name this stays an ordinary message.
+        webhook_name = (form.get("webhook_name") or "").strip()[:80]
+        webhook_avatar = (form.get("webhook_avatar") or "").strip()
+        if webhook_avatar and not webhook_avatar.startswith(("http://", "https://")):
+            return {"ok": False, "error": "The avatar has to be an http(s) URL."}
+
         # One result per channel rather than a burst of toasts, so a partial
         # failure is legible.
         results = []
@@ -285,7 +299,24 @@ class DashboardIntegration:
                 results.append({"channel": name, "ok": False, "why": "I cannot post there."})
                 continue
             try:
-                message = await channel.send(content=content, embeds=embeds)
+                if webhook_name:
+                    message = await self._send_as_webhook(
+                        channel, content, embeds, webhook_name, webhook_avatar
+                    )
+                else:
+                    message = await channel.send(content=content, embeds=embeds)
+            except discord.Forbidden:
+                results.append(
+                    {
+                        "channel": name,
+                        "ok": False,
+                        "why": (
+                            "I need Manage Webhooks there to post under another name."
+                            if webhook_name
+                            else "I am not allowed to post there."
+                        ),
+                    }
+                )
             except discord.HTTPException as error:
                 results.append({"channel": name, "ok": False, "why": str(error)})
             else:
@@ -303,48 +334,106 @@ class DashboardIntegration:
         )
         return {"ok": sent > 0, "results": results, "sent": sent, "total": len(results)}
 
-    async def _save(self, member, guild, payload: dict, form) -> dict:
-        name = (form.get("name") or "").strip().lower()
-        if not name:
-            return {"ok": False, "error": "Give the template a name."}
-        if len(name) > 32:
-            return {"ok": False, "error": "Names are limited to 32 characters."}
-        embeds = payload.get("embeds") or []
-        if not embeds:
-            return {"ok": False, "error": "There is no embed to save."}
+    async def _send_as_webhook(self, channel, content, embeds, username, avatar_url):
+        """Post through the bot's webhook, so it arrives under another name.
 
-        async with self.config.guild(guild).stored_embeds() as stored:
-            existing = stored.get(name)
-            if existing and existing.get("locked") and member.id not in self.bot.owner_ids:
-                return {"ok": False, "error": "`%s` is locked and cannot be replaced." % name}
-            if not existing and len(stored) >= 100:
-                return {
-                    "ok": False,
-                    "error": "This server has reached the 100 stored embed limit.",
+        A thread has no webhooks of its own; the one on its parent takes a
+        thread to post into.
+        """
+        thread = discord.utils.MISSING
+        target = channel
+        if isinstance(channel, discord.Thread):
+            thread, target = channel, channel.parent
+        hook = await get_or_create_webhook(bot=self.bot, channel=target)
+        return await hook.send(
+            content=content or discord.utils.MISSING,
+            embeds=embeds,
+            username=username,
+            avatar_url=avatar_url or discord.utils.MISSING,
+            thread=thread,
+            wait=True,
+        )
+
+    async def _edit(self, member, guild, payload: dict, form) -> dict:
+        """Replace the content and embeds of a message this bot already sent."""
+        problems = validate(payload)
+        if problems:
+            return {"ok": False, "error": problems[0], "problems": problems}
+
+        found = await self._fetch_referenced(guild, form)
+        if isinstance(found, dict):
+            return found
+        message = found
+
+        if message.author.id != guild.me.id:
+            return {"ok": False, "error": "I can only edit my own messages."}
+        if not message.channel.permissions_for(member).send_messages:
+            return {"ok": False, "error": "You cannot post in that channel."}
+
+        content = payload.get("content") or None
+        try:
+            embeds = [discord.Embed.from_dict(e) for e in payload.get("embeds") or []]
+        except Exception as error:  # noqa: BLE001
+            return {"ok": False, "error": "Discord rejected the embed data: %s" % error}
+        try:
+            message = await message.edit(content=content, embeds=embeds)
+        except discord.HTTPException as error:
+            return {"ok": False, "error": str(error)}
+        self.logger.trace(
+            "Embed Studio: %s (%s) edited %s in %s (%s).",
+            member.display_name,
+            member.id,
+            message.id,
+            guild.name,
+            guild.id,
+        )
+        return {"ok": True, "link": message.jump_url}
+
+    async def _migrate(self, member) -> dict:
+        """Bring stored embeds over from EmbedUtils by Phen. Owner only."""
+        if member.id not in self.bot.owner_ids:
+            return {"ok": False, "error": "Only a bot owner can run the migration."}
+
+        old_config = Config.get_conf(
+            "EmbedUtils",
+            identifier=43248937299564234735284,
+            force_registration=True,
+            cog_name="EmbedUtils",
+        )
+
+        def shaped(records: dict) -> dict:
+            return {
+                name: {
+                    "author": data["author"],
+                    "embed": data["embed"],
+                    "locked": data.get("locked", False),
+                    "uses": data["uses"],
                 }
-            # The same record shape `[p]embed store` writes, so templates saved
-            # here and in chat stay interchangeable.
-            stored[name] = {
-                "author": member.id,
-                "embed": embeds[0],
-                "locked": bool(existing.get("locked")) if existing else False,
-                "uses": int(existing.get("uses", 0)) if existing else 0,
+                for name, data in records.items()
             }
-        return {"ok": True, "saved": name, "list": await self._saved(guild)}
 
-    async def _delete(self, member, guild, form) -> dict:
-        name = (form.get("name") or "").strip().lower()
-        async with self.config.guild(guild).stored_embeds() as stored:
-            record = stored.get(name)
-            if record is None:
-                return {"ok": False, "error": "There is no template called `%s`." % name}
-            if record.get("locked") and member.id not in self.bot.owner_ids:
-                return {"ok": False, "error": "`%s` is locked." % name}
-            del stored[name]
-        return {"ok": True, "list": await self._saved(guild)}
+        moved = 0
+        old_global_data = await old_config.all()
+        if "embeds" in old_global_data:
+            async with self.config.stored_embeds() as stored:
+                # Anything already here wins: this is a migration, not a restore.
+                incoming = shaped(old_global_data["embeds"])
+                for name, record in incoming.items():
+                    if name not in stored:
+                        stored[name] = record
+                        moved += 1
+        for guild_id, old_guild_data in (await old_config.all_guilds()).items():
+            if "embeds" not in old_guild_data:
+                continue
+            async with self.config.guild_from_id(guild_id).stored_embeds() as stored:
+                for name, record in shaped(old_guild_data["embeds"]).items():
+                    if name not in stored:
+                        stored[name] = record
+                        moved += 1
+        return {"ok": True, "moved": moved}
 
-    async def _load_message(self, guild, form) -> dict:
-        """Pull the content and embeds off a posted message so they can be edited."""
+    async def _fetch_referenced(self, guild, form):
+        """The message a link points at, or an error dict saying why not."""
         reference = (form.get("reference") or "").strip()
         match = MESSAGE_LINK.search(reference)
         if not match:
@@ -354,22 +443,94 @@ class DashboardIntegration:
             }
         if int(match.group("guild")) != guild.id:
             return {"ok": False, "error": "That message is in a different server."}
-
         channel = guild.get_channel_or_thread(int(match.group("channel")))
         if channel is None:
             return {"ok": False, "error": "I cannot see that channel."}
         try:
-            message = await channel.fetch_message(int(match.group("message")))
+            return await channel.fetch_message(int(match.group("message")))
         except discord.NotFound:
             return {"ok": False, "error": "That message no longer exists."}
         except discord.Forbidden:
             return {"ok": False, "error": "I am not allowed to read that channel."}
 
+    def _store(self, guild):
+        """The stored_embeds group for a server, or the global one."""
+        return (self.config if guild is None else self.config.guild(guild)).stored_embeds
+
+    def _scope(self, member, guild, form):
+        """Which level a template action means. Global is owner-only."""
+        if (form.get("scope") or "guild") != "global":
+            return guild, None
+        if member.id not in self.bot.owner_ids:
+            return None, "Only a bot owner can touch global templates."
+        return None, None
+
+    async def _save(self, member, guild, payload: dict, form) -> dict:
+        name = (form.get("name") or "").strip().lower()
+        if not name:
+            return {"ok": False, "error": "Give the template a name."}
+        if len(name) > 32:
+            return {"ok": False, "error": "Names are limited to 32 characters."}
+        embeds = payload.get("embeds") or []
+        if not embeds:
+            return {"ok": False, "error": "There is no embed to save."}
+        where, denied = self._scope(member, guild, form)
+        if denied:
+            return {"ok": False, "error": denied}
+
+        async with self._store(where)() as stored:
+            existing = stored.get(name)
+            if existing and existing.get("locked") and member.id not in self.bot.owner_ids:
+                return {"ok": False, "error": "`%s` is locked and cannot be replaced." % name}
+            if not existing and len(stored) >= 100:
+                return {
+                    "ok": False,
+                    "error": "The 100 stored embed limit has been reached here.",
+                }
+            # The same record shape `[p]embed store` writes, so templates saved
+            # here and in chat stay interchangeable.
+            stored[name] = {
+                "author": member.id,
+                "embed": embeds[0],
+                "locked": bool(existing.get("locked")) if existing else False,
+                "uses": int(existing.get("uses", 0)) if existing else 0,
+            }
         return {
             "ok": True,
+            "saved": name,
+            "scope": "global" if where is None else "guild",
+            "list": await self._saved(where),
+        }
+
+    async def _delete(self, member, guild, form) -> dict:
+        name = (form.get("name") or "").strip().lower()
+        where, denied = self._scope(member, guild, form)
+        if denied:
+            return {"ok": False, "error": denied}
+        async with self._store(where)() as stored:
+            record = stored.get(name)
+            if record is None:
+                return {"ok": False, "error": "There is no template called `%s`." % name}
+            if record.get("locked") and member.id not in self.bot.owner_ids:
+                return {"ok": False, "error": "`%s` is locked." % name}
+            del stored[name]
+        return {
+            "ok": True,
+            "scope": "global" if where is None else "guild",
+            "list": await self._saved(where),
+        }
+
+    async def _load_message(self, guild, form) -> dict:
+        """Pull the content and embeds off a posted message so they can be edited."""
+        found = await self._fetch_referenced(guild, form)
+        if isinstance(found, dict):
+            return found
+        return {
+            "ok": True,
+            "mine": found.author.id == guild.me.id,
             "payload": {
-                "content": message.content or "",
-                "embeds": [e.to_dict() for e in message.embeds],
+                "content": found.content or "",
+                "embeds": [e.to_dict() for e in found.embeds],
             },
         }
 
@@ -396,7 +557,7 @@ class DashboardIntegration:
         return out
 
     async def _saved(self, guild) -> list:
-        stored = await self.config.guild(guild).stored_embeds()
+        stored = await self._store(guild)()
         return sorted(
             (
                 {
