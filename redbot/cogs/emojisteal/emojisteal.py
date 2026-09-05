@@ -41,8 +41,7 @@ class EmojiSteal(DashboardIntegration, commands.Cog):
     def __init__(self, bot):
         super().__init__()
         self.bot = bot
-        # Force-enabled, or Red's [p]slash gate keeps them hidden - and with
-        # the prefix commands gone these are the only way in.
+        # With the prefix commands gone these are the only way in.
         self.steal_context_menu = app_commands.ContextMenu(
             name="Steal Emotes",
             callback=self.steal_app_command,

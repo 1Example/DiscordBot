@@ -409,6 +409,5 @@ async def setup(bot: Red):
         # collide with and theirs is left alone.
 
         await bot.add_cog(SimpleCasino(bot))
-        await bot.tree.red_check_enabled()  # type: ignore  # register slash commands
 
     _ = asyncio.create_task(add_cog())

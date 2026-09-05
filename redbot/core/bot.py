@@ -163,6 +163,11 @@ class Red(
             datarequests__allow_user_requests=True,
             datarequests__user_requests_are_strict=True,
             use_buttons=False,
+            # Despite the names, these are the app command ID cache that
+            # tree.sync() fills and get_app_command_mention() reads. They
+            # were also the enable list, back when a command had to be
+            # turned on before it would register; the names stay so the
+            # stored data does.
             enabled_slash_commands={},
             enabled_user_commands={},
             enabled_message_commands={},
@@ -1935,7 +1940,6 @@ class Red(
 
         try:
             await lib.setup(self)
-            await self.tree.red_check_enabled()
             # A cog loaded after startup brings its own commands; publish them
             # rather than leaving them invisible until the next restart.
             if self._red_ready.is_set():
@@ -1985,71 +1989,6 @@ class Red(
 
         return cog
 
-    async def enable_app_command(
-        self,
-        command_name: str,
-        command_type: discord.AppCommandType = discord.AppCommandType.chat_input,
-    ) -> None:
-        """
-        Mark an application command as being enabled.
-
-        Enabled commands are able to be added to the bot's tree, are able to be synced, and can be invoked.
-
-        Raises
-        ------
-        CommandLimitReached
-            Raised when attempting to enable a command that would exceed the command limit.
-        """
-        if command_type is discord.AppCommandType.chat_input:
-            cfg = self._config.enabled_slash_commands()
-            limit = 100
-        elif command_type is discord.AppCommandType.message:
-            cfg = self._config.enabled_message_commands()
-            limit = 5
-        elif command_type is discord.AppCommandType.user:
-            cfg = self._config.enabled_user_commands()
-            limit = 5
-        else:
-            raise TypeError("command type must be one of chat_input, message, user")
-        async with cfg as curr_commands:
-            if len(curr_commands) >= limit:
-                raise app_commands.CommandLimitReached(None, limit, type=command_type)
-            if command_name not in curr_commands:
-                curr_commands[command_name] = None
-
-    async def disable_app_command(
-        self,
-        command_name: str,
-        command_type: discord.AppCommandType = discord.AppCommandType.chat_input,
-    ) -> None:
-        """
-        Mark an application command as being disabled.
-
-        Disabled commands are not added to the bot's tree, are not able to be synced, and cannot be invoked.
-        """
-        if command_type is discord.AppCommandType.chat_input:
-            cfg = self._config.enabled_slash_commands()
-        elif command_type is discord.AppCommandType.message:
-            cfg = self._config.enabled_message_commands()
-        elif command_type is discord.AppCommandType.user:
-            cfg = self._config.enabled_user_commands()
-        else:
-            raise TypeError("command type must be one of chat_input, message, user")
-        async with cfg as curr_commands:
-            if command_name in curr_commands:
-                del curr_commands[command_name]
-
-    async def list_enabled_app_commands(self) -> Dict[str, Dict[str, Optional[int]]]:
-        """List the currently enabled application command names."""
-        curr_slash_commands = await self._config.enabled_slash_commands()
-        curr_message_commands = await self._config.enabled_message_commands()
-        curr_user_commands = await self._config.enabled_user_commands()
-        return {
-            "slash": curr_slash_commands,
-            "message": curr_message_commands,
-            "user": curr_user_commands,
-        }
-
     async def get_app_command_id(
         self,
         command_name: str,
@@ -2059,7 +1998,7 @@ class Red(
         Get the cached ID for a particular app command.
 
         Pulls from Red's internal cache of app command IDs, which is updated
-        when the ``[p]slash sync`` command is ran on this instance
+        when the tree is next synced with Discord
         or `bot.tree.sync() <RedTree.sync()>` is called.
         Does not keep track of guild-specific app commands.
 
@@ -2098,7 +2037,7 @@ class Red(
         Get the string that allows you to mention a particular app command.
 
         Pulls from Red's internal cache of app command IDs, which is updated
-        when the ``[p]slash sync`` command is ran on this instance
+        when the tree is next synced with Discord
         or `bot.tree.sync() <RedTree.sync()>` is called.
         Does not keep track of guild-specific app commands.
 

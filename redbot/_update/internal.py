@@ -165,12 +165,6 @@ async def _run_cog_update(bot: Red, *, update_repos: bool) -> None:
             message.append("\nYou can use ")
             message.append("[p]cog info <repo> <cog>", style="bold")
             message.append(" to see the updated statements.\n")
-        # If the bot has any slash commands enabled, warn them to sync
-        enabled_slash = await bot.list_enabled_app_commands()
-        if any(enabled_slash.values()):
-            message.append("\nYou may need to resync your slash commands with ")
-            message.append("[p]slash sync")
-            message.append(".")
     if result.failed_cogs:
         message.append("\nFailed to update cogs: ")
         message.append_text(

@@ -169,12 +169,6 @@ class Downloader(DashboardIntegration, commands.Cog):
                             command=inline(f"{ctx.clean_prefix}cog info <repo> <cog>")
                         )
                     )
-            # If the bot has any slash commands enabled, warn them to sync
-            enabled_slash = await self.bot.list_enabled_app_commands()
-            if any(enabled_slash.values()):
-                message += _(
-                    "\nYou may need to resync your slash commands with `{prefix}slash sync`."
-                ).format(prefix=ctx.prefix)
         if update_result.failed_cogs:
             cognames = [cog.name for cog in update_result.failed_cogs]
             message += (
