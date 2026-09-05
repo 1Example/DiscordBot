@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import linecache
 import logging
 import tracemalloc
 import typing as t
@@ -9,7 +10,6 @@ import typing as t
 import discord
 from redbot.core import commands
 
-from .cog import get_top
 from ...dashboard_integration import audio_pages
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
@@ -18,6 +18,31 @@ from redbot.core.utils.dashboard_helpers import (
     form_reader,
     guild_member,
 )
+
+# Lives here rather than in cog.py: this is its only caller, and cog.py
+# imports this module for its mixin, so the other direction is a cycle.
+def get_top(snapshot, key_type="lineno", limit=10):
+    snapshot = snapshot.filter_traces(
+        (
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+            tracemalloc.Filter(False, "<unknown>"),
+        )
+    )
+    top_stats = snapshot.statistics(key_type)
+    response = ""
+    response += f"Top {limit} lines"
+    for index, stat in enumerate(top_stats[:limit], 1):
+        frame = stat.traceback[0]
+        response += f"\n\n#{index}: {frame.filename}:{frame.lineno}: {stat.size / 1024:.1f} KiB"
+        if line := linecache.getline(frame.filename, frame.lineno).strip():
+            response += f"\n    {line}"
+
+    if other := top_stats[limit:]:
+        size = sum(stat.size for stat in other)
+        response += f"\n\n{len(other)} other: {size / 1024:.1f} KiB"
+    total = sum(stat.size for stat in top_stats)
+    response += f"\n\nTotal allocated size: {total / 1024:.1f} KiB"
+    return response
 
 log = logging.getLogger("red.plutils.dashboard")
 

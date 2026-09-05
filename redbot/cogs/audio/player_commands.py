@@ -35,7 +35,16 @@ class PlayerCommands(DISCORD_COG_TYPE_MIXIN, SharedMethods):
     )
     @app_commands.guild_only()
     @invoker_is_dj(slash=True)
-    async def command_bump(self, context: DISCORD_INTERACTION_TYPE, queue_number: int, after_current: bool = False):
+    @app_commands.describe(
+        queue_number=_("Which track in the queue, counting from 1."),
+        after_current=_("Play it when the current track ends, rather than now."),
+    )
+    async def command_bump(
+        self,
+        context: DISCORD_INTERACTION_TYPE,
+        queue_number: int,
+        after_current: bool = False,
+    ):
         """
         Plays the specified track from the queue.
 
@@ -131,6 +140,9 @@ class PlayerCommands(DISCORD_COG_TYPE_MIXIN, SharedMethods):
     )
     @app_commands.guild_only()
     @invoker_is_dj(slash=True)
+    @app_commands.describe(
+        query=_("A link, or something to search for."),
+    )
     async def command_playnext(self, context: DISCORD_INTERACTION_TYPE, query: str):
         """Enqueue a track at the top of the queue."""
         if isinstance(context, discord.Interaction) and not context.response.is_done():
@@ -235,7 +247,16 @@ class PlayerCommands(DISCORD_COG_TYPE_MIXIN, SharedMethods):
     @player.command(name="remove", description=_("Remove the specified track from the queue."))
     @app_commands.guild_only()
     @invoker_is_dj(slash=True)
-    async def command_remove(self, context: DISCORD_INTERACTION_TYPE, track_url_or_index: str, remove_duplicates: bool = False):
+    @app_commands.describe(
+        track_url_or_index=_("A track link, or its position in the queue."),
+        remove_duplicates=_("Remove every copy of that track, not just this one."),
+    )
+    async def command_remove(
+        self,
+        context: DISCORD_INTERACTION_TYPE,
+        track_url_or_index: str,
+        remove_duplicates: bool = False,
+    ):
         """
         Remove the specified track from the queue.
 

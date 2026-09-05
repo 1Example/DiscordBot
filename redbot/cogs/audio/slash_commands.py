@@ -204,7 +204,10 @@ class SlashCommands(DISCORD_COG_TYPE_MIXIN, SharedMethods):
         extras={"red_force_enable": True},
     )
     @app_commands.describe(
-        query=shorten_string(max_length=100, string=_("This argument is the query to play, a link or a search query."))
+        query=shorten_string(max_length=100, string=_("This argument is the query to play, a link or a search query.")),
+        enqueue_type=shorten_string(
+            max_length=100, string=_("Where in the queue it goes. Defaults to the end.")
+        ),
     )
     @app_commands.choices(
         enqueue_type=[
