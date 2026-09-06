@@ -16,7 +16,6 @@ from pathlib import Path
 from redbot.core import app_commands
 from redbot.core.app_commands import checks as app_checks
 from redbot.core.utils.menus import menu
-from redbot.core.utils.views import SetApiView
 from redbot.core.commands import GuildConverter
 from string import ascii_letters, digits
 from typing import TYPE_CHECKING, Union, List, Optional, Iterable, Sequence, Dict, Set, Literal
@@ -1601,10 +1600,6 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     # TODO: Guild owner permissions for guild scope slash commands and syncing?
 
 
-    @commands.group(name="set")
-    async def _set(self, ctx: commands.Context):
-        """Commands for changing [botname]'s settings."""
-
     # -- Bot Metadata Commands -- ###
 
 
@@ -1682,119 +1677,6 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     # -- End Set Locale Commands -- ###
     # -- Set Api Commands -- ###
 
-    @_set.group(name="api", invoke_without_command=True)
-    @commands.is_owner()
-    async def _set_api(
-        self,
-        ctx: commands.Context,
-        service: Optional[str] = None,
-        *,
-        tokens: Optional[TokenConverter] = None,
-    ):
-        """
-        Commands to set, list or remove various external API tokens.
-
-        This setting will be asked for by some 3rd party cogs and some core cogs.
-
-        If passed without the `<service>` or `<tokens>` arguments it will allow you to open a modal to set your API keys securely.
-
-        To add the keys provide the service name and the tokens as a comma separated
-        list of key,values as described by the cog requesting this command.
-
-        Note: API tokens are sensitive, so this command should only be used in a private channel or in DM with the bot.
-
-        **Examples:**
-        - `[p]set api`
-        - `[p]set api spotify`
-        - `[p]set api spotify redirect_uri localhost`
-        - `[p]set api github client_id,whoops client_secret,whoops`
-
-        **Arguments:**
-        - `<service>` - The service you're adding tokens to.
-        - `<tokens>` - Pairs of token keys and values. The key and value should be separated by one of ` `, `,`, or `;`.
-        """
-        if service is None or tokens is None:
-            view = SetApiView(default_service=service)
-            msg = await ctx.send(_("Click the button below to set your keys."), view=view)
-            await view.wait()
-            await msg.edit(content=_("This API keys setup message has expired."), view=None)
-        else:
-            if ctx.bot_permissions.manage_messages:
-                await ctx.message.delete()
-
-            angle_bracket_warning = None
-
-            for token_name, token in tokens.items():
-                if token.startswith("<") and token.endswith(">"):
-                    angle_bracket_warning = _(
-                        "You may have failed to properly format your `{token_name}`. If you were told to enter a token"
-                        " with an example such as `[p]set api {service} {token_name} <your_{token_name}_here>`, and your {token_name}"
-                        " was `HREDFGWE`, make sure to run `[p]set api {service} {token_name} HREDFGWE` and not "
-                        "`[p]set api {service} {token_name} <HREDFGWE>`."
-                    ).format(token_name=token_name, service=service)
-                    break
-
-            await ctx.bot.set_shared_api_tokens(service, **tokens)
-
-            message = _("`{service}` API tokens have been set.").format(service=service)
-            if angle_bracket_warning:
-                message += "\n\n" + _("**Warning:** ") + angle_bracket_warning
-
-            await ctx.send(message)
-
-    @_set_api.command(name="list")
-    async def _set_api_list(self, ctx: commands.Context):
-        """
-        Show all external API services along with their keys that have been set.
-
-        Secrets are not shown.
-
-        **Example:**
-        - `[p]set api list`
-        """
-
-        services: dict = await ctx.bot.get_shared_api_tokens()
-        if not services:
-            await ctx.send(_("No API services have been set yet."))
-            return
-
-        sorted_services = sorted(services.keys(), key=str.lower)
-
-        joined = _("Set API services:\n") if len(services) > 1 else _("Set API service:\n")
-        for service_name in sorted_services:
-            joined += "+ {}\n".format(service_name)
-            for key_name in services[service_name].keys():
-                joined += "  - {}\n".format(key_name)
-        for page in pagify(joined, ["\n"], shorten_by=16):
-            await ctx.send(box(page.lstrip(" "), lang="diff"))
-
-    @_set_api.command(name="remove", require_var_positional=True)
-    async def _set_api_remove(self, ctx: commands.Context, *services: str):
-        """
-        Remove the given services with all their keys and tokens.
-
-        **Examples:**
-        - `[p]set api remove spotify`
-        - `[p]set api remove github youtube`
-
-        **Arguments:**
-        - `<services...>` - The services to remove."""
-        bot_services = (await ctx.bot.get_shared_api_tokens()).keys()
-        services = [s for s in services if s in bot_services]
-
-        if services:
-            await self.bot.remove_shared_api_services(*services)
-            if len(services) > 1:
-                msg = _("Services deleted successfully:\n{services_list}").format(
-                    services_list=humanize_list(services)
-                )
-            else:
-                msg = _("Service deleted successfully: {service_name}").format(
-                    service_name=services[0]
-                )
-            await ctx.send(msg)
-        else:
-            await ctx.send(_("None of the services you provided had any keys set."))
 
     # -- End Set Api Commands -- ###
     # -- Set Ownernotifications Commands -- ###

@@ -1866,6 +1866,68 @@ class DashboardRPC:
         return {"status": 0, "epoch": now, "key": key}
 
     @rpc_check()
+    async def get_api_tokens(self, user_id: int) -> dict[str, typing.Any]:
+        """Which API services are set, and which keys each holds.
+
+        Names only. A value that has been stored is never handed back out,
+        the same way `[p]set api list` showed the shape and not the secrets.
+        """
+        if user_id not in self.bot.owner_ids:
+            return {"status": 1}
+        services = await self.bot.get_shared_api_tokens()
+        return {
+            "status": 0,
+            "services": [
+                {"name": name, "keys": sorted(tokens.keys())}
+                for name, tokens in sorted(services.items(), key=lambda kv: kv[0].lower())
+            ],
+        }
+
+    @rpc_check()
+    async def set_api_tokens(
+        self, user_id: int, service: str, tokens: dict[str, str]
+    ) -> dict[str, typing.Any]:
+        """Set or replace the keys of one service.
+
+        Merges: a key not named here keeps whatever it had, which is how the
+        command behaved. An empty value removes that key.
+        """
+        if user_id not in self.bot.owner_ids:
+            return {"status": 1}
+        service = (service or "").strip()
+        if not service:
+            return {"status": 1, "message": "Name the service."}
+
+        drop = [key for key, value in tokens.items() if not str(value).strip()]
+        keep = {key: str(value) for key, value in tokens.items() if str(value).strip()}
+        if keep:
+            await self.bot.set_shared_api_tokens(service, **keep)
+        if drop:
+            await self.bot.remove_shared_api_tokens(service, *drop)
+        log.info(
+            "Dashboard: owner %s set %s key(s) on the %r API service.",
+            user_id,
+            len(keep),
+            service,
+        )
+        return {"status": 0, "service": service, "set": len(keep), "removed": len(drop)}
+
+    @rpc_check()
+    async def remove_api_tokens(
+        self, user_id: int, services: list[str]
+    ) -> dict[str, typing.Any]:
+        """Drop whole services, keys and all."""
+        if user_id not in self.bot.owner_ids:
+            return {"status": 1}
+        known = (await self.bot.get_shared_api_tokens()).keys()
+        wanted = [s for s in services if s in known]
+        if not wanted:
+            return {"status": 1, "message": "None of those services are set."}
+        await self.bot.remove_shared_api_services(*wanted)
+        log.info("Dashboard: owner %s removed API service(s) %s.", user_id, ", ".join(wanted))
+        return {"status": 0, "removed": wanted}
+
+    @rpc_check()
     async def lifecycle(self, user_id: int, action: str) -> dict[str, typing.Any]:
         """Restart or shut the bot down. Owner only, without exception.
 
