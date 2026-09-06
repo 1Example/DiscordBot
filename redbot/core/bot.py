@@ -1496,8 +1496,12 @@ class Red(
                     log.exception("Failed to load package %s (timeout)", package)
                     to_remove.append(package)
                 except Exception as e:
+                    # Left in the config deliberately, the same as a timeout
+                    # above: a cog that fails once should be retried on the
+                    # next boot, not silently unloaded forever. Removing it
+                    # here is unrecoverable for any cog that provides the
+                    # interface used to load cogs.
                     log.exception("Failed to load package %s", package, exc_info=e)
-                    await self.remove_loaded_package(package)
                     to_remove.append(package)
             for package in to_remove:
                 del packages[package]

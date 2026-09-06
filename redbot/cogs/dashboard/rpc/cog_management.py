@@ -205,6 +205,27 @@ class DashboardRPC_CogManagement:
                     },
                 )
 
+        # Running and "loads on boot" are separate: `--load-cogs` does the
+        # first without the second, and the cog then disappears on restart.
+        # Ticked here means both.
+        if to_persist := [
+            cog
+            for cog, loaded in cogs.items()
+            if cog in all_cogs and loaded and cog in loaded_cogs
+        ]:
+            packages = await self.bot._config.packages()
+            if missing := [cog for cog in to_persist if cog not in packages]:
+                for cog in missing:
+                    await self.bot.add_loaded_package(cog)
+                notifications.append(
+                    {
+                        "message": _("Set to load on startup: {packs}.").format(
+                            packs=humanize_list([inline(package) for package in missing]),
+                        ),
+                        "category": "success",
+                    },
+                )
+
         return {
             "status": status,
             "notifications": notifications,
