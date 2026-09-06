@@ -20,14 +20,10 @@ class DashboardRPC_DefaultCogs:
         self.bot: Red = cog.bot
         self.cog: commands.Cog = cog
 
-        self.bot.register_rpc_handler(self.get_aliases)
-        self.bot.register_rpc_handler(self.set_aliases)
         self.bot.register_rpc_handler(self.get_custom_commands)
         self.bot.register_rpc_handler(self.set_custom_commands)
 
     def unload(self) -> None:
-        self.bot.unregister_rpc_handler(self.get_aliases)
-        self.bot.unregister_rpc_handler(self.set_aliases)
         self.bot.unregister_rpc_handler(self.get_custom_commands)
         self.bot.unregister_rpc_handler(self.set_custom_commands)
 
