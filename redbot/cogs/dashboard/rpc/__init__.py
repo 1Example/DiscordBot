@@ -1866,6 +1866,39 @@ class DashboardRPC:
         return {"status": 0, "epoch": now, "key": key}
 
     @rpc_check()
+    async def lifecycle(self, user_id: int, action: str) -> dict[str, typing.Any]:
+        """Restart or shut the bot down. Owner only, without exception.
+
+        `Red.shutdown` closes the connection and exits with a code the launcher
+        reads: 0 to stay down, 26 to come back. Whether a restart actually
+        restarts depends on what is supervising the process - a bare `redbot`
+        in a terminal will simply exit - so the caller is told which of the two
+        it asked for and can say so.
+
+        The exit happens in a task, because this reply has to reach the
+        dashboard before the process goes away.
+        """
+        if user_id not in self.bot.owner_ids:
+            return {"status": 1}
+        if action not in ("restart", "shutdown"):
+            return {"status": 1, "message": "Unknown action."}
+
+        restart = action == "restart"
+        log.info(
+            "Dashboard: %s requested by owner %s.",
+            "restart" if restart else "shutdown",
+            user_id,
+        )
+
+        async def _go() -> None:
+            # Long enough for the HTTP response to be written and read.
+            await asyncio.sleep(1)
+            await self.bot.shutdown(restart=restart)
+
+        asyncio.create_task(_go())
+        return {"status": 0, "restart": restart}
+
+    @rpc_check()
     async def get_logs(
         self,
         user_id: int,
