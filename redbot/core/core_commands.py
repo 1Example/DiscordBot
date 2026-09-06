@@ -30,7 +30,6 @@ from .utils import AsyncIter, can_user_send_messages_in
 from .utils._internal_utils import fetch_latest_red_version
 from .utils.predicates import MessagePredicate
 from .utils.chat_formatting import box, humanize_list, humanize_timedelta, inline, pagify, warning
-from .commands import CommandConverter, CogConverter
 
 _entities = {
     "*": "&midast;",
@@ -1138,58 +1137,82 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 )
             )
 
-    @commands.group()
-    async def embedset(self, ctx: commands.Context):
-        """
-        Commands for toggling embeds on or off.
+    autoimmune = app_commands.Group(
+        name="autoimmune",
+        description="Members and roles exempt from my automatic moderation.",
+        extras={"red_force_enable": True},
+        guild_only=True,
+    )
+    ownernotifications = app_commands.Group(
+        name="ownernotifications",
+        description="Where my owner alerts go.",
+        extras={"red_force_enable": True},
+    )
+    embedset = app_commands.Group(
+        name="embedset",
+        description="Whether my replies use embeds.",
+        extras={"red_force_enable": True},
+    )
+    cogset = app_commands.Group(
+        name="cogset",
+        description="Turn a cog off for a server.",
+        extras={"red_force_enable": True},
+    )
 
-        This setting determines whether or not to use embeds as a response to a command (for commands that support it).
-        The default is to use embeds.
 
-        The embed settings are checked until the first True/False in this order:
-
-        - In guild context:
-          1. Channel override - `[p]embedset channel`
-          2. Server command override - `[p]embedset command server`
-          3. Server override - `[p]embedset server`
-          4. Global command override - `[p]embedset command global`
-          5. Global setting  -`[p]embedset global`
-
-        - In DM context:
-          1. User override - `[p]embedset user`
-          2. Global command override - `[p]embedset command global`
-          3. Global setting - `[p]embedset global`
-        """
-
-
-    @commands.guildowner_or_permissions(administrator=True)
-    @embedset.group(name="command", invoke_without_command=True)
+    @embedset.command(
+        name="command", description="Set whether one command's replies use embeds."
+    )
+    @app_commands.describe(
+        command="The command, as you would type it.",
+        enabled="On, off, or leave empty to clear the override.",
+        scope="Whose setting to change. Global is owner only.",
+    )
+    @app_commands.choices(
+        scope=[
+            app_commands.Choice(name="This server", value="server"),
+            app_commands.Choice(name="Global", value="global"),
+        ]
+    )
     async def embedset_command(
-        self, ctx: commands.Context, command: CommandConverter, enabled: bool = None
+        self,
+        interaction: discord.Interaction,
+        command: str,
+        enabled: bool = None,
+        scope: str = "server",
     ) -> None:
+        """Set a command's embed setting.
+
+        The prefix version had a subcommand per scope and a bare form that
+        guessed one from whether you were the owner. The scope is an option.
         """
-        Sets a command's embed setting.
-
-        If you're the bot owner, this will try to change the command's embed setting globally by default.
-        Otherwise, this will try to change embed settings on the current server.
-
-        If enabled is left blank, the setting will be unset.
-
-        To see full evaluation order of embed settings, run `[p]help embedset`.
-
-        **Examples:**
-        - `[p]embedset command info` - Clears command specific embed settings for 'info'.
-        - `[p]embedset command info False` - Disables embeds for 'info'.
-        - `[p]embedset command "ignore list" True` - Quotes are needed for subcommands.
-
-        **Arguments:**
-        - `[enabled]` - Whether to use embeds for this command. Leave blank to reset to default.
-        """
-        # Select the scope based on the author's privileges
-        if await ctx.bot.is_owner(ctx.author):
-            await self.embedset_command_global(ctx, command, enabled)
-        else:
-            await self.embedset_command_guild(ctx, command, enabled)
+        ctx = await commands.Context.from_interaction(interaction)
+        found = await self._one_command(ctx, command)
+        if found is None:
+            return
+        if scope == "global":
+            if not await ctx.bot.is_owner(ctx.author):
+                await ctx.send(_("Only a bot owner can change the global setting."))
+                return
+            self._check_if_command_requires_embed_links(found)
+            await ctx.bot._config.custom("COMMAND", found.qualified_name, 0).embeds.set(enabled)
+            await ctx.tick()
+            return
+        if ctx.guild is None:
+            await ctx.send(_("There is no server here."))
+            return
+        if not (
+            ctx.author.guild_permissions.administrator
+            or ctx.author.id == ctx.guild.owner_id
+            or await ctx.bot.is_owner(ctx.author)
+        ):
+            await ctx.send(_("You need to be the server owner or an administrator."))
+            return
+        self._check_if_command_requires_embed_links(found)
+        await ctx.bot._config.custom(
+            "COMMAND", found.qualified_name, ctx.guild.id
+        ).embeds.set(enabled)
+        await ctx.tick()
 
     def _check_if_command_requires_embed_links(self, command_obj: commands.Command) -> None:
         for command in itertools.chain((command_obj,), command_obj.parents):
@@ -1202,104 +1225,20 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                     )
                 )
 
-    @commands.is_owner()
-    @embedset_command.command(name="global")
-    async def embedset_command_global(
-        self, ctx: commands.Context, command: CommandConverter, enabled: bool = None
-    ):
-        """
-        Sets a command's embed setting globally.
 
-        If set, this is used instead of the global default to determine whether or not to use embeds.
-
-        If enabled is left blank, the setting will be unset.
-
-        To see full evaluation order of embed settings, run `[p]help embedset`.
-
-        **Examples:**
-        - `[p]embedset command global info` - Clears command specific embed settings for 'info'.
-        - `[p]embedset command global info False` - Disables embeds for 'info'.
-        - `[p]embedset command global "ignore list" True` - Quotes are needed for subcommands.
-
-        **Arguments:**
-        - `[enabled]` - Whether to use embeds for this command. Leave blank to reset to default.
-        """
-        self._check_if_command_requires_embed_links(command)
-        # qualified name might be different if alias was passed to this command
-        command_name = command.qualified_name
-
-        if enabled is None:
-            await self.bot._config.custom("COMMAND", command_name, 0).embeds.clear()
-            await ctx.send(_("Embeds will now fall back to the global setting."))
-            return
-
-        await self.bot._config.custom("COMMAND", command_name, 0).embeds.set(enabled)
-        if enabled:
-            await ctx.send(
-                _("Embeds are now enabled for {command_name} command.").format(
-                    command_name=inline(command_name)
-                )
-            )
-        else:
-            await ctx.send(
-                _("Embeds are now disabled for {command_name} command.").format(
-                    command_name=inline(command_name)
-                )
-            )
-
-    @commands.guild_only()
-    @embedset_command.command(name="server", aliases=["guild"])
-    async def embedset_command_guild(
-        self, ctx: commands.GuildContext, command: CommandConverter, enabled: bool = None
-    ):
-        """
-        Sets a command's embed setting for the current server.
-
-        If set, this is used instead of the server default to determine whether or not to use embeds.
-
-        If enabled is left blank, the setting will be unset and the server default will be used instead.
-
-        To see full evaluation order of embed settings, run `[p]help embedset`.
-
-        **Examples:**
-        - `[p]embedset command server info` - Clears command specific embed settings for 'info'.
-        - `[p]embedset command server info False` - Disables embeds for 'info'.
-        - `[p]embedset command server "ignore list" True` - Quotes are needed for subcommands.
-
-        **Arguments:**
-        - `[enabled]` - Whether to use embeds for this command. Leave blank to reset to default.
-        """
-        self._check_if_command_requires_embed_links(command)
-        # qualified name might be different if alias was passed to this command
-        command_name = command.qualified_name
-
-        if enabled is None:
-            await self.bot._config.custom("COMMAND", command_name, ctx.guild.id).embeds.clear()
-            await ctx.send(_("Embeds will now fall back to the server setting."))
-            return
-
-        await self.bot._config.custom("COMMAND", command_name, ctx.guild.id).embeds.set(enabled)
-        if enabled:
-            await ctx.send(
-                _("Embeds are now enabled for {command_name} command.").format(
-                    command_name=inline(command_name)
-                )
-            )
-        else:
-            await ctx.send(
-                _("Embeds are now disabled for {command_name} command.").format(
-                    command_name=inline(command_name)
-                )
-            )
-
-    @embedset.command(name="channel")
-    @commands.guildowner_or_permissions(administrator=True)
-    @commands.guild_only()
+    @embedset.command(name="channel", description="Set whether my replies in one channel use embeds.")
+    @app_commands.guild_only()
+    @app_checks.guildowner_or_permissions(administrator=True)
+    @app_commands.describe(
+        channel="Which channel.",
+        enabled="On, off, or leave empty to clear the override.",
+    )
     async def embedset_channel(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         channel: Union[
-            discord.TextChannel, discord.VoiceChannel, discord.StageChannel, discord.ForumChannel
+            discord.TextChannel, discord.VoiceChannel, discord.StageChannel,
+            discord.ForumChannel,
         ],
         enabled: bool = None,
     ):
@@ -1322,6 +1261,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             - `<channel>` - The text, voice, stage, or forum channel to set embed setting for.
             - `[enabled]` - Whether to use embeds in this channel. Leave blank to reset to default.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if enabled is None:
             await self.bot._config.channel(channel).embeds.clear()
             await ctx.send(_("Embeds will now fall back to the global setting."))
@@ -1334,8 +1274,13 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             )
         )
 
-    @embedset.command(name="user")
-    async def embedset_user(self, ctx: commands.Context, enabled: bool = None):
+    @embedset.command(name="user", description="Set whether my replies to you in DMs use embeds.")
+    @app_commands.describe(enabled="On, off, or leave empty to clear your override.")
+    async def embedset_user(
+        self,
+        interaction: discord.Interaction,
+        enabled: bool = None,
+    ):
         """
         Sets personal embed setting for DMs.
 
@@ -1353,6 +1298,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `[enabled]` - Whether to use embeds in your DMs. Leave blank to reset to default.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if enabled is None:
             await self.bot._config.user(ctx.author).embeds.clear()
             await ctx.send(_("Embeds will now fall back to the global setting."))
@@ -1783,18 +1729,13 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     # -- End Set Api Commands -- ###
     # -- Set Ownernotifications Commands -- ###
 
-    @commands.is_owner()
-    @_set.group(name="ownernotifications")
-    async def _set_ownernotifications(self, ctx: commands.Context):
-        """
-        Commands for configuring owner notifications.
 
-        Owner notifications include usage of `[p]contact` and available Red updates.
-        """
-        pass
-
-    @_set_ownernotifications.command(name="optin")
-    async def _set_ownernotifications_optin(self, ctx: commands.Context):
+    @ownernotifications.command(name="optin", description="Start receiving owner alerts yourself.")
+    @app_checks.is_owner()
+    async def _set_ownernotifications_optin(
+        self,
+        interaction: discord.Interaction,
+    ):
         """
         Opt-in on receiving owner notifications.
 
@@ -1806,14 +1747,19 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Example:**
         - `[p]set ownernotifications optin`
         """
+        ctx = await commands.Context.from_interaction(interaction)
         async with ctx.bot._config.owner_opt_out_list() as opt_outs:
             if ctx.author.id in opt_outs:
                 opt_outs.remove(ctx.author.id)
 
         await ctx.tick()
 
-    @_set_ownernotifications.command(name="optout")
-    async def _set_ownernotifications_optout(self, ctx: commands.Context):
+    @ownernotifications.command(name="optout", description="Stop receiving owner alerts yourself.")
+    @app_checks.is_owner()
+    async def _set_ownernotifications_optout(
+        self,
+        interaction: discord.Interaction,
+    ):
         """
         Opt-out of receiving owner notifications.
 
@@ -1823,17 +1769,19 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Example:**
         - `[p]set ownernotifications optout`
         """
+        ctx = await commands.Context.from_interaction(interaction)
         async with ctx.bot._config.owner_opt_out_list() as opt_outs:
             if ctx.author.id not in opt_outs:
                 opt_outs.append(ctx.author.id)
 
         await ctx.tick()
 
-    @_set_ownernotifications.command(name="adddestination")
+    @ownernotifications.command(name="adddestination", description="Send owner alerts to a channel as well.")
+    @app_checks.is_owner()
+    @app_commands.describe(channel="Where to send them.")
     async def _set_ownernotifications_adddestination(
         self,
-        ctx: commands.Context,
-        *,
+        interaction: discord.Interaction,
         channel: Union[discord.TextChannel, discord.VoiceChannel, discord.StageChannel],
     ):
         """
@@ -1846,20 +1794,26 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `<channel>` - The channel to send owner notifications to.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         async with ctx.bot._config.extra_owner_destinations() as extras:
             if channel.id not in extras:
                 extras.append(channel.id)
 
         await ctx.tick()
 
-    @_set_ownernotifications.command(
-        name="removedestination", aliases=["remdestination", "deletedestination", "deldestination"]
+    @ownernotifications.command(name="removedestination", description="Stop sending owner alerts to a channel.")
+    @app_checks.is_owner()
+    @app_commands.describe(
+        channel="The channel to drop.",
+        channel_id="Its ID instead, for a channel I can no longer see.",
     )
     async def _set_ownernotifications_removedestination(
         self,
-        ctx: commands.Context,
-        *,
-        channel: Union[discord.TextChannel, discord.VoiceChannel, discord.StageChannel, int],
+        interaction: discord.Interaction,
+        channel: Union[
+            discord.TextChannel, discord.VoiceChannel, discord.StageChannel
+        ] = None,
+        channel_id: str = None,
     ):
         """
         Removes a destination text channel from receiving owner notifications.
@@ -1871,6 +1825,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `<channel>` - The channel to stop sending owner notifications to.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        channel = await self._one_destination(ctx, channel, channel_id)
+        if channel is None:
+            return
 
         try:
             channel_id = channel.id
@@ -1883,14 +1841,19 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
 
         await ctx.tick()
 
-    @_set_ownernotifications.command(name="listdestinations")
-    async def _set_ownernotifications_listdestinations(self, ctx: commands.Context):
+    @ownernotifications.command(name="listdestinations", description="List where owner alerts go.")
+    @app_checks.is_owner()
+    async def _set_ownernotifications_listdestinations(
+        self,
+        interaction: discord.Interaction,
+    ):
         """
         Lists the configured extra destinations for owner notifications.
 
         **Example:**
         - `[p]set ownernotifications listdestinations`
         """
+        ctx = await commands.Context.from_interaction(interaction)
 
         channel_ids = await ctx.bot._config.extra_owner_destinations()
 
@@ -2601,15 +2564,15 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         await self.bot.clear_blacklist(ctx.guild)
         await ctx.send(_("Server blocklist has been cleared."))
 
-    @commands.guildowner_or_permissions(administrator=True)
-    @commands.group(name="command")
-    async def command_manager(self, ctx: commands.Context):
-        """Commands to enable and disable commands and cogs."""
-        pass
 
-    @commands.is_owner()
-    @command_manager.command(name="defaultdisablecog")
-    async def command_default_disable_cog(self, ctx: commands.Context, *, cog: CogConverter):
+    @cogset.command(name="defaultdisable", description="Have a cog start off in servers I newly join.")
+    @app_checks.is_owner()
+    @app_commands.describe(cog="Which cog.")
+    async def command_default_disable_cog(
+        self,
+        interaction: discord.Interaction,
+        cog: str,
+    ):
         """Set the default state for a cog as disabled.
 
         This will disable the cog for all servers by default.
@@ -2624,15 +2587,24 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `<cog>` - The name of the cog to make disabled by default. Must be title-case.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        cog = await self._one_cog(ctx, cog)
+        if cog is None:
+            return
         cogname = cog.qualified_name
         if isinstance(cog, commands.commands._RuleDropper):
             return await ctx.send(_("You can't disable this cog by default."))
         await self.bot._disabled_cog_cache.default_disable(cogname)
         await ctx.send(_("{cogname} has been set as disabled by default.").format(cogname=cogname))
 
-    @commands.is_owner()
-    @command_manager.command(name="defaultenablecog")
-    async def command_default_enable_cog(self, ctx: commands.Context, *, cog: CogConverter):
+    @cogset.command(name="defaultenable", description="Have a cog start on in servers I newly join.")
+    @app_checks.is_owner()
+    @app_commands.describe(cog="Which cog.")
+    async def command_default_enable_cog(
+        self,
+        interaction: discord.Interaction,
+        cog: str,
+    ):
         """Set the default state for a cog as enabled.
 
         This will re-enable the cog for all servers by default.
@@ -2647,13 +2619,23 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `<cog>` - The name of the cog to make enabled by default. Must be title-case.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        cog = await self._one_cog(ctx, cog)
+        if cog is None:
+            return
         cogname = cog.qualified_name
         await self.bot._disabled_cog_cache.default_enable(cogname)
         await ctx.send(_("{cogname} has been set as enabled by default.").format(cogname=cogname))
 
-    @commands.guild_only()
-    @command_manager.command(name="disablecog")
-    async def command_disable_cog(self, ctx: commands.Context, *, cog: CogConverter):
+    @cogset.command(name="disable", description="Turn a cog off in this server.")
+    @app_commands.guild_only()
+    @app_checks.is_owner()
+    @app_commands.describe(cog="Which cog.")
+    async def command_disable_cog(
+        self,
+        interaction: discord.Interaction,
+        cog: str,
+    ):
         """Disable a cog in this server.
 
         Note: This will only work on loaded cogs, and must reference the title-case cog name.
@@ -2665,6 +2647,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `<cog>` - The name of the cog to disable on this server. Must be title-case.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        cog = await self._one_cog(ctx, cog)
+        if cog is None:
+            return
         cogname = cog.qualified_name
         if isinstance(cog, commands.commands._RuleDropper):
             return await ctx.send(_("You can't disable this cog as you would lock yourself out."))
@@ -2675,9 +2661,15 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 _("{cogname} was already disabled (nothing to do).").format(cogname=cogname)
             )
 
-    @commands.guild_only()
-    @command_manager.command(name="enablecog", usage="<cog>")
-    async def command_enable_cog(self, ctx: commands.Context, *, cogname: str):
+    @cogset.command(name="enable", description="Turn a cog back on in this server.")
+    @app_commands.guild_only()
+    @app_checks.is_owner()
+    @app_commands.describe(cogname="Which cog.")
+    async def command_enable_cog(
+        self,
+        interaction: discord.Interaction,
+        cogname: str,
+    ):
         """Enable a cog in this server.
 
         Note: This will only work on loaded cogs, and must reference the title-case cog name.
@@ -2689,6 +2681,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `<cog>` - The name of the cog to enable on this server. Must be title-case.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if await self.bot._disabled_cog_cache.enable_cog_in_guild(cogname, ctx.guild.id):
             await ctx.send(_("{cogname} has been enabled in this guild.").format(cogname=cogname))
         else:
@@ -2701,14 +2694,31 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 _("{cogname} was not disabled (nothing to do).").format(cogname=cogname)
             )
 
-    @commands.guild_only()
-    @command_manager.command(name="listdisabledcogs")
-    async def command_list_disabled_cogs(self, ctx: commands.Context):
+    @command_disable_cog.autocomplete("cog")
+    @command_default_disable_cog.autocomplete("cog")
+    @command_default_enable_cog.autocomplete("cog")
+    @command_enable_cog.autocomplete("cogname")
+    async def _cog_autocomplete(self, interaction, current: str) -> list:
+        """The cogs this bot has loaded."""
+        current = current.lower()
+        return [
+            app_commands.Choice(name=name[:100], value=name)
+            for name in sorted(interaction.client.cogs)
+            if current in name.lower()
+        ][:25]
+
+    @cogset.command(name="listdisabled", description="List the cogs turned off in this server.")
+    @app_commands.guild_only()
+    async def command_list_disabled_cogs(
+        self,
+        interaction: discord.Interaction,
+    ):
         """List the cogs which are disabled in this server.
 
         **Example:**
         - `[p]command listdisabledcogs`
         """
+        ctx = await commands.Context.from_interaction(interaction)
         disabled = [
             cog.qualified_name
             for cog in self.bot.cogs.values()
@@ -2726,25 +2736,62 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             await ctx.send(_("There are no disabled cogs in this guild."))
 
 
-    @commands.guild_only()
-    @commands.guildowner_or_permissions(manage_guild=True)
-    @commands.group(name="autoimmune")
-    async def autoimmune_group(self, ctx: commands.Context):
-        """
-        Commands to manage server settings for immunity from automated actions.
+    async def _one_destination(self, ctx, channel, channel_id: str):
+        """Exactly one of a channel or a raw ID, or None once refused.
 
-        This includes duplicate message deletion and mention spam from the Mod cog, and filters from the Filter cog.
+        The prefix version took ``Union[..., int]`` in one argument, so a
+        destination whose channel the bot can no longer see could still be
+        removed by ID. An option cannot be a union of a channel and an int, so
+        there are two and this insists on one.
         """
-        pass
+        if (channel is None) == (channel_id is None):
+            await ctx.send(_("Give me either a channel or an ID, not both and not neither."))
+            return None
+        if channel is not None:
+            return channel
+        try:
+            return int(channel_id.strip())
+        except ValueError:
+            await ctx.send(_("`{value}` is not an ID.").format(value=channel_id[:100]))
+            return None
 
-    @autoimmune_group.command(name="list")
-    async def autoimmune_list(self, ctx: commands.Context):
+    async def _one_cog(self, ctx, name: str):
+        """A loaded cog by name, or None once refused."""
+        cog = ctx.bot.get_cog(name.strip())
+        if cog is None:
+            await ctx.send(_("`{name}` is not a loaded cog.").format(name=name[:100]))
+            return None
+        return cog
+
+    async def _one_command(self, ctx, name: str):
+        """A command by name from either tree, or None once refused."""
+        found = ctx.bot.get_command(name.strip())
+        if found is None:
+            parts = name.strip().lstrip("/").split()
+            node = ctx.bot.tree.get_command(parts[0]) if parts else None
+            for part in parts[1:]:
+                if node is None:
+                    break
+                node = getattr(node, "get_command", lambda _n: None)(part)
+            found = node
+        if found is None:
+            await ctx.send(_("`{name}` is not a command.").format(name=name[:100]))
+            return None
+        return found
+
+    @autoimmune.command(name="list", description="List who is exempt from automatic moderation.")
+    @app_checks.guildowner_or_permissions(manage_guild=True)
+    async def autoimmune_list(
+        self,
+        interaction: discord.Interaction,
+    ):
         """
         Gets the current members and roles configured for automatic moderation action immunity.
 
         **Example:**
         - `[p]autoimmune list`
         """
+        ctx = await commands.Context.from_interaction(interaction)
         ai_ids = await ctx.bot._config.guild(ctx.guild).autoimmune_ids()
 
         roles = {r.name for r in ctx.guild.roles if r.id in ai_ids}
@@ -2766,9 +2813,13 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         for page in pagify(output):
             await ctx.send(page)
 
-    @autoimmune_group.command(name="add")
+    @autoimmune.command(name="add", description="Exempt a member or role from automatic moderation.")
+    @app_checks.guildowner_or_permissions(manage_guild=True)
+    @app_commands.describe(user_or_role="Who or which role to exempt.")
     async def autoimmune_add(
-        self, ctx: commands.Context, *, user_or_role: Union[discord.Member, discord.Role]
+        self,
+        interaction: discord.Interaction,
+        user_or_role: Union[discord.Member, discord.Role],
     ):
         """
         Makes a user or role immune from automated moderation actions.
@@ -2780,15 +2831,20 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `<user_or_role>` - The user or role to add immunity to.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         async with ctx.bot._config.guild(ctx.guild).autoimmune_ids() as ai_ids:
             if user_or_role.id in ai_ids:
                 return await ctx.send(_("Already added."))
             ai_ids.append(user_or_role.id)
         await ctx.tick()
 
-    @autoimmune_group.command(name="remove")
+    @autoimmune.command(name="remove", description="Stop exempting a member or role.")
+    @app_checks.guildowner_or_permissions(manage_guild=True)
+    @app_commands.describe(user_or_role="Who or which role to stop exempting.")
     async def autoimmune_remove(
-        self, ctx: commands.Context, *, user_or_role: Union[discord.Member, discord.Role]
+        self,
+        interaction: discord.Interaction,
+        user_or_role: Union[discord.Member, discord.Role],
     ):
         """
         Remove a user or role from being immune to automated moderation actions.
@@ -2800,15 +2856,20 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `<user_or_role>` - The user or role to remove immunity from.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         async with ctx.bot._config.guild(ctx.guild).autoimmune_ids() as ai_ids:
             if user_or_role.id not in ai_ids:
                 return await ctx.send(_("Not in list."))
             ai_ids.remove(user_or_role.id)
         await ctx.tick()
 
-    @autoimmune_group.command(name="isimmune")
+    @autoimmune.command(name="isimmune", description="Check whether someone is exempt.")
+    @app_checks.guildowner_or_permissions(manage_guild=True)
+    @app_commands.describe(user_or_role="Who or which role to check.")
     async def autoimmune_checkimmune(
-        self, ctx: commands.Context, *, user_or_role: Union[discord.Member, discord.Role]
+        self,
+        interaction: discord.Interaction,
+        user_or_role: Union[discord.Member, discord.Role],
     ):
         """
         Checks if a user or role would be considered immune from automated actions.
@@ -2820,6 +2881,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         **Arguments:**
         - `<user_or_role>` - The user or role to check the immunity of.
         """
+        ctx = await commands.Context.from_interaction(interaction)
 
         if await ctx.bot.is_automod_immune(user_or_role):
             await ctx.send(_("They are immune."))
