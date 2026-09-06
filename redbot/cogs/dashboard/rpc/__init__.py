@@ -73,6 +73,10 @@ class DashboardRPC:
         self.bot.register_rpc_handler(self.set_custom_pages)
         self.bot.register_rpc_handler(self.get_logs)
         self.bot.register_rpc_handler(self.bump_session_epoch)
+        self.bot.register_rpc_handler(self.lifecycle)
+        self.bot.register_rpc_handler(self.get_api_tokens)
+        self.bot.register_rpc_handler(self.set_api_tokens)
+        self.bot.register_rpc_handler(self.remove_api_tokens)
 
         # Initialize handlers.
         self.handlers: dict[str, typing.Any] = {}
@@ -133,6 +137,10 @@ class DashboardRPC:
         self.bot.unregister_rpc_handler(self.set_custom_pages)
         self.bot.unregister_rpc_handler(self.get_logs)
         self.bot.unregister_rpc_handler(self.bump_session_epoch)
+        self.bot.unregister_rpc_handler(self.lifecycle)
+        self.bot.unregister_rpc_handler(self.get_api_tokens)
+        self.bot.unregister_rpc_handler(self.set_api_tokens)
+        self.bot.unregister_rpc_handler(self.remove_api_tokens)
         for handler in self.handlers.values():
             handler.unload()
 
