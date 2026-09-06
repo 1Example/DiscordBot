@@ -50,6 +50,12 @@ MAX_ROLL: Final[int] = 2**53 - 1
 class General(commands.Cog):
     """Dice, coin flips, 8 ball, server info and other odds and ends."""
 
+    fun = app_commands.Group(
+        name="fun",
+        description="Dice, coin flips, the 8 ball and other odds and ends.",
+        extras={"red_force_enable": True},
+    )
+
     global _
     _ = lambda s: s
     ball = [
@@ -85,7 +91,7 @@ class General(commands.Cog):
         """Nothing to delete"""
         return
 
-    @app_commands.command(
+    @fun.command(
         name="choose",
         description="Choose between multiple options.",
         extras={"red_force_enable": True},
@@ -106,7 +112,7 @@ class General(commands.Cog):
         else:
             await ctx.send(choice(choices))
 
-    @app_commands.command(
+    @fun.command(
         name="roll",
         description="Roll a random number between 1 and the number you give.",
         extras={"red_force_enable": True},
@@ -128,7 +134,7 @@ class General(commands.Cog):
             )
         )
 
-    @app_commands.command(
+    @fun.command(
         name="flip",
         description="Flip a coin, or flip a user upside down.",
         extras={"red_force_enable": True},
@@ -156,7 +162,7 @@ class General(commands.Cog):
         else:
             await ctx.send(_("*flips a coin and... ") + choice([_("HEADS!*"), _("TAILS!*")]))
 
-    @app_commands.command(
+    @fun.command(
         name="rps",
         description="Play Rock Paper Scissors.",
         extras={"red_force_enable": True},
@@ -201,7 +207,7 @@ class General(commands.Cog):
                 )
             )
 
-    @app_commands.command(
+    @fun.command(
         name="8ball",
         description="Ask 8 ball a question.",
         extras={"red_force_enable": True},
@@ -218,7 +224,7 @@ class General(commands.Cog):
         else:
             await ctx.send(_("That doesn't look like a question."))
 
-    @app_commands.command(
+    @fun.command(
         name="stopwatch",
         description="Start or stop your stopwatch.",
         extras={"red_force_enable": True},
@@ -238,7 +244,7 @@ class General(commands.Cog):
             )
             self.stopwatches.pop(author.id, None)
 
-    @app_commands.command(
+    @fun.command(
         name="lmgtfy",
         description="Create a let-me-google-that-for-you link.",
         extras={"red_force_enable": True},
@@ -252,7 +258,7 @@ class General(commands.Cog):
             f"https://cog-creators.github.io/lmgtfy/search?q={search_terms}&btnK=Google+Search"
         )
 
-    @app_commands.command(
+    @fun.command(
         name="hug",
         description="Because everyone likes hugs!",
         extras={"red_force_enable": True},
@@ -515,7 +521,7 @@ class General(commands.Cog):
 
         await ctx.send(embed=data)
 
-    @app_commands.command(
+    @fun.command(
         name="urban",
         description="Look a word up on Urban Dictionary.",
         extras={"red_force_enable": True},

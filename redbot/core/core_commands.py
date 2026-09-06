@@ -356,6 +356,12 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     These commands come loaded with every Red bot, and cover some of the most basic usage of the bot.
     """
 
+    botinfo = app_commands.Group(
+        name="bot",
+        description="About me, and the levers only my owner can pull.",
+        extras={"red_force_enable": True},
+    )
+
     async def red_delete_data_for_user(self, **kwargs):
         """Nothing to delete (Core Config is handled in a bot method)"""
         return
@@ -399,7 +405,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             await ctx.send(_("`{value}` is not a user ID.").format(value=raw[:100]))
             return None
 
-    @app_commands.command(
+    @botinfo.command(
         name="ping",
         description="Check how fast I answer Discord.",
         extras={"red_force_enable": True},
@@ -412,7 +418,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         ctx = await commands.Context.from_interaction(interaction)
         await ctx.send("Pong.")
 
-    @app_commands.command(
+    @botinfo.command(
         name="info",
         description="Show information about me.",
         extras={"red_force_enable": True},
@@ -571,7 +577,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             )
             await ctx.send(refs)
 
-    @app_commands.command(
+    @botinfo.command(
         name="uptime",
         description="Show how long I have been running.",
         extras={"red_force_enable": True},
@@ -1380,7 +1386,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             else _("Embeds are now disabled for you in DMs.")
         )
 
-    @app_commands.command(
+    @botinfo.command(
         name="traceback",
         description="Show the last exception I hit.",
         extras={"red_force_enable": True},
@@ -1427,7 +1433,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         else:
             await ctx.send(_("No exception has occurred yet."))
 
-    @app_commands.command(
+    @botinfo.command(
         name="invite",
         description="Get a link to add me to a server.",
         extras={"red_force_enable": True},
@@ -1467,7 +1473,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             )
 
 
-    @app_commands.command(
+    @botinfo.command(
         name="leave",
         description="Make me leave a server.",
         extras={"red_force_enable": True},
@@ -1564,7 +1570,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                     else:
                         await ctx.send(_("Alright, I'm not leaving that server."))
 
-    @app_commands.command(
+    @botinfo.command(
         name="servers",
         description="List the servers I am in.",
         extras={"red_force_enable": True},
@@ -1830,7 +1836,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     # -- End Set Ownernotifications Commands -- ###
 
 
-    @app_commands.command(
+    @botinfo.command(
         name="contact",
         description="Send a message to my owner.",
         extras={"red_force_enable": True},
@@ -1923,7 +1929,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         else:
             await ctx.send(_("I'm unable to deliver your message. Sorry."))
 
-    @app_commands.command(
+    @botinfo.command(
         name="dm",
         description="Send a direct message as me.",
         extras={"red_force_enable": True},
@@ -1996,7 +2002,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             else:
                 await ctx.send(_("Message delivered to {}").format(destination))
 
-    @app_commands.command(
+    @botinfo.command(
         name="datapath",
         description="Show where my data is kept.",
         extras={"red_force_enable": True},
@@ -2014,7 +2020,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         msg = _("Data path: {path}").format(path=data_dir)
         await ctx.send(box(msg))
 
-    @app_commands.command(
+    @botinfo.command(
         name="debuginfo",
         description="Show version and platform information.",
         extras={"red_force_enable": True},
@@ -2035,7 +2041,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     # Truth to be told, that would require us to make some part of this
     # more end-user friendly rather than just bot owner friendly - terms like
     # 'global call once checks' are not of any use to someone who isn't bot owner.
-    @app_commands.command(
+    @botinfo.command(
         name="diagnoseissues",
         description="Work out why a command is not available to someone.",
         extras={"red_force_enable": True},
@@ -3044,7 +3050,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
 
     # Removing this command from forks is a violation of the GPLv3 under which it is licensed.
     # Otherwise interfering with the ability for this command to be accessible is also a violation.
-    @app_commands.command(
+    @botinfo.command(
         name="licenseinfo",
         description="Show my licence.",
         extras={"red_force_enable": True},

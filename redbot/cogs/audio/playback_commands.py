@@ -134,7 +134,7 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
                 ephemeral=True,
             )
 
-    @app_commands.command(
+    @player.command(
         name="np",
         description=shorten_string(
             max_length=100, string=_("Shows which track is currently being played on this server.")
@@ -144,7 +144,6 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
     @app_commands.describe(
         to_dm=shorten_string(max_length=100, string=_("Whether to send this command to your DM instead."))
     )
-    @app_commands.guild_only()
     @requires_player(slash=True)
     async def command_now(self, context: DISCORD_INTERACTION_TYPE, to_dm: bool = False):
         """Shows which track is currently being played on this server."""
@@ -182,12 +181,11 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             return
         await context.send(ephemeral=True, **kwargs)
 
-    @app_commands.command(
+    @player.command(
         name="skip",
         description=shorten_string(max_length=100, string=_("Skips the current track.")),
         extras={"red_force_enable": True},
     )
-    @app_commands.guild_only()
     @requires_player(slash=True)
     @invoker_is_dj(slash=True)
     async def command_skip(self, context: DISCORD_INTERACTION_TYPE):
@@ -221,12 +219,11 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             )
         await context.player.skip(requester=context.author)
 
-    @app_commands.command(
+    @player.command(
         name="stop",
         description=shorten_string(max_length=100, string=_("Stops the player and clears the queue.")),
         extras={"red_force_enable": True},
     )
-    @app_commands.guild_only()
     @requires_player(slash=True)
     @invoker_is_dj(slash=True)
     async def command_stop(self, context: DISCORD_INTERACTION_TYPE):
@@ -265,7 +262,7 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @app_commands.command(
+    @player.command(
         name="dc",
         description=shorten_string(
             max_length=100, string=_("Request that I disconnect from the current voice channel.")
@@ -300,12 +297,11 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @app_commands.command(
+    @player.command(
         name="queue",
         description=shorten_string(max_length=100, string=_("Shows the current queue for this server.")),
         extras={"red_force_enable": True},
     )
-    @app_commands.guild_only()
     @requires_player(slash=True)
     async def command_queue(self, context: DISCORD_INTERACTION_TYPE):
         """Shows the current queue for this server."""
@@ -328,12 +324,11 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             original_author=context.interaction.user if context.interaction else context.author,
         ).start(ctx=context)
 
-    @app_commands.command(
+    @player.command(
         name="shuffle",
         description=shorten_string(max_length=100, string=_("Shuffles the current queue.")),
         extras={"red_force_enable": True},
     )
-    @app_commands.guild_only()
     @requires_player(slash=True)
     @invoker_is_dj(slash=True)
     async def command_shuffle(self, context: DISCORD_INTERACTION_TYPE):
@@ -377,13 +372,12 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @app_commands.command(
+    @player.command(
         name="repeat",
         description=shorten_string(max_length=100, string=_("Set whether to repeat the current song or queue.")),
         extras={"red_force_enable": True},
     )
     @app_commands.describe(queue=shorten_string(max_length=100, string=_("Should the whole queue be repeated?")))
-    @app_commands.guild_only()
     @requires_player(slash=True)
     @invoker_is_dj(slash=True)
     async def command_repeat(self, context: DISCORD_INTERACTION_TYPE, queue: bool | None = None):
@@ -424,12 +418,11 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             embed=await context.pylav.construct_embed(description=msg, messageable=context), ephemeral=True
         )
 
-    @app_commands.command(
+    @player.command(
         name="pause",
         description=shorten_string(max_length=100, string=_("Pause the player")),
         extras={"red_force_enable": True},
     )
-    @app_commands.guild_only()
     @requires_player(slash=True)
     @invoker_is_dj(slash=True)
     async def command_pause(self, context: DISCORD_INTERACTION_TYPE):
@@ -466,12 +459,11 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @app_commands.command(
+    @player.command(
         name="resume",
         description=shorten_string(max_length=100, string=_("Resume the player")),
         extras={"red_force_enable": True},
     )
-    @app_commands.guild_only()
     @requires_player(slash=True)
     @invoker_is_dj(slash=True)
     async def command_resume(self, context: DISCORD_INTERACTION_TYPE):
@@ -508,11 +500,10 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @app_commands.command(
+    @player.command(
         name="volume", description=_("Set the current volume for the player."), extras={"red_force_enable": True}
     )
     @app_commands.describe(volume=_("The volume to set"))
-    @app_commands.guild_only()
     @requires_player(slash=True)
     @invoker_is_dj(slash=True)
     async def command_volume(self, context: DISCORD_INTERACTION_TYPE, volume: int):
@@ -571,9 +562,8 @@ class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
             ephemeral=True,
         )
 
-    @app_commands.command(name="seek", description=_("Seek the current track."), extras={"red_force_enable": True})
+    @player.command(name="seek", description=_("Seek the current track."), extras={"red_force_enable": True})
     @app_commands.describe(seek=_("The player position to seek to"))
-    @app_commands.guild_only()
     @requires_player(slash=True)
     @invoker_is_dj(slash=True)
     async def command_seek(self, context: DISCORD_INTERACTION_TYPE, seek: str):  # sourcery skip: low-code-quality
