@@ -46,7 +46,6 @@ from .errors import (
     ArgParserFailure as ArgParserFailure,
 )
 from .help import (
-    red_help as red_help,
     RedHelpFormatter as RedHelpFormatter,
     HelpSettings as HelpSettings,
 )
@@ -247,7 +246,6 @@ __all__ = (
     "BotMissingPermissions",
     "UserFeedbackCheckFailure",
     "ArgParserFailure",
-    "red_help",
     "RedHelpFormatter",
     "HelpSettings",
     "CheckPredicate",

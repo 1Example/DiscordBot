@@ -147,7 +147,9 @@ class Image(DashboardIntegration, commands.Cog):
             return
 
         if window not in ("day", "week", "month", "year", "all"):
-            await ctx.send_help()
+            await ctx.send(
+                _("Pick a window: day, week, month, year or all.")
+            )
             return
 
         imgur_client_id = (await ctx.bot.get_shared_api_tokens("imgur")).get("client_id")

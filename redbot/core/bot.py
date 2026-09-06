@@ -282,8 +282,10 @@ class Red(
         )
         # Do not manually use the help formatter attribute here, see `send_help_for`,
         # for a documented API. The internals of this object are still subject to change.
+        # The formatter stays - send_help_for and Context.send_help are public and
+        # still work - but nothing registers a `[p]help` command any more. There is
+        # nothing for it to list.
         self._help_formatter = commands.help.RedHelpFormatter()
-        self.add_command(commands.help.red_help)
 
         self._permissions_hooks: List[commands.CheckPredicate] = []
         self._red_ready = asyncio.Event()

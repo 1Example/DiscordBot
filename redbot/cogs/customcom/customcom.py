@@ -6,6 +6,7 @@ from typing import Iterable, List, Mapping, Tuple, Dict, Set, Literal, Union
 from urllib.parse import quote_plus
 
 import discord
+from discord import app_commands
 
 from redbot.core import Config, commands
 from redbot.core.commands import Parameter
@@ -260,61 +261,72 @@ class CustomCommands(DashboardIntegration, commands.Cog):
 
         await self.commandobj.redact_author_ids(user_id)
 
-    @commands.Cog.listener()
-    async def on_message_without_command(self, message):
-        is_private = message.guild is None
+    @app_commands.command(
+        name="cc",
+        description="Run one of this server's custom commands.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_commands.describe(
+        name="Which custom command.",
+        arguments="Anything the response asks for, separated by spaces.",
+    )
+    async def cc(
+        self, interaction: discord.Interaction, name: str, arguments: str = ""
+    ) -> None:
+        """Run a custom command.
 
-        # user_allowed check, will be replaced with self.bot.user_allowed or
-        # something similar once it's added
-        user_allowed = True
-
-        if isinstance(message.channel, discord.PartialMessageable):
-            return
-
-        if len(message.content) < 2 or is_private or not user_allowed or message.author.bot:
-            return
-
-        if await self.bot.cog_disabled_in_guild(self, message.guild):
-            return
-
-        ctx = await self.bot.get_context(message)
-
-        if ctx.prefix is None:
+        These used to fire off a prefixed message, which is why the response
+        can take positional arguments; they arrive as one string here and are
+        split the same way the message parser split them.
+        """
+        ctx = await commands.Context.from_interaction(interaction)
+        if await self.bot.cog_disabled_in_guild(self, ctx.guild):
             return
 
         try:
             raw_response, cooldowns = await self.commandobj.get(
-                message=message, command=ctx.invoked_with
+                message=ctx.message, command=name.lower()
             )
-            if isinstance(raw_response, list):
-                raw_response = random.choice(raw_response)
-            elif isinstance(raw_response, str):
-                pass
-            else:
-                raise NotFound()
-            if cooldowns:
-                self.test_cooldowns(ctx, ctx.invoked_with, cooldowns)
         except CCError:
+            await ctx.send(
+                _("There is no custom command called `{name}` here.").format(name=name[:100]),
+                ephemeral=True,
+            )
             return
 
-        # wrap the command here so it won't register with the bot
-        fake_cc = commands.command(name=ctx.invoked_with)(self.cc_callback)
-        fake_cc.params = self.prepare_args(raw_response)
-        fake_cc.requires.ready_event.set()
-        ctx.command = fake_cc
+        if isinstance(raw_response, list):
+            raw_response = random.choice(raw_response)
+        elif not isinstance(raw_response, str):
+            await ctx.send(_("That custom command is stored wrong."), ephemeral=True)
+            return
 
-        await self.bot.invoke(ctx)
-        if not ctx.command_failed:
-            await self.cc_command(*ctx.args, **ctx.kwargs, raw_response=raw_response)
+        if cooldowns:
+            try:
+                self.test_cooldowns(ctx, name.lower(), cooldowns)
+            except OnCooldown:
+                # It has already told them how long is left.
+                return
 
-    async def cc_callback(self, *args, **kwargs) -> None:
-        """
-        Custom command.
+        await self.cc_command(ctx, *arguments.split(), raw_response=raw_response)
 
-        Created via the CustomCom cog. See `[p]customcom` for more details.
-        """
-        # fake command to take advantage of discord.py's parsing and events
-        pass
+    @cc.autocomplete("name")
+    async def _cc_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list:
+        """The custom commands this server has."""
+        if interaction.guild is None:
+            return []
+        try:
+            names = await self.get_command_names(interaction.guild)
+        except Exception:  # noqa: BLE001 - autocomplete must not raise
+            return []
+        current = current.lower()
+        return [
+            app_commands.Choice(name=name[:100], value=name)
+            for name in sorted(names)
+            if current in name.lower()
+        ][:25]
 
     async def cc_command(self, ctx, *cc_args, raw_response, **cc_kwargs) -> None:
         cc_args = (*cc_args, *cc_kwargs.values())

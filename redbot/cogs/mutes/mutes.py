@@ -892,7 +892,7 @@ class Mutes(DashboardIntegration, VoiceMutes, commands.Cog, metaclass=CompositeM
             await ctx.send(str(error))
             return
         if not users:
-            return await ctx.send_help()
+            return await ctx.send(_("Name someone."))
         if ctx.me in users:
             return await ctx.send(_("You cannot mute me."))
         if ctx.author in users:
@@ -979,7 +979,7 @@ class Mutes(DashboardIntegration, VoiceMutes, commands.Cog, metaclass=CompositeM
             await ctx.send(str(error))
             return
         if not users:
-            return await ctx.send_help()
+            return await ctx.send(_("Name someone."))
         if ctx.me in users:
             return await ctx.send(_("You cannot mute me."))
         if ctx.author in users:
@@ -1137,7 +1137,7 @@ class Mutes(DashboardIntegration, VoiceMutes, commands.Cog, metaclass=CompositeM
             await ctx.send(str(error))
             return
         if not users:
-            return await ctx.send_help()
+            return await ctx.send(_("Name someone."))
         if ctx.me in users:
             return await ctx.send(_("You cannot mute me."))
         if ctx.author in users:
@@ -1233,7 +1233,7 @@ class Mutes(DashboardIntegration, VoiceMutes, commands.Cog, metaclass=CompositeM
         ctx = await commands.Context.from_interaction(interaction)
         users = [member]
         if not users:
-            return await ctx.send_help()
+            return await ctx.send(_("Name someone."))
         if ctx.me in users:
             return await ctx.send(_("You cannot unmute me."))
         if ctx.author in users:
@@ -1313,7 +1313,7 @@ class Mutes(DashboardIntegration, VoiceMutes, commands.Cog, metaclass=CompositeM
         ctx = await commands.Context.from_interaction(interaction)
         users = [member]
         if not users:
-            return await ctx.send_help()
+            return await ctx.send(_("Name someone."))
         if ctx.me in users:
             return await ctx.send(_("You cannot unmute me."))
         if ctx.author in users:
@@ -1392,7 +1392,7 @@ class Mutes(DashboardIntegration, VoiceMutes, commands.Cog, metaclass=CompositeM
         ctx = await commands.Context.from_interaction(interaction)
         users = [member]
         if not users:
-            return await ctx.send_help()
+            return await ctx.send(_("Name someone."))
         if ctx.me in users:
             return await ctx.send(_("You cannot unmute me."))
         if ctx.author in users:

@@ -33,7 +33,7 @@ class Stars(MixinMeta):
 
         if not user and not last_used:
             # User has not given a star yet, just send help
-            return await ctx.send_help()
+            return await ctx.send("Name someone to give a star to.")
 
         elif not user and last_used:
             # User has given a star, but they didnt mention anyone

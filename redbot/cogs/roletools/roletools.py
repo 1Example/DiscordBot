@@ -448,7 +448,7 @@ class RoleTools(
         role = await self._rt_hierarchy_role(ctx, role)
 
         if len(who) == 0:
-            await ctx.send_help()
+            await ctx.send(_("Name at least one member, role, or everyone."))
             return
         async with ctx.typing():
             members = []
@@ -554,7 +554,7 @@ class RoleTools(
         role = await self._rt_hierarchy_role(ctx, role)
 
         if len(who) == 0:
-            return await ctx.send_help()
+            return await ctx.send(_("Name at least one member, role, or everyone."))
         async with ctx.typing():
             members = []
             for entity in who:

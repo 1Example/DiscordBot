@@ -644,7 +644,7 @@ class Dev(commands.Cog):
         """
         msg = ctx.message
         if not content and not msg.embeds and not msg.attachments and not msg.stickers:
-            await ctx.send_help()
+            await ctx.send(_("Give me something to send."))
             return
         msg = copy(msg)
         msg.author = user

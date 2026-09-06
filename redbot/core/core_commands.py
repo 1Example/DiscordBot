@@ -938,7 +938,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 )
             )
         else:
-            await ctx.send_help()
+            await ctx.send(_("I did not understand that."))
 
     @mydata_owner.command(name="discordrequest", description="Process a deletion request that came from Discord.")
     @app_checks.is_owner()
@@ -1624,7 +1624,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 except aiohttp.ClientError:
                     return await ctx.send(_("Something went wrong while trying to get the image."))
         else:
-            await ctx.send_help()
+            await ctx.send(_("I did not understand that."))
             return
 
         try:

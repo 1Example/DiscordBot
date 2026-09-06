@@ -6,7 +6,6 @@ import typing
 
 import discord
 
-from redbot.core.utils import synthetic_context
 from redbot.core.utils.views import confirm
 from redbot.core import bank, commands
 from redbot.core.i18n import Translator
@@ -1897,20 +1896,14 @@ class ExplainView(discord.ui.View):
     ) -> None:
         await interaction.response.defer()
         command = self.pages[self.page]["command"]
-        # These pages point at this cog's own commands. They are still
-        # prefix commands, so this runs one the way a person would; when
-        # MafiaGame moves to slash commands the button should call the
-        # callback instead of going back through the message parser.
-        bot = interaction.client
-        prefixes = await bot.get_valid_prefixes(guild=interaction.guild)
-        context = await synthetic_context(
-            bot=bot,
-            author=interaction.user,
-            channel=interaction.channel,
-            content=f"{prefixes[0]}{command}",
-        )
-        if context.valid:
-            await bot.invoke(context)
+        # These point at this cog's own commands. They were prefix
+        # commands and this went through the message parser to reach
+        # them; they are subcommands of /mafia now, so the callback is
+        # called directly.
+        cog = interaction.client.get_cog("MafiaGame")
+        target = getattr(cog, command.split()[-1], None) if cog else None
+        if target is not None:
+            await target.callback(cog, interaction)
 
     @discord.ui.button(emoji="✖️", style=discord.ButtonStyle.danger)
     async def close(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:

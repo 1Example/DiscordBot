@@ -54,7 +54,7 @@ from ..utils.chat_formatting import (
     underline,
 )
 
-__all__ = ["red_help", "RedHelpFormatter", "HelpSettings", "HelpFormatterABC"]
+__all__ = ["RedHelpFormatter", "HelpSettings", "HelpFormatterABC"]
 
 _ = Translator("Help", __file__)
 
@@ -746,7 +746,9 @@ class RedHelpFormatter(HelpFormatterABC):
                 yield obj
 
     async def embed_requested(self, ctx: Context) -> bool:
-        return await ctx.bot.embed_requested(channel=ctx, command=red_help)
+        # There is no help command to ask about any more, so this asks the
+        # channel and server setting for whatever command is running.
+        return await ctx.bot.embed_requested(channel=ctx, command=ctx.command)
 
     async def command_not_found(self, ctx, help_for, help_settings: HelpSettings):
         """
@@ -939,12 +941,3 @@ class RedHelpFormatter(HelpFormatterABC):
                 asyncio.create_task(_delete_delay_help(destination, messages, delete_delay))
 
 
-@commands.command(name="help", hidden=True, i18n=_)
-async def red_help(ctx: Context, *, thing_to_get_help_for: str = None):
-    """
-    I need somebody
-    (Help) not just anybody
-    (Help) you know I need someone
-    (Help!)
-    """
-    await ctx.bot.send_help_for(ctx, thing_to_get_help_for, from_help_command=True)

@@ -516,7 +516,7 @@ class KickBanMixin(MixinMeta):
         guild = ctx.guild
 
         if not user_ids:
-            await ctx.send_help()
+            await ctx.send(_("Name at least one user."))
             return
 
         if days is None:
