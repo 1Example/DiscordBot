@@ -198,7 +198,7 @@ class RPCMethods(MixinMeta, ABC):
 
         reason_msg = (
             f"{reason_type['description']}\nPoints: {reason_type['points']}"
-            f"\n\nUse `[p]unwarn {member.id} {warn_key}` to remove this warning."
+            f"\n\nUse `/unwarn` on {member.id} with key {warn_key} to remove this warning."
         )
         case = await modlog.create_case(
             self.bot,

@@ -315,8 +315,7 @@ PERMISSIONS_TEMPLATE = (
   <div class="dz-panel">
     <h5><i class="fa fa-plus-circle"></i> Add or change a rule</h5>
     <p class="dz-hint">
-      Same effect as <code>[p]permissions addguildrule</code> and
-      <code>[p]permissions setdefaultguildrule</code>. Rule <b>ordering</b> and
+      Sets this server's rules and its default. Rule <b>ordering</b> and
       global rules are still YAML-only &mdash; upload an ACL for those.
     </p>
     <form method="POST">

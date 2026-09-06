@@ -2455,7 +2455,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
         chips.push('<span class="plc-chip on" title="When the queue runs out, playback continues from this playlist.">' +
                    '<i class="fa fa-magic"></i> Autoplay: ' + esc(ap.name) + "</span>");
       } else {
-        chips.push('<span class="plc-chip warn" title="Autoplay is on, but this server has no auto-play playlist set, so nothing will follow the queue. Set one with [p]audioset autoplay playlist.">' +
+        chips.push('<span class="plc-chip warn" title="Autoplay is on, but this server has no auto-play playlist set, so nothing will follow the queue. Set one on the PyLav settings page.">' +
                    '<i class="fa fa-magic"></i> Autoplay: no playlist set</span>');
       }
     }

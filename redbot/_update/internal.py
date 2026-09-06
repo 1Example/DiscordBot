@@ -162,8 +162,8 @@ async def _run_cog_update(bot: Red, *, update_repos: bool) -> None:
                     Text(cog_name, style="bold") for cog_name in cogs_with_changed_eud_statement
                 )
             )
-            message.append("\nYou can use ")
-            message.append("[p]cog info <repo> <cog>", style="bold")
+            message.append("\nYou can check ")
+            message.append("the Downloader page", style="bold")
             message.append(" to see the updated statements.\n")
     if result.failed_cogs:
         message.append("\nFailed to update cogs: ")

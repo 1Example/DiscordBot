@@ -436,7 +436,7 @@ TRIVIA_TEMPLATE = (
       <h5><i class="fa fa-list"></i> Available lists</h5>
       <p class="dz-hint">
         Pick any of these when starting a session above. New lists are uploaded
-        in Discord with <code>[p]triviaset custom upload</code>, since that needs
+        in Discord by uploading the file there, since that needs
         a file attachment.
       </p>
       {% if lists %}

@@ -511,7 +511,7 @@ class PyLavYouTubeRadio(YouTubeRadioDashboard, DISCORD_COG_TYPE_MIXIN):
             builtin = await player.autoplay_enabled()
         if builtin:
             lines.append("FAIL - PyLav autoplay is ON and will pre-empt the radio.")
-            lines.append("       Run: [p]playerset server auto false")
+            lines.append("       Turn it off under Autoplay on the PyLav settings page.")
         else:
             lines.append("PASS - PyLav built-in autoplay is off")
 

@@ -510,7 +510,7 @@ class Custom(Mode):
     name: str = "Custom"
     emoji: str = "🔧"
     description: str = _(
-        "A mode where you can choose all the roles. Use `[p]setmafia customroles` to configure this mode.",
+        "A mode where you can choose all the roles. Pick them under Roles on this server's Mafia settings page.",
     )
 
     @classmethod

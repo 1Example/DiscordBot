@@ -19,7 +19,8 @@ async def generate(description: str, request: "ToolContext", endpoint: str) -> b
         api_key = tokens.get("apikey") or tokens.get("api_key")
     if not api_key:
         raise ValueError(
-            "Gemini API key not configured. Set with: [p]set api gemini apikey,<KEY>"
+            "Gemini API key not configured. Add it on the dashboard under"
+            " Admin → API Keys, service `gemini`, key `apikey`."
         )
 
     model = await request.services.config.guild(

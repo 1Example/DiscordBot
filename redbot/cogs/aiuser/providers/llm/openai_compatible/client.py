@@ -62,7 +62,8 @@ async def setup_openai_client(
     if not api_key and (not base_url or api_type == "openrouter"):
         logger.error(
             f'{api_type} API key not set for "aiuser" yet! '
-            f"Please set it with: [p]set api {api_type} api_key,[API_KEY_HERE]"
+            f"Add it on the dashboard under Admin → API Keys, service "
+            f"{api_type}, key api_key."
         )
         return None
 

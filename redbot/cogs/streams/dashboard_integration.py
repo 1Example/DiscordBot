@@ -22,6 +22,8 @@ log = logging.getLogger("red.streams.dashboard")
 
 # The steps [p]streamset twitchtoken / youtubekey / kicktoken used to print.
 # Each service's own docs are linked rather than restated, since they move.
+# `fields` are the key names to enter under Admin -> API Keys, which is
+# where credentials are set now that `[p]set api` is gone.
 CREDENTIAL_HELP = (
     {
         "key": "twitch",
@@ -34,10 +36,7 @@ CREDENTIAL_HELP = (
             " and pick any application category.",
             "Click <b>Register</b>, then copy the client ID and the client secret.",
         ],
-        "command": (
-            "[p]set api twitch client_id &lt;your_client_id&gt;"
-            " client_secret &lt;your_client_secret&gt;"
-        ),
+        "fields": ("client_id", "client_secret"),
     },
     {
         "key": "youtube",
@@ -52,7 +51,7 @@ CREDENTIAL_HELP = (
             " (<a href=\"https://support.google.com/googleapi/answer/6158862\""
             ' target="_blank" rel="noopener">how</a>).',
         ],
-        "command": "[p]set api youtube api_key &lt;your_api_key&gt;",
+        "fields": ("api_key",),
     },
     {
         "key": "kick",
@@ -65,10 +64,7 @@ CREDENTIAL_HELP = (
             " <code>http://localhost</code>.",
             "Click <b>Create Application</b>, then copy the client ID and client secret.",
         ],
-        "command": (
-            "[p]set api kick client_id &lt;your_client_id&gt;"
-            " client_secret &lt;your_client_secret&gt;"
-        ),
+        "fields": ("client_id", "client_secret"),
     },
 )
 
@@ -676,7 +672,7 @@ STREAMS_TEMPLATE = (
           Credentials: Twitch {{ 'set' if tokens.twitch else 'missing' }} &middot;
           YouTube {{ 'set' if tokens.youtube else 'missing' }} &middot;
           Kick {{ 'set' if tokens.kick else 'missing' }}.
-          They are set from Discord and are never shown here.
+          They are set under Admin &rarr; API Keys and are never shown here.
         </p>
 
         {% for c in credentials %}
@@ -692,13 +688,17 @@ STREAMS_TEMPLATE = (
             <ol class="dz-hint" style="margin:0 0 8px 18px; padding:0;">
               {% for step in c.steps %}<li style="margin:3px 0;">{{ step|safe }}</li>{% endfor %}
             </ol>
-            <p class="dz-hint" style="margin:0;">Then send the bot, in a DM:</p>
-            <code style="display:block; margin-top:5px; word-break:break-all;"
-              >{{ c.command|safe }}</code>
+            <p class="dz-hint" style="margin:0;">
+              Then add them under <a href="{{ url_for('base_blueprint.admin', page='api') }}">Admin &rarr; API Keys</a>, under the service
+              <code>{{ c.key }}</code>:
+            </p>
+            <ul class="dz-hint" style="margin:5px 0 0 18px; padding:0;">
+              {% for field in c.fields %}<li><code>{{ field }}</code></li>{% endfor %}
+            </ul>
           </details>
         {% endfor %}
         <p class="dz-hint">
-          These are secrets: send that in a DM with the bot, not a server channel.
+          Only the bot owner can see or change those keys.
         </p>
         <label class="dz-label">Seconds between checks</label>
         <div class="dz-row">

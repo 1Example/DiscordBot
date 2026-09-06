@@ -2,7 +2,6 @@ import discord
 from redbot.core.bot import Red
 from redbot.core import app_commands, commands, Config
 from redbot.core.i18n import cog_i18n, Translator, set_contextual_locales_from_guild
-from redbot.core.utils._internal_utils import send_to_owners_with_prefix_replaced
 from redbot.core.utils.chat_formatting import escape, inline
 
 from .streamtypes import (
@@ -144,20 +143,15 @@ class Streams(DashboardIntegration, commands.Cog):
             "1. Go to this page: {link}.\n"
             '2. Click "Manage" on your application.\n'
             '3. Click on "New secret".\n'
-            "4. Copy your client ID and your client secret into:\n"
+            "4. On the dashboard, paste them into:\n"
             "{command}"
-            "\n\n"
-            "Note: These tokens are sensitive and should only be used in a private channel "
-            "or in DM with the bot."
         ).format(
             link="https://dev.twitch.tv/console/apps",
             command=inline(
-                "[p]set api twitch client_id {} client_secret {}".format(
-                    _("<your_client_id_here>"), _("<your_client_secret_here>")
-                )
+                _("Admin → API Keys → twitch → client_id and client_secret")
             ),
         )
-        await send_to_owners_with_prefix_replaced(self.bot, message)
+        await self.bot.send_to_owners(message)
         await self.config.notified_owner_missing_twitch_secret.set(True)
 
     async def _notify_owner_about_missing_kick_secret(self) -> None:
@@ -166,20 +160,15 @@ class Streams(DashboardIntegration, commands.Cog):
             "Follow these steps:\n"
             "1. Go to this page: {link}.\n"
             '2. Click "Manage" on your application.\n'
-            "3. Copy your client ID and your client secret into:\n"
+            "3. On the dashboard, paste them into:\n"
             "{command}"
-            "\n\n"
-            "Note: These tokens are sensitive and should only be used in a private channel "
-            "or in DM with the bot."
         ).format(
             link="https://kick.com/settings/developer",
             command=inline(
-                "[p]set api kick client_id {} client_secret {}".format(
-                    _("<your_client_id_here>"), _("<your_client_secret_here>")
-                )
+                _("Admin → API Keys → kick → client_id and client_secret")
             ),
         )
-        await send_to_owners_with_prefix_replaced(self.bot, message)
+        await self.bot.send_to_owners(message)
         await self.config.notified_owner_missing_kick_secret.set(True)
 
     async def get_twitch_bearer_token(self, api_tokens: Optional[Dict] = None) -> None:

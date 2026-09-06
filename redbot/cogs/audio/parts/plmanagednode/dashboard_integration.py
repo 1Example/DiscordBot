@@ -538,7 +538,7 @@ PLMANAGED_TEMPLATE = (
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
     <div class="dz-panel">
       <h5><i class="fa fa-cog"></i> Server tuning</h5>
-      <p class="dz-hint">The settings <code>[p]plmanaged settings server</code>
+      <p class="dz-hint">The managed-node server settings
          exposes, with their accepted ranges.</p>
       {% for s in settings %}
         <div style="padding:9px 0; border-bottom:1px solid rgba(255,255,255,.06);">

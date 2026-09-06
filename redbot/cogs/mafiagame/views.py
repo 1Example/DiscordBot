@@ -1724,8 +1724,8 @@ class ExplainView(discord.ui.View):
                     ),
                     discord.Embed(
                         description=_(
-                            "ℹ️ See `{prefix}mafia roles` or `{prefix}mafia role <role>` for more information.",
-                        ).format(prefix="[p]"),
+                            "ℹ️ See `/mafia roles` or `/mafia role` for more information.",
+                        ),
                     ),
                     discord.Embed(
                         title=_("Roles Priority"),
@@ -1747,8 +1747,8 @@ class ExplainView(discord.ui.View):
                     discord.Embed(
                         title=_("**Modes:**"),
                         description=_(
-                            "There are several possible modes.\n- {predefined_modes_number} have predefined options and make specific choices depending on the number of players.\n- A `Random` mode works from the number of players and selects roles randomly according to the number of players on Mafia's side, Villagers' side or Neutral's side required.\n- A `Custom` mode depends on your own preferences with `{prefix}setmafia customroles <roles...>`.\nℹ️ See `{prefix}mafia modes` or `{prefix}mafia mode <mode>` for more information.",
-                        ).format(prefix="[p]", predefined_modes_number=len(self.MODES) - 2),
+                            "There are several possible modes.\n- {predefined_modes_number} have predefined options and make specific choices depending on the number of players.\n- A `Random` mode works from the number of players and selects roles randomly according to the number of players on Mafia's side, Villagers' side or Neutral's side required.\n- A `Custom` mode depends on your own preferences, set under Roles on this server's Mafia settings page.\nℹ️ See `/mafia modes` or `/mafia mode` for more information.",
+                        ).format(predefined_modes_number=len(self.MODES) - 2),
                         color=MODES_COLOR,
                     ),
                 ],
@@ -1782,8 +1782,8 @@ class ExplainView(discord.ui.View):
                     discord.Embed(
                         title=_("**Anomalies:**"),
                         description=_(
-                            "Anomalies are special events that can occur during the game. They can be beneficial or harmful. Each turn, they have 40% chance to occur and a random anomaly among the {anomalies_number} existing will be selected.\nℹ️ See `{prefix}mafia anomalies` or `{prefix}mafia anomaly <anomaly>` for more information.",
-                        ).format(prefix="[p]", anomalies_number=len(self.ANOMALIES)),
+                            "Anomalies are special events that can occur during the game. They can be beneficial or harmful. Each turn, they have 40% chance to occur and a random anomaly among the {anomalies_number} existing will be selected.\nℹ️ See `/mafia anomalies` or `/mafia anomaly` for more information.",
+                        ).format(anomalies_number=len(self.ANOMALIES)),
                         color=ANOMALIES_COLOR,
                     ),
                 ],
@@ -1796,8 +1796,8 @@ class ExplainView(discord.ui.View):
                     discord.Embed(
                         title=_("**Achievements:**"),
                         description=_(
-                            "Achievements are special goals that players can achieve during the game. They can be general or specific to a role. They are global for all the servers. If you get an achievement, you will receive a DM when a game ends.\nℹ️ You can check them with `{prefix}mafia achievements`.",
-                        ).format(prefix="[p]"),
+                            "Achievements are special goals that players can achieve during the game. They can be general or specific to a role. They are global for all the servers. If you get an achievement, you will receive a DM when a game ends.\nℹ️ You can check them with `/mafia achievements`.",
+                        ),
                         color=ACHIEVEMENTS_COLOR,
                     ),
                 ],

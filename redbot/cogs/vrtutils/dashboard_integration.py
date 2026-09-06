@@ -579,7 +579,7 @@ class DashboardIntegration:
                 {
                     "message": "PrivateRooms is not tracking any rooms and has no "
                     "category set, so there is nothing I can safely sweep. Set one "
-                    "with `[p]prooms setup category`.",
+                    "in the PrivateRooms section of this page.",
                     "category": "warning",
                 }
             )

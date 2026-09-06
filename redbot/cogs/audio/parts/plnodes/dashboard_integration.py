@@ -252,7 +252,7 @@ PLNODES_TEMPLATE = (
 <div class="dz">
   <div class="dz-head">
     <h4><i class="fa fa-sitemap"></i> Lavalink nodes</h4>
-    <p>Everything the <code>[p]plnode</code> menus do, as a form. Nodes PyLav
+    <p>Every node setting, as a form. Nodes PyLav
        manages itself are shown but cannot be edited.</p>
   </div>
 

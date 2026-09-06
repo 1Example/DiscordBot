@@ -1418,10 +1418,10 @@ class Red(
                         self,
                         "We detected a change in minor Python version"
                         " and cleared packages in lib folder.\n"
-                        "The instance was started with no cogs, please load Downloader"
-                        " and use `[p]cog reinstallreqs` to regenerate lib folder."
-                        " After that, restart the bot to get"
-                        " all of your previously loaded cogs loaded again.",
+                        "The instance was started with no cogs. Load Downloader and"
+                        " use Reinstall requirements on its dashboard page to"
+                        " regenerate the lib folder. After that, restart the bot to"
+                        " get all of your previously loaded cogs loaded again.",
                     )
                 )
                 python_version_changed = True
@@ -1457,7 +1457,8 @@ class Red(
                     "We detected a possible change in machine's operating system"
                     " or architecture. You might need to regenerate your lib folder"
                     " if 3rd-party cogs stop working properly.\n"
-                    "To regenerate lib folder, load Downloader and use `[p]cog reinstallreqs`.",
+                    "To regenerate the lib folder, load Downloader and use"
+                    " Reinstall requirements on its dashboard page.",
                 )
             )
 

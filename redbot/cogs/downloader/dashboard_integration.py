@@ -434,9 +434,9 @@ class DashboardIntegration:
             )
             out.append(
                 {
-                    "message": "Load them with the Core page or `[p]load "
-                    + " ".join(names)
-                    + "`.",
+                    "message": "Load them from the Cog Management page: "
+                    + ", ".join(names)
+                    + ".",
                     "category": "info",
                 }
             )
@@ -681,7 +681,7 @@ DOWNLOADER_TEMPLATE = (
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
     <div class="dz-panel">
       <h5><i class="fa fa-cube"></i> Install Python packages</h5>
-      <p class="dz-hint">Same as <code>[p]pipinstall</code>. Space separated.</p>
+      <p class="dz-hint">Installs into the bot's lib folder. Space separated.</p>
       <div class="dz-row">
         <input class="dz-input" type="text" name="deps"
                placeholder="requests beautifulsoup4" style="flex:1 1 260px;" />

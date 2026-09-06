@@ -256,11 +256,12 @@ PLCONFIG_TEMPLATE = (
         <li>Answer <b>No</b> when asked about commercial integration.</li>
         <li>Accept the terms, then copy the client ID and client secret.</li>
       </ol>
-      <p class="dz-hint" style="margin:0;">Then send the bot, in a DM:</p>
-      <code style="display:block; margin-top:5px; word-break:break-all;"
-        >[p]set api spotify client_id &lt;client_id&gt; client_secret &lt;client_secret&gt;</code>
+      <p class="dz-hint" style="margin:0;">
+        Then add them under <a href="{{ url_for('base_blueprint.admin', page='api') }}">Admin → API Keys</a>, under the service
+        <code>spotify</code>: <code>client_id</code> and <code>client_secret</code>.
+      </p>
       <p class="dz-hint" style="margin-top:7px;">
-        These are secrets: send that in a DM, not a server channel.
+        Only the bot owner can see or change those keys.
       </p>
     </details>
   </div>

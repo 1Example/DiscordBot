@@ -130,7 +130,7 @@ async def _edit_prefix(red, prefix, no_prompt):
     elif not no_prompt and confirm("Would you like to change instance's prefixes?", default=False):
         print(
             "Enter the prefixes, separated by a space (please note "
-            "that prefixes containing a space will need to be added with [p]set prefix)"
+            "that prefixes containing a space have to be added from the dashboard)"
         )
         while True:
             prefixes = input("> ").strip().split()

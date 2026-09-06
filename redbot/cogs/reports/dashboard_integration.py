@@ -396,7 +396,7 @@ REPORTS_TEMPLATE = (
     <h5><i class="fa fa-inbox"></i> Reports sent to a channel</h5>
     <p class="dz-hint">
       Reports collected by the channel path. Reply here to DM the reporter, the
-      way <code>[p]report interact</code> opens a conversation in Discord.
+      way an interactive report opens a conversation in Discord.
       {% if profile %}
         Reports now open tickets instead, so this list stops growing &mdash;
         new ones are in the Tickets module.

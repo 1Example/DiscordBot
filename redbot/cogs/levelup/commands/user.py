@@ -823,7 +823,8 @@ class User(MixinMeta):
                 txt = _(
                     "Set a Tenor API key to allow setting backgrounds from Discord's GIF links!\n"
                     "[Click here to get one](https://developers.google.com/tenor/guides/quickstart)\n"
-                    "Then set it with `[p]set api tenor api_key <your_key>`"
+                    "Then add it on the dashboard under Admin → API Keys, "
+                    "service tenor, key api_key."
                 )
                 await ctx.send(txt)
             log.debug("Sanitizing link")

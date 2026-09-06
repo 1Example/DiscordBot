@@ -31,7 +31,7 @@ CREDENTIAL_STEPS = (
             "Enter a valid email address and a description.",
             "Complete the captcha. The client ID is on the next page.",
         ],
-        "command": "[p]set api imgur client_id &lt;your_client_id&gt;",
+        "fields": ("client_id",),
     },
     {
         "key": "giphy",
@@ -44,7 +44,7 @@ CREDENTIAL_STEPS = (
             "Give it a name and a description, then create it.",
             "Copy the API key it shows you.",
         ],
-        "command": "[p]set api giphy api_key &lt;your_api_key&gt;",
+        "fields": ("api_key",),
     },
 )
 
@@ -152,8 +152,8 @@ class DashboardIntegration:
             if not api_key:
                 return [
                     {
-                        "message": "No Giphy API key is set. Add one with "
-                        "`[p]set api GIPHY api_key <key>`.",
+                        "message": "No Giphy API key is set. Add one under "
+                        "Admin → API Keys, service GIPHY, key api_key.",
                         "category": "warning",
                     }
                 ], {}
@@ -262,12 +262,16 @@ IMAGE_TEMPLATE = (
           <ol class="dz-hint" style="margin:0 0 8px 18px; padding:0;">
             {% for step in c.steps %}<li style="margin:3px 0;">{{ step|safe }}</li>{% endfor %}
           </ol>
-          <p class="dz-hint" style="margin:0;">Then send the bot, in a DM:</p>
-          <code style="display:block; margin-top:5px; word-break:break-all;"
-            >{{ c.command|safe }}</code>
+          <p class="dz-hint" style="margin:0;">
+            Then add them under <a href="{{ url_for('base_blueprint.admin', page='api') }}">Admin → API Keys</a>,
+            under the service <code>{{ c.key }}</code>:
+          </p>
+          <ul class="dz-hint" style="margin:5px 0 0 18px; padding:0;">
+            {% for field in c.fields %}<li><code>{{ field }}</code></li>{% endfor %}
+          </ul>
         </details>
       {% endfor %}
-      <p class="dz-hint">These are secrets: send that in a DM, not a server channel.</p>
+      <p class="dz-hint">Only the bot owner can see or change those keys.</p>
     </div>
   {% endif %}
 

@@ -477,7 +477,7 @@ class LevelUp(
                         await self.bot.send_to_owners(
                             _(
                                 "LevelUp has successfully migrated to v4!\n"
-                                "Leveling is now disabled by default and must be toggled on in each server via `[p]lset toggle`.\n"
+                                "Leveling is now disabled by default and must be turned on for each server on the LevelUp settings page.\n"
                                 "[View the changelog](https://github.com/vertyco/vrt-cogs/blob/main/levelup/CHANGELOG.md) for more information."
                             )
                         )
