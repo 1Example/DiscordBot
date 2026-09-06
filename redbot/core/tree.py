@@ -271,6 +271,18 @@ class RedTree(CommandTree):
         if interaction.user.bot:
             return False
 
+        # A command marked always-available skips these. The data
+        # protection commands are the reason: the allowlist and the
+        # blocklist shut out exactly the people most likely to want their
+        # data deleted, and the prefix versions bypassed checks through
+        # _AlwaysAvailableCommand for that reason. discord.py does not set
+        # interaction.command until after this runs, so the root name comes
+        # off the raw payload.
+        root = (interaction.data or {}).get("name")
+        command = self.get_command(root) if root else None
+        if command is not None and command.extras.get("red_always_available"):
+            return True
+
         if interaction.guild:
             if not (await self.client.ignored_channel_or_guild(interaction)):
                 await self._send_interaction_check_failure(
