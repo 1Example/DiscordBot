@@ -28,7 +28,10 @@ from types import CodeType, TracebackType
 
 import discord
 
+from discord import app_commands
+
 from . import commands
+from .app_commands import checks as app_checks
 from .commands import NoParseOptional as Optional
 from .i18n import Translator, cog_i18n
 from .utils import chat_formatting
@@ -412,6 +415,26 @@ class DevOutput:
 
 
 @cog_i18n(_)
+class _CodeModal(discord.ui.Modal):
+    """A paragraph field, because a slash string option is a single line.
+
+    debug and eval take code, which is the one thing an option cannot carry.
+    """
+
+    code: discord.ui.TextInput = discord.ui.TextInput(
+        label="Code", style=discord.TextStyle.paragraph, required=True, max_length=4000
+    )
+
+    def __init__(self, cog, runner: str, title: str) -> None:
+        super().__init__(title=title)
+        self.cog = cog
+        self.runner = runner
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        ctx = await commands.Context.from_interaction(interaction)
+        await getattr(self.cog, self.runner)(ctx, self.code.value)
+
+
 class Dev(commands.Cog):
     """Various development focused utilities."""
 
@@ -453,9 +476,24 @@ class Dev(commands.Cog):
                 env[name] = exc
         return env
 
-    @commands.command()
-    @commands.is_owner()
-    async def debug(self, ctx: commands.Context, *, code: str) -> None:
+    dev = app_commands.Group(
+        name="dev",
+        description="Debugging tools.",
+        extras={"red_force_enable": True},
+    )
+
+    @dev.command(name="debug", description="Evaluate one statement of Python.")
+    @app_checks.is_owner()
+    async def debug(self, interaction: discord.Interaction) -> None:
+        """Evaluate a statement of python code."""
+        await interaction.response.send_modal(_CodeModal(self, "_run_debug", "Debug"))
+
+    @dev.command(name="eval", description="Run a block of asynchronous Python.")
+    @app_checks.is_owner()
+    async def _eval(self, interaction: discord.Interaction) -> None:
+        """Execute asynchronous code."""
+        await interaction.response.send_modal(_CodeModal(self, "_run_eval", "Eval"))
+    async def _run_debug(self, ctx, code: str) -> None:
         """Evaluate a statement of python code.
 
         The bot will always respond with the return value of the code.
@@ -489,9 +527,7 @@ class Dev(commands.Cog):
         self._last_result = output.result
         await output.send()
 
-    @commands.command(name="eval")
-    @commands.is_owner()
-    async def _eval(self, ctx: commands.Context, *, body: str) -> None:
+    async def _run_eval(self, ctx, body: str) -> None:
         """Execute asynchronous code.
 
         This command wraps code into the body of an async function and then
@@ -525,9 +561,9 @@ class Dev(commands.Cog):
             self._last_result = output.result
         await output.send()
 
-    @commands.group(invoke_without_command=True)
-    @commands.is_owner()
-    async def repl(self, ctx: commands.Context) -> None:
+    @dev.command(name="repl", description="Open an interactive REPL in this channel.")
+    @app_checks.is_owner()
+    async def repl(self, interaction: discord.Interaction) -> None:
         """Open an interactive REPL.
 
         The REPL will only recognise code as messages which start with a
@@ -551,6 +587,7 @@ class Dev(commands.Cog):
             `commands` - the redbot.core.commands module
             `cf`       - the redbot.core.utils.chat_formatting module
         """
+        ctx = await commands.Context.from_interaction(interaction)
         if ctx.channel.id in self.sessions:
             if self.sessions[ctx.channel.id]:
                 await ctx.send(
@@ -598,9 +635,12 @@ class Dev(commands.Cog):
             except discord.HTTPException as exc:
                 await ctx.send(_("Unexpected error: ") + str(exc))
 
-    @repl.command(aliases=["resume"])
-    async def pause(self, ctx: commands.Context, toggle: Optional[bool] = None) -> None:
+    @dev.command(name="pause", description="Pause or resume this channel's REPL.")
+    @app_checks.is_owner()
+    @app_commands.describe(toggle="Leave empty to flip it.")
+    async def pause(self, interaction: discord.Interaction, toggle: bool = None) -> None:
         """Pauses/resumes the REPL running in the current channel."""
+        ctx = await commands.Context.from_interaction(interaction)
         if ctx.channel.id not in self.sessions:
             await ctx.send(_("There is no currently running REPL session in this channel."))
             return
@@ -614,25 +654,16 @@ class Dev(commands.Cog):
         else:
             await ctx.send(_("The REPL session in this channel is now paused."))
 
-    @commands.guild_only()
-    @commands.command()
-    @commands.is_owner()
-    async def mock(self, ctx: commands.Context, user: discord.Member, *, command: str) -> None:
-        """Mock another user invoking a command.
 
-        The prefix must not be entered.
-        """
-        msg = copy(ctx.message)
-        msg.author = user
-        msg.content = ctx.prefix + command
-
-        ctx.bot.dispatch("message", msg)
-
-    @commands.guild_only()
-    @commands.command(name="mockmsg")
-    @commands.is_owner()
+    @dev.command(name="mockmsg", description="Dispatch a message as if someone else sent it.")
+    @app_commands.guild_only()
+    @app_checks.is_owner()
+    @app_commands.describe(
+        user="Who to attribute it to.",
+        content="What it says.",
+    )
     async def mock_msg(
-        self, ctx: commands.Context, user: discord.Member, *, content: str = ""
+        self, interaction: discord.Interaction, user: discord.Member, content: str = ""
     ) -> None:
         """Dispatch a message event as if it were sent by a different user.
 
@@ -642,6 +673,7 @@ class Dev(commands.Cog):
         Note: If `content` isn't passed, the message needs to contain embeds, attachments,
         or anything else that makes the message non-empty.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         msg = ctx.message
         if not content and not msg.embeds and not msg.attachments and not msg.stickers:
             await ctx.send(_("Give me something to send."))
@@ -652,12 +684,16 @@ class Dev(commands.Cog):
 
         ctx.bot.dispatch("message", msg)
 
-    @commands.command()
-    @commands.is_owner()
-    async def bypasscooldowns(self, ctx: commands.Context, toggle: Optional[bool] = None) -> None:
+    @dev.command(name="bypasscooldowns", description="Let owners skip command cooldowns.")
+    @app_checks.is_owner()
+    @app_commands.describe(toggle="Leave empty to flip it.")
+    async def bypasscooldowns(
+        self, interaction: discord.Interaction, toggle: bool = None
+    ) -> None:
         """Give bot owners the ability to bypass cooldowns.
 
         Does not persist through restarts."""
+        ctx = await commands.Context.from_interaction(interaction)
         if toggle is None:
             toggle = not ctx.bot._bypass_cooldowns
         ctx.bot._bypass_cooldowns = toggle

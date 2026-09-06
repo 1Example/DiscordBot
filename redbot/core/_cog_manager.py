@@ -14,7 +14,10 @@ from redbot.core.utils import deduplicate_iterables
 from redbot.core.utils.views import ConfirmView
 import discord
 
+from discord import app_commands
+
 from . import commands
+from .app_commands import checks as app_checks
 from .config import Config
 from .i18n import Translator, cog_i18n
 from .data_manager import cog_data_path, data_path
@@ -342,12 +345,18 @@ class CogManagerUI(commands.Cog):
         """Nothing to delete (Core Config is handled in a bot method )"""
         return
 
-    @commands.command()
-    @commands.is_owner()
-    async def paths(self, ctx: commands.Context):
+    cogpath = app_commands.Group(
+        name="cogpath",
+        description="Where I look for cogs.",
+        extras={"red_force_enable": True},
+    )
+    @cogpath.command(name="list", description="Show the paths I search, in order.")
+    @app_checks.is_owner()
+    async def paths(self, interaction: discord.Interaction):
         """
         Lists current cog paths in order of priority.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         cog_mgr = ctx.bot._cog_mgr
         install_path = await cog_mgr.install_path()
         core_path = cog_mgr.CORE_PATH
@@ -373,12 +382,15 @@ class CogManagerUI(commands.Cog):
 
         await ctx.send(box(msg))
 
-    @commands.command()
-    @commands.is_owner()
-    async def addpath(self, ctx: commands.Context, *, path: Path):
+    @cogpath.command(name="add", description="Add a path to search.")
+    @app_checks.is_owner()
+    @app_commands.describe(path="A folder on the machine I run on.")
+    async def addpath(self, interaction: discord.Interaction, path: str):
         """
         Add a path to the list of available cog paths.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        path = Path(path)
         if not path.is_dir():
             await ctx.send(_("That path does not exist or does not point to a valid directory."))
             return
@@ -465,12 +477,21 @@ class CogManagerUI(commands.Cog):
         else:
             await ctx.send(_("Path successfully added."))
 
-    @commands.command(require_var_positional=True)
-    @commands.is_owner()
-    async def removepath(self, ctx: commands.Context, *path_numbers: positive_int):
+    @cogpath.command(name="remove", description="Remove a path by its number.")
+    @app_checks.is_owner()
+    @app_commands.describe(path_numbers="Numbers from the list, separated by spaces.")
+    async def removepath(self, interaction: discord.Interaction, path_numbers: str):
         """
         Removes one or more paths from the available cog paths given the `path_numbers` from `[p]paths`.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        numbers = []
+        for token in path_numbers.split():
+            if not token.isdigit() or int(token) < 1:
+                await ctx.send(_("`{value}` is not a path number.").format(value=token[:50]))
+                return
+            numbers.append(int(token))
+        path_numbers = numbers
         valid: List[Path] = []
         invalid: List[int] = []
 
@@ -503,12 +524,22 @@ class CogManagerUI(commands.Cog):
         for page in pagify("\n\n".join(parts), ["\n", " "]):
             await ctx.send(page)
 
-    @commands.command(usage="<from> <to>")
-    @commands.is_owner()
-    async def reorderpath(self, ctx: commands.Context, from_: positive_int, to: positive_int):
+    @cogpath.command(name="reorder", description="Move a path up or down the order.")
+    @app_checks.is_owner()
+    @app_commands.describe(
+        from_="The number it has now.",
+        to="The number it should have.",
+    )
+    async def reorderpath(
+        self,
+        interaction: discord.Interaction,
+        from_: app_commands.Range[int, 1, None],
+        to: app_commands.Range[int, 1, None],
+    ):
         """
         Reorders paths internally to allow discovery of different cogs.
         """
+        ctx = await commands.Context.from_interaction(interaction)
         # Doing this because in the paths command they're 1 indexed
         from_ -= 1
         to -= 1
@@ -529,9 +560,10 @@ class CogManagerUI(commands.Cog):
         await ctx.bot._cog_mgr.set_paths(all_paths)
         await ctx.send(_("Paths reordered."))
 
-    @commands.command()
-    @commands.is_owner()
-    async def installpath(self, ctx: commands.Context, path: Path = None):
+    @cogpath.command(name="install", description="Where Downloader puts cogs it installs.")
+    @app_checks.is_owner()
+    @app_commands.describe(path="Leave empty to see the current one.")
+    async def installpath(self, interaction: discord.Interaction, path: str = None):
         """
         Returns the current install path or sets it if one is provided.
 
@@ -540,6 +572,8 @@ class CogManagerUI(commands.Cog):
 
         No installed cogs will be transferred in the process.
         """
+        ctx = await commands.Context.from_interaction(interaction)
+        path = Path(path) if path else None
         if path:
             if not path.is_absolute():
                 path = (ctx.bot._main_dir / path).resolve()
@@ -554,57 +588,3 @@ class CogManagerUI(commands.Cog):
             _("The bot will install new cogs to the `{}` directory.").format(install_path)
         )
 
-    @commands.command()
-    @commands.is_owner()
-    async def cogs(self, ctx: commands.Context):
-        """
-        Lists all loaded and available cogs.
-        """
-        loaded = set(ctx.bot.extensions.keys())
-
-        all_cogs = set(await ctx.bot._cog_mgr.available_modules())
-
-        unloaded = all_cogs - loaded
-
-        loaded = sorted(list(loaded), key=str.lower)
-        unloaded = sorted(list(unloaded), key=str.lower)
-
-        if await ctx.embed_requested():
-            loaded = _("**{} loaded:**\n").format(len(loaded)) + ", ".join(loaded)
-            unloaded = _("**{} unloaded:**\n").format(len(unloaded)) + ", ".join(unloaded)
-
-            for page in pagify(loaded, delims=[", ", "\n"], page_length=1800):
-                if page.startswith(", "):
-                    page = page[2:]
-                e = discord.Embed(description=page, colour=discord.Colour.dark_green())
-                await ctx.send(embed=e)
-
-            for page in pagify(unloaded, delims=[", ", "\n"], page_length=1800):
-                if page.startswith(", "):
-                    page = page[2:]
-                e = discord.Embed(description=page, colour=discord.Colour.dark_red())
-                await ctx.send(embed=e)
-        else:
-            loaded_count = _("**{} loaded:**\n").format(len(loaded))
-            loaded = ", ".join(loaded)
-            unloaded_count = _("**{} unloaded:**\n").format(len(unloaded))
-            unloaded = ", ".join(unloaded)
-            loaded_count_sent = False
-            unloaded_count_sent = False
-            for page in pagify(loaded, delims=[", ", "\n"], page_length=1800):
-                if page.startswith(", "):
-                    page = page[2:]
-                if not loaded_count_sent:
-                    await ctx.send(loaded_count + box(page, lang="css"))
-                    loaded_count_sent = True
-                else:
-                    await ctx.send(box(page, lang="css"))
-
-            for page in pagify(unloaded, delims=[", ", "\n"], page_length=1800):
-                if page.startswith(", "):
-                    page = page[2:]
-                if not unloaded_count_sent:
-                    await ctx.send(unloaded_count + box(page, lang="ldif"))
-                    unloaded_count_sent = True
-                else:
-                    await ctx.send(box(page, lang="ldif"))
