@@ -26,7 +26,7 @@ _RE_TIME_CONVERTER: Final[Pattern] = re.compile(r"(?:(\d+):)?(\d+):(\d+)")
 # The above was updated to allow for any `(\d+)?\d+:\d+` combination to include unusual time formats such as `1:75`
 
 
-class HybridCommands(DISCORD_COG_TYPE_MIXIN):
+class PlaybackCommands(DISCORD_COG_TYPE_MIXIN):
     @staticmethod
     async def _process_play_search_queries(context, player, search_queries, single_track, total_tracks_enqueue):
         total_tracks_from_search = 0

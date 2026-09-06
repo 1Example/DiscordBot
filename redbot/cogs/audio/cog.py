@@ -14,7 +14,7 @@ from pylav.type_hints.bot import DISCORD_BOT_TYPE
 
 from .config_commands import ConfigCommands
 from .context_menus import ContextMenus
-from .hybrid_commands import HybridCommands
+from .playback_commands import PlaybackCommands
 from .player_commands import PlayerCommands
 from .slash_commands import SlashCommands
 from .dashboard_integration import DashboardIntegration
@@ -64,7 +64,7 @@ class Audio(
     PyLavManagedNode,
     PyLavConfigurator,
     PyLavUtils,
-    HybridCommands,
+    PlaybackCommands,
     PlayerCommands,
     ConfigCommands,
     ContextMenus,
