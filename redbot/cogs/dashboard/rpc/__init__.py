@@ -1879,6 +1879,10 @@ class DashboardRPC:
 
         Names only. A value that has been stored is never handed back out,
         the same way `[p]set api list` showed the shape and not the secrets.
+
+        The list is `fields`, not `keys`: Jinja resolves `service.keys`
+        to the dict method before it looks for the item, so a template
+        iterating it gets a bound method and raises.
         """
         if user_id not in self.bot.owner_ids:
             return {"status": 1}
@@ -1886,7 +1890,7 @@ class DashboardRPC:
         return {
             "status": 0,
             "services": [
-                {"name": name, "keys": sorted(tokens.keys())}
+                {"name": name, "fields": sorted(tokens.keys())}
                 for name, tokens in sorted(services.items(), key=lambda kv: kv[0].lower())
             ],
         }

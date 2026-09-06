@@ -173,7 +173,10 @@ class DashboardIntegration:
                     # A panel is {"buttons": {...}, "dropdown_options": {...}};
                     # iterating the outer dict listed those two containers
                     # rather than the items on them.
-                    "items": [
+                    # Named "entries", not "items": Jinja resolves
+                    # `p.items` to the dict method before the item, and
+                    # iterating that raises.
+                    "entries": [
                         {
                             "key": identifier,
                             "kind": kind,
@@ -1118,10 +1121,10 @@ TICKETS_TEMPLATE = (
           <tr>
             <td><a href="{{ p.link }}" target="_blank" rel="noopener">#{{ p.channel }}</a></td>
             <td>
-              {% if not p.items %}
+              {% if not p.entries %}
                 <span class="dz-hint" style="margin:0;">empty</span>
               {% endif %}
-              {% for item in p.items %}
+              {% for item in p.entries %}
                 <span class="dz-tag" title="{{ item.description }}">
                   {% if item.emoji %}{{ item.emoji }} {% endif %}{{ item.label }}
                   &rarr; {{ item.profile }}
