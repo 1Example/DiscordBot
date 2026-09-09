@@ -1150,6 +1150,16 @@ class DashboardRPC:
             )
         return final
 
+    _MARKDOWN_LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+    @classmethod
+    def _split_author_link(cls, author: str) -> tuple[str, str | None]:
+        """"[name](url)" as a name and a URL, or the string unchanged."""
+        match = cls._MARKDOWN_LINK.fullmatch((author or "").strip())
+        if match is None:
+            return author, None
+        return match.group(1), match.group(2)
+
     @rpc_check()
     async def get_commands(
         self,
@@ -1209,6 +1219,11 @@ class DashboardRPC:
             author = getattr(cog, "__authors__", []) or getattr(cog, "__author__", []) or author
             if isinstance(author, (list, tuple)):
                 author = humanize_list(author)
+            # A few cogs write __author__ as a markdown link. A cog naming its
+            # own repo is better than the guess made above from its module path.
+            author, author_url = self._split_author_link(author)
+            if author_url:
+                repo = author_url
             self.cogs_infos_cache[name] = {"author": author, "repo": repo}
             returning[name] = {
                 "name": name,
