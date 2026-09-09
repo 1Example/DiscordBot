@@ -5,7 +5,7 @@ import logging
 import typing as t
 
 import discord
-from redbot.core import commands
+from redbot.core import bank, commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
@@ -93,6 +93,7 @@ class DashboardIntegration:
                 }
             )
 
+        stake, house_bonus, currency = await self.pot_settings(guild)
         return {
             "status": 0,
             "notifications": notifications,
@@ -103,6 +104,9 @@ class DashboardIntegration:
                 "is_staff": staff,
                 "games": games,
                 "channel_options": channel_options(guild, require_send=True),
+                "stake": stake,
+                "house_bonus": house_bonus,
+                "currency": currency,
             },
         }
 
@@ -113,6 +117,27 @@ class DashboardIntegration:
         action = field("action")
 
         try:
+            if action == "save_pot":
+                stake = max(0, field.integer("stake", 0) or 0)
+                bonus = max(0, field.integer("house_bonus", 0) or 0)
+                if stake > 1_000_000 or bonus > 1_000_000:
+                    return [
+                        {"message": "Keep the stake and bonus under 1,000,000.",
+                         "category": "warning"}
+                    ]
+                await self.config.guild(guild).stake.set(stake)
+                await self.config.guild(guild).house_bonus.set(bonus)
+                currency = await bank.get_currency_name(guild)
+                if not stake and not bonus:
+                    return [{"message": "Games are played for nothing.", "category": "success"}]
+                return [
+                    {
+                        "message": f"Stake {stake} {currency}, server adds {bonus}. "
+                        f"A two-player pot is worth {stake * 2 + bonus} {currency}.",
+                        "category": "success",
+                    }
+                ]
+
             if action == "start":
                 channel = guild.get_channel(field.integer("channel_id", 0) or 0)
                 if channel is None:
@@ -180,6 +205,36 @@ SOS_TEMPLATE = (
   </div>
 
   {% if is_staff %}
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+      <div class="dz-panel">
+        <h5><i class="fa fa-coins"></i> What they are playing for</h5>
+        <p class="dz-hint">
+          Everyone who joins pays the stake; anyone not drawn to play gets theirs
+          straight back. The pot is the two players' stakes plus whatever the
+          server puts in. Both split and they halve it, one steals and takes all
+          of it, both steal and it is gone. Set both to 0 to play for nothing.
+        </p>
+        <div class="dz-grid two">
+          <div>
+            <label class="dz-label">Stake per player ({{ currency }})</label>
+            <input class="dz-input" type="number" min="0" max="1000000"
+                   name="stake" value="{{ stake }}" />
+          </div>
+          <div>
+            <label class="dz-label">The server adds ({{ currency }})</label>
+            <input class="dz-input" type="number" min="0" max="1000000"
+                   name="house_bonus" value="{{ house_bonus }}" />
+          </div>
+        </div>
+        <div class="dz-save">
+          <button class="dz-btn primary" name="action" value="save_pot">
+            <i class="fa fa-save"></i> Save
+          </button>
+        </div>
+      </div>
+    </form>
+
     <form method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
       <div class="dz-panel">

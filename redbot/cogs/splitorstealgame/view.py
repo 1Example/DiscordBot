@@ -3,9 +3,11 @@ import datetime
 import random
 import typing
 
+import contextlib
+
 import discord
 
-from redbot.core import commands
+from redbot.core import bank, commands, errors
 from redbot.core.i18n import Translator
 
 _: Translator = Translator("SplitOrSteal", __file__)
@@ -23,11 +25,37 @@ class SplitOrStealGameView(discord.ui.View):
         self.initial_players: list[discord.Member] = []
         self.players: dict[discord.Member, typing.Literal["split", "steal"]] = {}
 
+        # What each person paid to join, so anyone who does not end up playing
+        # - or whose game falls apart - can be given it back.
+        self.stake: int = 0
+        self.house_bonus: int = 0
+        self.currency: str = "credits"
+        self.paid: dict[discord.Member, int] = {}
+
         self._message: discord.Message = None
         self._mode: typing.Literal["join", "play"] = None
 
+    async def refund_all(self) -> None:
+        """Give everyone who paid their stake back. Safe to call twice."""
+        while self.paid:
+            member, amount = self.paid.popitem()
+            with contextlib.suppress(errors.BalanceTooHigh, RuntimeError):
+                await bank.deposit_credits(member, amount)
+
+    @property
+    def pot(self) -> int:
+        """What the two players are playing for."""
+        return sum(self.paid.values()) + (self.house_bonus if self.paid else 0)
+
+    async def payout(self, member: discord.Member, amount: int) -> None:
+        if amount <= 0:
+            return
+        with contextlib.suppress(errors.BalanceTooHigh, RuntimeError):
+            await bank.deposit_credits(member, amount)
+
     async def start(self, ctx: commands.Context) -> discord.Message:
         self.ctx: commands.Context = ctx
+        self.stake, self.house_bonus, self.currency = await self.cog.pot_settings(ctx.guild)
         embed: discord.Embed = discord.Embed(
             title=_("Split Or Steal Game"),
             color=await self.ctx.embed_color(),
@@ -35,6 +63,14 @@ class SplitOrStealGameView(discord.ui.View):
         embed.description = _(
             "Join the game by clicking on the button below. 2 players will be selected randomly.",
         )
+        if self.stake:
+            embed.description += "\n" + _(
+                "It costs **{stake} {currency}** to join. Anyone not drawn to play gets theirs back."
+            ).format(stake=self.stake, currency=self.currency)
+        elif self.house_bonus:
+            embed.description += "\n" + _(
+                "The winner takes **{pot} {currency}**."
+            ).format(pot=self.house_bonus, currency=self.currency)
         end_time = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(seconds=60)
         embed.add_field(
             name=_("End time for joining:"),
@@ -49,6 +85,7 @@ class SplitOrStealGameView(discord.ui.View):
         self._mode = "play"
         initial_players = self.initial_players.copy()
         if len(initial_players) < 2:
+            await self.refund_all()
             await self.on_timeout()
             self.stop()
             raise commands.UserFeedbackCheckFailure(_("At least two players are needed to play."))
@@ -57,6 +94,12 @@ class SplitOrStealGameView(discord.ui.View):
         player_B = random.choice(initial_players)
         initial_players.remove(player_B)
         self.players = {player_A: None, player_B: None}
+        # Everyone who paid but is not playing gets it back; what is left in
+        # `paid` is the pot.
+        for member in list(self.paid):
+            if member not in self.players:
+                amount = self.paid.pop(member)
+                await self.payout(member, amount)
         embed: discord.Embed = discord.Embed(
             title="SplitOrSteal Game",
             color=await self.ctx.embed_color(),
@@ -88,33 +131,50 @@ class SplitOrStealGameView(discord.ui.View):
         try:
             await asyncio.wait_for(check_conditions(), timeout=60)
         except TimeoutError:
+            await self.refund_all()
             await self.on_timeout()
             self.stop()
             raise commands.UserFeedbackCheckFailure(_("At least one player has stopped playing."))
+
+        pot = self.pot
+        self.paid.clear()
+        def spoils(amount: int) -> str:
+            if not pot or amount <= 0:
+                return ""
+            return " " + _("**{amount} {currency}**.").format(
+                amount=amount, currency=self.currency
+            )
+
         if self.players[player_A] == "split" and self.players[player_B] == "split":
-            await self._message.reply(
-                _(
-                    "{player_A.display_name} and {player_B.display_name}, you both chose `split` and therefore both win.",
-                ).format(player_A=player_A, player_B=player_B),
-            )
+            share = pot // 2
+            await self.payout(player_A, share)
+            await self.payout(player_B, share)
+            text = _(
+                "{player_A.display_name} and {player_B.display_name}, you both chose `split` and therefore both win.",
+            ).format(player_A=player_A, player_B=player_B)
+            if share:
+                text += " " + _("You take **{share} {currency}** each.").format(
+                    share=share, currency=self.currency
+                )
         elif self.players[player_A] == "steal" and self.players[player_B] == "steal":
-            await self._message.reply(
-                _(
-                    "{player_A.display_name} and {player_B.display_name}, you both chose `steal` and therefore both loose.",
-                ).format(player_A=player_A, player_B=player_B),
-            )
+            text = _(
+                "{player_A.display_name} and {player_B.display_name}, you both chose `steal` and therefore both loose.",
+            ).format(player_A=player_A, player_B=player_B)
+            if pot:
+                text += " " + _("The **{pot} {currency}** is gone.").format(
+                    pot=pot, currency=self.currency
+                )
         elif self.players[player_A] == "steal" and self.players[player_B] == "split":
-            await self._message.reply(
-                _(
-                    "{player_A.display_name} chose `steal` and {player_B.display_name} chose `split`, and therefore {player_A.display_name} win.",
-                ).format(player_A=player_A, player_B=player_B),
-            )
-        elif self.players[player_A] == "split" and self.players[player_B] == "steal":
-            await self._message.reply(
-                _(
-                    "{player_B.display_name} chose `steal` and {player_A.display_name} chose `split`, and therefore {player_B.display_name} win.",
-                ).format(player_A=player_A, player_B=player_B),
-            )
+            await self.payout(player_A, pot)
+            text = _(
+                "{player_A.display_name} chose `steal` and {player_B.display_name} chose `split`, and therefore {player_A.display_name} win.",
+            ).format(player_A=player_A, player_B=player_B) + spoils(pot)
+        else:
+            await self.payout(player_B, pot)
+            text = _(
+                "{player_B.display_name} chose `steal` and {player_A.display_name} chose `split`, and therefore {player_B.display_name} win.",
+            ).format(player_A=player_A, player_B=player_B) + spoils(pot)
+        await self._message.reply(text)
         return self._message
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -150,8 +210,33 @@ class SplitOrStealGameView(discord.ui.View):
                 ephemeral=True,
             )
             return
+        if self.stake:
+            if not await bank.can_spend(interaction.user, self.stake):
+                await interaction.response.send_message(
+                    _("Joining costs **{stake} {currency}** and you do not have it.").format(
+                        stake=self.stake, currency=self.currency
+                    ),
+                    ephemeral=True,
+                )
+                return
+            await bank.withdraw_credits(interaction.user, self.stake)
+            self.paid[interaction.user] = self.stake
+        elif self.house_bonus:
+            # No stake, but there is still a prize; mark them as in the pot so
+            # the bonus is paid out when a game actually happens.
+            self.paid[interaction.user] = 0
         self.initial_players.append(interaction.user)
-        await interaction.response.send_message(_("You have joined this game."), ephemeral=True)
+        await interaction.response.send_message(
+            _("You have joined this game.")
+            + (
+                " " + _("**{stake} {currency}** taken.").format(
+                    stake=self.stake, currency=self.currency
+                )
+                if self.stake
+                else ""
+            ),
+            ephemeral=True,
+        )
 
     @discord.ui.button(label="Split", style=discord.ButtonStyle.secondary)
     async def split_button(
