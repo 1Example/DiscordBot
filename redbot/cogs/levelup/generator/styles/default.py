@@ -344,12 +344,12 @@ def generate_default_profile(
 
     # A wash of the accent behind the avatar, so the header has a light source.
     glow = Image.new("L", desired_card_size, 0)
-    glow_r = pfp_size * 1.9
+    glow_r = pfp_size * 1.15
     ImageDraw.Draw(glow).ellipse(
         (pfp_cx - glow_r, pfp_cy - glow_r, pfp_cx + glow_r, pfp_cy + glow_r),
-        fill=64,
+        fill=54,
     )
-    stats.paste(decor, mask=glow.filter(ImageFilter.GaussianBlur(width / 22)))
+    stats.paste(decor, mask=glow.filter(ImageFilter.GaussianBlur(width / 44)))
 
     # ---------------- Panels ----------------
     tile_w = (inner_w - tile_gap * (tile_cols - 1)) / tile_cols
@@ -367,9 +367,10 @@ def generate_default_profile(
         shadow_draw.rounded_rectangle((x0, y0 + 5, x1, y1 + 8), radius=radius, fill=150)
     stats.paste((0, 0, 0), mask=shadow.filter(ImageFilter.GaussianBlur(8)))
 
+    panel_fill = tuple(min(255, c + 17) for c in ground)
     draw = ImageDraw.Draw(stats, "RGBA")
     for box, radius in panels:
-        draw.rounded_rectangle(box, radius=radius, fill=(255, 255, 255, 20), outline=(255, 255, 255, 36), width=1)
+        draw.rounded_rectangle(box, radius=radius, fill=panel_fill, outline=(255, 255, 255, 40), width=1)
         x0, y0, x1, _bottom = box
         draw.line((x0 + radius, y0 + 1, x1 - radius, y0 + 1), fill=(255, 255, 255, 58), width=1)
 
