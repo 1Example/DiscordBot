@@ -2,12 +2,13 @@ import asyncio
 import datetime
 import importlib
 import itertools
+import json
 import keyword
 import logging
 import io
 import random
-import markdown
 import re
+import zipfile
 import sys
 import platform
 import time
@@ -26,47 +27,11 @@ from packaging.version import Version
 
 from . import __version__, commands, errors, i18n, modlog, _downloader
 from ._diagnoser import IssueDiagnoser
+from .config import Config
 from .utils import AsyncIter, can_user_send_messages_in
 from .utils._internal_utils import fetch_latest_red_version
 from .utils.predicates import MessagePredicate
 from .utils.chat_formatting import box, humanize_list, humanize_timedelta, inline, pagify, warning
-
-_entities = {
-    "*": "&midast;",
-    "\\": "&bsol;",
-    "`": "&grave;",
-    "!": "&excl;",
-    "{": "&lcub;",
-    "[": "&lsqb;",
-    "_": "&UnderBar;",
-    "(": "&lpar;",
-    "#": "&num;",
-    ".": "&period;",
-    "+": "&plus;",
-    "}": "&rcub;",
-    "]": "&rsqb;",
-    ")": "&rpar;",
-}
-
-PRETTY_HTML_HEAD = """
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>3rd Party Data Statements</title>
-<style type="text/css">
-body{margin:2em auto;max-width:800px;line-height:1.4;font-size:16px;
-background-color=#EEEEEE;color:#454545;padding:1em;text-align:justify}
-h1,h2,h3{line-height:1.2}
-</style></head><body>
-"""  # This ends up being a small bit extra that really makes a difference.
-
-HTML_CLOSING = "</body></html>"
-
-
-def entity_transformer(statement: str) -> str:
-    return "".join(_entities.get(c, c) for c in statement)
-
 
 if TYPE_CHECKING:
     from redbot.core.bot import Red
@@ -677,9 +642,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             "It is all held on the server this bot runs on. None of it is sold, shared or "
             "sent anywhere else.\n\n"
             "Use `/mydata getmydata` for a copy of what is stored about you, and "
-            "`/mydata forgetme` to ask the bot to forget you. Modules loaded by the owner "
-            "may store their own things; `/mydata thirdparty` shows what each one says "
-            "about that."
+            "`/mydata forgetme` to ask the bot to forget you."
         )
         # This is a fork with most of its surface rewritten, so it answers for
         # itself rather than pointing at documentation for unmodified Red.
@@ -689,81 +652,6 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 link=f"{dashboard_url[0].rstrip('/')}/data"
             )
         await ctx.send(message)
-
-    # 1/30 minutes. It's not likely to change much and uploads a standalone webpage.
-    @mydata.command(name="thirdparty", description="The data statements of every third-party module.")
-    async def mydata_3rd_party(
-        self,
-        interaction: discord.Interaction,
-    ):
-        """View the End User Data statements of each 3rd-party module.
-
-        This will send an attachment with the End User Data statements of all loaded 3rd party cogs.
-
-        **Example:**
-        - `[p]mydata 3rdparty`
-        """
-        ctx = await commands.Context.from_interaction(interaction)
-        if await self._mydata_wait(ctx, "3rdparty", 1800):
-            return
-
-        # Can't check this as a command check, and want to prompt DMs as an option.
-        if not ctx.bot_permissions.attach_files:
-            return await ctx.send(_("I need to be able to attach files (try in DMs?)."))
-
-        statements = {
-            ext_name: getattr(ext, "__red_end_user_data_statement__", None)
-            for ext_name, ext in ctx.bot.extensions.items()
-            if not (ext.__package__ and ext.__package__.startswith("redbot."))
-        }
-
-        if not statements:
-            return await ctx.send(
-                _("This instance does not appear to have any 3rd-party extensions loaded.")
-            )
-
-        # Past every reason to bail out, so the wait starts here rather
-        # than at the top: the two refusals above cost nothing to answer.
-        self._mydata_stamp(ctx, "3rdparty")
-
-        parts = []
-
-        formatted_statements = []
-
-        no_statements = []
-
-        for ext_name, statement in sorted(statements.items()):
-            if not statement:
-                no_statements.append(ext_name)
-            else:
-                formatted_statements.append(
-                    f"### {entity_transformer(ext_name)}\n\n{entity_transformer(statement)}"
-                )
-
-        if formatted_statements:
-            parts.append(
-                "## "
-                + _("3rd party End User Data statements")
-                + "\n\n"
-                + _("The following are statements provided by 3rd-party extensions.")
-            )
-            parts.extend(formatted_statements)
-
-        if no_statements:
-            parts.append("## " + _("3rd-party extensions without statements\n"))
-            for ext in no_statements:
-                parts.append(f"\n - {entity_transformer(ext)}")
-
-        generated = markdown.markdown("\n".join(parts), output_format="html")
-
-        html = "\n".join((PRETTY_HTML_HEAD, generated, HTML_CLOSING))
-
-        fp = io.BytesIO(html.encode())
-
-        await ctx.send(
-            _("Here's a generated page with the statements provided by 3rd-party extensions."),
-            file=discord.File(fp, filename="3rd-party.html"),
-        )
 
     async def get_serious_confirmation(self, ctx: commands.Context, prompt: str) -> bool:
         confirm_token = "".join(random.choices((*ascii_letters, *digits), k=8))
@@ -881,23 +769,107 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 )
             )
 
-    # The cooldown of this should be longer once actually implemented
-    # This is a couple hours, and lets people occasionally check status, I guess.
+    async def _collect_user_data(self, user_id: int) -> Dict[str, bytes]:
+        """Everything the loaded cogs hold under this user's own ID.
+
+        Two sources. red_get_data_for_user is the documented contract, and the
+        few cogs that implement it give the friendliest answer. Most do not, so
+        each cog's Config is also swept for the scopes keyed by this user: the
+        global user scope, and the member scope in each guild they share with
+        the bot. Guild-wide and channel settings are nobody's personal data and
+        are left out.
+        """
+        files: Dict[str, bytes] = {}
+        shared_guilds = [g for g in self.bot.guilds if g.get_member(user_id) is not None]
+
+        for cog_name, cog in sorted(self.bot.cogs.items()):
+            try:
+                provided = await cog.red_get_data_for_user(user_id=user_id)
+            except Exception as e:
+                log.exception("Failed to collect data from %s for %s", cog_name, user_id)
+                files[f"{cog_name}/ERROR.txt"] = str(e).encode()
+                provided = {}
+            for filename, fp in (provided or {}).items():
+                data = fp.read() if hasattr(fp, "read") else bytes(fp)
+                files[f"{cog_name}/{filename}"] = data
+
+            payload = {}
+            for attr, config in vars(cog).items():
+                if not isinstance(config, Config):
+                    continue
+                scopes = {}
+                if user_scope := await config.user_from_id(user_id).all():
+                    scopes["user"] = user_scope
+                per_guild = {}
+                for guild in shared_guilds:
+                    if member_scope := await config.member_from_ids(guild.id, user_id).all():
+                        per_guild[f"{guild.name} ({guild.id})"] = member_scope
+                if per_guild:
+                    scopes["per_server"] = per_guild
+                if scopes:
+                    payload[attr] = scopes
+            if payload:
+                files[f"{cog_name}/settings.json"] = json.dumps(
+                    payload, indent=2, default=str, ensure_ascii=False
+                ).encode()
+
+        return files
+
+    # Two hours. Building this walks every cog's config, and nobody needs a
+    # fresh copy more often than that.
     @mydata.command(name="getmydata", description="Get a copy of what I know about you.")
     async def mydata_getdata(
         self,
         interaction: discord.Interaction,
     ):
-        """[Coming Soon] Get what data [botname] has about you."""
+        """Get a copy of what [botname] has stored about you."""
         ctx = await commands.Context.from_interaction(interaction)
+        if not ctx.bot_permissions.attach_files:
+            return await ctx.send(_("I need to be able to attach files (try in DMs?)."))
         if await self._mydata_wait(ctx, "getmydata", 7200):
             return
+
+        await ctx.defer()
+        files = await self._collect_user_data(ctx.author.id)
+
+        if not files:
+            self._mydata_stamp(ctx, "getmydata")
+            return await ctx.send(
+                _("I don't have anything stored about you.")
+            )
+
+        readme = _(
+            "This is everything {bot} has stored under your Discord ID ({user_id}), as of"
+            " {when}.\n\nEach folder is one part of the bot. settings.json holds what that"
+            " part keeps in its own settings store: `user` is what it knows about you"
+            " everywhere, `per_server` is what it knows about you in each server you share"
+            " with me.\n\nServer-wide settings are not included, because they belong to the"
+            " server rather than to you. Nor is anything Discord itself stores - ask Discord"
+            " for that.\n\nTo have this removed, use /mydata forgetme."
+        ).format(
+            bot=ctx.me.display_name,
+            user_id=ctx.author.id,
+            when=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        )
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("README.txt", readme)
+            for filename, data in sorted(files.items()):
+                archive.writestr(filename, data)
+        buffer.seek(0)
+
+        limit = ctx.guild.filesize_limit if ctx.guild else 10 * 1024 * 1024
+        if buffer.getbuffer().nbytes > limit:
+            self._mydata_stamp(ctx, "getmydata")
+            return await ctx.send(
+                _("Your data is too large for me to upload here. Ask the bot owner for it.")
+            )
+
         self._mydata_stamp(ctx, "getmydata")
         await ctx.send(
-            _(
-                "This command doesn't do anything yet, "
-                "but we're working on adding support for this."
-            )
+            _("Here is everything I have stored about you."),
+            file=discord.File(buffer, filename=f"mydata-{ctx.author.id}.zip"),
         )
 
 
