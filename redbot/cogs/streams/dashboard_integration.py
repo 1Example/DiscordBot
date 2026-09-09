@@ -32,9 +32,9 @@ CREDENTIAL_HELP = (
         "steps": [
             "Open the Twitch developer console linked above.",
             "Click <b>Register Your Application</b>.",
-            "Enter a name, then add <code>https://localhost</code> as an OAuth"
-            " Redirect URL and press <b>Add</b>. Twitch rejects <code>http://</code>"
-            " here - it requires HTTPS.",
+            "Enter a name, then add <code>http://localhost</code> as an OAuth"
+            " Redirect URL and press <b>Add</b>. Twitch allows plain http for"
+            " localhost specifically; anywhere else the URL has to be https.",
             "Pick any category, and leave <b>Client Type</b> on <b>Confidential</b>."
             " A Public client is never issued a secret.",
             "Click <b>Create</b>.",
