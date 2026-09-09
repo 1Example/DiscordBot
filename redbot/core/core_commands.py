@@ -825,18 +825,21 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         """Get a copy of what [botname] has stored about you."""
         ctx = await commands.Context.from_interaction(interaction)
         if not ctx.bot_permissions.attach_files:
-            return await ctx.send(_("I need to be able to attach files (try in DMs?)."))
+            return await ctx.send(
+                _("I need to be able to attach files (try in DMs?)."), ephemeral=True
+            )
         if await self._mydata_wait(ctx, "getmydata", 7200):
             return
 
-        await ctx.defer()
+        # Only the person who asked ever sees any of this. The deferral has to
+        # be ephemeral too: a public one cannot be answered with a private
+        # followup.
+        await ctx.defer(ephemeral=True)
         files = await self._collect_user_data(ctx.author.id)
 
         if not files:
             self._mydata_stamp(ctx, "getmydata")
-            return await ctx.send(
-                _("I don't have anything stored about you.")
-            )
+            return await ctx.send(_("I don't have anything stored about you."), ephemeral=True)
 
         readme = _(
             "This is everything {bot} has stored under your Discord ID ({user_id}), as of"
@@ -863,13 +866,15 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         if buffer.getbuffer().nbytes > limit:
             self._mydata_stamp(ctx, "getmydata")
             return await ctx.send(
-                _("Your data is too large for me to upload here. Ask the bot owner for it.")
+                _("Your data is too large for me to upload here. Ask the bot owner for it."),
+                ephemeral=True,
             )
 
         self._mydata_stamp(ctx, "getmydata")
         await ctx.send(
-            _("Here is everything I have stored about you."),
+            _("Here is everything I have stored about you. Only you can see this message."),
             file=discord.File(buffer, filename=f"mydata-{ctx.author.id}.zip"),
+            ephemeral=True,
         )
 
 
