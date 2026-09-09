@@ -10,7 +10,7 @@ import typing
 
 import discord
 
-from redbot.core import bank, commands, core_commands, i18n
+from redbot.core import bank, commands, i18n
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator
 from redbot.core.utils import AsyncIter
@@ -976,9 +976,6 @@ class DashboardRPC:
     @rpc_check()
     async def get_bot_variables(self) -> dict[str, typing.Any]:
         bot_info = await self.bot._config.custom_info()
-        prefixes = [
-            p for p in await self.bot.get_valid_prefixes() if not re.match(r"<@!?([0-9]+)>", p)
-        ]
 
         guilds_count = len(self.bot.guilds)
         users_count = len(self.bot.users)
@@ -1006,7 +1003,6 @@ class DashboardRPC:
                 "application_id": self.bot.application_id,
                 "info": bot_info,
                 "profile_description": getattr(app_info, "description", "") or "",
-                "prefixes": prefixes,
                 "owner_ids": list(self.bot.owner_ids),
                 "owner": self.owner,
                 "avatar": str(self.bot.user.display_avatar.url).split("?")[0],
@@ -1025,12 +1021,6 @@ class DashboardRPC:
                 "uptime": int(self.bot.uptime.timestamp()),
             },
             "constants": {
-                "MIN_PREFIX_LENGTH": getattr(
-                    core_commands,
-                    "MINIMUM_PREFIX_LENGTH",
-                    1,
-                ),  # Added by #6013 in Red 3.5.6.
-                "MAX_PREFIX_LENGTH": core_commands.MAX_PREFIX_LENGTH,
                 "MAX_DISCORD_PERMISSIONS_VALUE": discord.Permissions.all().value,
             },
         }
@@ -1419,8 +1409,6 @@ class DashboardRPC:
             "voice_channels_number": len(guild.voice_channels),
             "roles_number": len(guild.roles),
             "roles": all_roles,
-            # Bot wide settings.
-            "prefixes": sorted(await self.bot.get_valid_prefixes(guild)),
             "settings": {
                 "edit_permission": user_id in self.bot.owner_ids
                 or await self.bot.is_admin(member)
@@ -1428,7 +1416,6 @@ class DashboardRPC:
                 # Base.
                 "bot_nickname": guild.me.nick,
                 "bot_profile": await self._guild_profile(guild),
-                "prefixes": await config_group.prefix(),
                 "admin_roles": admin_roles,
                 "mod_roles": mod_roles,
                 "whitelist": await config_group.whitelist(),
@@ -1480,7 +1467,6 @@ class DashboardRPC:
                 await guild.me.edit(nick=settings["bot_nickname"])
             except discord.HTTPException as e:
                 change_nickname_error = str(e)
-        await self.bot.set_prefixes(settings["prefixes"], guild=guild)
         config_group = self.bot._config.guild(guild)
         await config_group.admin_role.set([int(role_id) for role_id in settings["admin_roles"]])
         await config_group.mod_role.set([int(role_id) for role_id in settings["mod_roles"]])
@@ -1741,7 +1727,6 @@ class DashboardRPC:
         return {
             "status": 0,
             # Base.
-            "prefixes": await config_group.prefix(),
             "invoke_error_msg": await config_group.invoke_error_msg(),
             "whitelist": await config_group.whitelist(),
             "blacklist": await config_group.blacklist(),
@@ -1779,7 +1764,6 @@ class DashboardRPC:
         if user_id not in self.bot.owner_ids:
             return {"status": 1}
         config_group = self.bot._config
-        await config_group.prefix.set(settings["prefixes"])
         await config_group.invoke_error_msg.set(settings["invoke_error_msg"])
         already_disabled_commands = await config_group.disabled_commands()
         for command_name in settings["disabled_commands"].copy():
