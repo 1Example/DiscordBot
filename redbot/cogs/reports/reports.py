@@ -239,6 +239,10 @@ class Reports(DashboardIntegration, commands.Cog):
                 # report store. The Ticket comes back rather than a number so
                 # the caller can point the member at the channel.
                 return ticket
+            # This server chose tickets. If the ticket could not be opened,
+            # say so rather than posting the report in a channel behind their
+            # back; open_ticket_for_report has already logged why.
+            return None
 
         channel_id = await self.config.guild(guild).output_channel()
         channel = guild.get_channel(channel_id)
@@ -285,10 +289,10 @@ class Reports(DashboardIntegration, commands.Cog):
         extras={"red_force_enable": True},
     )
     @app_commands.describe(
-        _report="What you want to report. Leave empty and I will ask."
+        message="What you want to report. Leave empty and I will ask."
     )
     async def report(
-        self, interaction: discord.Interaction, _report: str = ""
+        self, interaction: discord.Interaction, message: str = ""
     ):
         """Send a report.
 
@@ -296,6 +300,10 @@ class Reports(DashboardIntegration, commands.Cog):
         `[p]report [text]` to use it non-interactively.
         """
         ctx = await commands.Context.from_interaction(interaction)
+        # Everything this command says is between it and the reporter, and the
+        # interactive path waits minutes for a DM - far past the three seconds
+        # Discord allows before it decides the command never answered.
+        await ctx.defer(ephemeral=True)
         author = ctx.author
         guild = ctx.guild
         if guild is None:
@@ -306,44 +314,50 @@ class Reports(DashboardIntegration, commands.Cog):
             return
         g_active = await self.config.guild(guild).active()
         if not g_active:
-            return await author.send(_("Reporting has not been enabled for this server"))
+            return await ctx.send(
+                _("Reporting has not been enabled for this server"), ephemeral=True
+            )
         if guild.id not in self.antispam:
             self.antispam[guild.id] = {}
         if author.id not in self.antispam[guild.id]:
             self.antispam[guild.id][author.id] = AntiSpam(self.intervals)
         if self.antispam[guild.id][author.id].spammy:
-            return await author.send(
+            return await ctx.send(
                 _(
                     "You've sent too many reports recently. "
                     "Please contact a server admin if this is important matter, "
                     "or please wait and try again later."
-                )
+                ),
+                ephemeral=True,
             )
         if author.id in self.user_cache:
-            return await author.send(
+            return await ctx.send(
                 _(
                     "Please finish making your prior report before trying to make an "
                     "additional one!"
-                )
+                ),
+                ephemeral=True,
             )
         self.user_cache.append(author.id)
         try:
-            await self._run_report(ctx, author, guild, _report)
+            await self._run_report(ctx, author, guild, message)
         finally:
             # The old after_invoke released this; every early return below
             # would otherwise leave the author unable to report again.
             if author.id in self.user_cache:
                 self.user_cache.remove(author.id)
 
-    async def _run_report(self, ctx, author, guild, _report: str) -> None:
+    async def _run_report(self, ctx, author, guild, message: str) -> None:
         """The body of /report, so the in-flight guard is always released."""
 
-        if _report:
+        if message:
             _m = copy(ctx.message)
-            _m.content = _report
+            _m.content = message
             _m.content = _m.clean_content
             val = await self.send_report(ctx, _m, guild)
         else:
+            # The one thing that still needs a DM: it is where the reply comes
+            # back. Say so where they are, so an unanswered DM is not a mystery.
             try:
                 await author.send(
                     _(
@@ -352,18 +366,19 @@ class Reports(DashboardIntegration, commands.Cog):
                     )
                 )
             except discord.Forbidden:
-                return await ctx.send(_("This requires DMs enabled."))
+                return await ctx.send(_("This requires DMs enabled."), ephemeral=True)
+            await ctx.send(_("Check your DMs - I've asked you there."), ephemeral=True)
 
             try:
-                message = await self.bot.wait_for(
+                reply = await self.bot.wait_for(
                     "message",
                     check=MessagePredicate.same_context(ctx, channel=author.dm_channel),
                     timeout=180,
                 )
             except asyncio.TimeoutError:
-                return await author.send(_("You took too long. Try again later."))
+                return await ctx.send(_("You took too long. Try again later."), ephemeral=True)
             else:
-                val = await self.send_report(ctx, message, guild)
+                val = await self.send_report(ctx, reply, guild)
 
         with contextlib.suppress(discord.Forbidden, discord.HTTPException):
             if val is None:
@@ -371,30 +386,35 @@ class Reports(DashboardIntegration, commands.Cog):
                     await self.config.guild(guild).output_channel() is None
                     and await self.config.guild(guild).ticket_profile() is None
                 ):
-                    await author.send(
+                    await ctx.send(
                         _(
                             "This server has no reports channel set up. Please contact a server admin."
-                        )
+                        ),
+                        ephemeral=True,
                     )
                 else:
-                    await author.send(
-                        _("There was an error sending your report, please contact a server admin.")
+                    await ctx.send(
+                        _("There was an error sending your report, please contact a server admin."),
+                        ephemeral=True,
                     )
             elif isinstance(val, int):
-                await author.send(_("Your report was submitted. (Ticket #{})").format(val))
+                await ctx.send(
+                    _("Your report was submitted. (Ticket #{})").format(val), ephemeral=True
+                )
                 self.antispam[guild.id][author.id].stamp()
             else:
                 # A Tickets ticket: the member can follow it in its channel.
                 channel = getattr(val, "channel", None)
                 if channel is not None:
-                    await author.send(
+                    await ctx.send(
                         _("Your report opened ticket #{id} in {channel}.").format(
                             id=val.id, channel=channel.mention
-                        )
+                        ),
+                        ephemeral=True,
                     )
                 else:
-                    await author.send(
-                        _("Your report opened ticket #{id}.").format(id=val.id)
+                    await ctx.send(
+                        _("Your report opened ticket #{id}.").format(id=val.id), ephemeral=True
                     )
                 self.antispam[guild.id][author.id].stamp()
 
