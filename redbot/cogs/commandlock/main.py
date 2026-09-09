@@ -53,9 +53,10 @@ class CommandLock(DashboardIntegration, commands.Cog):
         # Requester can be "discord_deleted_user", "owner", "user", or "user_strict"
         return
 
-    async def red_get_data_for_user(self, *, requester: str, user_id: int):
-        # Requester can be "discord_deleted_user", "owner", "user", or "user_strict"
-        return
+    async def red_get_data_for_user(self, *, user_id: int) -> dict:
+        # This cog stores no end user data; the signature here used to be the
+        # deletion API's, which meant nothing could ever call it.
+        return {}
 
     async def cog_load(self) -> None:
         self.bot.before_invoke(self.before_invoke_hook)

@@ -239,10 +239,9 @@ class Reports(DashboardIntegration, commands.Cog):
                 # report store. The Ticket comes back rather than a number so
                 # the caller can point the member at the channel.
                 return ticket
-            # This server chose tickets. If the ticket could not be opened,
-            # say so rather than posting the report in a channel behind their
-            # back; open_ticket_for_report has already logged why.
-            return None
+            # A profile that exists but will not open a ticket - creation
+            # switched off, or a failure already logged - is the "tickets are
+            # disabled" case, so the reports channel below takes over.
 
         channel_id = await self.config.guild(guild).output_channel()
         channel = guild.get_channel(channel_id)

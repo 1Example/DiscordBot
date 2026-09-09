@@ -785,6 +785,15 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         for cog_name, cog in sorted(self.bot.cogs.items()):
             try:
                 provided = await cog.red_get_data_for_user(user_id=user_id)
+            except commands.RedUnhandledAPI:
+                # The base class raising this is how a cog says it never
+                # implemented the hook, which is almost all of them. Its
+                # Config is still swept below.
+                provided = {}
+            except TypeError as e:
+                # A cog implementing the hook with the wrong signature.
+                log.warning("%s does not implement red_get_data_for_user correctly: %s", cog_name, e)
+                provided = {}
             except Exception as e:
                 log.exception("Failed to collect data from %s for %s", cog_name, user_id)
                 files[f"{cog_name}/ERROR.txt"] = str(e).encode()
