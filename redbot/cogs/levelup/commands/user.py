@@ -12,9 +12,11 @@ from discord import app_commands
 from discord.app_commands import Choice
 from redbot.core import app_commands, commands
 from redbot.core.app_commands import checks as app_checks
+from redbot.core import bank
+from redbot.core import errors as bank_errors
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator
-from redbot.core.utils.chat_formatting import humanize_list
+from redbot.core.utils.chat_formatting import humanize_list, humanize_number
 
 from ..abc import MixinMeta
 from ..common import const, formatter, utils
@@ -287,6 +289,19 @@ class User(MixinMeta):
         self.save()
 
         txt = _("You have reached Prestige {}!\n").format(f"**{next_prestige}**")
+        # Prestiging throws away levels, so a server can make it worth doing.
+        if conf.prestige_reward > 0:
+            try:
+                await bank.deposit_credits(ctx.author, conf.prestige_reward)
+            except bank_errors.BalanceTooHigh as e:
+                await bank.set_balance(ctx.author, e.max_balance)
+            except Exception as e:  # noqa: BLE001
+                log.warning("Could not pay %s for prestiging: %s", ctx.author, e)
+            else:
+                currency = await bank.get_currency_name(ctx.guild)
+                txt += _("You earned {} {} for it!\n").format(
+                    humanize_number(conf.prestige_reward), currency
+                )
         added, removed = await self.ensure_roles(ctx.author, conf, _("Reached prestige {}").format(next_prestige))
         embed = discord.Embed(description=txt, color=await self.bot.get_embed_color(ctx))
         if added:

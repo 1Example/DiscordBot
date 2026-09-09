@@ -294,6 +294,11 @@ class GuildSettings(Base):
     role_groups: t.Dict[int, float] = {}  # Role_ID: Exp
     use_embeds: bool = True  # Use Embeds instead of generated images for leveling
     showbal: bool = False  # Show economy balance
+    # Economy rewards. All 0 means levelling pays nothing, which is how this
+    # cog behaved before they existed.
+    level_reward: int = 0  # Flat credits awarded for each level gained
+    level_reward_per_level: float = 0.0  # Extra credits multiplied by the level reached
+    prestige_reward: int = 0  # Credits awarded for prestiging
     autoremove: bool = False  # Remove previous role on level up
     style_override: t.Union[str, None] = None  # Override the profile style for this guild
     default_background: str = "default"  # Default background for all users in the guild

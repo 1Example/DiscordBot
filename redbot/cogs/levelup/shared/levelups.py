@@ -8,7 +8,9 @@ from io import BytesIO
 
 import aiohttp
 import discord
+from redbot.core import bank, errors
 from redbot.core.i18n import Translator
+from redbot.core.utils.chat_formatting import humanize_number
 
 from ..abc import MixinMeta
 from ..common import utils
@@ -20,6 +22,42 @@ _ = Translator("LevelUp", __file__)
 
 
 class LevelUps(MixinMeta):
+    async def _reward_suffix(self, member: discord.Member, credits_awarded: int) -> str:
+        """" You earned N credits!", or nothing when the award is off."""
+        if not credits_awarded:
+            return ""
+        currency = await bank.get_currency_name(member.guild)
+        return " " + _("You earned {} {}!").format(humanize_number(credits_awarded), currency)
+
+    async def award_level_credits(
+        self,
+        member: discord.Member,
+        conf: GuildSettings,
+        level: int,
+        levels_gained: int = 1,
+    ) -> int:
+        """Pay a member for reaching a level. Returns what they were paid.
+
+        Multiple levels at once (a big XP grant, or an import) pay for each of
+        them, so a shortcut is not a way to skip the cost of the levels below.
+        """
+        if not conf.level_reward and not conf.level_reward_per_level:
+            return 0
+        total = 0
+        for step in range(levels_gained):
+            reached = level - step
+            total += conf.level_reward + int(conf.level_reward_per_level * reached)
+        if total <= 0:
+            return 0
+        try:
+            await bank.deposit_credits(member, total)
+        except errors.BalanceTooHigh as e:
+            await bank.set_balance(member, e.max_balance)
+        except Exception as e:  # noqa: BLE001
+            log.warning("Could not pay %s for levelling up: %s", member, e)
+            return 0
+        return total
+
     async def check_levelups(
         self,
         guild: discord.Guild,
@@ -52,7 +90,9 @@ class LevelUps(MixinMeta):
             # User hasnt reached level 1 yet
             return False
         log.debug(f"{member} has reached level {calculated_level} in {guild}")
+        levels_gained = max(calculated_level - profile.level, 1)
         profile.level = calculated_level
+        credits_awarded = await self.award_level_credits(member, conf, calculated_level, levels_gained)
         # User has reached a new level, time to log and award roles if needed
         await self.ensure_roles(member, conf)
         current_channel = channel or (message.channel if message else None)
@@ -70,6 +110,7 @@ class LevelUps(MixinMeta):
             "level": profile.level,
             "role": role.name if role else None,
             "server": guild.name,
+            "credits": credits_awarded,
         }
         username = member.display_name if profile.show_displayname else member.name
         mention = member.mention if conf.notifymention else username
@@ -79,23 +120,27 @@ class LevelUps(MixinMeta):
             else:
                 dm_txt = _("You just reached level {} in {} and obtained the {} role!").format(
                     profile.level, guild.name, role.mention
-                )
+                ) + await self._reward_suffix(member, credits_awarded)
             if msg_txt_raw := conf.role_awarded_msg:
                 msg_txt = msg_txt_raw.format(**placeholders)
             else:
                 msg_txt = _("{} just reached level {} and obtained the {} role!").format(
                     mention, profile.level, role.mention
-                )
+                ) + await self._reward_suffix(member, credits_awarded)
         else:
             placeholders.pop("role")
             if dm_txt_raw := conf.levelup_dm:
                 dm_txt = dm_txt_raw.format(**placeholders)
             else:
-                dm_txt = _("You just reached level {} in {}!").format(profile.level, guild.name)
+                dm_txt = _("You just reached level {} in {}!").format(
+                    profile.level, guild.name
+                ) + await self._reward_suffix(member, credits_awarded)
             if msg_txt_raw := conf.levelup_msg:
                 msg_txt = msg_txt_raw.format(**placeholders)
             else:
-                msg_txt = _("{} just reached level {}!").format(mention, profile.level)
+                msg_txt = _("{} just reached level {}!").format(
+                    mention, profile.level
+                ) + await self._reward_suffix(member, credits_awarded)
 
         if conf.use_embeds or self.db.force_embeds:
             if conf.notifydm:

@@ -529,6 +529,33 @@ async def handle_settings_page(
             default=conf.showbal,
             render_kw=bool_kw(_("Display the user's Red economy balance on their profile card.")),
         )
+        level_reward = wtforms.IntegerField(
+            _("Credits per Level"),
+            default=conf.level_reward,
+            render_kw=kw(
+                placeholder="0",
+                tooltip=_("Flat economy credits paid each time someone gains a level. 0 pays nothing."),
+            ),
+        )
+        level_reward_per_level = wtforms.FloatField(
+            _("Credits Scaling per Level"),
+            default=conf.level_reward_per_level,
+            render_kw=kw(
+                placeholder="0",
+                tooltip=_(
+                    "Extra credits multiplied by the level reached, on top of the flat amount."
+                    " 0.5 pays an extra 5 at level 10."
+                ),
+            ),
+        )
+        prestige_reward = wtforms.IntegerField(
+            _("Credits per Prestige"),
+            default=conf.prestige_reward,
+            render_kw=kw(
+                placeholder="0",
+                tooltip=_("One-off credits paid for prestiging, which costs the member their levels."),
+            ),
+        )
         autoremove = wtforms.BooleanField(
             _("Auto-Remove Previous Level Role"),
             default=conf.autoremove,
@@ -1053,6 +1080,9 @@ async def handle_settings_page(
             payload["use_embeds"] = bool(form.use_embeds.data)
             payload["showbal"] = bool(form.showbal.data)
             payload["autoremove"] = bool(form.autoremove.data)
+            payload["level_reward"] = max(0, int(form.level_reward.data or 0))
+            payload["level_reward_per_level"] = max(0.0, float(form.level_reward_per_level.data or 0))
+            payload["prestige_reward"] = max(0, int(form.prestige_reward.data or 0))
             style_val = (form.style_override.data or "").strip()
             payload["style_override"] = style_val if style_val else None
             payload["default_background"] = (form.default_background.data or "default").strip() or "default"
