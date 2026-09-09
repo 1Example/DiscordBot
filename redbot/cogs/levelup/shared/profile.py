@@ -23,6 +23,7 @@ from ..generator.styles import default, gaming, minimal, runescape
 log = logging.getLogger("red.vrt.levelup.shared.profile")
 _ = Translator("LevelUp", __file__)
 _PRESENCE_WARNED = False
+_DECORATION_LOGGED = False
 
 
 class ProfileFile(discord.File):
@@ -49,16 +50,18 @@ class ProfileFormatting(MixinMeta):
         quietly rendering the wrong thing forever.
         """
         global _PRESENCE_WARNED
-        if not self.bot.intents.presences:
-            if not _PRESENCE_WARNED:
-                _PRESENCE_WARNED = True
+        status = str(member.status).strip()
+        if not _PRESENCE_WARNED:
+            _PRESENCE_WARNED = True
+            if self.bot.intents.presences:
+                log.info("Presences intent is on; %s reads as %s", member, status)
+            else:
                 log.warning(
                     "The presences intent is off, so every profile card will show OFFLINE."
                     " Enable Presence Intent for the bot in the Discord developer portal,"
                     " and do not start Red with --disable-intent presences."
                 )
-            return "offline"
-        return str(member.status).strip()
+        return status if self.bot.intents.presences else "offline"
 
     def make_profile_file(self, member: discord.Member, img_bytes: bytes, animated: bool) -> ProfileFile:
         """Clamp generated profile images to the guild upload limit."""
@@ -376,11 +379,17 @@ class ProfileFormatting(MixinMeta):
         # Always use avatar URL (external API and subprocess both support URL fetching)
         request_data["avatar_url"] = str(member.display_avatar.url)
 
-        # Avatar decoration, if the member has one. Discord's presets are 96px
-        # with the avatar filling the middle 80, so ask for a size the card can
-        # scale down from rather than up.
+        # Avatar decoration, if the member has one. Ask for the asset as
+        # Discord serves it: a preset is a 96px box with the avatar filling the
+        # middle 80, which is already the size the card wants, and a rejected
+        # ?size= on this endpoint means no decoration at all rather than a
+        # bigger one.
         if decoration := getattr(member, "avatar_decoration", None):
-            request_data["avatar_frame_url"] = str(decoration.with_size(512).url)
+            request_data["avatar_frame_url"] = str(decoration.url)
+            global _DECORATION_LOGGED
+            if not _DECORATION_LOGGED:
+                _DECORATION_LOGGED = True
+                log.info("Avatar decoration asset for %s: %s", member, request_data["avatar_frame_url"])
 
         # Try API first if configured (external or managed local)
         if api_url := self.get_api_url():
@@ -467,7 +476,7 @@ class ProfileFormatting(MixinMeta):
         kwargs["avatar_bytes"] = await member.display_avatar.read()
         if decoration := getattr(member, "avatar_decoration", None):
             with suppress(discord.HTTPException):
-                kwargs["avatar_frame"] = await decoration.with_size(512).read()
+                kwargs["avatar_frame"] = await decoration.read()
         if profile_style != "runescape":
             kwargs["background_bytes"] = await self.get_profile_background(member.id, profile, guild_id=guild.id)
             if pdata and pdata.emoji_url:
