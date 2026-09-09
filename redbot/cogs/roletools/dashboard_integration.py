@@ -15,6 +15,9 @@ from redbot.core.utils.dashboard_helpers import (
     dashboard_page,
     emoji_options,
     emoji_problem,
+    EMOJI_UPLOAD_ASSETS,
+    create_guild_emoji,
+    decode_emoji_image,
     form_reader,
     guild_member,
     is_staff,
@@ -645,7 +648,14 @@ class DashboardIntegration:
                 }
             ]
 
-        emoji, key_part, problem = self._rt_read_emoji(field)
+        uploaded, upload_problem = await self._rt_upload_emoji(guild, field, "reaction")
+        if upload_problem:
+            return [{"message": upload_problem, "category": "danger"}]
+        if uploaded:
+            partial = discord.PartialEmoji.from_str(uploaded)
+            emoji, key_part, problem = partial, str(partial.id), ""
+        else:
+            emoji, key_part, problem = self._rt_read_emoji(field)
         if problem:
             return [{"message": problem, "category": "danger"}]
 
@@ -716,6 +726,28 @@ class DashboardIntegration:
                 "category": "success",
             }
         ]
+
+    async def _rt_upload_emoji(self, guild: discord.Guild, field, key: str) -> tuple[str, str]:
+        """A picture from the `img_{key}` field as an `<:name:id>` token.
+
+        Returns ("", "") when nothing was uploaded. The emoji is created on the
+        server and stays there: Discord will not render an image on a button or
+        in a reaction any other way, and this form has nowhere to record that
+        the picture came from here.
+        """
+        value = field(f"img_{key}") or ""
+        if not value:
+            return "", ""
+        raw, why = decode_emoji_image(value)
+        if raw is None:
+            return "", f"That picture could not be used: {why}."
+        token, why = await create_guild_emoji(
+            guild, f"rt_{key}_{int(discord.utils.utcnow().timestamp())}"[:32], raw,
+            reason="RoleTools emoji upload",
+        )
+        if token is None:
+            return "", why
+        return token, ""
 
     @staticmethod
     def _rt_read_emoji(field) -> tuple[t.Any, str, str]:
@@ -1129,12 +1161,16 @@ class DashboardIntegration:
             style = self.BUTTON_STYLES.get(
                 (field("button_style") or "primary").lower(), 1
             )
+            uploaded, why = await self._rt_upload_emoji(guild, field, "button")
+            if why:
+                return [{"message": why, "category": "warning"}]
+            button_emoji = uploaded or (field("button_emoji") or "").strip() or None
             async with conf.buttons() as buttons:
                 existed = name in buttons
                 buttons[name] = {
                     "role_id": role.id,
                     "label": (field("button_label") or name)[:80],
-                    "emoji": (field("button_emoji") or "").strip() or None,
+                    "emoji": button_emoji,
                     "style": style,
                     # Keep the messages this button is already posted into, so
                     # editing one does not orphan the messages showing it.
@@ -1199,12 +1235,16 @@ class DashboardIntegration:
             role = self._rt_pick_role(guild, field("option_role"))
             if role is None:
                 return [{"message": "Pick a role for the option.", "category": "warning"}]
+            uploaded, why = await self._rt_upload_emoji(guild, field, "option")
+            if why:
+                return [{"message": why, "category": "warning"}]
+            option_emoji = uploaded or (field("option_emoji") or "").strip() or None
             async with conf.select_options() as options:
                 options[name] = {
                     "role_id": role.id,
                     "label": (field("option_label") or name)[:100],
                     "description": (field("option_description") or "")[:100],
-                    "emoji": (field("option_emoji") or "").strip() or None,
+                    "emoji": option_emoji,
                 }
             menu = (field("option_menu") or "").strip().lower()
             attached = ""
@@ -1342,6 +1382,7 @@ class DashboardIntegration:
 ROLETOOLS_TEMPLATE = (
     BASE_CSS
     + MACROS
+    + EMOJI_UPLOAD_ASSETS
     + """
 <style>
   .rt-msg { display:flex; align-items:center; gap:9px; flex-wrap:wrap;
@@ -1586,6 +1627,9 @@ ROLETOOLS_TEMPLATE = (
           <div class="dz-label" style="margin-top:9px;">Or type any emoji</div>
           <input class="dz-input" type="text" name="emoji_text"
                  placeholder="paste a single emoji, e.g. 🎉" />
+          <div class="dz-label" style="margin-top:9px;">Or upload a picture</div>
+          {{ emoji_upload('reaction') }}
+          <p class="dz-hint">It becomes one of this server&#39;s emoji and stays one. Max 256 KB.</p>
         </div>
         <div>
           <div class="dz-label">Role to grant</div>
@@ -1745,6 +1789,7 @@ ROLETOOLS_TEMPLATE = (
                  style="max-width:190px;" />
           <input class="dz-input" name="button_emoji" placeholder="emoji"
                  style="max-width:90px;" />
+          {{ emoji_upload('button') }}
           <select class="dz-select" name="button_style" style="max-width:130px;">
             <option value="primary">Blurple</option>
             <option value="secondary">Grey</option>
@@ -1816,6 +1861,7 @@ ROLETOOLS_TEMPLATE = (
                  style="max-width:160px;" />
           <input class="dz-input" name="option_emoji" placeholder="emoji"
                  style="max-width:90px;" />
+          {{ emoji_upload('option') }}
           <select class="dz-select" name="option_role" style="max-width:180px;">
             <option value="">Role...</option>
             {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
