@@ -3,6 +3,7 @@ import base64
 import logging
 import random
 import typing as t
+from contextlib import suppress
 from io import BytesIO
 from time import perf_counter
 
@@ -333,6 +334,12 @@ class ProfileFormatting(MixinMeta):
         # Always use avatar URL (external API and subprocess both support URL fetching)
         request_data["avatar_url"] = str(member.display_avatar.url)
 
+        # Avatar decoration, if the member has one. Discord's presets are 96px
+        # with the avatar filling the middle 80, so ask for a size the card can
+        # scale down from rather than up.
+        if decoration := getattr(member, "avatar_decoration", None):
+            request_data["avatar_frame_url"] = str(decoration.with_size(512).url)
+
         # Try API first if configured (external or managed local)
         if api_url := self.get_api_url():
             endpoints = {
@@ -416,6 +423,9 @@ class ProfileFormatting(MixinMeta):
 
         # Fetch assets for in-process fallback
         kwargs["avatar_bytes"] = await member.display_avatar.read()
+        if decoration := getattr(member, "avatar_decoration", None):
+            with suppress(discord.HTTPException):
+                kwargs["avatar_frame"] = await decoration.with_size(512).read()
         if profile_style != "runescape":
             kwargs["background_bytes"] = await self.get_profile_background(member.id, profile, guild_id=guild.id)
             if pdata and pdata.emoji_url:

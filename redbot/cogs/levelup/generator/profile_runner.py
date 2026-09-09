@@ -98,6 +98,7 @@ def generate_profile(input_data: dict, output_path: Path) -> dict:
     background_bytes = get_asset_bytes(input_data.get("background_url"), input_data.get("background_b64"))
     prestige_emoji_bytes = get_asset_bytes(input_data.get("prestige_emoji_url"), input_data.get("prestige_emoji_b64"))
     role_icon_bytes = get_asset_bytes(input_data.get("role_icon_url"), input_data.get("role_icon_b64"))
+    avatar_frame_bytes = get_asset_bytes(input_data.get("avatar_frame_url"), input_data.get("avatar_frame_b64"))
 
     # Resolve font path
     font_path = None
@@ -163,6 +164,7 @@ def generate_profile(input_data: dict, output_path: Path) -> dict:
         kwargs["background_bytes"] = background_bytes
         kwargs["prestige_emoji"] = prestige_emoji_bytes
         kwargs["role_icon"] = role_icon_bytes
+        kwargs["avatar_frame"] = avatar_frame_bytes
 
     # Select generator based on style
     generators = {

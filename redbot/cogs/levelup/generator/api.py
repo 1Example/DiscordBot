@@ -103,6 +103,7 @@ class ProfileRequest(BaseModel):
     background_url: t.Optional[str] = None
     prestige_emoji_url: t.Optional[str] = None
     role_icon_url: t.Optional[str] = None
+    avatar_frame_url: t.Optional[str] = None
 
     # Font
     font_name: t.Optional[str] = None
@@ -198,6 +199,9 @@ async def generate_profile(request: ProfileRequest) -> ImageResponse:
         await asyncio.to_thread(_download_url, request.prestige_emoji_url) if request.style != "runescape" else None
     )
     role_icon = await asyncio.to_thread(_download_url, request.role_icon_url) if request.style != "runescape" else None
+    avatar_frame = (
+        await asyncio.to_thread(_download_url, request.avatar_frame_url) if request.style != "runescape" else None
+    )
 
     # Resolve font (supports both bundled fonts by name and custom fonts via base64)
     font_path = _resolve_font(request.font_name, request.font_b64)
@@ -237,6 +241,7 @@ async def generate_profile(request: ProfileRequest) -> ImageResponse:
         kwargs["background_bytes"] = background_bytes
         kwargs["prestige_emoji"] = prestige_emoji
         kwargs["role_icon"] = role_icon
+        kwargs["avatar_frame"] = avatar_frame
 
     # Select generator
     generators = {

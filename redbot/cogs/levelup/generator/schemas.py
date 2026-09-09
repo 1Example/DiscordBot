@@ -42,12 +42,14 @@ class ProfileRequest(BaseModel):
     background_url: t.Optional[str] = Field(default=None, description="URL to background image")
     prestige_emoji_url: t.Optional[str] = Field(default=None, description="URL to prestige emoji")
     role_icon_url: t.Optional[str] = Field(default=None, description="URL to role icon")
+    avatar_frame_url: t.Optional[str] = Field(default=None, description="URL to the avatar decoration")
 
     # Asset bytes (base64 encoded, fallback if URLs fail)
     avatar_b64: t.Optional[str] = Field(default=None, description="Base64 encoded avatar bytes")
     background_b64: t.Optional[str] = Field(default=None, description="Base64 encoded background bytes")
     prestige_emoji_b64: t.Optional[str] = Field(default=None, description="Base64 encoded prestige emoji")
     role_icon_b64: t.Optional[str] = Field(default=None, description="Base64 encoded role icon")
+    avatar_frame_b64: t.Optional[str] = Field(default=None, description="Base64 encoded avatar decoration")
 
     # Styling options
     blur: bool = Field(default=True, description="Blur background behind stats")

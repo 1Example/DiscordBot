@@ -185,7 +185,7 @@ class User(MixinMeta):
         if not conf.enabled:
             txt = _("Leveling is disabled in this server!")
             if await self.bot.is_admin(ctx.author):
-                txt += _("\nYou can enable it with `{}`").format(f"{ctx.clean_prefix}lset toggle")
+                txt += _("\nYou can enable it from the dashboard, under LevelUp.")
             return await ctx.send(txt)
 
         if not user:
@@ -202,7 +202,7 @@ class User(MixinMeta):
                 "Welcome to LevelUp!\n"
                 "Use {} to view your profile settings and the available customization commands!\n"
                 "*You can use {} to view your profile settings at any time*"
-            ).format(f"`{ctx.clean_prefix}setprofile`", f"`{ctx.clean_prefix}setprofile view`")
+            ).format("`/setprofile`", "`/setprofile view`")
             profile.show_tutorial = False
             self.save()
 
@@ -223,12 +223,14 @@ class User(MixinMeta):
                             result.fp.seek(0)
                             await ctx.send(content=new_user_txt, file=result)
             else:
-                await ctx.defer(ephemeral=True)
+                # Public: a profile card is something people show off, and an
+                # ephemeral reply means nobody else in the channel ever sees it.
+                await ctx.defer()
                 result = await self.get_user_profile_cached(user)
                 if isinstance(result, discord.Embed):
-                    await ctx.send(content=new_user_txt, embed=result, ephemeral=True)
+                    await ctx.send(content=new_user_txt, embed=result)
                 else:  # File
-                    await ctx.send(content=new_user_txt, file=result, ephemeral=True)
+                    await ctx.send(content=new_user_txt, file=result)
         except Exception as e:
             log.error("Error generating profile", exc_info=e)
             if "Payload Too Large" in str(e):
@@ -525,7 +527,7 @@ class User(MixinMeta):
         async with ctx.typing():
             file = await asyncio.to_thread(_run)
             txt = _("Here are all the available backgrounds!\nYou can use {} to set your background").format(
-                f"`{ctx.clean_prefix}setprofile background <image name>`"
+                "`/setprofile background <image name>`"
             )
             await ctx.send(txt, file=file)
 
@@ -551,7 +553,7 @@ class User(MixinMeta):
         async with ctx.typing():
             file = await asyncio.to_thread(_run)
             txt = _("Here are all the available fonts!\nYou can use {} to set your font").format(
-                f"`{ctx.clean_prefix}setprofile font <font name>`"
+                "`/setprofile font <font name>`"
             )
             await ctx.send(txt, file=file)
 
