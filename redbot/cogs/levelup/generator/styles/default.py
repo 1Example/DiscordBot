@@ -426,7 +426,7 @@ def generate_default_profile(
     # The role icon reads as a badge on the name, which is what it is.
     if role_icon_bytes and not square:
         try:
-            badge = Image.open(BytesIO(role_icon_bytes)).resize((32, 32), Image.Resampling.LANCZOS)
+            badge = Image.open(BytesIO(role_icon_bytes)).convert("RGBA").resize((32, 32), Image.Resampling.LANCZOS)
             ink.paste(badge, (int(text_x + name_font.getlength(username) + 12), name_y + 14), badge)
         except (ValueError, UnidentifiedImageError) as e:
             if reraise:
@@ -489,8 +489,10 @@ def generate_default_profile(
             cursor = chip_x + 15
             if emoji_slot:
                 try:
-                    emoji = Image.open(BytesIO(prestige_emoji_bytes)).resize(
-                        (emoji_slot, emoji_slot), Image.Resampling.LANCZOS
+                    emoji = (
+                        Image.open(BytesIO(prestige_emoji_bytes))
+                        .convert("RGBA")
+                        .resize((emoji_slot, emoji_slot), Image.Resampling.LANCZOS)
                     )
                     ink.paste(emoji, (int(cursor), int(chip_y + 4)), emoji)
                     cursor += emoji_slot + 8
@@ -610,7 +612,7 @@ def generate_default_profile(
 
     halo = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
     halo.putalpha(
-        Image.eval(ink.getchannel("A").filter(ImageFilter.GaussianBlur(4.5)), lambda v: min(255, v * 5))
+        Image.eval(ink.getchannel("A").filter(ImageFilter.GaussianBlur(3.0)), lambda v: min(255, v * 2))
     )
     stats = Image.alpha_composite(stats, halo)
     stats = Image.alpha_composite(stats, ink)
