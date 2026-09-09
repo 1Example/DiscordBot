@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import logging
 from collections import namedtuple
 from copy import copy
 from typing import Literal
@@ -8,16 +9,17 @@ import discord
 from discord import app_commands
 
 from redbot.cogs.warnings.helpers import warning_points_add_check, warning_points_remove_check
-from redbot.core import Config, commands, modlog
+from redbot.core import Config, bank, commands, errors, modlog
 from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
-from redbot.core.utils.chat_formatting import pagify, warning
+from redbot.core.utils.chat_formatting import humanize_number, pagify, warning
 from redbot.core.utils.views import ConfirmView
 from .dashboard_integration import DashboardIntegration
 
 
 _ = Translator("Warnings", __file__)
+log = logging.getLogger("red.warnings")
 
 
 @cog_i18n(_)
@@ -33,6 +35,9 @@ class Warnings(DashboardIntegration, commands.Cog):
         "warn_channel": None,
         "toggle_channel": False,
         "mywarnings_in_dms": False,
+        # A warning can cost credits. 0 for both keeps warnings free.
+        "fine_flat": 0,
+        "fine_per_point": 0,
     }
 
     default_member = {"total_points": 0, "status": "", "warnings": {}}
@@ -43,6 +48,32 @@ class Warnings(DashboardIntegration, commands.Cog):
         self.config.register_guild(**self.default_guild)
         self.config.register_member(**self.default_member)
         self.bot = bot
+
+    async def _apply_fine(
+        self, guild_settings: dict, member: discord.Member, points: int
+    ) -> tuple[int, str]:
+        """Charge a member for a warning. Returns (taken, currency name).
+
+        Someone who cannot cover the fine pays what they have: a warning is not
+        cancelled by being broke. The credits are removed from circulation
+        rather than paid to anyone - there is no guild account to hold them,
+        and a moderator earning from warnings is the wrong incentive.
+        """
+        flat = int(guild_settings.get("fine_flat") or 0)
+        per_point = int(guild_settings.get("fine_per_point") or 0)
+        fine = flat + per_point * max(int(points), 0)
+        if fine <= 0:
+            return 0, ""
+        try:
+            currency = await bank.get_currency_name(member.guild)
+            balance = await bank.get_balance(member)
+            taken = min(balance, fine)
+            if taken > 0:
+                await bank.withdraw_credits(member, taken)
+        except (errors.BankError, RuntimeError) as e:
+            log.warning("Could not fine %s in %s: %s", member, member.guild, e)
+            return 0, ""
+        return taken, currency
 
     async def cog_load(self) -> None:
         await self.register_warningtype()
@@ -216,6 +247,9 @@ class Warnings(DashboardIntegration, commands.Cog):
                 "mod": ctx.author.id,
             }
         }
+        fined, currency = await self._apply_fine(
+            guild_settings, member, reason_type["points"]
+        )
         dm = guild_settings["toggle_dm"]
         showmod = guild_settings["show_mod"]
         dm_failed = False
@@ -230,6 +264,8 @@ class Warnings(DashboardIntegration, commands.Cog):
                 color=await ctx.embed_colour(),
             )
             em.add_field(name=_("Points"), value=str(reason_type["points"]))
+            if fined:
+                em.add_field(name=_("Fine"), value=f"{humanize_number(fined)} {currency}")
             try:
                 await member.send(
                     _("You have received a warning in {guild_name}.").format(

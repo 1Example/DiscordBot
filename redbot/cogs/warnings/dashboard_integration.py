@@ -5,7 +5,7 @@ import typing as t
 from datetime import datetime, timezone
 
 import discord
-from redbot.core import commands, modlog
+from redbot.core import bank, commands, modlog
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
@@ -96,6 +96,9 @@ class DashboardIntegration:
                 "is_admin": staff,
                 "history": history,
                 "member_options": member_options(guild, humans_only=True),
+                "fine_flat": settings.get("fine_flat") or 0,
+                "fine_per_point": settings.get("fine_per_point") or 0,
+                "currency": await bank.get_currency_name(guild),
                 "toggles": [
                     {"key": k, "label": lbl, "help": h, "on": bool(settings.get(k))}
                     for k, lbl, h in TOGGLES
@@ -389,6 +392,15 @@ class DashboardIntegration:
                             }
                         )
                 await conf.warn_channel.set(channel_id)
+                flat = max(0, field.integer("fine_flat", 0) or 0)
+                per_point = max(0, field.integer("fine_per_point", 0) or 0)
+                if flat > 1_000_000 or per_point > 1_000_000:
+                    warnings.append(
+                        {"message": "Fines above 1,000,000 were ignored.", "category": "warning"}
+                    )
+                else:
+                    await conf.fine_flat.set(flat)
+                    await conf.fine_per_point.set(per_point)
                 return warnings + [{"message": "Settings saved.", "category": "success"}]
 
             if action == "add_reason":
@@ -572,6 +584,19 @@ WARNINGS_TEMPLATE = (
           </select>
           <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
             Only used when "post warnings to a channel" is on.
+          </div>
+
+          <div class="dz-label" style="margin-top:14px;">Fine per warning ({{ currency }})</div>
+          <input class="dz-input" type="number" min="0" max="1000000"
+                 name="fine_flat" value="{{ fine_flat }}" />
+          <div class="dz-label" style="margin-top:9px;">Extra per point ({{ currency }})</div>
+          <input class="dz-input" type="number" min="0" max="1000000"
+                 name="fine_per_point" value="{{ fine_per_point }}" />
+          <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+            Charged when a warning lands, so a 5-point warning costs five times
+            the per-point amount on top of the flat one. Someone who cannot cover
+            it pays what they have. The credits leave circulation - there is no
+            account for them to go to. 0 and 0 keeps warnings free.
           </div>
         </div>
       </div>
