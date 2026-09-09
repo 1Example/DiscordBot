@@ -494,6 +494,30 @@ BASE_CSS += """
   select.dz-select[multiple] { height:auto; padding:6px; }
   select.dz-select[multiple] option { padding:3px 6px; border-radius:6px; }
 
+  /* reddash runs Choices.js over every select on the page, which hides the
+     original and leaves a .choices wrapper in its place. The floor above
+     then lands on an element nobody can see while the wrapper - the real
+     flex item - collapses to its own arrow, which is what renders the open
+     list one letter wide. Scoped to .dz so reddash's own pages keep the
+     styling reddash gives them. */
+  .dz .dz-row > .choices { flex:1 1 220px; min-width:170px; margin-bottom:0; }
+  .dz .choices { margin-bottom:0; }
+  .dz .choices__inner {
+    background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.12);
+    border-radius:10px; min-height:42px; padding:5px 12px; font-size:.88rem;
+  }
+  .dz .choices.is-focused .choices__inner,
+  .dz .choices.is-open .choices__inner { border-color:rgba(130,175,255,.45); }
+  .dz .choices__list--dropdown, .dz .choices__list[aria-expanded] {
+    background:#151b2c; border:1px solid rgba(255,255,255,.14);
+    border-radius:10px; min-width:100%; width:max-content; max-width:340px;
+  }
+  .dz .choices__list--dropdown .choices__item { font-size:.88rem; padding:8px 12px; }
+  .dz .choices__list--dropdown .choices__item--selectable.is-highlighted {
+    background:rgba(130,175,255,.18); }
+  .dz .choices__input { background:transparent; color:inherit; }
+  .dz .choices__placeholder { opacity:.5; }
+
   .dz-pick { position:relative; }
   .dz-pick input.dz-search { margin-bottom:6px; }
   .dz-pick .dz-count { font-size:.7rem; opacity:.45; margin-top:4px; }
