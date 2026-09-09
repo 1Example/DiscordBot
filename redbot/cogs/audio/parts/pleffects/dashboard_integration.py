@@ -52,6 +52,58 @@ BASS_PRESETS = {
     "Light": [{"band": 0, "gain": 0.15}, {"band": 1, "gain": 0.08}],
 }
 
+# Every filter parameter: the form field, the constructor keyword it maps to,
+# a label, and min/max/step/default for its slider. PyLav bounds only vibrato
+# and tremolo, so the rest are Lavalink's semantics and documented defaults.
+FILTER_CONTROLS = (
+    ("vibrato", "Vibrato", (
+        ("vibrato_frequency", "frequency", "Frequency", 0.1, 14.0, 0.1, 2.0),
+        ("vibrato_depth", "depth", "Depth", 0.05, 1.0, 0.05, 0.5),
+    )),
+    ("tremolo", "Tremolo", (
+        ("tremolo_frequency", "frequency", "Frequency", 0.1, 14.0, 0.1, 2.0),
+        ("tremolo_depth", "depth", "Depth", 0.05, 1.0, 0.05, 0.5),
+    )),
+    ("timescale", "Timescale", (
+        ("timescale_speed", "speed", "Speed", 0.25, 3.0, 0.05, 1.0),
+        ("timescale_pitch", "pitch", "Pitch", 0.25, 3.0, 0.05, 1.0),
+        ("timescale_rate", "rate", "Rate", 0.25, 3.0, 0.05, 1.0),
+    )),
+    ("rotation", "Rotation", (
+        ("rotation_hertz", "hertz", "Rotation Hz", 0.0, 5.0, 0.05, 0.2),
+    )),
+    ("low_pass", "Low pass", (
+        ("low_pass_smoothing", "smoothing", "Smoothing", 1.0, 100.0, 1.0, 20.0),
+    )),
+    ("karaoke", "Karaoke", (
+        ("karaoke_level", "level", "Level", 0.0, 1.0, 0.05, 1.0),
+        ("karaoke_mono_level", "mono_level", "Mono level", 0.0, 1.0, 0.05, 1.0),
+        ("karaoke_filter_band", "filter_band", "Filter band (Hz)", 0.0, 1000.0, 5.0, 220.0),
+        ("karaoke_filter_width", "filter_width", "Filter width", 0.0, 500.0, 5.0, 100.0),
+    )),
+    ("channel_mix", "Channel mix", (
+        ("mix_ll", "left_to_left", "Left to left", 0.0, 1.0, 0.05, 1.0),
+        ("mix_lr", "left_to_right", "Left to right", 0.0, 1.0, 0.05, 0.0),
+        ("mix_rl", "right_to_left", "Right to left", 0.0, 1.0, 0.05, 0.0),
+        ("mix_rr", "right_to_right", "Right to right", 0.0, 1.0, 0.05, 1.0),
+    )),
+    ("distortion", "Distortion", (
+        ("dist_sin_offset", "sin_offset", "Sin offset", -1.0, 1.0, 0.05, 0.0),
+        ("dist_sin_scale", "sin_scale", "Sin scale", 0.0, 4.0, 0.05, 1.0),
+        ("dist_cos_offset", "cos_offset", "Cos offset", -1.0, 1.0, 0.05, 0.0),
+        ("dist_cos_scale", "cos_scale", "Cos scale", 0.0, 4.0, 0.05, 1.0),
+        ("dist_tan_offset", "tan_offset", "Tan offset", -1.0, 1.0, 0.05, 0.0),
+        ("dist_tan_scale", "tan_scale", "Tan scale", 0.0, 4.0, 0.05, 1.0),
+        ("dist_offset", "offset", "Offset", -1.0, 1.0, 0.05, 0.0),
+        ("dist_scale", "scale", "Scale", 0.0, 4.0, 0.05, 1.0),
+    )),
+    ("echo", "Echo", (
+        ("echo_delay", "delay", "Delay (seconds)", 0.0, 10.0, 0.1, 1.0),
+        ("echo_decay", "decay", "Decay", 0.0, 1.0, 0.05, 0.5),
+    )),
+)
+
+
 # Band index to the frequency it controls, matching PyLav's EQ_BAND_MAPPING.
 EQ_BAND_LABELS = {
     0: "20Hz",
@@ -165,10 +217,65 @@ class EffectsDashboard:
                 "active_filters": sum(1 for f in self._fx_state(player) if f["active"]),
                 "current_eq": getattr(getattr(player, "equalizer", None), "name", "Flat") if player else "Flat",
                 "bass_levels": list(BASS_PRESETS),
+                "current_bass": self._current_bass(player),
+                "fx_controls": FILTER_CONTROLS,
+                "fx_values": self._fx_slider_values(player),
+                "fx_enabled": self._fx_enabled(player),
+                "band_gains": self._eq_gains(player),
                 "eq_presets": [(key, value[0]) for key, value in EQ_PRESETS.items()],
                 "bands": list(EQ_BAND_LABELS.items()),
             },
         }
+
+    def _fx_slider_values(self, player) -> dict[str, float]:
+        """What each slider should open on: the player's value, or the default.
+
+        A filter that is off reports None for its parameters, and a slider
+        parked at zero would misrepresent that, so the documented default is
+        shown instead and the enable box is what says it is off.
+        """
+        values: dict[str, float] = {}
+        for key, _label, controls in FILTER_CONTROLS:
+            obj = getattr(player, key, None) if player is not None else None
+            for name, attr, _lbl, _mn, _mx, _st, default in controls:
+                current = getattr(obj, attr, None) if obj is not None else None
+                values[name] = default if current is None else current
+        return values
+
+    def _fx_enabled(self, player) -> dict[str, bool]:
+        """Which filters are doing something right now."""
+        keys = [key for key, _l, _c in FILTER_CONTROLS] + ["reverb"]
+        if player is None:
+            return {key: False for key in keys}
+        return {
+            key: bool(getattr(getattr(player, key, None), "changed", False))
+            for key in keys
+        }
+
+    @staticmethod
+    def _eq_gains(player) -> dict[int, float]:
+        """The gain on each band, so the equalizer sliders start where it is."""
+        equalizer = getattr(player, "equalizer", None) if player is not None else None
+        if equalizer is None:
+            return {band: 0.0 for band in EQ_BAND_LABELS}
+        return {band: equalizer.get_gain(band) for band in EQ_BAND_LABELS}
+
+    @staticmethod
+    def _current_bass(player) -> str:
+        """Which bass preset is on, read off the equalizer's name.
+
+        The handler names it "Bass boost - <level>" when it applies one, which
+        is a good deal steadier than comparing gain lists and finding two
+        presets that happen to share a shape.
+        """
+        equalizer = getattr(player, "equalizer", None) if player is not None else None
+        name = getattr(equalizer, "name", "") or ""
+        prefix = "Bass boost - "
+        if name.startswith(prefix):
+            level = name[len(prefix):]
+            if level in BASS_PRESETS:
+                return level
+        return "Off"
 
     def _fx_state(self, player) -> list[dict]:
         """Which filters are currently active on the live player."""
@@ -310,55 +417,39 @@ class EffectsDashboard:
                 ]
 
             if action == "filters":
+                classes = {
+                    "vibrato": Vibrato,
+                    "tremolo": Tremolo,
+                    "timescale": Timescale,
+                    "rotation": Rotation,
+                    "low_pass": LowPass,
+                    "karaoke": Karaoke,
+                    "channel_mix": ChannelMix,
+                    "distortion": Distortion,
+                    "echo": Echo,
+                }
                 filters: dict[str, t.Any] = {}
-                filters["vibrato"] = Vibrato(
-                    frequency=self._fx_float(field, "vibrato_frequency"),
-                    depth=self._fx_float(field, "vibrato_depth"),
-                )
-                filters["tremolo"] = Tremolo(
-                    frequency=self._fx_float(field, "tremolo_frequency"),
-                    depth=self._fx_float(field, "tremolo_depth"),
-                )
-                filters["rotation"] = Rotation(
-                    hertz=self._fx_float(field, "rotation_hertz")
-                )
-                filters["low_pass"] = LowPass(
-                    smoothing=self._fx_float(field, "low_pass_smoothing")
-                )
-                filters["timescale"] = Timescale(
-                    speed=self._fx_float(field, "timescale_speed"),
-                    pitch=self._fx_float(field, "timescale_pitch"),
-                    rate=self._fx_float(field, "timescale_rate"),
-                )
-                filters["karaoke"] = Karaoke(
-                    level=self._fx_float(field, "karaoke_level"),
-                    mono_level=self._fx_float(field, "karaoke_mono_level"),
-                    filter_band=self._fx_float(field, "karaoke_filter_band"),
-                    filter_width=self._fx_float(field, "karaoke_filter_width"),
-                )
-                filters["channel_mix"] = ChannelMix(
-                    left_to_left=self._fx_float(field, "mix_ll"),
-                    left_to_right=self._fx_float(field, "mix_lr"),
-                    right_to_left=self._fx_float(field, "mix_rl"),
-                    right_to_right=self._fx_float(field, "mix_rr"),
-                )
-                filters["distortion"] = Distortion(
-                    sin_offset=self._fx_float(field, "dist_sin_offset"),
-                    sin_scale=self._fx_float(field, "dist_sin_scale"),
-                    cos_offset=self._fx_float(field, "dist_cos_offset"),
-                    cos_scale=self._fx_float(field, "dist_cos_scale"),
-                    tan_offset=self._fx_float(field, "dist_tan_offset"),
-                    tan_scale=self._fx_float(field, "dist_tan_scale"),
-                    offset=self._fx_float(field, "dist_offset"),
-                    scale=self._fx_float(field, "dist_scale"),
-                )
-                filters["echo"] = Echo(
-                    delay=self._fx_float(field, "echo_delay"),
-                    decay=self._fx_float(field, "echo_decay"),
-                )
-                filters["reverb"] = Reverb(
-                    delays=self._fx_floats(field, "reverb_delays"),
-                    gains=self._fx_floats(field, "reverb_gains"),
+                for key, _label, controls in FILTER_CONTROLS:
+                    cls = classes[key]
+                    if not field.checked(f"enable_{key}"):
+                        # A filter built with nothing set is what PyLav treats
+                        # as off, so unticking is how you turn one off.
+                        filters[key] = cls()
+                        continue
+                    filters[key] = cls(
+                        **{
+                            attr: self._fx_float(field, name, default)
+                            for name, attr, _lbl, _mn, _mx, _st, default in controls
+                        }
+                    )
+                # Reverb takes two lists, so it keeps its text boxes.
+                filters["reverb"] = (
+                    Reverb(
+                        delays=self._fx_floats(field, "reverb_delays"),
+                        gains=self._fx_floats(field, "reverb_gains"),
+                    )
+                    if field.checked("enable_reverb")
+                    else Reverb()
                 )
                 await player.set_filters(requester=requester, **filters)
                 return [
@@ -398,6 +489,7 @@ class EffectsDashboard:
 
 EFFECTS_TEMPLATE = (
     BASE_CSS
+    + '<style>\n  /* An effects rack reads as rows of one control, not a grid of boxes: the\n     label, the travel, and the number it is currently on. */\n  .fx-slider { display:flex; align-items:center; gap:10px; margin:6px 0; }\n  .fx-slider > label { flex:0 0 118px; font-size:.79rem; opacity:.75;\n                       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }\n  .fx-slider input[type=range] { flex:1 1 auto; min-width:70px; accent-color:#6ea8fe;\n                                 background:transparent; }\n  .fx-slider output { flex:0 0 46px; text-align:right; font-size:.79rem;\n                      font-variant-numeric:tabular-nums; opacity:.9; }\n  .fx-group { padding:10px 12px; margin:8px 0; border-radius:11px;\n              border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.16); }\n  .fx-head { display:flex; align-items:center; gap:9px; font-weight:600;\n             font-size:.87rem; margin-bottom:4px; cursor:pointer; }\n  .fx-head input { accent-color:#6ea8fe; }\n  /* Unticked reads as off without hiding where its sliders sit. */\n  .fx-group:has(.fx-head input:not(:checked)) .fx-slider { opacity:.45; }\n</style>\n'
     + MACROS
     + """
 <div class="dz">
@@ -480,9 +572,10 @@ EFFECTS_TEMPLATE = (
         <div class="dz-row" style="margin-top:12px;">
           <label class="dz-label" style="margin:0;">Bass boost</label>
           <select class="dz-select" name="bass_level" style="max-width:200px;">
-            <option value="Off">Off</option>
+            <option value="Off" {% if current_bass == "Off" %}selected{% endif %}>Off</option>
             {% for level in bass_levels %}
-              <option value="{{ level }}">{{ level }}</option>
+              <option value="{{ level }}"
+                      {% if current_bass == level %}selected{% endif %}>{{ level }}</option>
             {% endfor %}
           </select>
           <button class="dz-btn primary" name="action" value="bassboost">
@@ -496,14 +589,17 @@ EFFECTS_TEMPLATE = (
       <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
       <div class="dz-panel">
         <h5><i class="fa fa-sliders"></i> Custom equalizer</h5>
-        <p class="dz-hint">Gain per band, from -0.25 to 1.0. Leave a band empty
-           to keep it flat.</p>
+        <p class="dz-hint">Gain per band, from -0.25 to 1.0. The sliders start
+           where the player is.</p>
         <div class="dz-grid three">
           {% for band, label in bands %}
-            <div>
-              <label class="dz-label">{{ label }}</label>
-              <input class="dz-input" type="number" step="0.05" min="-0.25" max="1"
-                     name="band_{{ band }}" placeholder="0" />
+            <div class="fx-slider">
+              <label for="band_{{ band }}">{{ label }}</label>
+              <input type="range" id="band_{{ band }}" name="band_{{ band }}"
+                     min="-0.25" max="1" step="0.05"
+                     value="{{ band_gains[band] }}"
+                     oninput="this.nextElementSibling.value = (+this.value).toFixed(2);" />
+              <output>{{ "%.2f"|format(band_gains[band]) }}</output>
             </div>
           {% endfor %}
         </div>
@@ -519,97 +615,40 @@ EFFECTS_TEMPLATE = (
       <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
       <div class="dz-panel">
         <h5><i class="fa fa-flask"></i> Filters</h5>
-        <p class="dz-hint">Everything is applied together; leave a field empty to
-           leave that part of the filter alone.</p>
-        <div class="dz-grid three">
-          <div>
-            <label class="dz-label">Vibrato</label>
-            <input class="dz-input" type="number" step="0.1" name="vibrato_frequency"
-                   placeholder="frequency (0-14)" />
-            <input class="dz-input" type="number" step="0.1" name="vibrato_depth"
-                   placeholder="depth (0-1)" style="margin-top:6px;" />
+        <p class="dz-hint">Tick a filter to apply its sliders; untick it to turn
+           it off. Everything here is applied together.</p>
+        {% for key, label, controls in fx_controls %}
+          <div class="fx-group">
+            <label class="fx-head">
+              <input type="checkbox" name="enable_{{ key }}"
+                     {% if fx_enabled[key] %}checked{% endif %} />
+              <span>{{ label }}</span>
+            </label>
+            {% for name, attr, ctl_label, lo, hi, step, default in controls %}
+              <div class="fx-slider">
+                <label for="{{ name }}">{{ ctl_label }}</label>
+                <input type="range" id="{{ name }}" name="{{ name }}"
+                       min="{{ lo }}" max="{{ hi }}" step="{{ step }}"
+                       value="{{ fx_values[name] }}"
+                       oninput="this.nextElementSibling.value = (+this.value).toFixed(2);" />
+                <output>{{ "%.2f"|format(fx_values[name]) }}</output>
+              </div>
+            {% endfor %}
           </div>
-          <div>
-            <label class="dz-label">Tremolo</label>
-            <input class="dz-input" type="number" step="0.1" name="tremolo_frequency"
-                   placeholder="frequency" />
-            <input class="dz-input" type="number" step="0.1" name="tremolo_depth"
-                   placeholder="depth (0-1)" style="margin-top:6px;" />
-          </div>
-          <div>
-            <label class="dz-label">Rotation and low pass</label>
-            <input class="dz-input" type="number" step="0.1" name="rotation_hertz"
-                   placeholder="rotation hertz" />
-            <input class="dz-input" type="number" step="0.1" name="low_pass_smoothing"
-                   placeholder="low pass smoothing" style="margin-top:6px;" />
-          </div>
-        </div>
-        <div class="dz-grid three" style="margin-top:10px;">
-          <div>
-            <label class="dz-label">Timescale</label>
-            <input class="dz-input" type="number" step="0.05" name="timescale_speed"
-                   placeholder="speed" />
-            <input class="dz-input" type="number" step="0.05" name="timescale_pitch"
-                   placeholder="pitch" style="margin-top:6px;" />
-            <input class="dz-input" type="number" step="0.05" name="timescale_rate"
-                   placeholder="rate" style="margin-top:6px;" />
-          </div>
-          <div>
-            <label class="dz-label">Karaoke</label>
-            <input class="dz-input" type="number" step="0.05" name="karaoke_level"
-                   placeholder="level" />
-            <input class="dz-input" type="number" step="0.05" name="karaoke_mono_level"
-                   placeholder="mono level" style="margin-top:6px;" />
-            <input class="dz-input" type="number" step="1" name="karaoke_filter_band"
-                   placeholder="filter band" style="margin-top:6px;" />
-            <input class="dz-input" type="number" step="1" name="karaoke_filter_width"
-                   placeholder="filter width" style="margin-top:6px;" />
-          </div>
-          <div>
-            <label class="dz-label">Channel mix</label>
-            <input class="dz-input" type="number" step="0.05" name="mix_ll"
-                   placeholder="left to left" />
-            <input class="dz-input" type="number" step="0.05" name="mix_lr"
-                   placeholder="left to right" style="margin-top:6px;" />
-            <input class="dz-input" type="number" step="0.05" name="mix_rl"
-                   placeholder="right to left" style="margin-top:6px;" />
-            <input class="dz-input" type="number" step="0.05" name="mix_rr"
-                   placeholder="right to right" style="margin-top:6px;" />
-          </div>
-        </div>
-        <label class="dz-label" style="margin-top:12px;">Distortion</label>
-        <div class="dz-grid three">
-          <input class="dz-input" type="number" step="0.05" name="dist_sin_offset"
-                 placeholder="sin offset" />
-          <input class="dz-input" type="number" step="0.05" name="dist_sin_scale"
-                 placeholder="sin scale" />
-          <input class="dz-input" type="number" step="0.05" name="dist_cos_offset"
-                 placeholder="cos offset" />
-          <input class="dz-input" type="number" step="0.05" name="dist_cos_scale"
-                 placeholder="cos scale" />
-          <input class="dz-input" type="number" step="0.05" name="dist_tan_offset"
-                 placeholder="tan offset" />
-          <input class="dz-input" type="number" step="0.05" name="dist_tan_scale"
-                 placeholder="tan scale" />
-          <input class="dz-input" type="number" step="0.05" name="dist_offset"
-                 placeholder="offset" />
-          <input class="dz-input" type="number" step="0.05" name="dist_scale"
-                 placeholder="scale" />
-        </div>
-        <div class="dz-grid two" style="margin-top:12px;">
-          <div>
-            <label class="dz-label">Echo</label>
-            <input class="dz-input" type="number" step="0.1" min="0" name="echo_delay"
-                   placeholder="delay in seconds (0+)" />
-            <input class="dz-input" type="number" step="0.05" min="0" max="1"
-                   name="echo_decay" placeholder="decay (0-1)" style="margin-top:6px;" />
-          </div>
-          <div>
-            <label class="dz-label">Reverb</label>
+        {% endfor %}
+        <div class="fx-group">
+          <label class="fx-head">
+            <input type="checkbox" name="enable_reverb"
+                   {% if fx_enabled["reverb"] %}checked{% endif %} />
+            <span>Reverb</span>
+          </label>
+          <p class="dz-hint" style="margin:2px 0 8px;">Two lists of numbers, so
+             these stay as text.</p>
+          <div class="dz-grid two">
             <input class="dz-input" name="reverb_delays"
                    placeholder="delays, comma separated" />
             <input class="dz-input" name="reverb_gains"
-                   placeholder="gains, comma separated" style="margin-top:6px;" />
+                   placeholder="gains, comma separated" />
           </div>
         </div>
         <div class="dz-save">
