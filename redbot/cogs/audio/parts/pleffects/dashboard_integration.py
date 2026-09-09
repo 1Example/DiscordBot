@@ -31,19 +31,25 @@ FILTERS = (
     ("rotation", "Rotation", "Rotates audio between channels."),
     ("channel_mix", "Channel mix", "Blends left and right."),
     ("echo", "Echo", "Repeats the signal."),
+    ("reverb", "Reverb", "Adds a sense of space."),
 )
 
 
-# Bass boost presets, matching the levels `[p]fx bassboost` accepts.
+# Bass boost presets. This is the only place they live now that /fx is gone,
+# so the order here is the order of the dropdown - strongest first, ending
+# with the two that take bass away rather than add it.
 BASS_PRESETS = {
     "Maximum": [{"band": 0, "gain": 1.0}, {"band": 1, "gain": 1.0}],
     "Insane": [{"band": 0, "gain": 1.0}, {"band": 1, "gain": 0.75}],
     "Extreme": [{"band": 0, "gain": 1.0}, {"band": 1, "gain": 0.5}],
-    "High": [{"band": 0, "gain": 0.75}, {"band": 1, "gain": 0.5}],
-    "Very High": [{"band": 0, "gain": 0.75}, {"band": 1, "gain": 0.25}],
+    "Very High": [{"band": 0, "gain": 0.75}, {"band": 1, "gain": 0.5}],
+    "High": [{"band": 0, "gain": 0.75}, {"band": 1, "gain": 0.25}],
     "Medium": [{"band": 0, "gain": 0.5}, {"band": 1, "gain": 0.25}],
     "Fined Tuned": [{"band": 0, "gain": 0.25}, {"band": 1, "gain": 0.15}],
     "Cut-off": [{"band": 0, "gain": -0.25}, {"band": 1, "gain": -0.25}],
+    # A lift you notice rather than one you feel in the desk - well under
+    # Fine Tuned, for when the track already has enough low end.
+    "Light": [{"band": 0, "gain": 0.15}, {"band": 1, "gain": 0.08}],
 }
 
 # Band index to the frequency it controls, matching PyLav's EQ_BAND_MAPPING.
@@ -187,15 +193,33 @@ class EffectsDashboard:
         except ValueError:
             return default
 
+    @staticmethod
+    def _fx_floats(field, key: str):
+        """A comma separated list of numbers, as reverb's delays and gains are.
+
+        None when the box is empty or holds anything that is not a number, so
+        an unreadable value leaves that half of the filter alone rather than
+        applying a partial list.
+        """
+        raw = (field(key) or "").strip()
+        if not raw:
+            return None
+        try:
+            return [float(part) for part in raw.replace(";", ",").split(",") if part.strip()]
+        except ValueError:
+            return None
+
     async def _fx_apply(self, guild: discord.Guild, field, action: str) -> list[dict]:
         """Apply one of the `/fx` presets or filters to the live player."""
         from pylav.exceptions.node import NodeHasNoFiltersException
         from pylav.players.filters import (
             ChannelMix,
             Distortion,
+            Echo,
             Equalizer,
             Karaoke,
             LowPass,
+            Reverb,
             Rotation,
             Timescale,
             Tremolo,
@@ -327,6 +351,14 @@ class EffectsDashboard:
                     tan_scale=self._fx_float(field, "dist_tan_scale"),
                     offset=self._fx_float(field, "dist_offset"),
                     scale=self._fx_float(field, "dist_scale"),
+                )
+                filters["echo"] = Echo(
+                    delay=self._fx_float(field, "echo_delay"),
+                    decay=self._fx_float(field, "echo_decay"),
+                )
+                filters["reverb"] = Reverb(
+                    delays=self._fx_floats(field, "reverb_delays"),
+                    gains=self._fx_floats(field, "reverb_gains"),
                 )
                 await player.set_filters(requester=requester, **filters)
                 return [
@@ -563,6 +595,22 @@ EFFECTS_TEMPLATE = (
                  placeholder="offset" />
           <input class="dz-input" type="number" step="0.05" name="dist_scale"
                  placeholder="scale" />
+        </div>
+        <div class="dz-grid two" style="margin-top:12px;">
+          <div>
+            <label class="dz-label">Echo</label>
+            <input class="dz-input" type="number" step="0.1" min="0" name="echo_delay"
+                   placeholder="delay in seconds (0+)" />
+            <input class="dz-input" type="number" step="0.05" min="0" max="1"
+                   name="echo_decay" placeholder="decay (0-1)" style="margin-top:6px;" />
+          </div>
+          <div>
+            <label class="dz-label">Reverb</label>
+            <input class="dz-input" name="reverb_delays"
+                   placeholder="delays, comma separated" />
+            <input class="dz-input" name="reverb_gains"
+                   placeholder="gains, comma separated" style="margin-top:6px;" />
+          </div>
         </div>
         <div class="dz-save">
           <button class="dz-btn primary" name="action" value="filters">
