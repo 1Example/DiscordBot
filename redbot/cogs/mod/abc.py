@@ -19,15 +19,8 @@ class MixinMeta(ABC):
         self.cache: dict
 
     # The moderation actions are top-level commands, since a moderator reaches
-    # for them constantly and `/ban` beats `/mod ban`. These two are grouped
-    # because their members belong together and are used far less often.
-    voice = app_commands.Group(
-        name="voice",
-        description="Disconnect, server mute or unmute a member in voice.",
-        guild_only=True,
-        extras={"red_force_enable": True},
-    )
-
+    # for them constantly and `/ban` beats `/mod ban`. modlog is grouped
+    # because its members belong together and are used far less often.
     modlog = app_commands.Group(
         name="modlog",
         description="Look up moderation cases and correct their reasons.",

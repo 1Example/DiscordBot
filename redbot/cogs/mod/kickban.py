@@ -21,8 +21,6 @@ from redbot.core.utils.views import ConfirmView
 from .abc import MixinMeta
 from .utils import is_allowed_by_hierarchy
 
-voice = MixinMeta.voice
-
 log = logging.getLogger("red.mod")
 _ = i18n.Translator("Mod", __file__)
 
@@ -926,7 +924,12 @@ class KickBanMixin(MixinMeta):
             )
             await ctx.send(_("Done. Enough chaos."))
 
-    @voice.command(name="kick", description="Disconnect a member from voice.")
+    @app_commands.command(
+        name="voicekick",
+        description="Disconnect a member from voice.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
     @app_checks.mod_or_permissions(move_members=True)
     @app_commands.describe(
         member="The member to disconnect.",
@@ -982,113 +985,6 @@ class KickBanMixin(MixinMeta):
             )
             await ctx.send(_("User has been kicked from the voice channel."))
 
-    @voice.command(
-        name="unban", description="Let a member speak and listen in voice again."
-    )
-    @app_checks.admin_or_permissions(mute_members=True, deafen_members=True)
-    @app_commands.describe(
-        member="The member to unmute and undeafen.",
-        reason="Shown in the audit log and recorded on the modlog case.",
-    )
-    async def voiceunban(
-        self, interaction: discord.Interaction, member: discord.Member, reason: str = None
-    ):
-        """Unban a user from speaking and listening in the server's voice channels."""
-        ctx = await commands.Context.from_interaction(interaction)
-        await ctx.typing()
-        if reason is None and await self.config.guild(ctx.guild).require_reason():
-            await ctx.send(_("You must provide a reason for the voice unban."))
-            return
-
-        user_voice_state = member.voice
-        if (
-            await self._voice_perm_check(
-                ctx, user_voice_state, deafen_members=True, mute_members=True
-            )
-            is False
-        ):
-            return
-        needs_unmute = True if user_voice_state.mute else False
-        needs_undeafen = True if user_voice_state.deaf else False
-        audit_reason = get_audit_reason(ctx.author, reason, shorten=True)
-        if needs_unmute and needs_undeafen:
-            await member.edit(mute=False, deafen=False, reason=audit_reason)
-        elif needs_unmute:
-            await member.edit(mute=False, reason=audit_reason)
-        elif needs_undeafen:
-            await member.edit(deafen=False, reason=audit_reason)
-        else:
-            await ctx.send(_("That user isn't muted or deafened by the server."))
-            return
-
-        guild = ctx.guild
-        author = ctx.author
-        await modlog.create_case(
-            self.bot,
-            guild,
-            ctx.message.created_at,
-            "voiceunban",
-            member,
-            author,
-            reason,
-            until=None,
-            channel=None,
-        )
-        await ctx.send(_("User is now allowed to speak and listen in voice channels."))
-
-    @voice.command(
-        name="ban", description="Server mute and deafen a member in voice."
-    )
-    @app_checks.admin_or_permissions(mute_members=True, deafen_members=True)
-    @app_commands.describe(
-        member="The member to mute and deafen.",
-        reason="Shown in the audit log and recorded on the modlog case.",
-    )
-    async def voiceban(
-        self, interaction: discord.Interaction, member: discord.Member, reason: str = None
-    ):
-        """Ban a user from speaking and listening in the server's voice channels."""
-        ctx = await commands.Context.from_interaction(interaction)
-        await ctx.typing()
-        if reason is None and await self.config.guild(ctx.guild).require_reason():
-            await ctx.send(_("You must provide a reason for the voice ban."))
-            return
-
-        user_voice_state: discord.VoiceState = member.voice
-        if (
-            await self._voice_perm_check(
-                ctx, user_voice_state, deafen_members=True, mute_members=True
-            )
-            is False
-        ):
-            return
-        needs_mute = True if user_voice_state.mute is False else False
-        needs_deafen = True if user_voice_state.deaf is False else False
-        audit_reason = get_audit_reason(ctx.author, reason, shorten=True)
-        author = ctx.author
-        guild = ctx.guild
-        if needs_mute and needs_deafen:
-            await member.edit(mute=True, deafen=True, reason=audit_reason)
-        elif needs_mute:
-            await member.edit(mute=True, reason=audit_reason)
-        elif needs_deafen:
-            await member.edit(deafen=True, reason=audit_reason)
-        else:
-            await ctx.send(_("That user is already muted and deafened server-wide."))
-            return
-
-        await modlog.create_case(
-            self.bot,
-            guild,
-            ctx.message.created_at,
-            "voiceban",
-            member,
-            author,
-            reason,
-            until=None,
-            channel=None,
-        )
-        await ctx.send(_("User has been banned from speaking or listening in voice channels."))
 
     @app_commands.command(
         name="unban", description="Lift a ban on a user.", extras={"red_force_enable": True}
