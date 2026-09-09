@@ -550,3 +550,20 @@ def fit_discord_upload_limit(image_bytes: bytes, file_size_limit: int) -> t.Tupl
 
 if __name__ == "__main__":
     print(calc_aspect_ratio(200, 70))
+
+
+def text_halo(ink: Image.Image, blur: float = 3.0, gain: int = 2) -> Image.Image:
+    """A soft dark shadow shaped like whatever is drawn on `ink`.
+
+    Text on a photograph needs more separation than a one pixel stroke gives.
+    Blurring the layer's own alpha and laying it down first darkens only what
+    is directly behind a glyph, so the picture underneath stays visible.
+    """
+    halo = Image.new("RGBA", ink.size, (0, 0, 0, 0))
+    halo.putalpha(
+        Image.eval(
+            ink.getchannel("A").filter(ImageFilter.GaussianBlur(blur)),
+            lambda v: min(255, v * gain),
+        )
+    )
+    return halo

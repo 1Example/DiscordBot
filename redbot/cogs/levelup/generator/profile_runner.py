@@ -231,6 +231,10 @@ def generate_levelup(input_data: dict, output_path: Path) -> dict:
         "background_bytes": background_bytes,
         "level": input_data.get("level", 1),
         "render_gif": input_data.get("render_gif", False),
+        "username": input_data.get("username", ""),
+        "avatar_frame": get_asset_bytes(
+            input_data.get("avatar_frame_url"), input_data.get("avatar_frame_b64")
+        ),
     }
 
     if color := input_data.get("color"):

@@ -3,6 +3,8 @@
 Args:
     background_bytes (t.Optional[bytes], optional): The background image as bytes. Defaults to None.
     avatar_bytes (t.Optional[bytes], optional): The avatar image as bytes. Defaults to None.
+    avatar_frame (t.Optional[bytes], optional): The member's avatar decoration. Defaults to None.
+    username (str, optional): Shown above the level. Defaults to "".
     level (t.Optional[int], optional): The level number. Defaults to 1.
     color (t.Optional[t.Tuple[int, int, int]], optional): The color of the level text as a tuple of RGB values. Defaults to None.
     font (t.Optional[t.Union[str, Path]], optional): The path to the font file or the name of the font. Defaults to None.
@@ -14,7 +16,6 @@ Returns:
 """
 
 import logging
-import math
 import typing as t
 from io import BytesIO
 from pathlib import Path
@@ -34,6 +35,8 @@ _ = Translator("LevelUp", __file__)
 def generate_level_img(
     background_bytes: t.Optional[t.Union[bytes, str]] = None,
     avatar_bytes: t.Optional[t.Union[bytes, str]] = None,
+    avatar_frame: t.Optional[t.Union[bytes, str]] = None,
+    username: str = "",
     level: int = 1,
     color: t.Optional[t.Tuple[int, int, int]] = None,
     font_path: t.Optional[t.Union[str, Path]] = None,
@@ -49,6 +52,10 @@ def generate_level_img(
         log.debug("Avatar image is a URL, attempting to download")
         avatar_bytes = imgtools.download_image(avatar_bytes)
 
+    if isinstance(avatar_frame, str) and avatar_frame.startswith("http"):
+        log.debug("Avatar frame is a URL, attempting to download")
+        avatar_frame = imgtools.download_image(avatar_frame)
+
     if background_bytes:
         try:
             card = Image.open(BytesIO(background_bytes))
@@ -61,15 +68,43 @@ def generate_level_img(
 
     pfp_animated = getattr(pfp, "is_animated", False)
     bg_animated = getattr(card, "is_animated", False)
-    log.debug(f"PFP animated: {pfp_animated}, BG animated: {bg_animated}")
+    pfp_frames = getattr(pfp, "n_frames", 1) if pfp_animated else 1
+    bg_frames = getattr(card, "n_frames", 1) if bg_animated else 1
 
-    desired_card_size = (200, 70)
-    # 3 layers: card, profile, text
+    width, height = 480, 132
+    desired_card_size = (width, height)
+    pad = 12
+    pfp_size = height - pad * 2
 
-    # PREPARE THE TEXT LAYER
-    text_layer = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
-    tw, th = text_layer.size
-    fontsize = 30
+    # ---------------- Avatar decoration ----------------
+    # Decoded once, forward, at the size it is drawn: seeking an APNG back and
+    # forth composites each frame onto whatever the last seek left behind.
+    frame_pad = int(pfp_size * 0.1) if avatar_frame else 0
+    sprite_size = pfp_size + frame_pad * 2
+    deco_sprites: t.List[Image.Image] = []
+    deco_duration = 0
+    if avatar_frame:
+        try:
+            source = Image.open(BytesIO(avatar_frame))
+            durations = []
+            for frame in ImageSequence.Iterator(source):
+                frame.load()
+                if duration := frame.info.get("duration"):
+                    durations.append(duration)
+                deco_sprites.append(
+                    frame.convert("RGBA").resize((sprite_size, sprite_size), Image.Resampling.LANCZOS)
+                )
+            if durations:
+                deco_duration = sum(durations) // len(durations)
+        except (ValueError, UnidentifiedImageError, OSError) as e:
+            deco_sprites = []
+            log.error("Failed to read avatar decoration", exc_info=e)
+    if not deco_sprites:
+        frame_pad = 0
+        sprite_size = pfp_size
+    pfp_paste = (pad - frame_pad, pad - frame_pad)
+
+    # ---------------- Fonts ----------------
     font_path = font_path or imgtools.DEFAULT_FONT
     if isinstance(font_path, str):
         font_path = Path(font_path)
@@ -79,173 +114,108 @@ def generate_level_img(
         else:
             font_path = imgtools.DEFAULT_FONT
     font_path = str(font_path)
-    font = ImageFont.truetype(font_path, fontsize)
-    text = _("Level {}").format(level)
-    placement_area_center_x = th + ((tw - th) / 2)
-    while font.getlength(text) > (tw - th) - 10:
-        fontsize -= 1
-        font = ImageFont.truetype(font_path, fontsize)
-    draw = ImageDraw.Draw(text_layer)
-    draw.text(
-        xy=(placement_area_center_x, int(th / 2)),
-        text=text,
-        fill=color or imgtools.rand_rgb(),
-        font=font,
-        anchor="mm",
-        stroke_width=3,
-        stroke_fill=(0, 0, 0),
+    label_path = imgtools.DEFAULT_FONTS / "Roboto.ttf"
+    label_path = str(label_path) if label_path.exists() else font_path
+
+    accent = tuple(color or (88, 139, 255))[:3]
+
+    # ---------------- The pane the text sits on ----------------
+    ink = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(ink)
+    panel_left = pad + pfp_size + 18
+    draw.rectangle(
+        (panel_left, pad, width - pad, height - pad),
+        fill=(9, 11, 18, 122),
+        outline=(255, 255, 255, 58),
+        width=1,
     )
-    # FINALIZE IMAGE
-    if not render_gif or (not pfp_animated and not bg_animated):
-        # Render a static pfp on a static background
-        if not card.mode == "RGBA":
-            card = card.convert("RGBA")
-        if not pfp.mode == "RGBA":
-            pfp = pfp.convert("RGBA")
-        card = imgtools.fit_aspect_ratio(card, desired_card_size)
-        pfp = pfp.resize((card.height, card.height), Image.Resampling.LANCZOS)
-        pfp = imgtools.make_profile_circle(pfp)
-        card.paste(text_layer, (0, 0), text_layer)
-        card.paste(pfp, (0, 0), pfp)
-        card = imgtools.round_image_corners(card, card.height)
+    draw.line((panel_left + 1, pad + 1, width - pad - 1, pad + 1), fill=(255, 255, 255, 78), width=1)
+
+    text_x = panel_left + 18
+    text_right = width - pad - 16
+    stroke = {"stroke_width": 1, "stroke_fill": (0, 0, 0, 205)}
+
+    eyebrow = (username or _("Level up")).upper()
+    eyebrow_font = ImageFont.truetype(label_path, 16)
+    while eyebrow_font.getlength(eyebrow) > (text_right - text_x) and eyebrow_font.size > 9:
+        eyebrow_font = ImageFont.truetype(label_path, eyebrow_font.size - 1)
+    cursor = text_x
+    for char in eyebrow:
+        draw.text((cursor, pad + 16), char, font=eyebrow_font, fill=(214, 220, 235), **stroke)
+        cursor += eyebrow_font.getlength(char) + 1.4
+
+    hero = _("LEVEL {}").format(level)
+    hero_font = ImageFont.truetype(font_path, 56)
+    while hero_font.getlength(hero) > (text_right - text_x) and hero_font.size > 14:
+        hero_font = ImageFont.truetype(font_path, hero_font.size - 1)
+    draw.text((text_x, pad + 42), hero, font=hero_font, fill=accent, stroke_width=2,
+              stroke_fill=(0, 0, 0, 205))
+
+    overlay = Image.alpha_composite(imgtools.text_halo(ink), ink)
+
+    # ---------------- Frames ----------------
+    def background_frame(index: int) -> Image.Image:
+        if bg_animated:
+            card.seek(index % bg_frames)
+        return imgtools.fit_aspect_ratio(card.convert("RGBA"), desired_card_size)
+
+    if not pfp_animated and pfp.mode != "RGBA":
+        pfp = pfp.convert("RGBA")
+
+    def avatar_circle(index: int, method) -> Image.Image:
+        source = pfp
+        if pfp_animated:
+            pfp.seek(index % pfp_frames)
+            source = pfp.copy()
+            if source.mode != "RGBA":
+                source = source.convert("RGBA")
+        return imgtools.make_profile_circle(
+            source.resize((pfp_size, pfp_size), method), method=method
+        )
+
+    def compose(index: int, method) -> Image.Image:
+        frame = background_frame(index)
+        frame.alpha_composite(overlay)
+        avatar = avatar_circle(index, method)
+        if deco_sprites:
+            sprite = Image.new("RGBA", (sprite_size, sprite_size), (0, 0, 0, 0))
+            sprite.paste(avatar, (frame_pad, frame_pad), avatar)
+            avatar = Image.alpha_composite(sprite, deco_sprites[index % len(deco_sprites)])
+        frame.paste(avatar, pfp_paste, avatar)
+        return frame
+
+    frame_count = max(pfp_frames, bg_frames, len(deco_sprites) or 1)
+    if not render_gif or frame_count == 1:
+        finished = compose(0, Image.Resampling.LANCZOS)
         if debug:
-            card.show(title="LevelUp Image")
+            finished.show(title="LevelUp Image")
         buffer = BytesIO()
-        card.save(buffer, format="WEBP")
-        card.close()
+        finished.save(buffer, format="WEBP")
+        finished.close()
         return buffer.getvalue(), False
-    if pfp_animated and not bg_animated:
-        # Render an animated pfp on a static background
-        if not card.mode == "RGBA":
-            card = card.convert("RGBA")
-        card = imgtools.fit_aspect_ratio(card, desired_card_size)
-        avg_duration = imgtools.get_avg_duration(pfp)
-        log.debug(f"Average frame duration: {avg_duration}")
-        frames: t.List[Image.Image] = []
-        for frame in range(pfp.n_frames):
-            pfp_frame = ImageSequence.Iterator(pfp)[frame]
-            card_frame = card.copy()
-            if not pfp_frame.mode == "RGBA":
-                pfp_frame = pfp_frame.convert("RGBA")
 
-            pfp_frame = pfp_frame.resize((card.height, card.height), Image.Resampling.LANCZOS)
-            pfp_frame = imgtools.make_profile_circle(pfp_frame)
+    avg_duration = 0
+    for source, animated in ((pfp, pfp_animated), (card, bg_animated)):
+        if animated and not avg_duration:
+            avg_duration = imgtools.get_avg_duration(source)
+    avg_duration = avg_duration or deco_duration or 60
+    frame_count = min(frame_count, 50)
+    log.debug(f"Rendering {frame_count} frames at {avg_duration}ms")
 
-            card_frame.paste(text_layer, (0, 0), text_layer)
-            card_frame.paste(pfp_frame, (0, 0), pfp_frame)
-            card_frame = imgtools.round_image_corners(card_frame, card_frame.height)
-            card_frame = imgtools.clean_gif_frame(card_frame)
-            frames.append(card_frame)
-        buffer = BytesIO()
-        frames[0].save(
-            buffer,
-            save_all=True,
-            append_images=frames[1:],
-            format="GIF",
-            duration=avg_duration,
-            loop=0,
-            quality=75,
-            optimize=True,
-        )
-        buffer.seek(0)
-        if debug:
-            Image.open(buffer).show()
-        return buffer.getvalue(), True
-    if bg_animated and not pfp_animated:
-        # Render a static pfp on an animated background
-        if not pfp.mode == "RGBA":
-            pfp = pfp.convert("RGBA")
-        pfp = pfp.resize((desired_card_size[1], desired_card_size[1]), Image.Resampling.LANCZOS)
-        pfp = imgtools.make_profile_circle(pfp)
-        avg_duration = imgtools.get_avg_duration(card)
-        log.debug(f"Average frame duration: {avg_duration}")
-        frames: t.List[Image.Image] = []
-        for frame in range(card.n_frames):
-            bg_frame = ImageSequence.Iterator(card)[frame]
-            card_frame = bg_frame.copy()
-            if not card_frame.mode == "RGBA":
-                card_frame = card_frame.convert("RGBA")
-            card_frame = imgtools.fit_aspect_ratio(card_frame, desired_card_size)
-            card_frame = imgtools.round_image_corners(card_frame, card_frame.height)
-            card_frame = imgtools.clean_gif_frame(card_frame)
-            card_frame.paste(text_layer, (0, 0), text_layer)
-            card_frame.paste(pfp, (0, 0), pfp)
-            frames.append(card_frame)
-
-        buffer = BytesIO()
-        frames[0].save(
-            buffer,
-            save_all=True,
-            append_images=frames[1:],
-            format="GIF",
-            duration=avg_duration,
-            loop=0,
-            quality=75,
-            optimize=True,
-        )
-        buffer.seek(0)
-        if debug:
-            Image.open(buffer).show()
-        return buffer.getvalue(), True
-
-    # If we're here, both the pfp and the background are animated
-    card_duration = imgtools.get_avg_duration(card)
-    pfp_duration = imgtools.get_avg_duration(pfp)
-    log.debug(f"Card duration: {card_duration}, PFP duration: {pfp_duration}")
-    # Round to the nearest 10ms
-    card_duration = round(card_duration, -1)
-    pfp_duration = round(pfp_duration, -1)
-    # Get the least common multiple of the two durations
-    combined_duration = math.lcm(card_duration, pfp_duration)
-    # Soft cap it
-    max_duration = max(card_duration, pfp_duration)
-    if combined_duration > max_duration * 1.2:
-        combined_duration = max_duration * 1.2
-
-    total_pfp_duration = pfp.n_frames * pfp_duration
-    total_card_duration = card.n_frames * card_duration
-    total_duration_lcm = math.lcm(total_pfp_duration, total_card_duration)
-
-    # Get the number of frames to render
-    num_frames = total_duration_lcm // combined_duration
-    # Also soft cap max amount of frames so we dont get a huge gif
-    max_frame_count = max(pfp.n_frames, card.n_frames) * 1.2
-    max_frame_count = min(round(max_frame_count), num_frames)
-    log.debug(f"Max frame count: {max_frame_count}")
-
-    frames: t.List[Image.Image] = []
-    for frame_num in range(max_frame_count):
-        time = frame_num * combined_duration
-
-        card_frame_index = (time // card_duration) % card.n_frames
-        pfp_frame_index = (time // pfp_duration) % pfp.n_frames
-
-        card_frame: Image.Image = ImageSequence.Iterator(card)[int(card_frame_index)]
-        pfp_frame: Image.Image = ImageSequence.Iterator(pfp)[int(pfp_frame_index)]
-
-        card_frame = imgtools.fit_aspect_ratio(card_frame, desired_card_size)
-        pfp_frame = pfp_frame.resize((card_frame.height, card_frame.height), Image.Resampling.LANCZOS)
-        pfp_frame = imgtools.make_profile_circle(pfp_frame)
-        if not card_frame.mode == "RGBA":
-            card_frame = card_frame.convert("RGBA")
-        if not pfp_frame.mode == "RGBA":
-            pfp_frame = pfp_frame.convert("RGBA")
-
-        card_frame = imgtools.round_image_corners(card_frame, card_frame.height)
-        card_frame = imgtools.clean_gif_frame(card_frame)
-        card_frame.paste(text_layer, (0, 0), text_layer)
-        card_frame.paste(pfp_frame, (0, 0), pfp_frame)
-        frames.append(card_frame)
+    frames = [compose(index, Image.Resampling.LANCZOS) for index in range(frame_count)]
     buffer = BytesIO()
+    # WEBP rather than GIF: 256 palette entries cannot carry a photograph, an
+    # avatar and a decoration without posterising all three.
     frames[0].save(
         buffer,
+        format="WEBP",
         save_all=True,
         append_images=frames[1:],
-        format="GIF",
-        duration=combined_duration,
+        duration=avg_duration,
         loop=0,
-        quality=75,
-        optimize=True,
+        quality=86,
+        method=4,
+        minimize_size=True,
     )
     buffer.seek(0)
     if debug:
@@ -262,6 +232,7 @@ if __name__ == "__main__":
     res, animated = generate_level_img(
         background_bytes=test_banner,
         avatar_bytes=test_avatar,
+        username="Vertyco",
         level=10,
         debug=True,
         render_gif=True,

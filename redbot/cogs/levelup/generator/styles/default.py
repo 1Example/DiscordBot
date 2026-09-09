@@ -218,7 +218,7 @@ def generate_default_profile(
         hero_level = False
         cap_y, bar_y, bar_h = 130, 150, 9
         tiles_top, tile_h, tile_gap, tile_cols = 174, 58, 6, 2
-        panel_radius, tile_radius = 14, 12
+        panel_radius, tile_radius = 0, 0
     else:
         pad = 34
         head_top, head_bottom = 26, 156
@@ -228,7 +228,7 @@ def generate_default_profile(
         hero_level = True
         cap_y, bar_y, bar_h = 172, 196, 12
         tiles_top, tile_h, tile_gap, tile_cols = 226, 96, 12, 4
-        panel_radius, tile_radius = 18, 16
+        panel_radius, tile_radius = 0, 0
 
     left = pad
     right = width - pad
@@ -455,7 +455,7 @@ def generate_default_profile(
     chip_w = dot_r * 2 + 10 + tracked_width(status_text, chip_font, 1.6) + 30
     draw.rounded_rectangle(
         (chip_x, chip_y, chip_x + chip_w, chip_y + chip_h),
-        radius=chip_h // 2,
+        radius=0,
         fill=(*status_color, 46),
         outline=(*status_color, 150),
         width=1,
@@ -481,7 +481,7 @@ def generate_default_profile(
         if chip_x + chip_w < text_right:
             draw.rounded_rectangle(
                 (chip_x, chip_y, chip_x + chip_w, chip_y + chip_h),
-                radius=chip_h // 2,
+                radius=0,
                 fill=(*accent, 40),
                 outline=(*accent, 150),
                 width=1,
@@ -526,12 +526,11 @@ def generate_default_profile(
     bar_px = (int(inner_w) * supersample, bar_h * supersample)
     bar = Image.new("RGBA", bar_px, (0, 0, 0, 0))
     bar_draw = ImageDraw.Draw(bar)
-    bar_draw.rounded_rectangle((0, 0, bar_px[0] - 1, bar_px[1] - 1), bar_px[1] // 2, fill=(255, 255, 255, 34))
+    bar_draw.rectangle((0, 0, bar_px[0] - 1, bar_px[1] - 1), fill=(255, 255, 255, 34))
     if progress > 0:
         mask = Image.new("L", bar_px, 0)
-        ImageDraw.Draw(mask).rounded_rectangle(
+        ImageDraw.Draw(mask).rectangle(
             (0, 0, max(bar_px[1], int(bar_px[0] * progress)), bar_px[1] - 1),
-            bar_px[1] // 2,
             fill=255,
         )
         ramp = Image.new("RGBA", (bar_px[0], 1))
@@ -610,11 +609,7 @@ def generate_default_profile(
                 **stroke,
             )
 
-    halo = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
-    halo.putalpha(
-        Image.eval(ink.getchannel("A").filter(ImageFilter.GaussianBlur(3.0)), lambda v: min(255, v * 2))
-    )
-    stats = Image.alpha_composite(stats, halo)
+    stats = Image.alpha_composite(stats, imgtools.text_halo(ink))
     stats = Image.alpha_composite(stats, ink)
 
     # ---------------- Start finalizing the image ----------------
@@ -630,7 +625,7 @@ def generate_default_profile(
         frame = imgtools.fit_aspect_ratio(frame, desired_card_size)
         if blur:
             frame = frame.filter(ImageFilter.GaussianBlur(6))
-        return imgtools.round_image_corners(frame, 45)
+        return frame
 
     def avatar_circle(index: int, method) -> Image.Image:
         """The avatar cropped to a circle, at one frame of its animation."""

@@ -152,7 +152,10 @@ class LevelUps(MixinMeta):
                 "level": profile.level,
                 "render_gif": self.db.render_gifs,
                 "avatar_url": str(member.display_avatar.url),
+                "username": member.display_name,
             }
+            if decoration := getattr(member, "avatar_decoration", None):
+                request_data["avatar_frame_url"] = str(decoration.url)
 
             # Get background URL
             banner = await self.get_profile_background(member.id, profile, try_return_url=True)
@@ -227,6 +230,10 @@ class LevelUps(MixinMeta):
             if not img_bytes:
                 log.warning("Subprocess failed for levelup image, falling back to in-process generation")
                 avatar = await member.display_avatar.read()
+                frame = None
+                if decoration := getattr(member, "avatar_decoration", None):
+                    with suppress(discord.HTTPException):
+                        frame = await decoration.read()
                 if isinstance(banner, str):
                     banner = await utils.get_content_from_url(banner)
 
@@ -238,6 +245,8 @@ class LevelUps(MixinMeta):
                         color=color,
                         font_path=font,
                         render_gif=self.db.render_gifs,
+                        username=member.display_name,
+                        avatar_frame=frame,
                     )
                     return img_bytes, animated
 
