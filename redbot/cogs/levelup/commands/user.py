@@ -755,7 +755,7 @@ class User(MixinMeta):
         **Additional Options**
          - Leave `url` blank or specify `default` to reset back to using your profile banner (or random if you don't have one)
          - `random` will randomly select from a pool of default backgrounds each time
-         - `filename` run `[p]mypf backgrounds` to view default options you can use by including their filename
+         - `filename` run `/setprofile backgrounds` to view default options you can use by including their filename
         """
         ctx = await commands.Context.from_interaction(interaction)
         conf = self.db.get_conf(ctx.guild)
@@ -766,23 +766,28 @@ class User(MixinMeta):
         if profile.style in const.STATIC_FONT_STYLES:
             return await ctx.send(_("You cannot change your name color with the current profile style!"))
 
-        cached_txt = _("\n\nProfiles are cached for {} seconds so you may not see the change immediately").format(
-            self.db.cache_seconds
-        )
+        footer = ""
+        if (conf.style_override or profile.style) == "default":
+            footer += _(
+                "\n\nHeads up: the **default** style draws its own background, so this won't show up on your"
+                " card. Pick another style with {} if you want your background used."
+            ).format("`/setprofile style`")
+        if self.db.cache_seconds:
+            footer += _(
+                "\n\nProfiles are cached for {} seconds so you may not see the change immediately"
+            ).format(self.db.cache_seconds)
 
         if url and url == "random":
             profile.background = "random"
             self.save()
             txt = _("Your profile background has been set to random!")
-            if self.db.cache_seconds:
-                txt += cached_txt
+            txt += footer
             return await ctx.send(txt)
         if url and url == "default":
             profile.background = "default"
             self.save()
             txt = _("Your profile background has been set to default!")
-            if self.db.cache_seconds:
-                txt += cached_txt
+            txt += footer
             return await ctx.send(txt)
 
         attachments = utils.get_attachments(ctx)
@@ -795,8 +800,7 @@ class User(MixinMeta):
                 profile.background = "default"
                 self.save()
                 txt = _("Your background has been reset to default!")
-                if self.db.cache_seconds:
-                    txt += cached_txt
+                txt += footer
                 return await ctx.send(txt)
 
         if url is None:
@@ -816,8 +820,7 @@ class User(MixinMeta):
                 return await ctx.send(_("That image is not a valid profile background!\n{}").format(str(e)))
             self.save()
             txt = _("Your profile background has been set!")
-            if self.db.cache_seconds:
-                txt += cached_txt
+            txt += footer
             return await ctx.send(txt)
 
         if url.startswith("http"):
@@ -852,8 +855,7 @@ class User(MixinMeta):
                 return await ctx.send(_("That image is not a valid profile background!\n{}").format(str(e)))
             self.save()
             txt = _("Your profile background has been set!")
-            if self.db.cache_seconds:
-                txt += cached_txt
+            txt += footer
             return await ctx.send(txt)
 
         # Check if the user provided a filename
@@ -867,8 +869,7 @@ class User(MixinMeta):
         profile.background = path.stem
         self.save()
         txt = _("Your profile background has been set to {}").format(f"`{path.name}`")
-        if self.db.cache_seconds:
-            txt += cached_txt
+        txt += footer
         await ctx.send(txt, file=file)
 
     @set_profile.command(name="font")
