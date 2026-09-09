@@ -199,6 +199,7 @@ class EffectsDashboard:
 
         settings = await self._effects_config.guild(guild).all()
         player = self.pylav.get_player(guild)
+        gains = self._eq_gains(player)
 
         return {
             "status": 0,
@@ -221,9 +222,14 @@ class EffectsDashboard:
                 "fx_controls": FILTER_CONTROLS,
                 "fx_values": self._fx_slider_values(player),
                 "fx_enabled": self._fx_enabled(player),
-                "band_gains": self._eq_gains(player),
                 "eq_presets": [(key, value[0]) for key, value in EQ_PRESETS.items()],
-                "bands": list(EQ_BAND_LABELS.items()),
+                # (band, label, gain) rather than a dict keyed by band:
+                # this crosses JSON-RPC, and JSON turns an integer key
+                # into a string, so band_gains[0] came back undefined.
+                "bands": [
+                    (band, label, gains.get(band, 0.0))
+                    for band, label in EQ_BAND_LABELS.items()
+                ],
             },
         }
 
@@ -592,14 +598,14 @@ EFFECTS_TEMPLATE = (
         <p class="dz-hint">Gain per band, from -0.25 to 1.0. The sliders start
            where the player is.</p>
         <div class="dz-grid three">
-          {% for band, label in bands %}
+          {% for band, label, gain in bands %}
             <div class="fx-slider">
               <label for="band_{{ band }}">{{ label }}</label>
               <input type="range" id="band_{{ band }}" name="band_{{ band }}"
                      min="-0.25" max="1" step="0.05"
-                     value="{{ band_gains[band] }}"
+                     value="{{ gain }}"
                      oninput="this.nextElementSibling.value = (+this.value).toFixed(2);" />
-              <output>{{ "%.2f"|format(band_gains[band]) }}</output>
+              <output>{{ "%.2f"|format(gain) }}</output>
             </div>
           {% endfor %}
         </div>
