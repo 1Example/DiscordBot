@@ -116,14 +116,14 @@ def generate_default_profile(
 ) -> t.Tuple[bytes, bool]:
     """
     Generate a full profile image with customizable parameters.
-    If the avatar is animated and not the background, the avatar will be rendered as a gif.
-    If the background is animated and not the avatar, the background will be rendered as a gif.
-    If both are animated, the avatar will be rendered as a gif and the background will be rendered as a static image.
-    To optimize performance, the profile will be generated in 3 layers, the background, the avatar, and the stats.
-    The stats layer will be generated as a separate image and then pasted onto the background.
+
+    The card draws its own ground; the member's background is not composited.
+    It is rendered as a gif when the avatar or the avatar decoration is
+    animated, and as a static webp otherwise.
 
     Args:
-        background (t.Optional[bytes], optional): The background image as bytes. Defaults to None.
+        background_bytes (t.Optional[bytes], optional): Accepted for signature compatibility
+            with the other styles and ignored. Defaults to None.
         avatar (t.Optional[bytes], optional): The avatar image as bytes. Defaults to None.
         username (t.Optional[str], optional): The username. Defaults to "Spartan117".
         status (t.Optional[str], optional): The status. Defaults to "online".
@@ -159,10 +159,6 @@ def generate_default_profile(
     user_color = user_color or base_color
     stat_color = stat_color or base_color
     level_bar_color = level_bar_color or base_color
-
-    if isinstance(background_bytes, str) and background_bytes.startswith("http"):
-        log.debug("Background image is a URL, attempting to download")
-        background_bytes = imgtools.download_image(background_bytes)
 
     if isinstance(avatar_bytes, str) and avatar_bytes.startswith("http"):
         log.debug("Avatar image is a URL, attempting to download")
@@ -674,12 +670,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("PIL").setLevel(logging.INFO)
 
-    test_banner = (imgtools.ASSETS / "tests" / "banner3.gif").read_bytes()
     test_avatar = (imgtools.ASSETS / "tests" / "tree.gif").read_bytes()
     test_icon = (imgtools.ASSETS / "tests" / "icon.png").read_bytes()
     font_path = imgtools.ASSETS / "fonts" / "BebasNeue.ttf"
     res, animated = generate_default_profile(
-        background_bytes=test_banner,
         avatar_bytes=test_avatar,
         username="Vertyco",
         status="online",
