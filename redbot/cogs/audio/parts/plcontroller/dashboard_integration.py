@@ -1956,7 +1956,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   </a>
   <a class="dz-subnav-item"
      href="{{ url_for('third_parties_blueprint.third_party', name=name,
-                        page='settings', guild_id=guild.id if guild else none) }}">
+                        page='player-settings', guild_id=guild.id if guild else none) }}">
     <i class="fa fa-sliders"></i> Settings
   </a>
 </div>
