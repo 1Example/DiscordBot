@@ -20,6 +20,13 @@ __all__ = (
     "role_options",
     "member_options",
     "emoji_options",
+    "emoji_cdn_url",
+    "decode_emoji_image",
+    "create_guild_emoji",
+    "delete_guild_emoji",
+    "apply_emoji_uploads",
+    "EMOJI_UPLOAD_ASSETS",
+    "EMOJI_MAX_BYTES",
     "message_preview",
     "MACROS",
     "notify",
@@ -688,5 +695,244 @@ MACROS = """
           onclick="return confirm('{{ question }}');">
     <i class="fa {{ icon }}"></i> {{ label }}
   </button>
+{%- endmacro %}
+"""
+
+
+# Discord caps an emoji image at 256 KB, and the browser is told the same
+# number so a too-large file is refused before it is ever posted.
+EMOJI_MAX_BYTES = 256 * 1024
+EMOJI_IMAGE_TYPES = ("image/png", "image/jpeg", "image/gif", "image/webp")
+
+
+def emoji_cdn_url(token: str | None) -> str:
+    """The CDN url for a `<:name:id>` token, so a page can show the picture."""
+    import re
+
+    match = re.fullmatch(r"<(a?):([^:]+):(\d{15,25})>", (token or "").strip())
+    if not match:
+        return ""
+    animated, _name, emoji_id = match.groups()
+    return f"https://cdn.discordapp.com/emojis/{emoji_id}.{'gif' if animated else 'png'}"
+
+
+def decode_emoji_image(value: str) -> tuple[bytes | None, str]:
+    """Turn a `data:image/png;base64,...` field into bytes.
+
+    Returns (None, reason) rather than raising: a bad paste should report
+    itself on the page instead of failing the whole save.
+    """
+    import base64
+
+    if not value or not value.startswith("data:"):
+        return None, "that was not an image"
+    try:
+        header, payload = value.split(",", 1)
+        mime = header[5:].split(";", 1)[0].strip().lower()
+    except ValueError:
+        return None, "the image data was malformed"
+    if mime not in EMOJI_IMAGE_TYPES:
+        return None, f"{mime or 'that file type'} is not supported"
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except Exception:  # noqa: BLE001
+        return None, "the image data was malformed"
+    if not raw:
+        return None, "the image was empty"
+    if len(raw) > EMOJI_MAX_BYTES:
+        return None, f"the image is {len(raw) // 1024} KB, over Discord's 256 KB limit"
+    return raw, ""
+
+
+async def create_guild_emoji(
+    guild: discord.Guild, name: str, raw: bytes, *, reason: str = "Dashboard upload"
+) -> tuple[str | None, str]:
+    """Register an image as a guild emoji and return its `<:name:id>` token.
+
+    It has to be a *guild* emoji: Discord rejects an application emoji on a
+    message component, even though the application owns it and the CDN serves
+    it happily.
+    """
+    import contextlib
+
+    name = name[:32]
+    me = guild.me
+    if me is None or not me.guild_permissions.manage_expressions:
+        return None, (
+            "I need the Manage Expressions permission to upload a picture. "
+            "Grant it, or paste an existing emoji as <:name:id> instead."
+        )
+    # Clear a previous upload under this name first; a duplicate name is
+    # rejected outright.
+    for existing in guild.emojis:
+        if existing.name == name:
+            with contextlib.suppress(discord.HTTPException):
+                await existing.delete(reason=reason)
+    try:
+        emoji = await guild.create_custom_emoji(name=name, image=raw, reason=reason)
+    except discord.HTTPException as exc:
+        if exc.code == 30008:
+            return None, "this server has no free emoji slots."
+        return None, f"Discord refused the picture: {exc.text or exc}"
+    return f"<{'a' if emoji.animated else ''}:{emoji.name}:{emoji.id}>", ""
+
+
+async def delete_guild_emoji(bot, guild: discord.Guild, token: str, *, reason: str = "Replaced") -> None:
+    """Delete an emoji uploaded from the dashboard, so a replacement is not a leak.
+
+    Also checks the application's own emoji: earlier versions of some pages
+    uploaded there, and those need cleaning up even though they were never
+    usable on a button.
+    """
+    import contextlib
+    import re
+
+    match = re.search(r":(\d{15,25})>$", token or "")
+    if not match:
+        return
+    emoji_id = int(match.group(1))
+    emoji = guild.get_emoji(emoji_id)
+    if emoji is not None:
+        with contextlib.suppress(discord.HTTPException):
+            await emoji.delete(reason=reason)
+        return
+    fetch = getattr(bot, "fetch_application_emoji", None)
+    if fetch is not None:
+        with contextlib.suppress(Exception):
+            await (await fetch(emoji_id)).delete()
+
+
+async def apply_emoji_uploads(
+    bot,
+    guild: discord.Guild,
+    field,
+    keys: t.Iterable[str],
+    tokens: dict,
+    owned: dict,
+    *,
+    name_prefix: str,
+    reason: str = "Dashboard upload",
+) -> list[str]:
+    """Apply every uploaded or cleared picture from one form submit.
+
+    `tokens` is the mapping the cog stores its emoji in and `owned` records
+    which of those this page created, so a replaced picture can be deleted
+    rather than left behind. Both are mutated in place; pass the dicts from
+    inside an `async with conf.x()` block. Returns problems to show the person.
+    """
+    problems: list[str] = []
+    for key in keys:
+        if field.checked(f"clear_img_{key}"):
+            if key in owned:
+                await delete_guild_emoji(bot, guild, owned.pop(key), reason=reason)
+                tokens.pop(key, None)
+            continue
+        value = field(f"img_{key}") or ""
+        if not value:
+            continue
+        raw, why = decode_emoji_image(value)
+        if raw is None:
+            problems.append(f"{key}: {why}.")
+            continue
+        token, why = await create_guild_emoji(
+            guild, f"{name_prefix}{key}", raw, reason=reason
+        )
+        if token is None:
+            problems.append(f"{key}: {why}")
+            continue
+        if key in owned:
+            await delete_guild_emoji(bot, guild, owned[key], reason=reason)
+        owned[key] = token
+        tokens[key] = token
+    return problems
+
+
+# The widget itself: a macro to place, plus the style and script it needs.
+# Include EMOJI_UPLOAD_ASSETS once per page and call emoji_upload() per field.
+EMOJI_UPLOAD_ASSETS = """
+<style>
+  .dz-up { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+  .dz-up-pick { display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+                font-size:.74rem; padding:5px 10px; border-radius:7px;
+                border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); }
+  .dz-up-pick:hover { background:rgba(255,255,255,.09); }
+  .dz-up-pick.set { border-color:rgba(59,165,93,.5); color:#3ba55d; }
+  .dz-up-clear { display:inline-flex; align-items:center; gap:5px;
+                 font-size:.7rem; opacity:.6; cursor:pointer; }
+  .dz-up-row { display:flex; align-items:center; gap:8px; }
+  .dz-up-row .dz-input { flex:1 1 auto; }
+  img.dz-emoji { width:22px; height:22px; object-fit:contain; vertical-align:-5px; }
+</style>
+<script>
+(function () {
+  // reddash forwards request.form but not request.files, so the picture is read
+  // here and posted as an ordinary base64 field instead of a real upload.
+  var MAX = 256 * 1024;
+  function wire() {
+    document.querySelectorAll('input[type=file][data-target]').forEach(function (input) {
+      if (input.dataset.wired) { return; }
+      input.dataset.wired = '1';
+      input.addEventListener('change', function () {
+        var target = document.getElementById(input.dataset.target);
+        var pick = input.closest('.dz-up-pick');
+        var name = pick ? pick.querySelector('.dz-up-name') : null;
+        var file = input.files && input.files[0];
+        if (!target) { return; }
+        if (!file) { target.value = ''; return; }
+        if (file.size > MAX) {
+          if (name) { name.textContent = Math.round(file.size / 1024) + ' KB - too big'; }
+          pick && pick.classList.remove('set');
+          input.value = '';
+          target.value = '';
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+          target.value = reader.result;
+          if (name) { name.textContent = file.name.slice(0, 18); }
+          pick && pick.classList.add('set');
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+  }
+  // The script can sit before the inputs in the rendered page, in which case
+  // querySelectorAll finds nothing and no picture ever uploads. Wait for the
+  // document while it is still parsing, and run straight away when it is not.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
+})();
+</script>
+
+{% macro emoji_upload(key, image='') -%}
+  <div class="dz-up">
+    <label class="dz-up-pick">
+      <input type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+             data-target="img_{{ key }}" hidden />
+      <i class="fa fa-upload"></i>
+      <span class="dz-up-name">{% if image %}replace{% else %}upload{% endif %}</span>
+    </label>
+    <input type="hidden" name="img_{{ key }}" id="img_{{ key }}" value="" />
+    {% if image %}
+      <label class="dz-up-clear">
+        <input type="checkbox" name="clear_img_{{ key }}" /> remove
+      </label>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro emoji_field(key, label, value='', image='') -%}
+  <div>
+    <label class="dz-label">{{ label }}</label>
+    <div class="dz-up-row">
+      {% if image %}<img class="dz-emoji" src="{{ image }}" alt="" />{% endif %}
+      <input class="dz-input" type="text" name="emoji_{{ key }}" value="{{ value }}"
+             placeholder="an emoji, or <:name:id>" />
+      {{ emoji_upload(key, image) }}
+    </div>
+  </div>
 {%- endmacro %}
 """

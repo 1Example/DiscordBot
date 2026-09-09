@@ -11,9 +11,12 @@ from redbot.core.utils import generate_key
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
+    EMOJI_UPLOAD_ASSETS,
     MACROS,
+    apply_emoji_uploads,
     channel_options,
     dashboard_page,
+    emoji_cdn_url,
     fake_context,
     form_reader,
     guild_member,
@@ -294,6 +297,12 @@ class DashboardIntegration:
             "max_open": data.get("max_open_tickets_by_member") or 5,
             "auto_delete": data.get("auto_delete_on_close"),
             "emojis": data.get("emojis") or {},
+            # Each button's current emoji as a picture, where it has one, so a
+            # row shows what is set rather than only a token.
+            "emoji_images": {
+                key: emoji_cdn_url((data.get("emojis") or {}).get(key))
+                for key, _label in EMOJIS
+            },
             "appeals_enabled": bool(appeals.get("enabled")),
             "appeals_guild_id": appeals.get("guild_id") or "",
             "appeals_invite": appeals.get("invite_code") or "",
@@ -944,11 +953,27 @@ class DashboardIntegration:
             data[key] = value or None
 
         emojis = dict(data.get("emojis") or {})
+        owned = dict(data.get("owned_emojis") or {})
         for emoji_key, _label in EMOJIS:
             value = (field(f"emoji_{emoji_key}") or "").strip()
             if value:
                 emojis[emoji_key] = value
+            elif emoji_key in emojis and not field(f"img_{emoji_key}"):
+                # Emptying the box is how you go back to the built-in emoji.
+                emojis.pop(emoji_key, None)
+        # Pictures last, so an upload wins over whatever was typed beside it.
+        problems = await apply_emoji_uploads(
+            self.bot,
+            guild,
+            field,
+            [key for key, _label in EMOJIS],
+            emojis,
+            owned,
+            name_prefix="tk_",
+            reason="Tickets button image",
+        )
         data["emojis"] = emojis
+        data["owned_emojis"] = owned
 
         appeals = dict(data.get("appeals") or {})
         appeals["enabled"] = field.checked("appeals_enabled")
@@ -958,12 +983,15 @@ class DashboardIntegration:
         data["appeals"] = appeals
 
         await self.config.guild(guild).profiles.set_raw(name, value=data)
-        return [{"message": f"Profile {name} saved.", "category": "success"}]
+        notes = [{"message": f"Profile {name} saved.", "category": "success"}]
+        notes += [{"message": p, "category": "warning"} for p in problems]
+        return notes
 
 
 TICKETS_TEMPLATE = (
     BASE_CSS
     + MACROS
+    + EMOJI_UPLOAD_ASSETS
     + """
 <div class="dz">
   <div class="dz-head">
@@ -1380,13 +1408,16 @@ TICKETS_TEMPLATE = (
           </div>
 
           <label class="dz-label" style="margin-top:14px;">Button emojis</label>
+          <p class="dz-hint">
+            Type an emoji, paste a <code>&lt;:name:id&gt;</code> token, or upload a
+            picture. Leave a box empty to go back to the built-in emoji.
+            <b>An uploaded picture becomes one of this server&#39;s emoji</b> and
+            takes a slot &mdash; Discord only accepts a server emoji on a button.
+            Max 256 KB.
+          </p>
           <div class="dz-grid three">
             {% for key, label in emoji_keys %}
-              <div>
-                <label class="dz-label">{{ label }}</label>
-                <input class="dz-input" type="text" name="emoji_{{ key }}"
-                       value="{{ p.emojis.get(key, '') }}" />
-              </div>
+              {{ emoji_field(key, label, p.emojis.get(key, ''), p.emoji_images.get(key, '')) }}
             {% endfor %}
           </div>
 
