@@ -227,10 +227,13 @@ class User(MixinMeta):
                 # ephemeral reply means nobody else in the channel ever sees it.
                 await ctx.defer()
                 result = await self.get_user_profile_cached(user)
+                content = new_user_txt
+                if notice := getattr(result, "notice", None):
+                    content = f"{content}\n{notice}" if content else notice
                 if isinstance(result, discord.Embed):
-                    await ctx.send(content=new_user_txt, embed=result)
+                    await ctx.send(content=content, embed=result)
                 else:  # File
-                    await ctx.send(content=new_user_txt, file=result)
+                    await ctx.send(content=content, file=result)
         except Exception as e:
             log.error("Error generating profile", exc_info=e)
             if "Payload Too Large" in str(e):

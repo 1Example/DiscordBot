@@ -22,24 +22,66 @@ from ..generator.styles import default, gaming, minimal, runescape
 
 log = logging.getLogger("red.vrt.levelup.shared.profile")
 _ = Translator("LevelUp", __file__)
+_PRESENCE_WARNED = False
+
+
+class ProfileFile(discord.File):
+    """A File that can carry a notice back to whatever ends up sending it.
+
+    discord.File defines __slots__, so an attribute has to be declared rather
+    than tacked on.
+    """
+
+    __slots__ = ("notice",)
+
+    def __init__(self, *args, notice: t.Optional[str] = None, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.notice = notice
 
 
 class ProfileFormatting(MixinMeta):
-    def make_profile_file(self, member: discord.Member, img_bytes: bytes, animated: bool) -> discord.File:
+    def member_status(self, member: discord.Member) -> str:
+        """The member's presence, or a warning if the bot cannot see presences.
+
+        discord.py reports every member as offline when the presences intent is
+        off, so a card that says OFFLINE for the whole server is a symptom of
+        the intent, not of anyone actually being offline. Say so once instead of
+        quietly rendering the wrong thing forever.
+        """
+        global _PRESENCE_WARNED
+        if not self.bot.intents.presences:
+            if not _PRESENCE_WARNED:
+                _PRESENCE_WARNED = True
+                log.warning(
+                    "The presences intent is off, so every profile card will show OFFLINE."
+                    " Enable Presence Intent for the bot in the Discord developer portal,"
+                    " and do not start Red with --disable-intent presences."
+                )
+            return "offline"
+        return str(member.status).strip()
+
+    def make_profile_file(self, member: discord.Member, img_bytes: bytes, animated: bool) -> ProfileFile:
         """Clamp generated profile images to the guild upload limit."""
         original_size = len(img_bytes)
-        original_ext = "gif" if animated else "webp"
-        img_bytes, animated, ext = imgtools.fit_discord_upload_limit(img_bytes, member.guild.filesize_limit)
-        if original_size != len(img_bytes) or original_ext != ext:
+        img_bytes, animated, ext, downgraded = imgtools.fit_discord_upload_limit(
+            img_bytes, member.guild.filesize_limit
+        )
+        if original_size != len(img_bytes):
             log.info(
-                "Adjusted profile image for %s (%s -> %s bytes, %s -> %s)",
+                "Adjusted profile image for %s (%s -> %s bytes, .%s%s)",
                 member,
                 original_size,
                 len(img_bytes),
-                original_ext,
                 ext,
+                ", animation dropped" if downgraded else "",
             )
-        return discord.File(BytesIO(img_bytes), filename=f"profile.{ext}")
+        notice = None
+        if downgraded:
+            notice = _(
+                "-# This card is animated, but it is larger than this server can upload, so it was sent as a"
+                " still. Server Boost Level 2 raises the upload limit from {} to 50 MB."
+            ).format(humanize_number(member.guild.filesize_limit // (1024 * 1024)) + " MB")
+        return ProfileFile(BytesIO(img_bytes), filename=f"profile.{ext}", notice=notice)
 
     async def add_xp(self, member: discord.Member, xp: int) -> int:
         """Add XP to a user and check for level ups"""
@@ -271,7 +313,7 @@ class ProfileFormatting(MixinMeta):
         request_data = {
             "style": profile_style,
             "username": member.display_name if profile.show_displayname else member.name,
-            "status": str(member.status).strip(),
+            "status": self.member_status(member),
             "level": profile.level,
             "messages": profile.messages,
             "voicetime": int(profile.voice),

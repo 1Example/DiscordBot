@@ -412,16 +412,19 @@ def get_avg_duration(image: Image.Image) -> int:
         log.warning("Image is not animated")
         return 0
 
+    durations = []
     try:
-        durations = [frame.info["duration"] for frame in ImageSequence.Iterator(image)]
-        # durations = []
-        # for frame in range(1, image.n_frames):
-        #     image.seek(frame)
-        #     durations.append(image.info.get("duration", 0))
-        return sum(durations) // len(durations)
+        for frame in ImageSequence.Iterator(image):
+            # WEBP only fills info["duration"] once the frame is decoded, so
+            # reading it straight after the seek gives None for every frame.
+            frame.load()
+            if duration := frame.info.get("duration"):
+                durations.append(duration)
     except Exception as e:
-        log.error("Failed to get average duration of GIF", exc_info=e)
-        return 0
+        log.error("Failed to read frame durations", exc_info=e)
+    if durations:
+        return sum(durations) // len(durations)
+    return int(image.info.get("duration") or 0)
 
 
 def shrink_animation(image: Image.Image, max_bytes: int, scale: float, frame_step: int) -> t.Optional[bytes]:
@@ -429,7 +432,7 @@ def shrink_animation(image: Image.Image, max_bytes: int, scale: float, frame_ste
     if not getattr(image, "is_animated", False):
         return None
 
-    default_duration = max(get_avg_duration(image), 20)
+    default_duration = max(get_avg_duration(image), 50)
     frame_total = getattr(image, "n_frames", 1)
     frames: t.List[Image.Image] = []
     durations: t.List[int] = []
@@ -439,7 +442,9 @@ def shrink_animation(image: Image.Image, max_bytes: int, scale: float, frame_ste
         stop = min(start + frame_step, frame_total)
         for index in range(start, stop):
             image.seek(index)
-            duration += max(int(image.info.get("duration", default_duration)), 20)
+            # Same as in get_avg_duration: WEBP fills this in on decode.
+            image.load()
+            duration += max(int(image.info.get("duration") or default_duration), 20)
 
         image.seek(start)
         frame = image.convert("RGBA")
@@ -453,20 +458,24 @@ def shrink_animation(image: Image.Image, max_bytes: int, scale: float, frame_ste
     if len(frames) < 2:
         return None
 
-    buffer = BytesIO()
-    frames[0].save(
-        buffer,
-        format="GIF",
-        save_all=True,
-        append_images=frames[1:],
-        duration=durations,
-        loop=0,
-        optimize=True,
-        disposal=2,
-    )
-    data = buffer.getvalue()
-    if len(data) <= max_bytes:
-        return data
+    for quality in (86, 78, 70, 60):
+        buffer = BytesIO()
+        # Always WEBP: full colour and alpha at a fraction of GIF's size, so
+        # fitting a limit costs quality instead of costing the palette.
+        frames[0].save(
+            buffer,
+            format="WEBP",
+            save_all=True,
+            append_images=frames[1:],
+            duration=durations,
+            loop=0,
+            quality=quality,
+            method=4,
+            minimize_size=True,
+        )
+        data = buffer.getvalue()
+        if len(data) <= max_bytes:
+            return data
     return None
 
 
@@ -494,12 +503,20 @@ def make_static_image(image: Image.Image, max_bytes: int) -> t.Optional[bytes]:
     return None
 
 
-def fit_discord_upload_limit(image_bytes: bytes, file_size_limit: int) -> t.Tuple[bytes, bool, str]:
-    """Shrink oversized animated images, then fall back to a static WEBP if needed."""
+def fit_discord_upload_limit(image_bytes: bytes, file_size_limit: int) -> t.Tuple[bytes, bool, str, bool]:
+    """Fit an image under a guild's upload limit.
+
+    Returns the bytes, whether they are still animated, the file extension, and
+    whether animation had to be dropped to make it fit.
+
+    Resolution is the last thing given up, not the first: a card scaled to fit
+    is a card nobody can read. Compress harder, then drop frames, both at full
+    size; only past that does the animation go.
+    """
     if not image_bytes:
-        return image_bytes, False, "webp"
+        return image_bytes, False, "webp", False
     if not file_size_limit or file_size_limit <= 0:
-        return image_bytes, False, "webp"
+        return image_bytes, False, "webp", False
 
     safety_margin = min(16 * 1024, max(1024, file_size_limit // 50))
     max_bytes = max(1, file_size_limit - safety_margin)
@@ -508,25 +525,27 @@ def fit_discord_upload_limit(image_bytes: bytes, file_size_limit: int) -> t.Tupl
         image = Image.open(BytesIO(image_bytes))
     except Exception as e:
         log.warning("Failed to inspect generated image size", exc_info=e)
-        return image_bytes, False, "webp"
+        return image_bytes, False, "webp", False
 
     animated = bool(getattr(image, "is_animated", False))
-    ext = "gif" if animated else "webp"
+    # Follow what the bytes actually are; an animated image is no longer
+    # necessarily a gif.
+    ext = (image.format or "webp").lower()
+    if ext == "jpeg":
+        ext = "jpg"
     if len(image_bytes) <= max_bytes or not animated:
-        return image_bytes, animated, ext
+        return image_bytes, animated, ext, False
 
-    scales = (1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4)
-    frame_steps = (1, 2, 3, 4, 5)
+    for frame_step in (1, 2, 3, 4):
+        if shrunk := shrink_animation(image, max_bytes, 1.0, frame_step):
+            return shrunk, True, "webp", False
 
-    for frame_step in frame_steps:
-        for scale in scales:
-            if shrunk := shrink_animation(image, max_bytes, scale, frame_step):
-                return shrunk, True, "gif"
-
+    # A sharp still beats a smeared animation. The caller gets told, so it can
+    # explain rather than leaving someone wondering why theirs does not move.
     if static_image := make_static_image(image, max_bytes):
-        return static_image, False, "webp"
+        return static_image, False, "webp", True
 
-    return image_bytes, animated, ext
+    return image_bytes, animated, ext, False
 
 
 if __name__ == "__main__":

@@ -361,6 +361,12 @@ def generate_default_profile(
         x0, y0, x1, _bottom = box
         draw.line((x0 + radius, y0 + 1, x1 - radius, y0 + 1), fill=(255, 255, 255, 78), width=1)
 
+    # Everything from here goes on its own layer so a blurred copy of it can be
+    # laid down first as a halo. Against a photograph that reads far better
+    # than a stroke, and it only darkens what is directly behind a glyph.
+    ink = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(ink)
+
     # A ring around the avatar, unless the member brought their own frame.
     if deco_src is None:
         ring_w = 3 if square else 4
@@ -394,7 +400,7 @@ def generate_default_profile(
     role_slot = 0 if square else 40
     name_font = fitted(username, name_pt, max(60, text_right - text_x - role_slot))
     name_y = head_top + (16 if square else 16)
-    with Pilmoji(stats) as pilmoji:
+    with Pilmoji(ink) as pilmoji:
         pilmoji.text(
             xy=(text_x, name_y),
             text=username,
@@ -407,7 +413,7 @@ def generate_default_profile(
     if role_icon_bytes and not square:
         try:
             badge = Image.open(BytesIO(role_icon_bytes)).resize((32, 32), Image.Resampling.LANCZOS)
-            stats.paste(badge, (int(text_x + name_font.getlength(username) + 12), name_y + 14), badge)
+            ink.paste(badge, (int(text_x + name_font.getlength(username) + 12), name_y + 14), badge)
         except (ValueError, UnidentifiedImageError) as e:
             if reraise:
                 raise e
@@ -472,7 +478,7 @@ def generate_default_profile(
                     emoji = Image.open(BytesIO(prestige_emoji_bytes)).resize(
                         (emoji_slot, emoji_slot), Image.Resampling.LANCZOS
                     )
-                    stats.paste(emoji, (int(cursor), int(chip_y + 4)), emoji)
+                    ink.paste(emoji, (int(cursor), int(chip_y + 4)), emoji)
                     cursor += emoji_slot + 8
                 except (ValueError, UnidentifiedImageError) as e:
                     if reraise:
@@ -521,7 +527,7 @@ def generate_default_profile(
         ramp = ramp.resize(bar_px)
         ramp.putalpha(mask)
         bar = Image.alpha_composite(bar, ramp)
-    stats.paste(bar.resize((int(inner_w), bar_h), Image.Resampling.LANCZOS), (left, bar_y))
+    ink.paste(bar.resize((int(inner_w), bar_h), Image.Resampling.LANCZOS), (left, bar_y))
 
     # ---------------- Stat tiles ----------------
     voice_text = imgtools.abbreviate_time(voicetime) if voicetime else "0m"
@@ -588,6 +594,13 @@ def generate_default_profile(
                 **stroke,
             )
 
+    halo = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
+    halo.putalpha(
+        Image.eval(ink.getchannel("A").filter(ImageFilter.GaussianBlur(4.5)), lambda v: min(255, v * 5))
+    )
+    stats = Image.alpha_composite(stats, halo)
+    stats = Image.alpha_composite(stats, ink)
+
     # ---------------- Start finalizing the image ----------------
     if not pfp_animated and pfp.mode != "RGBA":
         log.debug(f"Converting pfp mode '{pfp.mode}' to RGBA")
@@ -642,17 +655,21 @@ def generate_default_profile(
     frame_count = min(frame_count, 50)
     log.debug(f"Rendering {frame_count} frames at {avg_duration}ms")
 
-    frames: t.List[Image.Image] = [compose(index, Image.Resampling.NEAREST) for index in range(frame_count)]
+    frames: t.List[Image.Image] = [compose(index, Image.Resampling.LANCZOS) for index in range(frame_count)]
     buffer = BytesIO()
+    # WEBP rather than GIF. A card is a photograph plus text plus a decoration,
+    # and 256 palette entries cannot hold that: it posterises, and the file is
+    # big enough that the cog then has to scale it down to fit an upload limit.
     frames[0].save(
         buffer,
-        format="GIF",
+        format="WEBP",
         save_all=True,
         append_images=frames[1:],
         duration=avg_duration,
         loop=0,
-        quality=75,
-        optimize=True,
+        quality=86,
+        method=4,
+        minimize_size=True,
     )
     buffer.seek(0)
     if debug:
