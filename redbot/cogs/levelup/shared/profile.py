@@ -317,9 +317,8 @@ class ProfileFormatting(MixinMeta):
         if profile_style != "runescape" and member.top_role.icon:
             request_data["role_icon_url"] = member.top_role.icon.url
 
-        # Get background URL/bytes. The default style draws its own ground and
-        # never composites this, so fetching one for it is wasted work.
-        if profile_style not in ("runescape", "default"):
+        # Get background URL/bytes
+        if profile_style != "runescape":
             background = await self.get_profile_background(member.id, profile, try_return_url=True, guild_id=guild.id)
             if isinstance(background, str):
                 request_data["background_url"] = background
@@ -428,8 +427,7 @@ class ProfileFormatting(MixinMeta):
             with suppress(discord.HTTPException):
                 kwargs["avatar_frame"] = await decoration.with_size(512).read()
         if profile_style != "runescape":
-            if profile_style != "default":
-                kwargs["background_bytes"] = await self.get_profile_background(member.id, profile, guild_id=guild.id)
+            kwargs["background_bytes"] = await self.get_profile_background(member.id, profile, guild_id=guild.id)
             if pdata and pdata.emoji_url:
                 kwargs["prestige_emoji"] = await utils.get_content_from_url(pdata.emoji_url)
             if member.top_role.icon:

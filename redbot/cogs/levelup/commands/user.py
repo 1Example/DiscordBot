@@ -767,11 +767,6 @@ class User(MixinMeta):
             return await ctx.send(_("You cannot change your name color with the current profile style!"))
 
         footer = ""
-        if (conf.style_override or profile.style) == "default":
-            footer += _(
-                "\n\nHeads up: the **default** style draws its own background, so this won't show up on your"
-                " card. Pick another style with {} if you want your background used."
-            ).format("`/setprofile style`")
         if self.db.cache_seconds:
             footer += _(
                 "\n\nProfiles are cached for {} seconds so you may not see the change immediately"

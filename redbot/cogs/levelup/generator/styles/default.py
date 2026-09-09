@@ -117,13 +117,13 @@ def generate_default_profile(
     """
     Generate a full profile image with customizable parameters.
 
-    The card draws its own ground; the member's background is not composited.
-    It is rendered as a gif when the avatar or the avatar decoration is
-    animated, and as a static webp otherwise.
+    The member's background is the card. Everything drawn over it - panels,
+    bar, chips - is translucent, so the background stays visible throughout.
+    Rendered as a gif when the background, the avatar or the avatar decoration
+    is animated, and as a static webp otherwise.
 
     Args:
-        background_bytes (t.Optional[bytes], optional): Accepted for signature compatibility
-            with the other styles and ignored. Defaults to None.
+        background_bytes (t.Optional[bytes], optional): The background image as bytes. Defaults to None.
         avatar (t.Optional[bytes], optional): The avatar image as bytes. Defaults to None.
         username (t.Optional[str], optional): The username. Defaults to "Spartan117".
         status (t.Optional[str], optional): The status. Defaults to "online".
@@ -160,6 +160,10 @@ def generate_default_profile(
     stat_color = stat_color or base_color
     level_bar_color = level_bar_color or base_color
 
+    if isinstance(background_bytes, str) and background_bytes.startswith("http"):
+        log.debug("Background image is a URL, attempting to download")
+        background_bytes = imgtools.download_image(background_bytes)
+
     if isinstance(avatar_bytes, str) and avatar_bytes.startswith("http"):
         log.debug("Avatar image is a URL, attempting to download")
         avatar_bytes = imgtools.download_image(avatar_bytes)
@@ -182,10 +186,21 @@ def generate_default_profile(
     else:
         avatar_frame_bytes = avatar_frame
 
-    # background_bytes and blur are accepted for signature compatibility with
-    # the other styles and deliberately unused: this card draws its own ground.
-    # Compositing the member's photo under the panels only ever showed up as a
-    # ghost of it smeared across the card.
+    if background_bytes:
+        try:
+            card = Image.open(BytesIO(background_bytes))
+        except UnidentifiedImageError as e:
+            if reraise:
+                raise e
+            log.error(
+                f"Failed to open background image ({type(background_bytes)} - {len(background_bytes)})", exc_info=e
+            )
+            card = imgtools.get_random_background()
+    else:
+        card = imgtools.get_random_background()
+    bg_animated = getattr(card, "is_animated", False)
+    bg_frames = getattr(card, "n_frames", 1) if bg_animated else 1
+
     pfp = imgtools.open_avatar(avatar_bytes)
     pfp_animated = getattr(pfp, "is_animated", False)
     pfp_frames = getattr(pfp, "n_frames", 1) if pfp_animated else 1
@@ -221,8 +236,6 @@ def generate_default_profile(
     circle_x = left + (head_bottom - head_top - pfp_size) // 2
     circle_y = head_top + (head_bottom - head_top - pfp_size) // 2
     desired_pfp_size = (pfp_size, pfp_size)
-    pfp_cx = circle_x + pfp_size / 2
-    pfp_cy = circle_y + pfp_size / 2
 
     # ---------------- Avatar decoration ----------------
     # Discord ships decorations as a 96px box with the avatar filling the
@@ -295,7 +308,7 @@ def generate_default_profile(
         """Uppercase labels need air between the letters to read as labels."""
         x, y = xy
         for char in text:
-            draw.text((x, y), char, font=font, fill=fill)
+            draw.text((x, y), char, font=font, fill=fill, **stroke)
             x += font.getlength(char) + extra
 
     # ---------------- Palette ----------------
@@ -308,48 +321,22 @@ def generate_default_profile(
     decor = accent if min(accent) < 210 else (88, 139, 255)
     if min(bar_color) >= 210:
         bar_color = decor
-    label_ink = (*figure, 150)
-    faint_ink = (*figure, 112)
-    # A near black pulled a little toward the accent, so the card feels lit by
-    # the same colour the accents are.
-    ground = (max(9, accent[0] // 11), max(11, accent[1] // 11), max(17, accent[2] // 10))
+    # Muted by colour, not by alpha: a translucent fill drawn on a transparent
+    # layer replaces the alpha beneath it instead of blending, so text at a low
+    # alpha would punch a hole through its own panel.
+    label_ink = tuple(int(c * 0.88) for c in figure)
+    faint_ink = tuple(int(c * 0.74) for c in figure)
+    # Text sits on the member's photo, so it carries its own contrast.
+    stroke = {"stroke_width": 1, "stroke_fill": (0, 0, 0, 205)}
+    # Dark glass: enough to read against, sheer enough to see through.
+    glass = (9, 11, 18, 116)
     span = max(next_xp - previous_xp, 1)
     progress = min(max((current_xp - previous_xp) / span, 0.0), 1.0)
 
-    # ---------------- Ground ----------------
-    # RGB canvas: see the module note about ImageDraw and alpha. The card gets
-    # its alpha in one go once everything is drawn.
-    stats = Image.new("RGB", desired_card_size, ground)
-
-    # A slow diagonal sheen. With no photo behind it the ground would otherwise
-    # be a dead flat rectangle, and the panels would have nothing to sit on.
-    sheen = Image.new("L", (64, 28))
-    sheen_px = sheen.load()
-    for sx in range(64):
-        for sy in range(28):
-            ramp = 1.0 - ((sx / 63) * 0.62 + (sy / 27) * 0.38)
-            sheen_px[sx, sy] = int(max(0.0, ramp) ** 1.7 * 52)
-    stats.paste(
-        tuple(min(255, c + 46) for c in ground),
-        mask=sheen.resize(desired_card_size, Image.Resampling.BICUBIC),
-    )
-
-    vignette = Image.new("L", desired_card_size, 0)
-    ImageDraw.Draw(vignette).ellipse(
-        (-width * 0.18, -height * 0.45, width * 1.18, height * 1.45),
-        fill=255,
-    )
-    vignette = vignette.filter(ImageFilter.GaussianBlur(width / 16))
-    stats.paste((0, 0, 0), mask=Image.eval(vignette, lambda v: (255 - v) * 3 // 5))
-
-    # A wash of the accent behind the avatar, so the header has a light source.
-    glow = Image.new("L", desired_card_size, 0)
-    glow_r = pfp_size * 1.15
-    ImageDraw.Draw(glow).ellipse(
-        (pfp_cx - glow_r, pfp_cy - glow_r, pfp_cx + glow_r, pfp_cy + glow_r),
-        fill=54,
-    )
-    stats.paste(decor, mask=glow.filter(ImageFilter.GaussianBlur(width / 44)))
+    # ---------------- Overlay ----------------
+    # Transparent: the background shows through everything drawn here. No wash,
+    # no vignette, no sheen - those were the overlays hiding the member's image.
+    stats = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
 
     # ---------------- Panels ----------------
     tile_w = (inner_w - tile_gap * (tile_cols - 1)) / tile_cols
@@ -360,34 +347,19 @@ def generate_default_profile(
         ty = tiles_top + row * (tile_h + tile_gap)
         panels.append(((tx, ty, tx + tile_w, ty + tile_h), tile_radius))
 
-    # One blur for every shadow rather than one per panel.
-    shadow = Image.new("L", desired_card_size, 0)
+    # One blur for every shadow rather than one per panel. It lifts the glass
+    # off a busy photo without covering any of it.
+    shadow = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
     shadow_draw = ImageDraw.Draw(shadow)
     for (x0, y0, x1, y1), radius in panels:
-        shadow_draw.rounded_rectangle((x0, y0 + 5, x1, y1 + 8), radius=radius, fill=150)
-    stats.paste((0, 0, 0), mask=shadow.filter(ImageFilter.GaussianBlur(8)))
+        shadow_draw.rounded_rectangle((x0, y0 + 5, x1, y1 + 8), radius=radius, fill=(0, 0, 0, 140))
+    stats = Image.alpha_composite(stats, shadow.filter(ImageFilter.GaussianBlur(9)))
 
-    panel_fill = tuple(min(255, c + 17) for c in ground)
-    draw = ImageDraw.Draw(stats, "RGBA")
+    draw = ImageDraw.Draw(stats)
     for box, radius in panels:
-        draw.rounded_rectangle(box, radius=radius, fill=panel_fill, outline=(255, 255, 255, 40), width=1)
+        draw.rounded_rectangle(box, radius=radius, fill=glass, outline=(255, 255, 255, 60), width=1)
         x0, y0, x1, _bottom = box
-        draw.line((x0 + radius, y0 + 1, x1 - radius, y0 + 1), fill=(255, 255, 255, 58), width=1)
-
-    # Hairlines raked across the header, clipped to its rounded corners.
-    rake = Image.new("L", desired_card_size, 0)
-    rake_draw = ImageDraw.Draw(rake)
-    for offset in range(int(width * 0.40), width + height, 46):
-        rake_draw.line(
-            (offset, head_top - 4, offset - (head_bottom - head_top) - 8, head_bottom + 4),
-            fill=20,
-            width=1,
-        )
-    header_mask = Image.new("L", desired_card_size, 0)
-    ImageDraw.Draw(header_mask).rounded_rectangle(
-        (left, head_top, right, head_bottom), radius=panel_radius, fill=255
-    )
-    stats.paste((255, 255, 255), mask=Image.composite(rake, Image.new("L", desired_card_size, 0), header_mask))
+        draw.line((x0 + radius, y0 + 1, x1 - radius, y0 + 1), fill=(255, 255, 255, 78), width=1)
 
     # A ring around the avatar, unless the member brought their own frame.
     if deco_src is None:
@@ -416,13 +388,21 @@ def generate_default_profile(
         text_right = right - 18 - hero_w - 30
         hero_x = right - 18 - hero_w
         tracked((hero_x, head_top + 24), _("LEVEL"), hero_label_font, label_ink, 2.4)
-        draw.text((hero_x, head_top + 42), hero_value, fill=accent, font=hero_font)
+        draw.text((hero_x, head_top + 42), hero_value, fill=accent, font=hero_font, stroke_width=2,
+                  stroke_fill=(0, 0, 0, 205))
 
     role_slot = 0 if square else 40
     name_font = fitted(username, name_pt, max(60, text_right - text_x - role_slot))
     name_y = head_top + (16 if square else 16)
     with Pilmoji(stats) as pilmoji:
-        pilmoji.text(xy=(text_x, name_y), text=username, fill=figure, font=name_font)
+        pilmoji.text(
+            xy=(text_x, name_y),
+            text=username,
+            fill=figure,
+            font=name_font,
+            stroke_width=2,
+            stroke_fill=(0, 0, 0, 205),
+        )
     # The role icon reads as a badge on the name, which is what it is.
     if role_icon_bytes and not square:
         try:
@@ -505,7 +485,7 @@ def generate_default_profile(
     caption = _("{} / {} XP").format(
         humanize_number(current_xp - previous_xp), humanize_number(next_xp - previous_xp)
     )
-    draw.text((left + 2, cap_y), caption, fill=label_ink, font=cap_font)
+    draw.text((left + 2, cap_y), caption, fill=label_ink, font=cap_font, **stroke)
     tail = _("{}% · {} XP TO LEVEL {}").format(
         int(progress * 100),
         humanize_number(max(next_xp - current_xp, 0)),
@@ -514,7 +494,9 @@ def generate_default_profile(
     tail_font = cap_font
     while tail_font.getlength(tail) > inner_w - cap_font.getlength(caption) - 30 and tail_font.size > 10:
         tail_font = sized(tail_font.size - 1, label_path)
-    draw.text((right - 2 - tail_font.getlength(tail), cap_y), tail, fill=faint_ink, font=tail_font)
+    draw.text(
+        (right - 2 - tail_font.getlength(tail), cap_y), tail, fill=faint_ink, font=tail_font, **stroke
+    )
 
     # Drawn here rather than with make_progress_bar so the fill can carry a
     # gradient and the empty track can be filled instead of outlined.
@@ -539,8 +521,7 @@ def generate_default_profile(
         ramp = ramp.resize(bar_px)
         ramp.putalpha(mask)
         bar = Image.alpha_composite(bar, ramp)
-    bar = bar.resize((int(inner_w), bar_h), Image.Resampling.LANCZOS)
-    stats.paste(bar, (left, bar_y), bar)
+    stats.paste(bar.resize((int(inner_w), bar_h), Image.Resampling.LANCZOS), (left, bar_y))
 
     # ---------------- Stat tiles ----------------
     voice_text = imgtools.abbreviate_time(voicetime) if voicetime else "0m"
@@ -592,7 +573,8 @@ def generate_default_profile(
                 )
 
         value_font = fitted(value, tile_value_pt, tile_w - inset * 2 - reserved)
-        draw.text((tx + inset, value_y), value, fill=colour, font=value_font)
+        draw.text((tx + inset, value_y), value, fill=colour, font=value_font, stroke_width=2,
+                  stroke_fill=(0, 0, 0, 205))
 
         if sec_value:
             # Sit the pair on one line: the fonts differ in size and in face, so
@@ -603,19 +585,23 @@ def generate_default_profile(
                 sec_value,
                 fill=faint_ink,
                 font=sec_v_font,
+                **stroke,
             )
 
-    stats = stats.convert("RGBA")
-
     # ---------------- Start finalizing the image ----------------
-    card = imgtools.round_image_corners(stats, 45)
     if not pfp_animated and pfp.mode != "RGBA":
         log.debug(f"Converting pfp mode '{pfp.mode}' to RGBA")
         pfp = pfp.convert("RGBA")
 
-    # Either the avatar or the decoration animating is enough to make this a
-    # gif; whichever has more frames sets the length.
-    frame_count = max(pfp_frames, deco_frames)
+    def background_frame(index: int) -> Image.Image:
+        """The card itself: the member's background, at one frame."""
+        if bg_animated:
+            card.seek(index % bg_frames)
+        frame = card.convert("RGBA")
+        frame = imgtools.fit_aspect_ratio(frame, desired_card_size)
+        if blur:
+            frame = frame.filter(ImageFilter.GaussianBlur(6))
+        return imgtools.round_image_corners(frame, 45)
 
     def avatar_circle(index: int, method) -> Image.Image:
         """The avatar cropped to a circle, at one frame of its animation."""
@@ -627,28 +613,36 @@ def generate_default_profile(
                 source = source.convert("RGBA")
         return imgtools.make_profile_circle(source.resize(desired_pfp_size, method), method=method)
 
+    def compose(index: int, method) -> Image.Image:
+        frame = background_frame(index)
+        frame.alpha_composite(stats)
+        sprite = dress_avatar(avatar_circle(index, method), index)
+        frame.paste(sprite, pfp_paste, sprite)
+        return frame
+
+    # Any of the three animating is enough to make this a gif.
+    frame_count = max(pfp_frames, deco_frames, bg_frames)
     if not render_gif or frame_count == 1:
-        sprite = dress_avatar(avatar_circle(0, Image.Resampling.LANCZOS))
-        card.paste(sprite, pfp_paste, sprite)
+        finished = compose(0, Image.Resampling.LANCZOS)
         if debug:
-            card.show()
+            finished.show()
         buffer = BytesIO()
-        card.save(buffer, format="WEBP")
-        card.close()
+        finished.save(buffer, format="WEBP")
+        finished.close()
         return buffer.getvalue(), False
 
-    # When both animate, the avatar sets the pace and the decoration is
-    # sampled against it rather than the two being reconciled by their LCM,
-    # which used to blow the frame count up to keep a background in step.
-    avg_duration = imgtools.get_avg_duration(pfp if pfp_animated else deco_src) or 60
+    # Durations have to be read before anything seeks these files.
+    avg_duration = 0
+    for source, animated in ((pfp, pfp_animated), (card, bg_animated), (deco_src, deco_animated)):
+        if animated and not avg_duration:
+            avg_duration = imgtools.get_avg_duration(source)
+    avg_duration = avg_duration or 60
+    # Past this the file is large enough that the cog just has to shrink it
+    # again, and the extra frames buy nothing anyone can see.
+    frame_count = min(frame_count, 50)
     log.debug(f"Rendering {frame_count} frames at {avg_duration}ms")
-    frames: t.List[Image.Image] = []
-    for index in range(frame_count):
-        card_frame = card.copy()
-        sprite = dress_avatar(avatar_circle(index, Image.Resampling.NEAREST), index)
-        card_frame.paste(sprite, pfp_paste, sprite)
-        frames.append(card_frame)
 
+    frames: t.List[Image.Image] = [compose(index, Image.Resampling.NEAREST) for index in range(frame_count)]
     buffer = BytesIO()
     frames[0].save(
         buffer,
