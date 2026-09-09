@@ -24,7 +24,7 @@ import aiohttp
 import discord
 from packaging.version import Version
 
-from . import __version__, version_info as red_version_info, commands, errors, i18n, modlog, _downloader
+from . import __version__, commands, errors, i18n, modlog, _downloader
 from ._diagnoser import IssueDiagnoser
 from .utils import AsyncIter, can_user_send_messages_in
 from .utils._internal_utils import fetch_latest_red_version
@@ -435,6 +435,8 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         contributors_url = red_repo + "/graphs/contributors"
         red_pypi = "https://pypi.org/project/Red-DiscordBot"
         support_server_url = "https://discord.gg/red"
+        fork_repo = "https://github.com/1Example/DiscordBot"
+        fork_owner_url = "https://discord.com/users/212320651334254593"
         dpy_repo = "https://github.com/Rapptz/discord.py"
         python_url = "https://www.python.org/"
         since = datetime.datetime(2016, 1, 2, 0, 0)
@@ -462,13 +464,24 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             red_version = "[{}]({})".format(__version__, red_pypi)
 
             about = _(
-                "This bot is an instance of [Red, an open source Discord bot]({}) "
-                "created by [Twentysix]({}) and [improved by many]({}).\n\n"
-                "Red is backed by a passionate community who contributes and "
-                "creates content for everyone to enjoy. [Join us today]({}) "
-                "and help us improve!\n\n"
+                "This bot runs [CUBIX]({fork}), a heavily modified fork of "
+                "[Red, an open source Discord bot]({red}), maintained by "
+                "[1Example]({owner}).\n\n"
+                "The commands, the web dashboard and most of what you interact "
+                "with here have been rewritten or replaced. The foundation is "
+                "still Red, created by [Twentysix]({author}) and [improved by "
+                "many]({contributors}), and this fork carries the same GNU "
+                "GPLv3 licence. Red is backed by a passionate community - "
+                "[join them]({support}) and help them improve it.\n\n"
                 "(c) Cog Creators"
-            ).format(red_repo, author_repo, contributors_url, support_server_url)
+            ).format(
+                fork=fork_repo,
+                red=red_repo,
+                owner=fork_owner_url,
+                author=author_repo,
+                contributors=contributors_url,
+                support=support_server_url,
+            )
 
             embed = discord.Embed(color=(await ctx.embed_colour()))
             embed.add_field(
@@ -477,7 +490,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             )
             embed.add_field(name="Python", value=python_version)
             embed.add_field(name="discord.py", value=dpy_version)
-            embed.add_field(name=_("Red version"), value=red_version)
+            embed.add_field(name=_("Red core"), value=red_version)
             if outdated in (True, None):
                 if outdated is True:
                     outdated_value = _("Yes, {version} is available.").format(
@@ -488,7 +501,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 embed.add_field(name=_("Outdated"), value=outdated_value)
             if custom_info:
                 embed.add_field(name=_("About this instance"), value=custom_info, inline=False)
-            embed.add_field(name=_("About Red"), value=about, inline=False)
+            embed.add_field(name=_("About this bot"), value=about, inline=False)
 
             embed.set_footer(
                 text=_("Bringing joy since 02 Jan 2016 (over {} days ago!)").format(days_since)
@@ -500,11 +513,14 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             red_version = "{}".format(__version__)
 
             about = _(
-                "This bot is an instance of Red, an open source Discord bot (1) "
-                "created by Twentysix (2) and improved by many (3).\n\n"
-                "Red is backed by a passionate community who contributes and "
-                "creates content for everyone to enjoy. Join us today (4) "
-                "and help us improve!\n\n"
+                "This bot runs CUBIX (8), a heavily modified fork of Red, an "
+                "open source Discord bot (1), maintained by 1Example.\n\n"
+                "The commands, the web dashboard and most of what you interact "
+                "with here have been rewritten or replaced. The foundation is "
+                "still Red, created by Twentysix (2) and improved by many (3), "
+                "and this fork carries the same GNU GPLv3 licence. Red is "
+                "backed by a passionate community - join them (4) and help "
+                "them improve it.\n\n"
                 "(c) Cog Creators"
             )
             about = box(about)
@@ -514,7 +530,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                     "Instance owned by team: [{owner}]\n"
                     "Python:                 [{python_version}] (5)\n"
                     "discord.py:             [{dpy_version}] (6)\n"
-                    "Red version:            [{red_version}] (7)\n"
+                    "Red core:               [{red_version}] (7)\n"
                 ).format(
                     owner=owner,
                     python_version=python_version,
@@ -526,7 +542,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                     "Instance owned by: [{owner}]\n"
                     "Python:            [{python_version}] (5)\n"
                     "discord.py:        [{dpy_version}] (6)\n"
-                    "Red version:       [{red_version}] (7)\n"
+                    "Red core:          [{red_version}] (7)\n"
                 ).format(
                     owner=owner,
                     python_version=python_version,
@@ -566,6 +582,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 "5. <{}>\n"
                 "6. <{}>\n"
                 "7. <{}>\n"
+                "8. <{}>\n"
             ).format(
                 red_repo,
                 author_repo,
@@ -574,6 +591,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 python_url,
                 dpy_repo,
                 red_pypi,
+                fork_repo,
             )
             await ctx.send(refs)
 
@@ -650,23 +668,27 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             return
         self._mydata_stamp(ctx, "whatdata")
 
-        ver = "latest" if red_version_info.dev_release else "stable"
-        link = f"https://docs.discord.red/en/{ver}/red_core_data_statement.html"
-        await ctx.send(
-            _(
-                "This bot stores some data about users as necessary to function. "
-                "This is mostly the ID your user is assigned by Discord, linked to "
-                "a handful of things depending on what you interact with in the bot. "
-                "There are a few commands which store it to keep track of who created "
-                "something. (such as playlists) "
-                "For full details about this as well as more in depth details of what "
-                "is stored and why, see {link}.\n\n"
-                "Additionally, 3rd party addons loaded by the bot's owner may or "
-                "may not store additional things. "
-                "You can use `{prefix}mydata 3rdparty` "
-                "to view the statements provided by each 3rd-party addition."
-            ).format(link=link, prefix=ctx.clean_prefix)
+        message = _(
+            "This bot stores some data about you, as much as it needs to work and no more. "
+            "Mostly that is the ID Discord assigned you, with whatever a feature has to "
+            "remember attached to it: settings you chose, counters a feature keeps such as "
+            "your level or balance, things you created so it knows they are yours, and "
+            "moderation records where a server's staff have used those features.\n\n"
+            "It is all held on the server this bot runs on. None of it is sold, shared or "
+            "sent anywhere else.\n\n"
+            "Use `/mydata getmydata` for a copy of what is stored about you, and "
+            "`/mydata forgetme` to ask the bot to forget you. Modules loaded by the owner "
+            "may store their own things; `/mydata thirdparty` shows what each one says "
+            "about that."
         )
+        # This is a fork with most of its surface rewritten, so it answers for
+        # itself rather than pointing at documentation for unmodified Red.
+        dashboard_url = getattr(self.bot, "dashboard_url", None)
+        if dashboard_url is not None and dashboard_url[1]:
+            message += _("\n\nThe full statement is at <{link}>.").format(
+                link=f"{dashboard_url[0].rstrip('/')}/data"
+            )
+        await ctx.send(message)
 
     # 1/30 minutes. It's not likely to change much and uploads a standalone webpage.
     @mydata.command(name="thirdparty", description="The data statements of every third-party module.")
@@ -978,10 +1000,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 "Discord has specifically requested this with regard to a deleted user. "
                 "This will remove the user from various anti-abuse measures. "
                 "If you are processing a manual request from a user, you may want "
-                "`{prefix}{command_name}` instead."
+                "`/{command_name}` instead."
                 "\n\nIf you are sure this is what you intend to do "
                 "please respond with the following:"
-            ).format(prefix=ctx.clean_prefix, command_name="mydata ownermanagement deleteforuser"),
+            ).format(command_name="mydata ownermanagement deleteforuser"),
         ):
             return
         results = await self.bot.handle_data_deletion_request(
@@ -3069,7 +3091,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             "This bot is an instance of Red-DiscordBot (hereinafter referred to as Red).\n"
             "Red is a free and open source application made available to the public and "
             "licensed under the GNU GPLv3. The full text of this license is available to you at "
-            "<https://github.com/Cog-Creators/Red-DiscordBot/blob/V3/develop/LICENSE>."
+            "<https://github.com/Cog-Creators/Red-DiscordBot/blob/V3/develop/LICENSE>.\n\n"
+            "This instance runs CUBIX, a modified fork of Red maintained by 1Example. "
+            "Those modifications are covered by the same licence, and their source is "
+            "available to you at <https://github.com/1Example/DiscordBot>."
         )
         await ctx.send(message)
         # We need a link which contains a thank you to other projects which we use at some point.

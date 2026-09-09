@@ -289,15 +289,23 @@ class Dashboard(CogBase):
         if (dashboard_url := getattr(ctx.bot, "dashboard_url", None)) is None:
             await ctx.send(
                 _(
-                    "Red-Web-Dashboard is not installed. Check <https://red-web-dashboard.readthedocs.io>.",
+                    "The web dashboard is not installed. Check <https://red-web-dashboard.readthedocs.io>.",
                 ),
             )
             return
         if not dashboard_url[1] and ctx.author.id not in ctx.bot.owner_ids:
             await ctx.send(_("You can't access the Dashboard."))
             return
+        # The title the dashboard is actually configured with, not the name of
+        # the software it was built from. Same {name} substitution the web side
+        # does, so one setting drives both.
+        title = await self.config.webserver.ui.meta.title()
+        if title:
+            title = title.replace("{name}", ctx.me.display_name)
+        else:
+            title = _("{name} Dashboard").format(name=ctx.me.display_name)
         embed: discord.Embed = discord.Embed(
-            title=_("Red-Web-Dashboard"),
+            title=title,
             color=await ctx.embed_color(),
         )
         url = dashboard_url[0]
