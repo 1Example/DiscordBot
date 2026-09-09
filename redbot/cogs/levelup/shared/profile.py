@@ -42,26 +42,29 @@ class ProfileFile(discord.File):
 
 class ProfileFormatting(MixinMeta):
     def member_status(self, member: discord.Member) -> str:
-        """The member's presence, or a warning if the bot cannot see presences.
+        """The member's presence, read off the cached member.
 
-        discord.py reports every member as offline when the presences intent is
-        off, so a card that says OFFLINE for the whole server is a symptom of
-        the intent, not of anyone actually being offline. Say so once instead of
-        quietly rendering the wrong thing forever.
+        A Member from an interaction is built fresh out of the interaction
+        payload, which carries no presence at all, so its status is always
+        offline no matter what the person has set. Every slash command gets one
+        of those. The guild's cached member is the one PRESENCE_UPDATE reaches.
+
+        The presences intent still has to be on for any of it to be populated,
+        and a card that says OFFLINE for the whole server is a symptom of that
+        rather than of anyone's status, so say so once.
         """
         global _PRESENCE_WARNED
-        status = str(member.status).strip()
-        if not _PRESENCE_WARNED:
-            _PRESENCE_WARNED = True
-            if self.bot.intents.presences:
-                log.info("Presences intent is on; %s reads as %s", member, status)
-            else:
+        if not self.bot.intents.presences:
+            if not _PRESENCE_WARNED:
+                _PRESENCE_WARNED = True
                 log.warning(
                     "The presences intent is off, so every profile card will show OFFLINE."
                     " Enable Presence Intent for the bot in the Discord developer portal,"
                     " and do not start Red with --disable-intent presences."
                 )
-        return status if self.bot.intents.presences else "offline"
+            return "offline"
+        cached = member.guild.get_member(member.id) or member
+        return str(cached.status).strip()
 
     def make_profile_file(self, member: discord.Member, img_bytes: bytes, animated: bool) -> ProfileFile:
         """Clamp generated profile images to the guild upload limit."""

@@ -5,7 +5,7 @@ import typing as t
 from io import BytesIO
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, UnidentifiedImageError
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageSequence, UnidentifiedImageError
 from redbot.core.i18n import Translator
 from redbot.core.utils.chat_formatting import humanize_number
 
@@ -238,35 +238,49 @@ def generate_default_profile(
     desired_pfp_size = (pfp_size, pfp_size)
 
     # ---------------- Avatar decoration ----------------
-    # Discord ships decorations as a 96px box with the avatar filling the
-    # middle 80, so the art is 1.2x the avatar and concentric with it.
-    # Held open rather than converted up front: most decorations are animated
-    # PNGs, and converting one collapses it to its first frame.
-    deco_src: t.Optional[Image.Image] = None
+    # Discord ships decorations as a box with the avatar filling the middle
+    # 80/96 of it, so the art is 1.2x the avatar and concentric with it.
+    frame_pad = int(pfp_size * 0.1) if avatar_frame_bytes else 0
+    sprite_size = pfp_size + frame_pad * 2
+    pfp_paste = (circle_x - frame_pad, circle_y - frame_pad)
+
+    # Decoded once, in order, at the size it will be drawn. An APNG frame is
+    # composited onto the one before it: read forward and Pillow tracks that,
+    # seek backwards and it rebuilds from whatever the last seek left behind,
+    # which blends every frame with the wrong thing and drains the colour out
+    # of the art. Reading the durations here keeps that single pass single.
+    deco_sprites: t.List[Image.Image] = []
+    deco_duration = 0
     if avatar_frame_bytes:
         try:
-            deco_src = Image.open(BytesIO(avatar_frame_bytes))
-        except (ValueError, UnidentifiedImageError) as e:
-            deco_src = None
+            source = Image.open(BytesIO(avatar_frame_bytes))
+            durations = []
+            for frame in ImageSequence.Iterator(source):
+                frame.load()
+                if duration := frame.info.get("duration"):
+                    durations.append(duration)
+                deco_sprites.append(
+                    frame.convert("RGBA").resize((sprite_size, sprite_size), Image.Resampling.LANCZOS)
+                )
+            if durations:
+                deco_duration = sum(durations) // len(durations)
+        except (ValueError, UnidentifiedImageError, OSError) as e:
+            deco_sprites = []
             if reraise:
                 raise e
-            log.error(f"Failed to open avatar decoration for {username}", exc_info=e)
-    deco_animated = getattr(deco_src, "is_animated", False)
-    deco_frames = getattr(deco_src, "n_frames", 1) if deco_animated else 1
-    frame_pad = int(pfp_size * 0.1) if deco_src is not None else 0
-    pfp_paste = (circle_x - frame_pad, circle_y - frame_pad)
+            log.error(f"Failed to read avatar decoration for {username}", exc_info=e)
+    if not deco_sprites:
+        frame_pad = 0
+        pfp_paste = (circle_x, circle_y)
+    deco_frames = max(len(deco_sprites), 1)
 
     def dress_avatar(circle_img: Image.Image, index: int = 0) -> Image.Image:
         """The circular avatar with one frame of its decoration over it."""
-        if deco_src is None:
+        if not deco_sprites:
             return circle_img
-        if deco_animated:
-            deco_src.seek(index % deco_frames)
-        size = circle_img.width + frame_pad * 2
-        sprite = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        sprite = Image.new("RGBA", (sprite_size, sprite_size), (0, 0, 0, 0))
         sprite.paste(circle_img, (frame_pad, frame_pad), circle_img)
-        deco = deco_src.convert("RGBA").resize((size, size), Image.Resampling.LANCZOS)
-        return Image.alpha_composite(sprite, deco)
+        return Image.alpha_composite(sprite, deco_sprites[index % len(deco_sprites)])
 
     # ---------------- Fonts ----------------
     font_path = font_path or imgtools.DEFAULT_FONT
@@ -368,7 +382,7 @@ def generate_default_profile(
     draw = ImageDraw.Draw(ink)
 
     # A ring around the avatar, unless the member brought their own frame.
-    if deco_src is None:
+    if not deco_sprites:
         ring_w = 3 if square else 4
         ring_pad = ring_w / 2 + 2
         draw.ellipse(
@@ -646,10 +660,11 @@ def generate_default_profile(
 
     # Durations have to be read before anything seeks these files.
     avg_duration = 0
-    for source, animated in ((pfp, pfp_animated), (card, bg_animated), (deco_src, deco_animated)):
+    for source, animated in ((pfp, pfp_animated), (card, bg_animated)):
         if animated and not avg_duration:
             avg_duration = imgtools.get_avg_duration(source)
-    avg_duration = avg_duration or 60
+    # The decoration's was read while its frames were decoded.
+    avg_duration = avg_duration or deco_duration or 60
     # Past this the file is large enough that the cog just has to shrink it
     # again, and the extra frames buy nothing anyone can see.
     frame_count = min(frame_count, 50)
