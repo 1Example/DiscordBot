@@ -28,13 +28,18 @@ CREDENTIAL_HELP = (
     {
         "key": "twitch",
         "label": "Twitch",
-        "docs": "https://dev.twitch.tv/dashboard/apps",
+        "docs": "https://dev.twitch.tv/console/apps",
         "steps": [
             "Open the Twitch developer console linked above.",
             "Click <b>Register Your Application</b>.",
-            "Enter a name, set the OAuth Redirect URI to <code>http://localhost</code>,"
-            " and pick any application category.",
-            "Click <b>Register</b>, then copy the client ID and the client secret.",
+            "Enter a name, then add <code>https://localhost</code> as an OAuth"
+            " Redirect URL and press <b>Add</b>. Twitch rejects <code>http://</code>"
+            " here - it requires HTTPS.",
+            "Pick any category, and leave <b>Client Type</b> on <b>Confidential</b>."
+            " A Public client is never issued a secret.",
+            "Click <b>Create</b>.",
+            "Open the app with <b>Manage</b>, copy the client ID, then click"
+            " <b>New Secret</b> and copy that too - the secret is only shown once.",
         ],
         "fields": ("client_id", "client_secret"),
     },
