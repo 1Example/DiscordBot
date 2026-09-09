@@ -237,16 +237,6 @@ def generate_default_profile(
     # Establish layer for all text and accents
     stats = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
 
-    # Setup progress bar
-    progress = (current_xp - previous_xp) / (next_xp - previous_xp)
-    level_bar = imgtools.make_progress_bar(
-        bar_width,
-        bar_height,
-        progress,
-        level_bar_color,
-    )
-    stats.paste(level_bar, (bar_start, bar_top), level_bar)
-
     # Establish font
     font_path = font_path or imgtools.DEFAULT_FONT
     if isinstance(font_path, str):
@@ -260,176 +250,176 @@ def generate_default_profile(
     # Convert back to string
     font_path = str(font_path)
 
+    def sized(points: int) -> ImageFont.FreeTypeFont:
+        return ImageFont.truetype(font_path, points)
+
+    def fitted(text: str, points: int, limit: float) -> ImageFont.FreeTypeFont:
+        """The largest size at or below `points` keeping `text` inside `limit`."""
+        font = sized(points)
+        while points > 11 and font.getlength(text) > limit:
+            points -= 1
+            font = sized(points)
+        return font
+
+    accent = tuple(user_color[:3])
+    muted = (*stat_color[:3], 195)
+    progress = (current_xp - previous_xp) / (next_xp - previous_xp)
+
+    # ---------------- Grade the whole card ----------------
+    # A diagonal wash rather than a box: the background stays visible at the
+    # top right and gets out of the way everywhere text lands.
+    width, height = desired_card_size
+    grade = Image.new("L", (width, height))
+    grade_px = grade.load()
+    for x in range(0, width, 2):
+        for y in range(0, height, 2):
+            # 0 at the top right corner, 1 at the bottom left
+            t = ((width - x) / width) * 0.55 + (y / height) * 0.45
+            # A mid alpha over a pale photo just reads as grey haze, so the
+            # floor is high: the background becomes texture and atmosphere
+            # rather than something the text has to compete with.
+            value = 148 + int(min(1.0, t) ** 1.3 * 92)
+            grade_px[x, y] = value
+            if x + 1 < width:
+                grade_px[x + 1, y] = value
+            if y + 1 < height:
+                grade_px[x, y + 1] = value
+                if x + 1 < width:
+                    grade_px[x + 1, y + 1] = value
+    # Tinted a touch toward the accent so the card feels lit, not just dim.
+    wash = Image.new(
+        "RGBA",
+        (width, height),
+        (max(8, accent[0] // 12), max(10, accent[1] // 12), max(18, accent[2] // 10), 255),
+    )
+    wash.putalpha(grade)
+    stats = Image.alpha_composite(stats, wash)
     draw = ImageDraw.Draw(stats)
-    # ---------------- Username text ----------------
-    fontsize = 60
-    font = ImageFont.truetype(font_path, fontsize)
+
+    # ---------------- XP ring around the avatar ----------------
+    ring_box = (circle_x - 22, circle_y - 22, circle_x + 352, circle_y + 352)
+    draw.arc(ring_box, 0, 360, fill=(*stat_color[:3], 55), width=14)
+    if progress > 0:
+        draw.arc(ring_box, -90, -90 + int(360 * min(progress, 1.0)), fill=accent, width=14)
+
+    # ---------------- Right column ----------------
+    # Derived from the card, not hardcoded: the square variant is 450 wide,
+    # where a column starting at 430 has negative width and PIL refuses to
+    # draw it. Nothing passes square= today, but it should degrade rather
+    # than raise if something starts to.
+    beside_avatar = width >= 900
+    col_x = 430 if beside_avatar else 30
+    col_right = width - 45
+    col_width = col_right - col_x
+
+    # Name, with prestige beside it since it qualifies the name.
+    name_font = fitted(username, 58, col_width - 70)
+    name_y = 42 if beside_avatar else circle_y + 350
     with Pilmoji(stats) as pilmoji:
-        # Ensure text doesnt pass star_icon_x
-        while pilmoji.getsize(username, font)[0] + stat_start > star_icon_x - 10:
-            fontsize -= 1
-            font = ImageFont.truetype(font_path, fontsize)
         pilmoji.text(
-            xy=(stat_start, name_y),
+            xy=(col_x, name_y),
             text=username,
             fill=user_color,
-            stroke_width=stroke_width,
+            stroke_width=1,
             stroke_fill=default_fill,
-            font=font,
+            font=name_font,
         )
-    # ---------------- Prestige text ----------------
-    if prestige:
-        text = _("(Prestige {})").format(f"{humanize_number(prestige)}")
-        fontsize = 40
-        font = ImageFont.truetype(font_path, fontsize)
-        # Ensure text doesnt pass stat_end
-        while font.getlength(text) + stat_start > stat_end:
-            fontsize -= 1
-            font = ImageFont.truetype(font_path, fontsize)
+    if prestige and prestige_emoji_bytes:
+        try:
+            icon = Image.open(BytesIO(prestige_emoji_bytes)).resize((46, 46), Image.Resampling.LANCZOS)
+            stats.paste(icon, (int(col_x + name_font.getlength(username) + 14), name_y + 8), icon)
+        except (ValueError, UnidentifiedImageError) as e:
+            if reraise:
+                raise e
+            log.error(f"Failed to paste prestige emoji for {username}", exc_info=e)
+
+    # ---------------- Standing: rank, level, stars ----------------
+    # Rank carries a colour in the top three, the way a leaderboard does.
+    medal = {1: (255, 197, 66), 2: (196, 202, 212), 3: (198, 128, 74)}.get(position)
+    pills = [
+        (_("RANK"), f"#{humanize_number(position)}", medal or accent),
+        (_("LEVEL"), humanize_number(level), accent),
+        (_("STARS"), humanize_number(stars), (*stat_color[:3], 255)),
+    ]
+    pill_y = name_y + 74
+    pill_h = 46
+    pill_x = col_x
+    label_font = sized(19)
+    for label, value, colour in pills:
+        value_font = sized(30)
+        inner = label_font.getlength(label) + 10 + value_font.getlength(value)
+        pill_w = inner + 46
+        draw.rounded_rectangle(
+            (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
+            radius=pill_h // 2,
+            fill=(8, 10, 18, 160),
+            outline=(*colour[:3], 150),
+            width=2,
+        )
+        draw.text((pill_x + 22, pill_y + 15), label, fill=(*colour[:3], 210), font=label_font)
         draw.text(
-            xy=(stat_start, name_y + 70),
-            text=text,
-            fill=stat_color,
-            stroke_width=stroke_width,
-            stroke_fill=default_fill,
-            font=font,
+            (pill_x + 22 + label_font.getlength(label) + 10, pill_y + 8),
+            value,
+            fill=colour[:3],
+            font=value_font,
         )
-        if prestige_emoji:
-            prestige_icon = Image.open(BytesIO(prestige_emoji)).resize((50, 50), Image.Resampling.LANCZOS)
-            if prestige_icon.mode != "RGBA":
-                prestige_icon = prestige_icon.convert("RGBA")
-            placement = (round(stat_start + font.getlength(text) + 10), name_y + 65)
-            stats.paste(prestige_icon, placement, prestige_icon)
-    # ---------------- Stars text ----------------
-    text = humanize_number(stars)
-    fontsize = 60
-    font = ImageFont.truetype(font_path, fontsize)
-    # Ensure text doesnt pass stat_end
-    while font.getlength(text) + star_text_x > stat_end:
-        fontsize -= 1
-        font = ImageFont.truetype(font_path, fontsize)
+        pill_x += pill_w + 12
+
+    # ---------------- Stat tiles ----------------
+    tiles = [
+        (_("MESSAGES"), humanize_number(messages)),
+        (_("VOICE"), imgtools.abbreviate_time(voicetime, short=True) if voicetime else "-"),
+        (_("BALANCE"), f"{imgtools.abbreviate_number(balance)}"),
+        (_("TOTAL XP"), imgtools.abbreviate_number(current_xp)),
+    ]
+    tile_y = pill_y + pill_h + 20
+    tile_h = 82
+    gap = 12
+    tile_w = (col_width - gap * (len(tiles) - 1)) / len(tiles)
+    for index, (label, value) in enumerate(tiles):
+        tx = col_x + index * (tile_w + gap)
+        draw.rounded_rectangle(
+            (tx, tile_y, tx + tile_w, tile_y + tile_h),
+            radius=14,
+            fill=(8, 10, 18, 170),
+            outline=(255, 255, 255, 42),
+            width=1,
+        )
+        draw.text((tx + 14, tile_y + 12), label, fill=muted, font=sized(19))
+        draw.text(
+            (tx + 14, tile_y + 33),
+            value,
+            fill=stat_color,
+            font=fitted(value, 34, tile_w - 28),
+        )
+
+    # ---------------- Experience ----------------
+    remaining = max(next_xp - current_xp, 0)
+    bar_y = tile_y + tile_h + 26
+    bar_h = 26
+    level_bar = imgtools.make_progress_bar(int(col_width), bar_h, progress, level_bar_color)
+    stats.paste(level_bar, (col_x, bar_y + 22), level_bar)
+    small = sized(21)
     draw.text(
-        xy=(star_text_x, star_text_y),
-        text=text,
-        fill=stat_color,
-        stroke_width=stroke_width,
-        stroke_fill=default_fill,
-        font=font,
+        (col_x, bar_y),
+        _("{} / {} XP").format(
+            humanize_number(current_xp - previous_xp), humanize_number(next_xp - previous_xp)
+        ),
+        fill=muted,
+        font=small,
     )
-    stats.paste(imgtools.STAR, (star_icon_x, star_icon_y), imgtools.STAR)
-    # ---------------- Rank text ----------------
-    text = _("Rank: {}").format(f"#{humanize_number(position)}")
-    fontsize = 40
-    font = ImageFont.truetype(font_path, fontsize)
-    # Ensure text doesnt pass stat_split point
-    while font.getlength(text) + stat_start > stat_split - 5:
-        fontsize -= 1
-        font = ImageFont.truetype(font_path, fontsize)
+    right_text = _("{} XP to level {}").format(humanize_number(remaining), humanize_number(level + 1))
     draw.text(
-        xy=(stat_start, stats_y),
-        text=text,
-        fill=stat_color,
-        stroke_width=stroke_width,
-        stroke_fill=default_fill,
-        font=font,
+        (col_right - small.getlength(right_text), bar_y),
+        right_text,
+        fill=muted,
+        font=small,
     )
-    # ---------------- Level text ----------------
-    text = _("Level: {}").format(humanize_number(level))
-    fontsize = 40
-    font = ImageFont.truetype(font_path, fontsize)
-    # Ensure text doesnt pass the stat_split point
-    while font.getlength(text) + stat_start > stat_split - 5:
-        fontsize -= 1
-        font = ImageFont.truetype(font_path, fontsize)
-    draw.text(
-        xy=(stat_start, stats_y + stat_offset),
-        text=text,
-        fill=stat_color,
-        stroke_width=stroke_width,
-        stroke_fill=default_fill,
-        font=font,
-    )
-    # ---------------- Messages text ----------------
-    text = _("Messages: {}").format(humanize_number(messages))
-    fontsize = 40
-    font = ImageFont.truetype(font_path, fontsize)
-    # Ensure text doesnt pass the stat_end
-    while font.getlength(text) + stat_split > stat_end:
-        fontsize -= 1
-        font = ImageFont.truetype(font_path, fontsize)
-    draw.text(
-        xy=(stat_split, stats_y),
-        text=text,
-        fill=stat_color,
-        stroke_width=stroke_width,
-        stroke_fill=default_fill,
-        font=font,
-    )
-    # ---------------- Voice text ----------------
-    text = _("Voice: {}").format(imgtools.abbreviate_time(voicetime))
-    fontsize = 40
-    font = ImageFont.truetype(font_path, fontsize)
-    # Ensure text doesnt pass the stat_end
-    while font.getlength(text) + stat_split > stat_end:
-        fontsize -= 1
-        font = ImageFont.truetype(font_path, fontsize)
-    draw.text(
-        xy=(stat_split, stats_y + stat_offset),
-        text=text,
-        fill=stat_color,
-        stroke_width=stroke_width,
-        stroke_fill=default_fill,
-        font=font,
-    )
-    # ---------------- Balance text ----------------
-    if balance:
-        text = _("Balance: {}").format(f"{humanize_number(balance)} {currency_name}")
-        font = ImageFont.truetype(font_path, 40)
-        with Pilmoji(stats) as pilmoji:
-            # Ensure text doesnt pass the stat_end
-            while pilmoji.getsize(text, font)[0] + stat_start > stat_end:
-                fontsize -= 1
-                font = ImageFont.truetype(font_path, fontsize)
-            placement = (stat_start, stat_bottom - stat_offset * 2)
-            pilmoji.text(
-                xy=placement,
-                text=text,
-                fill=stat_color,
-                stroke_width=stroke_width,
-                stroke_fill=default_fill,
-                font=font,
-            )
-    # ---------------- Experience text ----------------
-    current = current_xp - previous_xp
-    goal = next_xp - previous_xp
-    text = _("Exp: {} ({} total)").format(
-        f"{humanize_number(current)}/{humanize_number(goal)}", humanize_number(current_xp)
-    )
-    fontsize = 40
-    font = ImageFont.truetype(font_path, fontsize)
-    # Ensure text doesnt pass the stat_end
-    while font.getlength(text) + stat_start > stat_end:
-        fontsize -= 1
-        font = ImageFont.truetype(font_path, fontsize)
-    draw.text(
-        xy=(stat_start, stat_bottom - stat_offset),
-        text=text,
-        fill=stat_color,
-        stroke_width=stroke_width,
-        stroke_fill=default_fill,
-        font=font,
-    )
+
     # ---------------- Profile Accents ----------------
-    # Draw a circle outline around where the avatar is
-    # Calculate the circle outline's placement around the avatar
-    circle = imgtools.make_circle_outline(thickness=5, color=user_color)
-    outline_size = (380, 380)
-    circle = circle.resize(outline_size, Image.Resampling.LANCZOS)
-    placement = (circle_x - 25, circle_y - 25)
-    stats.paste(circle, placement, circle)
     # Place status icon
-    status_icon = imgtools.STATUS[status].resize((75, 75), Image.Resampling.LANCZOS)
-    stats.paste(status_icon, (circle_x + 260, circle_y + 260), status_icon)
+    status_icon = imgtools.STATUS[status].resize((66, 66), Image.Resampling.LANCZOS)
+    stats.paste(status_icon, (circle_x + 262, circle_y + 262), status_icon)
     # Paste role icon on top left of profile circle
     if role_icon_bytes:
         try:
