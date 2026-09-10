@@ -67,6 +67,11 @@ class User(MixinMeta):
     )
 
     @app_commands.command(name="leveltop", extras={"red_force_enable": True})
+    @app_commands.describe(
+        stat="What to rank by: xp, level, voice or messages. Defaults to xp.",
+        globalstats="Rank across every server I am in, rather than just this one.",
+        displayname="Use nicknames rather than usernames.",
+    )
     @app_commands.guild_only()
     async def leveltop(
         self,
@@ -122,6 +127,7 @@ class User(MixinMeta):
         await DynamicMenu(ctx, pages).refresh()
 
     @app_commands.command(name="profiledata", extras={"red_force_enable": True})
+    @app_commands.describe(user_id="The ID of the member whose stored profile you want.")
     @app_commands.guild_only()
     @app_checks.mod_or_permissions(manage_messages=True)
     async def profile_data(self, interaction: discord.Interaction, user_id: int):
@@ -177,6 +183,7 @@ class User(MixinMeta):
         self.save()
 
     @app_commands.command(name="profile", extras={"red_force_enable": True})
+    @app_commands.describe(user="Whose profile. Defaults to yours.")
     @app_commands.guild_only()
     @app_checks.cooldown(3, 10)
     async def profile(self, interaction: discord.Interaction, user: t.Optional[discord.Member] = None):
@@ -402,6 +409,9 @@ class User(MixinMeta):
         await ctx.send(txt)
 
     @set_profile.command(name="addbackground")
+    @app_commands.describe(
+        preferred_filename="What to call it. Defaults to the name of the file you attach."
+    )
     @app_checks.is_owner()
     async def add_background(self, interaction: discord.Interaction, preferred_filename: str = None):
         """
@@ -442,6 +452,7 @@ class User(MixinMeta):
         await ctx.send(_("Your custom background has been saved as {}").format(f"`{filename}`"))
 
     @set_profile.command(name="rembackground")
+    @app_commands.describe(filename="Which background to delete, by its filename.")
     @app_checks.is_owner()
     async def remove_background(self, interaction: discord.Interaction, *, filename: str):
         """Remove a default background from the cog's backgrounds folder"""
@@ -469,6 +480,9 @@ class User(MixinMeta):
         await ctx.send(txt)
 
     @set_profile.command(name="addfont")
+    @app_commands.describe(
+        preferred_filename="What to call it. Defaults to the name of the file you attach."
+    )
     @app_checks.is_owner()
     async def add_font(self, interaction: discord.Interaction, preferred_filename: str = None):
         """
@@ -505,6 +519,7 @@ class User(MixinMeta):
         await ctx.send(_("Your custom font has been saved as {}").format(f"`{filename}`"))
 
     @set_profile.command(name="remfont")
+    @app_commands.describe(filename="Which font to delete, by its filename.")
     @app_checks.is_owner()
     async def remove_font(self, interaction: discord.Interaction, *, filename: str):
         """Remove a default font from the cog's fonts folder"""
@@ -575,6 +590,7 @@ class User(MixinMeta):
             await ctx.send(txt, file=file)
 
     @set_profile.command(name="style")
+    @app_commands.describe(style="Which card layout to use.")
     async def toggle_profile_style(
         self,
         interaction: discord.Interaction,
@@ -658,6 +674,7 @@ class User(MixinMeta):
         await ctx.send(embed=embed)
 
     @set_profile.command(name="statcolor")
+    @app_commands.describe(color="A colour name or hex code, or `default` to clear it.")
     @app_checks.bot_has_permissions(embed_links=True, attach_files=True)
     async def set_stat_color(self, interaction: discord.Interaction, *, color: str):
         """
@@ -692,6 +709,7 @@ class User(MixinMeta):
         await ctx.send(embed=embed)
 
     @set_profile.command(name="barcolor")
+    @app_commands.describe(color="A colour name or hex code, or `default` to clear it.")
     @app_checks.bot_has_permissions(embed_links=True, attach_files=True)
     async def set_levelbar_color(self, interaction: discord.Interaction, *, color: str):
         """
@@ -746,6 +764,9 @@ class User(MixinMeta):
         return choices
 
     @set_profile.command(name="background")
+    @app_commands.describe(
+        url="An image link, a bundled filename, `random`, or leave it empty to reset."
+    )
     @app_checks.bot_has_permissions(embed_links=True)
     async def set_user_background(
         self,
@@ -885,6 +906,7 @@ class User(MixinMeta):
         await ctx.send(txt, file=file)
 
     @set_profile.command(name="font")
+    @app_commands.describe(font_name="Which font. Run /setprofile fonts to see them.")
     async def set_user_font(self, interaction: discord.Interaction, *, font_name: str):
         """
         Set a font for your profile

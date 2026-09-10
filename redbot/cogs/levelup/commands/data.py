@@ -241,6 +241,12 @@ class DataAdmin(MixinMeta):
         await ctx.send(_("Cog data restored!"))
 
     @lvldata.command(name="importamari")
+    @app_commands.describe(
+        import_by="Match the other bot's levels, or its raw experience.",
+        replace="Overwrite what people already have here, rather than adding to it.",
+        api_key="Your Amari API key.",
+        all_users="Import everyone the other bot knows, not just members of this server.",
+    )
     @app_checks.admin_or_permissions(manage_guild=True)
     @app_checks.guildowner()
     async def import_amari_data(
@@ -469,6 +475,11 @@ class DataAdmin(MixinMeta):
             await msg.edit(content=_("Imported data for {} users from Fixator's Leveler cog!").format(imported))
 
     @lvldata.command(name="importmalarne")
+    @app_commands.describe(
+        import_by="Match the other bot's levels, or its raw experience.",
+        replace="Overwrite what people already have here, rather than adding to it.",
+        all_users="Import everyone the other bot knows, not just members of this server.",
+    )
     @app_checks.admin_or_permissions(manage_guild=True)
     @app_checks.is_owner()
     async def import_from_malarne(
@@ -538,6 +549,12 @@ class DataAdmin(MixinMeta):
         self.save()
 
     @lvldata.command(name="importmee6")
+    @app_commands.describe(
+        import_by="Match the other bot's levels, or its raw experience.",
+        replace="Overwrite what people already have here, rather than adding to it.",
+        include_settings="Bring the other bot's level roles and settings across too.",
+        all_users="Import everyone the other bot knows, not just members of this server.",
+    )
     @app_checks.admin_or_permissions(manage_guild=True)
     @app_checks.guildowner()
     async def import_from_mee6(
@@ -667,6 +684,11 @@ class DataAdmin(MixinMeta):
             self.save()
 
     @lvldata.command(name="importpolaris")
+    @app_commands.describe(
+        replace="Overwrite what people already have here, rather than adding to it.",
+        include_settings="Bring the other bot's level roles and settings across too.",
+        all_users="Import everyone the other bot knows, not just members of this server.",
+    )
     @app_checks.admin_or_permissions(manage_guild=True)
     @app_checks.guildowner()
     async def import_from_polaris(
