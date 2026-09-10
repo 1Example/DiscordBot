@@ -159,6 +159,9 @@ class DashboardIntegration:
             "auto_voice_afk": bool(auto.get("AUTO_PAYDAY_VOICE_AFK")),
             "auto_voice_alone": bool(auto.get("AUTO_PAYDAY_VOICE_ALONE")),
             "auto_voice_deaf": bool(auto.get("AUTO_PAYDAY_VOICE_DEAF")),
+            "auto_msg_rate": auto.get("AUTO_PAYDAY_MESSAGE_RATE", 0),
+            "auto_msg_min": auto.get("AUTO_PAYDAY_MESSAGE_MIN", 0),
+            "auto_msg_max": auto.get("AUTO_PAYDAY_MESSAGE_MAX", 0),
             "auto_voice_preview": await self._eco_voice_preview(guild, auto),
             "auto_voice_live": sum(
                 1
@@ -241,7 +244,7 @@ class DashboardIntegration:
                 }
             ]
 
-        mode = "voice" if (field("auto_mode") or "fixed") == "voice" else "fixed"
+        mode = "earned" if (field("auto_mode") or "fixed") in ("earned", "voice") else "fixed"
         rate = field.integer("auto_voice_rate", 100)
         minutes = field.integer("auto_voice_min", 0)
         ceiling = field.integer("auto_voice_max", 0)
@@ -288,6 +291,9 @@ class DashboardIntegration:
         await conf.AUTO_PAYDAY_VOICE_AFK.set(field.checked("auto_voice_afk"))
         await conf.AUTO_PAYDAY_VOICE_ALONE.set(field.checked("auto_voice_alone"))
         await conf.AUTO_PAYDAY_VOICE_DEAF.set(field.checked("auto_voice_deaf"))
+        await conf.AUTO_PAYDAY_MESSAGE_RATE.set(max(0, field.integer("auto_msg_rate", 0) or 0))
+        await conf.AUTO_PAYDAY_MESSAGE_MIN.set(max(0, field.integer("auto_msg_min", 0) or 0))
+        await conf.AUTO_PAYDAY_MESSAGE_MAX.set(max(0, field.integer("auto_msg_max", 0) or 0))
         # The clocks read these on every voice event, so drop what they have
         # cached, and start counting whoever is already talking.
         await self.resync_voice(guild)
@@ -964,21 +970,21 @@ ECONOMY_TEMPLATE = (
         <select class="dz-input" name="auto_mode" id="eco-mode"
                 style="max-width:280px;"
                 onchange="document.getElementById('eco-voice').style.display =
-                          this.value === 'voice' ? 'block' : 'none';">
-          <option value="fixed" {% if auto_mode != 'voice' %}selected{% endif %}>
+                          this.value === 'earned' ? 'block' : 'none';">
+          <option value="fixed" {% if auto_mode not in ('earned', 'voice') %}selected{% endif %}>
             The same amount for everyone
           </option>
-          <option value="voice" {% if auto_mode == 'voice' %}selected{% endif %}>
-            Paid for time spent in voice
+          <option value="earned" {% if auto_mode in ('earned', 'voice') %}selected{% endif %}>
+            Paid for voice time and messages
           </option>
         </select>
         <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
-          The fixed amount is the payday amount above. Voice pay counts only the
-          time since the last payslip, so it rewards the day just gone.
+          The fixed amount is the payday amount above. Earned pay counts only
+          what happened since the last payslip, so it rewards the day just gone.
         </div>
 
         <div id="eco-voice"
-             style="display:{% if auto_mode == 'voice' %}block{% else %}none{% endif %};
+             style="display:{% if auto_mode in ('earned', 'voice') %}block{% else %}none{% endif %};
                     margin-top:13px;">
           <div class="dz-grid two">
             <div>
@@ -999,6 +1005,29 @@ ECONOMY_TEMPLATE = (
           <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
             0 for no cap. Per-role payday amounts act as per-hour rates in this
             mode, so a role that pays more still pays more.
+          </div>
+
+          <div class="dz-label" style="margin-top:15px;">{{ currency }} per message</div>
+          <div class="dz-grid two">
+            <div>
+              <input class="dz-input" type="number" min="0" name="auto_msg_rate"
+                     value="{{ auto_msg_rate }}" />
+              <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+                0 pays nothing for messages, which leaves this a voice-only payday.
+              </div>
+            </div>
+            <div>
+              <div class="dz-label" style="margin-top:0;">Messages needed to earn anything</div>
+              <input class="dz-input" type="number" min="0" name="auto_msg_min"
+                     value="{{ auto_msg_min }}" />
+            </div>
+          </div>
+          <div class="dz-label" style="margin-top:11px;">Most anyone can earn from messages</div>
+          <input class="dz-input" type="number" min="0" name="auto_msg_max"
+                 value="{{ auto_msg_max }}" style="max-width:200px;" />
+          <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
+            0 for no cap. Counted per message, not per character, so this pays
+            the same for a novel and for "k" - keep the rate low.
           </div>
 
           <div style="margin-top:12px;">

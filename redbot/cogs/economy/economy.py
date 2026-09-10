@@ -50,7 +50,7 @@ DEFAULT_PAYDAY_TITLE = "\N{MONEY WITH WINGS} Payslip's here"
 DEFAULT_PAYDAY_MESSAGE = "**{bot}** pays **{total} {currency}** to **{members}** members."
 DEFAULT_VOICE_PAYDAY_MESSAGE = (
     "**{bot}** pays **{total} {currency}** to **{members}** members "
-    "for **{voice}** in voice."
+    "for **{voice}** in voice and **{messages}** messages."
 )
 
 NUM_ENC = "\N{COMBINING ENCLOSING KEYCAP}"
@@ -128,12 +128,18 @@ class Economy(DashboardIntegration, commands.Cog):
         # One clock for the whole server. Without this each member drifts onto
         # their own timer and a server ends up with a payslip per person.
         "AUTO_PAYDAY_LAST": 0,
-        # "fixed" pays everyone the same; "voice" pays for time spent talking.
+        # "fixed" pays everyone the same; "earned" pays for what people did.
+        # Stored configs may still say "voice", which means the same thing.
         "AUTO_PAYDAY_MODE": "fixed",
         # Credits per hour of voice, and the bounds around it.
         "AUTO_PAYDAY_VOICE_RATE": 100,
         "AUTO_PAYDAY_VOICE_MIN": 5,
         "AUTO_PAYDAY_VOICE_MAX": 0,
+        # Credits per message, and the bounds around it. 0 pays nothing for
+        # messages, which is how an earned payday behaved before.
+        "AUTO_PAYDAY_MESSAGE_RATE": 0,
+        "AUTO_PAYDAY_MESSAGE_MIN": 0,
+        "AUTO_PAYDAY_MESSAGE_MAX": 0,
         # What still counts as being present.
         "AUTO_PAYDAY_VOICE_AFK": False,
         "AUTO_PAYDAY_VOICE_ALONE": False,
@@ -144,7 +150,13 @@ class Economy(DashboardIntegration, commands.Cog):
 
     # voice_seconds is what has been earned since the last payday, so a voice
     # payday pays for the day just gone rather than for all of history.
-    default_member_settings = {"next_payday": 0, "last_slot": 0, "voice_seconds": 0}
+    default_member_settings = {
+        "next_payday": 0,
+        "last_slot": 0,
+        "voice_seconds": 0,
+        # Counted since the last payday, for the same reason as voice_seconds.
+        "message_count": 0,
+    }
 
     default_role_settings = {"PAYDAY_CREDITS": 0}
 
@@ -212,7 +224,7 @@ class Economy(DashboardIntegration, commands.Cog):
             return cached[1]
         conf = await self.config.guild(guild).all()
         rules = {
-            "voice": (conf.get("AUTO_PAYDAY_MODE") or "fixed") == "voice",
+            "voice": Economy.is_earned_mode(conf.get("AUTO_PAYDAY_MODE")),
             "afk": bool(conf.get("AUTO_PAYDAY_VOICE_AFK")),
             "alone": bool(conf.get("AUTO_PAYDAY_VOICE_ALONE")),
             "deaf": bool(conf.get("AUTO_PAYDAY_VOICE_DEAF")),
@@ -276,6 +288,29 @@ class Economy(DashboardIntegration, commands.Cog):
         elif started is not None:
             del open_here[member.id]
             await self._voice_bank(member, time.monotonic() - started)
+
+    @staticmethod
+    def is_earned_mode(mode: str) -> bool:
+        """Whether a payday pays for what people did, rather than a flat rate.
+
+        "voice" is what this mode used to be called, back when voice was all it
+        could pay for. Reading it this way means no stored config has to change.
+        """
+        return (mode or "fixed") in ("earned", "voice")
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message) -> None:
+        """Count a message toward its author's next payday."""
+        guild = message.guild
+        if guild is None or message.author.bot:
+            return
+        settings = await self.config.guild(guild).all()
+        if not self.is_earned_mode(settings.get("AUTO_PAYDAY_MODE")):
+            return
+        if not int(settings.get("AUTO_PAYDAY_MESSAGE_RATE") or 0):
+            return
+        conf = self.config.member(message.author)
+        await conf.message_count.set(int(await conf.message_count()) + 1)
 
     async def _voice_flush(self, guild: discord.Guild = None) -> None:
         """Bank what is on the clock so far, leaving running clocks running."""
@@ -373,10 +408,13 @@ class Economy(DashboardIntegration, commands.Cog):
                 "skipped": True,
             }
 
-        voice_mode = (settings.get("AUTO_PAYDAY_MODE") or "fixed") == "voice"
+        voice_mode = self.is_earned_mode(settings.get("AUTO_PAYDAY_MODE"))
         rate = max(0, int(settings.get("AUTO_PAYDAY_VOICE_RATE") or 0))
         min_seconds = max(0, int(settings.get("AUTO_PAYDAY_VOICE_MIN") or 0)) * 60
         cap = max(0, int(settings.get("AUTO_PAYDAY_VOICE_MAX") or 0))
+        msg_rate = max(0, int(settings.get("AUTO_PAYDAY_MESSAGE_RATE") or 0))
+        msg_min = max(0, int(settings.get("AUTO_PAYDAY_MESSAGE_MIN") or 0))
+        msg_cap = max(0, int(settings.get("AUTO_PAYDAY_MESSAGE_MAX") or 0))
         earned: dict = {}
         if voice_mode:
             # Bank the live clocks first, so the payslip counts the minutes
@@ -389,6 +427,7 @@ class Economy(DashboardIntegration, commands.Cog):
         paid: list[discord.Member] = []
         capped = 0
         voice_seconds = 0
+        message_count = 0
         top: list[tuple[str, int, int]] = []
 
         for member in guild.members:
@@ -398,18 +437,37 @@ class Economy(DashboardIntegration, commands.Cog):
                 continue
 
             seconds = 0
+            messages = 0
             if voice_mode:
-                seconds = int((earned.get(member.id) or {}).get("voice_seconds", 0) or 0)
-                if seconds < min_seconds or rate <= 0:
+                row = earned.get(member.id) or {}
+                seconds = int(row.get("voice_seconds", 0) or 0)
+                messages = int(row.get("message_count", 0) or 0)
+
+                # Voice and messages are two halves of the same payday; either
+                # can be switched off by setting its rate to 0.
+                amount = 0
+                if rate > 0 and seconds >= min_seconds:
+                    member_rate = (
+                        rate
+                        if is_global
+                        else await self._payday_amount_for(member, rate, role_credits)
+                    )
+                    voice_pay = int(seconds * member_rate / SECONDS_PER_HOUR)
+                    amount += min(voice_pay, cap) if cap else voice_pay
+                else:
+                    seconds = 0
+                if msg_rate > 0 and messages >= msg_min:
+                    member_msg_rate = (
+                        msg_rate
+                        if is_global
+                        else await self._payday_amount_for(member, msg_rate, role_credits)
+                    )
+                    msg_pay = messages * member_msg_rate
+                    amount += min(msg_pay, msg_cap) if msg_cap else msg_pay
+                else:
+                    messages = 0
+                if amount <= 0:
                     continue
-                member_rate = (
-                    rate
-                    if is_global
-                    else await self._payday_amount_for(member, rate, role_credits)
-                )
-                amount = int(seconds * member_rate / SECONDS_PER_HOUR)
-                if cap:
-                    amount = min(amount, cap)
             else:
                 amount = (
                     base_credits
@@ -432,6 +490,7 @@ class Economy(DashboardIntegration, commands.Cog):
                 total += amount
                 paid.append(member)
                 voice_seconds += seconds
+                message_count += messages
                 top.append((member.display_name, amount, seconds))
 
             if is_global:
@@ -445,8 +504,11 @@ class Economy(DashboardIntegration, commands.Cog):
             # The day is settled, so everyone starts the next one from zero,
             # including the people who did not talk enough to earn anything.
             for member_id, data in earned.items():
+                member_conf = self.config.member_from_ids(guild.id, member_id)
                 if data.get("voice_seconds"):
-                    await self.config.member_from_ids(guild.id, member_id).voice_seconds.set(0)
+                    await member_conf.voice_seconds.set(0)
+                if data.get("message_count"):
+                    await member_conf.message_count.set(0)
             now = time.monotonic()
             for member_id in self._voice_open.get(guild.id, {}):
                 self._voice_open[guild.id][member_id] = now
@@ -461,6 +523,7 @@ class Economy(DashboardIntegration, commands.Cog):
             "next": cur_time + payday_time,
             "voice": voice_mode,
             "voice_seconds": voice_seconds,
+            "message_count": message_count,
             "top": top,
             "skipped": False,
         }
@@ -542,6 +605,8 @@ class Economy(DashboardIntegration, commands.Cog):
             "members": humanize_number(members),
             "average": humanize_number(total // members if members else 0),
             "voice": voice_time,
+            # A payslip that pays for messages should be able to mention them.
+            "messages": humanize_number(summary.get("message_count", 0)),
         }
 
         template = settings.get("AUTO_PAYDAY_MESSAGE") or (
