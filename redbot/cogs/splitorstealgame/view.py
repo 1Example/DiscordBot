@@ -42,6 +42,29 @@ class SplitOrStealGameView(discord.ui.View):
             with contextlib.suppress(errors.BalanceTooHigh, RuntimeError):
                 await bank.deposit_credits(member, amount)
 
+    async def safe_refund(self) -> None:
+        """Refund even while this task is being torn down.
+
+        A bot restart or a cog reload cancels the command mid-game, and a
+        cancelled task cannot reliably await anything - so the refund is
+        shielded from the cancellation, and handed to the loop as its own task
+        if it is cancelled anyway. Losing someone's stake to a restart is not
+        an acceptable way for a game to end.
+        """
+        if not self.paid:
+            return
+        try:
+            await asyncio.shield(self.refund_all())
+        except asyncio.CancelledError:
+            self.cog.bot.loop.create_task(self.refund_all())
+            raise
+
+    def stakes_returned(self) -> str:
+        """A line saying the money came back, when any of it did."""
+        if not self.stake:
+            return ""
+        return " " + _("Your stake has been returned.")
+
     @property
     def pot(self) -> int:
         """What the two players are playing for."""
@@ -86,14 +109,26 @@ class SplitOrStealGameView(discord.ui.View):
         self._mode = "join"
         self._message: discord.Message = await self.ctx.send(embed=embed, view=self)
         self.cog.views[self._message] = self
+        try:
+            return await self._run()
+        except commands.UserFeedbackCheckFailure:
+            raise
+        except BaseException:
+            # Cancellation included. Nobody pays for a game the bot abandoned.
+            await self.safe_refund()
+            raise
+
+    async def _run(self) -> discord.Message:
         await asyncio.sleep(60)
         self._mode = "play"
         initial_players = self.initial_players.copy()
         if len(initial_players) < 2:
-            await self.refund_all()
+            await self.safe_refund()
             await self.on_timeout()
             self.stop()
-            raise commands.UserFeedbackCheckFailure(_("At least two players are needed to play."))
+            raise commands.UserFeedbackCheckFailure(
+                _("At least two players are needed to play.") + self.stakes_returned()
+            )
         player_A = random.choice(initial_players)
         initial_players.remove(player_A)
         player_B = random.choice(initial_players)
@@ -145,10 +180,12 @@ class SplitOrStealGameView(discord.ui.View):
         try:
             await asyncio.wait_for(check_conditions(), timeout=60)
         except TimeoutError:
-            await self.refund_all()
+            await self.safe_refund()
             await self.on_timeout()
             self.stop()
-            raise commands.UserFeedbackCheckFailure(_("At least one player has stopped playing."))
+            raise commands.UserFeedbackCheckFailure(
+                _("At least one player has stopped playing.") + self.stakes_returned()
+            )
 
         pot = self.pot
         self.paid.clear()
@@ -201,6 +238,7 @@ class SplitOrStealGameView(discord.ui.View):
         return True
 
     async def on_timeout(self) -> None:
+        await self.refund_all()
         for child in self.children:
             child: discord.ui.Item
             if hasattr(child, "disabled") and not (
