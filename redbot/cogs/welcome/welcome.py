@@ -80,7 +80,12 @@ class Welcome(DashboardIntegration, InviteRewards, Events, commands.Cog):
 
     async def _prime_invite_cache(self) -> None:
         await self.bot.wait_until_red_ready()
-        await self.refresh_all_invite_caches()
+        try:
+            await self.refresh_all_invite_caches()
+        except Exception:
+            # A background task that dies silently is how a feature goes
+            # missing without anyone knowing why.
+            log.exception("Could not read invites at startup; rewards may miss the first join")
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         """

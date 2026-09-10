@@ -35,11 +35,27 @@ INVITE_DEFAULTS = {
 class InviteRewards:
     """Invite tracking and the payouts that hang off it."""
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        # guild id -> {invite code: uses}
-        self.invite_uses: dict[int, dict[str, int]] = {}
-        self._invite_warned: set[int] = set()
+    # Built on first use rather than in __init__. A mixin cannot rely on the
+    # cog it is mixed into calling super().__init__() - Welcome does not - and
+    # a mixin that only works when the host remembers to is a trap.
+
+    @property
+    def invite_uses(self) -> dict[int, dict[str, int]]:
+        """guild id -> {invite code: uses}."""
+        cache = getattr(self, "_invite_uses", None)
+        if cache is None:
+            cache = {}
+            self._invite_uses = cache
+        return cache
+
+    @property
+    def _invite_warned(self) -> set[int]:
+        """Guilds already logged about as unreadable, so it is said once."""
+        seen = getattr(self, "_invite_warned_ids", None)
+        if seen is None:
+            seen = set()
+            self._invite_warned_ids = seen
+        return seen
 
     # ---------------- keeping the counts ----------------
 
