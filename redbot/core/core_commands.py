@@ -580,6 +580,152 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             )
         )
 
+    cog = app_commands.Group(
+        name="cog",
+        description="Load, unload and reload my modules.",
+        extras={"red_force_enable": True},
+        default_permissions=discord.Permissions(administrator=True),
+    )
+
+    async def _cog_choices(
+        self, interaction: discord.Interaction, current: str, loaded: bool
+    ) -> List[app_commands.Choice]:
+        """Module names, either the running ones or the ones that are not."""
+        current = (current or "").lower()
+        try:
+            available = set(await self.bot._cog_mgr.available_modules())
+        except Exception:  # noqa: BLE001
+            available = set()
+        running = {name for name in self.bot.extensions}
+        names = sorted(running if loaded else (available - running))
+        return [
+            app_commands.Choice(name=name, value=name)
+            for name in names
+            if current in name.lower()
+        ][:25]
+
+    async def _loadable(self, interaction: discord.Interaction, current: str):
+        return await self._cog_choices(interaction, current, loaded=False)
+
+    async def _loaded(self, interaction: discord.Interaction, current: str):
+        return await self._cog_choices(interaction, current, loaded=True)
+
+    @staticmethod
+    def _cog_names(raw: str) -> List[str]:
+        """One command takes several names, separated by spaces or commas."""
+        return [part for part in re.split(r"[\s,]+", (raw or "").strip()) if part]
+
+    @cog.command(name="load", description="Start a module that is not running.")
+    @app_checks.is_owner()
+    @app_commands.describe(names="One or more module names, separated by spaces.")
+    @app_commands.autocomplete(names=_loadable)
+    async def cog_load(self, interaction: discord.Interaction, names: str):
+        """Load one or more modules."""
+        ctx = await commands.Context.from_interaction(interaction)
+        wanted = self._cog_names(names)
+        if not wanted:
+            return await ctx.send(_("Name at least one module."), ephemeral=True)
+        await ctx.defer(ephemeral=True)
+        async with ctx.typing():
+            outcome = await self._load(wanted)
+
+        lines = []
+        if loaded := outcome["loaded_packages"]:
+            lines.append(_("Loaded: {names}").format(names=humanize_list(loaded)))
+        if already := outcome["alreadyloaded_packages"]:
+            lines.append(_("Already running: {names}").format(names=humanize_list(already)))
+        if invalid := outcome["invalid_pkg_names"]:
+            lines.append(_("Not a module name: {names}").format(names=humanize_list(invalid)))
+        if failed := outcome["failed_packages"]:
+            lines.append(
+                _("Failed, see the console: {names}").format(names=humanize_list(failed))
+            )
+        for name, reason in (outcome["failed_with_reason_packages"] or {}).items():
+            lines.append(_("{name} failed: {reason}").format(name=name, reason=reason))
+        if not_found := outcome.get("notfound_packages"):
+            lines.append(_("Not installed: {names}").format(names=humanize_list(not_found)))
+        for page in pagify("\n".join(lines) or _("Nothing happened."), page_length=1900):
+            await ctx.send(page, ephemeral=True)
+
+    @cog.command(name="unload", description="Stop a running module.")
+    @app_checks.is_owner()
+    @app_commands.describe(names="One or more module names, separated by spaces.")
+    @app_commands.autocomplete(names=_loaded)
+    async def cog_unload(self, interaction: discord.Interaction, names: str):
+        """Unload one or more modules."""
+        ctx = await commands.Context.from_interaction(interaction)
+        wanted = self._cog_names(names)
+        if not wanted:
+            return await ctx.send(_("Name at least one module."), ephemeral=True)
+        await ctx.defer(ephemeral=True)
+        outcome = await self._unload(wanted)
+
+        lines = []
+        if unloaded := outcome["unloaded_packages"]:
+            lines.append(_("Unloaded: {names}").format(names=humanize_list(unloaded)))
+        if notloaded := outcome["notloaded_packages"]:
+            lines.append(_("Was not running: {names}").format(names=humanize_list(notloaded)))
+        await ctx.send("\n".join(lines) or _("Nothing happened."), ephemeral=True)
+
+    @cog.command(name="reload", description="Restart a running module.")
+    @app_checks.is_owner()
+    @app_commands.describe(names="One or more module names, separated by spaces.")
+    @app_commands.autocomplete(names=_loaded)
+    async def cog_reload(self, interaction: discord.Interaction, names: str):
+        """Reload one or more modules."""
+        ctx = await commands.Context.from_interaction(interaction)
+        wanted = self._cog_names(names)
+        if not wanted:
+            return await ctx.send(_("Name at least one module."), ephemeral=True)
+        await ctx.defer(ephemeral=True)
+        async with ctx.typing():
+            outcome = await self._reload(wanted)
+
+        lines = []
+        if loaded := outcome["loaded_packages"]:
+            lines.append(_("Reloaded: {names}").format(names=humanize_list(loaded)))
+        if invalid := outcome["invalid_pkg_names"]:
+            lines.append(_("Not a module name: {names}").format(names=humanize_list(invalid)))
+        if failed := outcome["failed_packages"]:
+            lines.append(
+                _("Failed, see the console: {names}").format(names=humanize_list(failed))
+            )
+        for name, reason in (outcome["failed_with_reason_packages"] or {}).items():
+            lines.append(_("{name} failed: {reason}").format(name=name, reason=reason))
+        if not_found := outcome.get("notfound_packages"):
+            lines.append(_("Not installed: {names}").format(names=humanize_list(not_found)))
+        for page in pagify("\n".join(lines) or _("Nothing happened."), page_length=1900):
+            await ctx.send(page, ephemeral=True)
+
+    @cog.command(name="list", description="Show which modules are running.")
+    @app_checks.is_owner()
+    async def cog_list(self, interaction: discord.Interaction):
+        """List the modules that are installed, and which are running."""
+        ctx = await commands.Context.from_interaction(interaction)
+        try:
+            available = set(await self.bot._cog_mgr.available_modules())
+        except Exception:  # noqa: BLE001
+            available = set()
+        running = sorted(self.bot.extensions)
+        # Something running from a path that is no longer searched still counts
+        # as running, so union rather than subtract in one direction only.
+        idle = sorted(available - set(running))
+
+        embed = discord.Embed(
+            title=_("Modules"), colour=await ctx.embed_colour()
+        )
+        embed.add_field(
+            name=_("Running ({count})").format(count=len(running)),
+            value=", ".join(f"`{n}`" for n in running) or _("none"),
+            inline=False,
+        )
+        embed.add_field(
+            name=_("Installed, not running ({count})").format(count=len(idle)),
+            value=", ".join(f"`{n}`" for n in idle) or _("none"),
+            inline=False,
+        )
+        await ctx.send(embed=embed, ephemeral=True)
+
     mydata = app_commands.Group(
         name="mydata",
         description="What I know about you, and getting rid of it.",
