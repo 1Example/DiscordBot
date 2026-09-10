@@ -22,7 +22,7 @@ from redbot.core.utils.dashboard_helpers import (
     decode_emoji_image,
     create_guild_emoji,
     emoji_cdn_url,
-    emoji_problem,
+    usable_emoji,
     form_reader,
     guild_member,
     is_staff,
@@ -113,6 +113,10 @@ class DashboardIntegration:
                     "channel_missing": channel is None,
                     "emoji": str(board.emoji),
                     "emoji_image": emoji_cdn_url(str(board.emoji)),
+                    # A board saved before this was validated can hold a
+                    # shortcode, which no reaction will ever match. Say so on
+                    # the board itself rather than leaving it looking fine.
+                    "emoji_bad": bool(usable_emoji(str(board.emoji), guild)[1]),
                     "threshold": board.threshold,
                     "enabled": bool(board.enabled),
                     "selfstar": bool(board.selfstar),
@@ -212,12 +216,14 @@ class DashboardIntegration:
         picked = (field(f"emoji_pick{suffix}") or "").strip()
         typed = (field(f"emoji{suffix}") or "").strip()
         chosen = picked or typed or fallback
-        if chosen == fallback:
-            return fallback, ""
-        partial = discord.PartialEmoji.from_str(chosen)
-        if partial.id is None and len(chosen) > 8:
-            return "", f"{chosen!r} is not an emoji: {emoji_problem(chosen)}."
-        return chosen, ""
+        # The old check only refused strings longer than 8 characters, so
+        # ":star:" - six - was stored verbatim and no reaction ever equalled
+        # it. An unchanged field is validated too, otherwise a bad value
+        # already saved survives every later save untouched.
+        value, problem = usable_emoji(chosen, guild)
+        if problem:
+            return "", f"{chosen!r} is not an emoji: {problem}."
+        return value, ""
 
     async def _sb_save(self, guild: discord.Guild, field) -> list[dict]:
         name = (field("name") or "").strip().lower()
@@ -371,6 +377,7 @@ STARBOARD_TEMPLATE = (
         <h5>
           {% if b.emoji_image %}<img class="dz-emoji" src="{{ b.emoji_image }}" alt="" />
           {% else %}{{ b.emoji }}{% endif %}
+          {% if b.emoji_bad %}<span class="dz-warn">no reaction can match this</span>{% endif %}
           {{ b.name }}
           {% if not b.enabled %}<span class="dz-tag">off</span>{% endif %}
           {% if b.channel_missing %}<span class="dz-tag bad">channel gone</span>{% endif %}
@@ -388,6 +395,9 @@ STARBOARD_TEMPLATE = (
             <label class="dz-label">Emoji</label>
             <div class="dz-up-row">
               <input class="dz-input" name="emoji_{{ b.name }}" value="{{ b.emoji }}" />
+              {% if b.emoji_bad %}<p class="dz-hint dz-warn">This is stored as plain text,
+              so reacting will never trigger it. Paste the emoji itself, such as
+              ⭐, or a &lt;:name:id&gt; token.</p>{% endif %}
               {{ emoji_upload('emoji_' ~ b.name, b.emoji_image) }}
             </div>
           </div>

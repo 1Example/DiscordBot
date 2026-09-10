@@ -11,7 +11,7 @@ from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils import AsyncIter
 from redbot.core.utils.chat_formatting import humanize_timedelta
 
-from .starboard_entry import FakePayload, StarboardEntry, StarboardMessage
+from .starboard_entry import emoji_matches, FakePayload, StarboardEntry, StarboardMessage
 
 _ = Translator("Starboard", __file__)
 log = getLogger("red.trusty-cogs.Starboard")
@@ -222,7 +222,7 @@ class StarboardEvents:
         # I know I am not supposed to use these private methods but I want to avoid
         # lookups if I can while ensuring historical lookups
         for starboard in self.starboards[guild.id].values():
-            if starboard.emoji == payload.emoji:
+            if emoji_matches(starboard.emoji, payload.emoji):
                 if not starboard.enabled:
                     continue
                 allowed_roles = starboard.check_roles(member)
@@ -233,11 +233,25 @@ class StarboardEvents:
 
                 star_channel = guild.get_channel(starboard.channel)
                 if star_channel is None:
+                    # Both of these end with a starboard that does nothing and
+                    # says nothing, which is indistinguishable from the cog
+                    # being broken. A private channel the bot was never added
+                    # to is the usual cause, so name it.
+                    log.warning(
+                        "Starboard %r in %s posts to a channel I cannot see (%s).",
+                        starboard.name,
+                        guild.id,
+                        starboard.channel,
+                    )
                     continue
-                if (
-                    not star_channel.permissions_for(guild.me).send_messages
-                    or not star_channel.permissions_for(guild.me).embed_links
-                ):
+                perms = star_channel.permissions_for(guild.me)
+                if not perms.send_messages or not perms.embed_links:
+                    log.warning(
+                        "Starboard %r in %s needs Send Messages and Embed Links in #%s.",
+                        starboard.name,
+                        guild.id,
+                        star_channel.name,
+                    )
                     continue
 
                 async with starboard.lock:

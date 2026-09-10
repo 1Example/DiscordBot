@@ -114,12 +114,52 @@ def emoji_problem(raw: str) -> str:
             "the id must be the numeric one, as in <:name:123456789012345678>"
         )
     if len(raw) > 2 and raw.startswith(":") and raw.endswith(":"):
-        return "shortcodes like :name: do not work - paste the <:name:id> token instead"
+        return (
+            "shortcodes like :name: do not work - paste the emoji itself, or a "
+            "<:name:id> token for a custom one"
+        )
     if raw.isascii():
         return "plain text is not an emoji - paste a real one, or a <:name:id> token"
     if len(raw) > 8:
         return f"it is {len(raw)} characters long; a single emoji is expected"
     return "Discord did not recognise it as an emoji"
+
+
+def usable_emoji(raw: str, guild: discord.Guild | None = None) -> tuple[str, str]:
+    """Normalise a typed emoji, or say why it cannot be used. (value, problem).
+
+    Discord accepts a unicode emoji or a <:name:id> token, and nothing else.
+    A :name: shortcode is resolved against the guild's own emojis when it names
+    one - that is the only shortcode resolvable without an emoji-name table -
+    and otherwise refused. Storing a shortcode is worse than refusing it: it
+    keeps a plain string that no reaction can ever equal, so whatever it was
+    meant to trigger silently never fires.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return "", emoji_problem(raw)
+    partial = discord.PartialEmoji.from_str(raw)
+    if partial.id is not None:
+        return str(partial), ""
+    # Only for the checks below. What is returned is what was typed: some
+    # emoji carry a variation selector in the reaction Discord sends (❤️ does,
+    # ⭐ does not), so stripping it here would break exactly the ones that
+    # need it. Matching normalises both sides instead.
+    stripped = raw.strip("️")
+    if len(stripped) > 2 and stripped.startswith(":") and stripped.endswith(":"):
+        found = (
+            discord.utils.get(guild.emojis, name=stripped[1:-1]) if guild is not None else None
+        )
+        if found is not None:
+            return str(found), ""
+        return "", emoji_problem(stripped)
+    if (
+        stripped.isascii()
+        or stripped.startswith(("http://", "https://"))
+        or len(stripped) > 8
+    ):
+        return "", emoji_problem(stripped)
+    return raw, ""
 
 
 def emoji_rejection(key: str, raw: str, *, limit: int = 40) -> dict:
@@ -443,6 +483,7 @@ BASE_CSS = """
   .dz-subnav-item i { opacity:.75; }
   .dz-panel h5 { margin:0 0 3px; font-size:.95rem; }
   .dz-hint { opacity:.6; font-size:.78rem; margin:0 0 11px; }
+  .dz-warn { color:#ffb454; opacity:.95; }
   .dz-grid { display:grid; gap:14px; grid-template-columns:1fr; }
   @media (min-width:1000px){ .dz-grid.two { grid-template-columns:1fr 1fr; } }
   .dz-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }

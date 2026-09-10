@@ -12,6 +12,21 @@ from redbot.core.utils import AsyncIter
 log = getLogger("red.trusty-cogs.starboard")
 
 
+def emoji_matches(stored: discord.PartialEmoji, reacted: discord.PartialEmoji) -> bool:
+    """Is this the reaction this starboard listens for?
+
+    Custom emoji compare by id. Unicode emoji compare by name - but a variation
+    selector may be on one side and not the other, since some emoji arrive from
+    Discord carrying one and some do not, and a person pasting into the
+    dashboard may include it either way. Comparing raw names makes that a
+    silent mismatch, so normalise both.
+    """
+    if stored.id is not None or reacted.id is not None:
+        return stored.id == reacted.id
+    vs16 = "\N{VARIATION SELECTOR-16}"
+    return (stored.name or "").strip(vs16) == (reacted.name or "").strip(vs16)
+
+
 @dataclass
 class FakePayload:
     """A fake payload object to utilize `_update_stars` method"""
