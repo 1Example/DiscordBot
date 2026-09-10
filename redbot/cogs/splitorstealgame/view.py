@@ -53,9 +53,14 @@ class SplitOrStealGameView(discord.ui.View):
         with contextlib.suppress(errors.BalanceTooHigh, RuntimeError):
             await bank.deposit_credits(member, amount)
 
-    async def start(self, ctx: commands.Context) -> discord.Message:
+    async def start(
+        self, ctx: commands.Context, stake: int | None = None
+    ) -> discord.Message:
         self.ctx: commands.Context = ctx
-        self.stake, self.house_bonus, self.currency = await self.cog.pot_settings(ctx.guild)
+        configured, self.house_bonus, self.currency = await self.cog.pot_settings(ctx.guild)
+        # A named amount wins over the server default; 0 is a real choice, so
+        # only an omitted one falls back.
+        self.stake = configured if stake is None else max(0, int(stake))
         embed: discord.Embed = discord.Embed(
             title=_("Split Or Steal Game"),
             color=await self.ctx.embed_color(),
@@ -111,6 +116,15 @@ class SplitOrStealGameView(discord.ui.View):
             "• If you both choose `steal`, both of you loose.\n"
             "• if one of you chooses `split` and one of you chooses `steal`, the one who choose `steal` will win.",
         ).format(player_A=player_A, player_B=player_B)
+        if self.pot:
+            # The moment it matters most: say what is actually on the table.
+            embed.add_field(
+                name=_("The pot:"),
+                value=_("**{pot} {currency}** — {share} each if you both split.").format(
+                    pot=self.pot, currency=self.currency, share=self.pot // 2
+                ),
+                inline=False,
+            )
         end_time = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(seconds=60)
         embed.add_field(
             name=_("End time for play:"),

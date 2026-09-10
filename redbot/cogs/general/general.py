@@ -113,6 +113,34 @@ class General(commands.Cog):
             await ctx.send(choice(choices))
 
     @fun.command(
+        name="splitorsteal",
+        description="Play a round of Split or Steal for credits.",
+        extras={"red_force_enable": True},
+    )
+    @app_commands.guild_only()
+    @app_commands.describe(
+        amount="What each player stakes. Leave empty to use the server's default."
+    )
+    async def splitorsteal(
+        self,
+        interaction: discord.Interaction,
+        amount: app_commands.Range[int, 0, 1_000_000] = None,
+    ):
+        """Play a round of Split or Steal.
+
+        Two players are drawn from whoever joins. Both split and they halve the
+        pot; one steals and takes all of it; both steal and it is gone.
+        """
+        ctx = await commands.Context.from_interaction(interaction)
+        # /fun belongs to this cog, the game does not. Two cogs cannot both own
+        # a global command called "fun", so the command is here and the game
+        # stays where it lives.
+        cog = self.bot.get_cog("SplitOrStealGame")
+        if cog is None:
+            return await ctx.send(_("Split or Steal is not loaded."), ephemeral=True)
+        await cog.start_game(ctx, amount)
+
+    @fun.command(
         name="roll",
         description="Roll a random number between 1 and the number you give.",
         extras={"red_force_enable": True},

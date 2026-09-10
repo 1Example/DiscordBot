@@ -1,6 +1,8 @@
+import contextlib
+
 import discord
 
-from redbot.core import Config, app_commands, bank, commands
+from redbot.core import Config, bank, commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.cog_base import CogBase
@@ -37,20 +39,15 @@ class SplitOrStealGame(DashboardIntegration, CogBase):
         currency = await bank.get_currency_name(guild)
         return int(settings["stake"] or 0), int(settings["house_bonus"] or 0), currency
 
-    @app_commands.command(
-        name="splitorsteal",
-        description="Play a round of Split or Steal.",
-        extras={"red_force_enable": True},
-    )
-    @app_commands.guild_only()
-    async def splitorstealgame(self, interaction: discord.Interaction) -> None:
-        """
-        Play a match of Split Or Steal game.
+    async def start_game(self, ctx: commands.Context, amount: int | None = None) -> None:
+        """Run a match. Called by /fun splitorsteal, which lives in General.
 
-        Two player will have to click the button that they choose (`split` or `steal`).
-        • If both choose `split` both of them win.
-        • If both choose `steal`, both loose.
-        • if one chooses `split` and one chooses `steal`, the one who choose `steal` will win.
+        Ending early - too few players, someone not choosing - is an outcome,
+        not a failure, so it is reported rather than raised. Raising logged a
+        traceback every time somebody wandered off.
         """
-        ctx = await commands.Context.from_interaction(interaction)
-        await SplitOrStealGameView(cog=self).start(ctx)
+        try:
+            await SplitOrStealGameView(cog=self).start(ctx, stake=amount)
+        except commands.UserFeedbackCheckFailure as e:
+            with contextlib.suppress(discord.HTTPException):
+                await ctx.send(str(e))
