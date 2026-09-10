@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Literal
 
 import discord
-from discord import app_commands
 from redbot.core import Config, bank, commands
 from redbot.core.bot import Red
 from redbot.core.errors import BalanceTooHigh
@@ -72,28 +71,14 @@ class Hunting(DashboardIntegration, commands.Cog):
         self.config.register_guild(**default_guild)
         self.config.register_global(**default_global)
 
-    hunting = app_commands.Group(
-        name="hunting",
-        description="Hunting, it hunts birds and things that fly.",
-        extras={"red_force_enable": True},
-        guild_only=True,
-    )
+    async def show_leaderboard(
+        self, ctx: commands.Context, global_leaderboard: bool = False
+    ) -> None:
+        """The top 50 hunters, for this server or everywhere.
 
-    @hunting.command(
-        name="leaderboard", description="Show the top hunters."
-    )
-    @app_commands.checks.bot_has_permissions(embed_links=True)
-    @app_commands.describe(
-        global_leaderboard="Show every server rather than just this one."
-    )
-    async def leaderboard(
-        self, interaction: discord.Interaction, global_leaderboard: bool = False
-    ):
+        Reached through /fun hunting leaderboard, which lives in General
+        because that is the cog /fun belongs to.
         """
-        This will show the top 50 hunters for the server.
-        Use True for the global_leaderboard variable to show the global leaderboard.
-        """
-        ctx = await commands.Context.from_interaction(interaction)
         userinfo = await self.config.all_users()
         if not userinfo:
             return await ctx.send(bold("Please shoot something before you can brag about it."))
@@ -147,13 +132,10 @@ class Hunting(DashboardIntegration, commands.Cog):
         else:
             await menu(ctx, page_list, DEFAULT_CONTROLS)
 
-    @hunting.command(name="score", description="Show a hunter's score.")
-    @app_commands.describe(member="Whose score. Defaults to yours.")
-    async def score(
-        self, interaction: discord.Interaction, member: discord.Member = None
-    ):
-        """This will show the score of a hunter."""
-        ctx = await commands.Context.from_interaction(interaction)
+    async def show_score(
+        self, ctx: commands.Context, member: discord.Member = None
+    ) -> None:
+        """One hunter's tally. Reached through /fun hunting score."""
         if not member:
             member = ctx.author
         score = await self.config.user(member).score()

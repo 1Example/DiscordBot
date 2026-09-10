@@ -140,6 +140,39 @@ class General(commands.Cog):
             return await ctx.send(_("Split or Steal is not loaded."), ephemeral=True)
         await cog.start_game(ctx, amount)
 
+    hunting = app_commands.Group(
+        name="hunting",
+        description="Scores for the birds people have shot out of the sky.",
+        parent=fun,
+    )
+
+    @hunting.command(name="leaderboard", description="Show the top hunters.")
+    @app_commands.checks.bot_has_permissions(embed_links=True)
+    @app_commands.describe(
+        global_leaderboard="Show every server rather than just this one."
+    )
+    async def hunting_leaderboard(
+        self, interaction: discord.Interaction, global_leaderboard: bool = False
+    ):
+        """Show the top hunters."""
+        ctx = await commands.Context.from_interaction(interaction)
+        cog = self.bot.get_cog("Hunting")
+        if cog is None:
+            return await ctx.send(_("Hunting is not loaded."), ephemeral=True)
+        await cog.show_leaderboard(ctx, global_leaderboard)
+
+    @hunting.command(name="score", description="Show a hunter's score.")
+    @app_commands.describe(member="Whose score. Defaults to yours.")
+    async def hunting_score(
+        self, interaction: discord.Interaction, member: discord.Member = None
+    ):
+        """Show a hunter's score."""
+        ctx = await commands.Context.from_interaction(interaction)
+        cog = self.bot.get_cog("Hunting")
+        if cog is None:
+            return await ctx.send(_("Hunting is not loaded."), ephemeral=True)
+        await cog.show_score(ctx, member)
+
     @fun.command(
         name="roll",
         description="Roll a random number between 1 and the number you give.",

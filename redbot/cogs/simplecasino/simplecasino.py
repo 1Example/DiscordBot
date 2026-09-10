@@ -110,9 +110,15 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
         await reply("Economy cog not loaded! Contact the bot owner for more information.", ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
     
 
-    @app_commands.command(name="blackjack", extras={"red_force_enable": True})
+    casino = app_commands.Group(
+        name="casino",
+        description="Blackjack, slots, poker and how you have done at them.",
+        guild_only=True,
+        extras={"red_force_enable": True},
+    )
+
+    @casino.command(name="blackjack")
     @app_commands.describe(bet="How much currency to bet.")
-    @app_commands.guild_only()
     async def blackjack_app(self, interaction: discord.Interaction, bet: int):
         """Play Blackjack against the bot. Get as close to 21 as possible!"""
         await self.blackjack(interaction, bet)
@@ -142,8 +148,7 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
             view.message = message if isinstance(ctx, commands.Context) else await ctx.original_response()  # type: ignore
 
 
-    @app_commands.command(name="slot", extras={"red_force_enable": True})
-    @app_commands.guild_only()
+    @casino.command(name="slot")
     @app_commands.describe(bet="How much currency to put in the slot machine.")
     async def slot_app(self, interaction: discord.Interaction, bet: int):
         """Play the slot machine."""
@@ -222,8 +227,7 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
     poker_app = app_commands.Group(
         name="poker",
         description="Play Texas Hold'em Poker with up to 8 people!",
-        guild_only=True,
-        extras={"red_force_enable": True},
+        parent=casino,
     )
 
     @poker_app.command(name="new")
@@ -370,10 +374,9 @@ class SimpleCasino(DashboardIntegration, BaseCasinoCog):
 
 
     casinostats_app = app_commands.Group(
-        name="casinostats",
+        name="stats",
         description="View your stats in Blackjack and Slots.",
-        guild_only=True,
-        extras={"red_force_enable": True},
+        parent=casino,
     )
 
     @casinostats_app.command(name="blackjack")
