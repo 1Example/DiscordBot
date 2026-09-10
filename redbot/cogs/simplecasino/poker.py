@@ -93,8 +93,17 @@ class PokerPlayer(DataClassJsonMixin):
 
 
 class PokerGame(BasePokerGame):
-    def __init__(self, cog: BaseCasinoCog, players: List[discord.Member], channel: Union[discord.TextChannel, discord.Thread], minimum_bet: int):
-        super().__init__(cog, players, channel, minimum_bet)
+    def __init__(
+        self,
+        cog: BaseCasinoCog,
+        players: List[discord.Member],
+        channel: Union[discord.TextChannel, discord.Thread],
+        minimum_bet: int,
+        # The base takes a seat limit and both callers pass one; this override
+        # did not accept it, so starting or restoring a game raised TypeError.
+        max_players: int = POKER_MAX_PLAYERS,
+    ):
+        super().__init__(cog, players, channel, minimum_bet, max_players)
         self.players: List[PokerPlayer] = [PokerPlayer(id=p, index=i) for i, p in enumerate(self.players_ids)]
 
     async def save_state(self) -> None:

@@ -31,6 +31,9 @@ class SplitOrStealGameView(discord.ui.View):
         self.house_bonus: int = 0
         self.currency: str = "credits"
         self.paid: dict[discord.Member, int] = {}
+        # Set as soon as a second player is in, so the join window ends when
+        # the game can actually be played rather than a minute later.
+        self._ready: asyncio.Event = asyncio.Event()
 
         self._message: discord.Message = None
         self._mode: typing.Literal["join", "play"] = None
@@ -84,17 +87,38 @@ class SplitOrStealGameView(discord.ui.View):
         # A named amount wins over the server default; 0 is a real choice, so
         # only an omitted one falls back.
         self.stake = configured if stake is None else max(0, int(stake))
+
+        # Whoever ran the command is playing. Charge them before anything is
+        # posted, so somebody who cannot cover their own wager is told plainly
+        # rather than watching a game they are not in.
+        if self.stake:
+            if not await bank.can_spend(ctx.author, self.stake):
+                raise commands.UserFeedbackCheckFailure(
+                    _("Starting this costs **{stake} {currency}** and you do not have it.").format(
+                        stake=self.stake, currency=self.currency
+                    )
+                )
+            await bank.withdraw_credits(ctx.author, self.stake)
+            self.paid[ctx.author] = self.stake
+        elif self.house_bonus:
+            self.paid[ctx.author] = 0
+        self.initial_players.append(ctx.author)
         embed: discord.Embed = discord.Embed(
             title=_("Split Or Steal Game"),
             color=await self.ctx.embed_color(),
         )
         embed.description = _(
-            "Join the game by clicking on the button below. 2 players will be selected randomly.",
-        )
+            "{author} is waiting for someone to play. The game starts the moment"
+            " somebody joins."
+        ).format(author=ctx.author.mention)
         if self.stake:
             embed.description += "\n" + _(
-                "It costs **{stake} {currency}** to join. Anyone not drawn to play gets theirs back."
-            ).format(stake=self.stake, currency=self.currency)
+                "It costs **{stake} {currency}** to join, for a pot of **{pot} {currency}**."
+            ).format(
+                stake=self.stake,
+                currency=self.currency,
+                pot=self.stake * 2 + self.house_bonus,
+            )
         elif self.house_bonus:
             embed.description += "\n" + _(
                 "The winner takes **{pot} {currency}**."
@@ -119,7 +143,9 @@ class SplitOrStealGameView(discord.ui.View):
             raise
 
     async def _run(self) -> discord.Message:
-        await asyncio.sleep(60)
+        # One minute to find an opponent, but no longer than it takes.
+        with contextlib.suppress(TimeoutError, asyncio.TimeoutError):
+            await asyncio.wait_for(self._ready.wait(), timeout=60)
         self._mode = "play"
         initial_players = self.initial_players.copy()
         if len(initial_players) < 2:
@@ -278,6 +304,8 @@ class SplitOrStealGameView(discord.ui.View):
             # the bonus is paid out when a game actually happens.
             self.paid[interaction.user] = 0
         self.initial_players.append(interaction.user)
+        if len(self.initial_players) >= 2:
+            self._ready.set()
         await interaction.response.send_message(
             _("You have joined this game.")
             + (
