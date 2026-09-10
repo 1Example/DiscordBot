@@ -133,6 +133,15 @@ class SplitOrStealGameView(discord.ui.View):
         self._mode = "join"
         self._message: discord.Message = await self.ctx.send(embed=embed, view=self)
         self.cog.views[self._message] = self
+        if self.stake:
+            with contextlib.suppress(discord.HTTPException):
+                await self.ctx.send(
+                    _(
+                        "You are in, and **{stake} {currency}** has been taken for your"
+                        " stake. You get it back if nobody joins."
+                    ).format(stake=self.stake, currency=self.currency),
+                    ephemeral=True,
+                )
         try:
             return await self._run()
         except commands.UserFeedbackCheckFailure:
@@ -173,9 +182,9 @@ class SplitOrStealGameView(discord.ui.View):
         embed.description = _(
             "The two players are {player_A.mention} and {player_B.mention}.\n"
             "You have to click the button that you choose (`split` or `steal`).\n"
-            "• If you both choose `split` both of them win.\n"
-            "• If you both choose `steal`, both of you loose.\n"
-            "• if one of you chooses `split` and one of you chooses `steal`, the one who choose `steal` will win.",
+            "• If you both choose `split`, you share the pot.\n"
+            "• If you both choose `steal`, the pot is gone and you both lose.\n"
+            "• If one chooses `split` and the other `steal`, whoever stole takes it all.",
         ).format(player_A=player_A, player_B=player_B)
         if self.pot:
             # The moment it matters most: say what is actually on the table.
@@ -215,11 +224,22 @@ class SplitOrStealGameView(discord.ui.View):
 
         pot = self.pot
         self.paid.clear()
-        def spoils(amount: int) -> str:
-            if not pot or amount <= 0:
+
+        def won(winner) -> str:
+            """What the winner walks away with, if there was anything to win."""
+            if not pot:
                 return ""
-            return " " + _("**{amount} {currency}**.").format(
-                amount=amount, currency=self.currency
+            return " " + _("{winner} takes the whole pot: **{pot} {currency}**.").format(
+                winner=winner.display_name, pot=pot, currency=self.currency
+            )
+
+        def lost(loser) -> str:
+            """And what it cost the other one. Losing quietly is how this
+            looked like the credits had gone nowhere."""
+            if not self.stake:
+                return ""
+            return " " + _("{loser} loses their **{stake} {currency}**.").format(
+                loser=loser.display_name, stake=self.stake, currency=self.currency
             )
 
         if self.players[player_A] == "split" and self.players[player_B] == "split":
@@ -227,30 +247,50 @@ class SplitOrStealGameView(discord.ui.View):
             await self.payout(player_A, share)
             await self.payout(player_B, share)
             text = _(
-                "{player_A.display_name} and {player_B.display_name}, you both chose `split` and therefore both win.",
+                "{player_A.display_name} and {player_B.display_name}, you both chose"
+                " `split` and therefore you both win.",
             ).format(player_A=player_A, player_B=player_B)
             if share:
-                text += " " + _("You take **{share} {currency}** each.").format(
+                text += " " + _("The pot splits: **{share} {currency}** each.").format(
                     share=share, currency=self.currency
                 )
         elif self.players[player_A] == "steal" and self.players[player_B] == "steal":
             text = _(
-                "{player_A.display_name} and {player_B.display_name}, you both chose `steal` and therefore both loose.",
+                "{player_A.display_name} and {player_B.display_name}, you both chose"
+                " `steal` and therefore you both lose.",
             ).format(player_A=player_A, player_B=player_B)
             if pot:
                 text += " " + _("The **{pot} {currency}** is gone.").format(
                     pot=pot, currency=self.currency
                 )
+            if self.stake:
+                # The pot can be house money alone, in which case nobody put
+                # anything in and there is nothing for them to have lost.
+                text += " " + _("You each lose your **{stake} {currency}**.").format(
+                    stake=self.stake, currency=self.currency
+                )
         elif self.players[player_A] == "steal" and self.players[player_B] == "split":
             await self.payout(player_A, pot)
-            text = _(
-                "{player_A.display_name} chose `steal` and {player_B.display_name} chose `split`, and therefore {player_A.display_name} win.",
-            ).format(player_A=player_A, player_B=player_B) + spoils(pot)
+            text = (
+                _(
+                    "{player_A.display_name} chose `steal` and"
+                    " {player_B.display_name} chose `split`, and therefore"
+                    " {player_A.display_name} wins.",
+                ).format(player_A=player_A, player_B=player_B)
+                + won(player_A)
+                + lost(player_B)
+            )
         else:
             await self.payout(player_B, pot)
-            text = _(
-                "{player_B.display_name} chose `steal` and {player_A.display_name} chose `split`, and therefore {player_B.display_name} win.",
-            ).format(player_A=player_A, player_B=player_B) + spoils(pot)
+            text = (
+                _(
+                    "{player_B.display_name} chose `steal` and"
+                    " {player_A.display_name} chose `split`, and therefore"
+                    " {player_B.display_name} wins.",
+                ).format(player_A=player_A, player_B=player_B)
+                + won(player_B)
+                + lost(player_A)
+            )
         await self._message.reply(text)
         return self._message
 

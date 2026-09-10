@@ -38,8 +38,8 @@ TOGGLES = (
 class DashboardIntegration:
     """Trivia sessions, settings, lists and the leaderboard.
 
-    Starts and stops sessions (``[p]trivia``, ``[p]trivia stop``), lists the
-    categories (``[p]trivia list``), covers every ``[p]triviaset`` option, and
+    Starts and stops sessions (``/fun trivia start``, ``/fun trivia stop``),
+    lists the categories, covers every session setting, and
     lets the owner remove an uploaded custom list.
     """
 

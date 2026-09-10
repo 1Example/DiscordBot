@@ -9,10 +9,8 @@ import io
 import yaml
 import discord
 
-from discord import app_commands
 
 from redbot.core import Config, commands
-from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 from redbot.core.i18n import Translator, cog_i18n
@@ -21,7 +19,6 @@ from redbot.core.utils.chat_formatting import box, pagify, humanize_number
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 
-from .checks import trivia_stop_check
 from .log import LOG
 from .session import TriviaSession
 from .schema import TRIVIA_LIST_SCHEMA, format_schema_error
@@ -30,6 +27,10 @@ from .dashboard_integration import DashboardIntegration
 __all__ = ("Trivia", "UNIQUE_ID", "InvalidListError", "get_core_lists", "get_list")
 
 UNIQUE_ID = 0xB3C0E453
+# A list named after a subcommand of /fun trivia could never be started, since
+# the name would be read as the subcommand. This was `self.trivia.all_commands`
+# - an attribute an app_commands.Group does not have, so every upload raised.
+RESERVED_LIST_NAMES = frozenset(("start", "stop", "upload", "leaderboard"))
 _ = Translator("Trivia", __file__)
 YAMLSafeLoader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
@@ -110,23 +111,12 @@ class Trivia(DashboardIntegration, commands.Cog):
             if user_id in guild_data:
                 await self.config.member_from_ids(guild_id, user_id).clear()
 
-    trivia = app_commands.Group(
-        name="trivia",
-        description="Play trivia.",
-        extras={"red_force_enable": True},
-        guild_only=True,
-    )
+    async def start_session(self, ctx: commands.Context, categories: str) -> None:
+        """Start a trivia session on the named categories.
 
-    @trivia.command(name="start", description="Start a trivia session.")
-    @app_commands.describe(
-        categories="One or more list names, separated by spaces. See the dashboard for what is available."
-    )
-    async def trivia_start(self, interaction: discord.Interaction, categories: str):
-        """Start trivia session on the specified categories.
-
-        Questions from every list named are mixed together.
+        Questions from every list named are mixed together. Called by
+        /fun trivia start, which lives in General.
         """
-        ctx = await commands.Context.from_interaction(interaction)
         categories = [c.lower() for c in categories.split()]
         if not categories:
             await ctx.send(_("Name at least one trivia list."))
@@ -145,9 +135,9 @@ class Trivia(DashboardIntegration, commands.Cog):
             except FileNotFoundError:
                 await ctx.send(
                     _(
-                        "Invalid category `{name}`. See `{prefix}trivia list` for a list of "
-                        "trivia categories."
-                    ).format(name=category, prefix=ctx.clean_prefix)
+                        "There is no trivia list called `{name}`. The dashboard lists"
+                        " the ones this server can use."
+                    ).format(name=category)
                 )
             except InvalidListError:
                 await ctx.send(
@@ -177,33 +167,34 @@ class Trivia(DashboardIntegration, commands.Cog):
         self.trivia_sessions.append(session)
         LOG.debug("New trivia session; #%s in %d", ctx.channel, ctx.guild.id)
 
-    @trivia_stop_check()
-    @trivia.command(name="stop", description="Stop the trivia session in this channel.")
-    async def trivia_stop(self, interaction: discord.Interaction):
-        """Stop an ongoing trivia session."""
+    async def stop_session(self, ctx: commands.Context) -> None:
+        """Stop the session running in this channel, for whoever may do that."""
         session = self._get_trivia_session(ctx.channel)
         if session is None:
-            await ctx.send(_("There is no ongoing trivia session in this channel."))
+            await ctx.send(
+                _("There is no ongoing trivia session in this channel."), ephemeral=True
+            )
+            return
+        author = ctx.author
+        may_stop = (
+            author == session.ctx.author
+            or await ctx.bot.is_owner(author)
+            or await ctx.bot.is_mod(author)
+            or await ctx.bot.is_admin(author)
+            or (ctx.guild is not None and author == ctx.guild.owner)
+        )
+        if not may_stop:
+            await ctx.send(
+                _("Only whoever started this session, or a moderator, can stop it."),
+                ephemeral=True,
+            )
             return
         await session.end_game()
         session.force_stop()
         await ctx.send(_("Trivia stopped."))
 
-    @trivia.command(
-        name="upload",
-        description="Add a custom trivia list from a YAML file.",
-    )
-    @app_checks.is_owner()
-    @app_commands.describe(file="The .yaml list to add.")
-    async def trivia_upload(
-        self, interaction: discord.Interaction, file: discord.Attachment
-    ):
-        """Upload a trivia file.
-
-        The prefix version took the attachment off the invoking message, or
-        waited thirty seconds for another one. Here it is an option.
-        """
-        ctx = await commands.Context.from_interaction(interaction)
+    async def upload_list(self, ctx: commands.Context, file: discord.Attachment) -> None:
+        """Add a custom trivia list from a YAML file."""
         try:
             await self._save_trivia_list(ctx=ctx, attachment=file)
         except yaml.error.MarkedYAMLError as exc:
@@ -221,33 +212,14 @@ class Trivia(DashboardIntegration, commands.Cog):
                 ).format(schema_error=box(format_schema_error(exc)))
             )
 
-    @trivia.command(name="leaderboard", description="Show the trivia leaderboard.")
-    @app_commands.describe(
-        scope="This server, or every server the bot is in.",
-        sort_by="Which column to rank by.",
-        top="How many places to show.",
-    )
-    @app_commands.choices(
-        scope=[
-            app_commands.Choice(name="This server", value="server"),
-            app_commands.Choice(name="Global", value="global"),
-        ],
-        sort_by=[
-            app_commands.Choice(name="Total wins", value="wins"),
-            app_commands.Choice(name="Average score", value="avg"),
-            app_commands.Choice(name="Total correct answers", value="total"),
-            app_commands.Choice(name="Games played", value="games"),
-        ],
-    )
-    async def trivia_leaderboard(
+    async def show_leaderboard(
         self,
-        interaction: discord.Interaction,
+        ctx: commands.Context,
         scope: str = "server",
         sort_by: str = "wins",
-        top: app_commands.Range[int, 1, 100] = 10,
-    ):
-        """Leaderboard for trivia."""
-        ctx = await commands.Context.from_interaction(interaction)
+        top: int = 10,
+    ) -> None:
+        """The trivia leaderboard, for this server or for all of them."""
         # The choices are fixed, so an unknown field is not reachable here
         # the way it was when this took free text.
         key = self._get_sort_key(sort_by)
@@ -451,7 +423,7 @@ class Trivia(DashboardIntegration, commands.Cog):
         filename = attachment.filename.rsplit(".", 1)[0].casefold()
 
         # Check if trivia filename exists in core files or if it is a command
-        if filename in self.trivia.all_commands or any(
+        if filename in RESERVED_LIST_NAMES or any(
             filename == item.stem for item in get_core_lists()
         ):
             await ctx.send(

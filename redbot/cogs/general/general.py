@@ -8,6 +8,7 @@ import aiohttp
 import discord
 from discord import app_commands
 from redbot.core import commands
+from redbot.core.app_commands import checks as app_checks
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.menus import menu
@@ -139,6 +140,83 @@ class General(commands.Cog):
         if cog is None:
             return await ctx.send(_("Split or Steal is not loaded."), ephemeral=True)
         await cog.start_game(ctx, amount)
+
+    trivia = app_commands.Group(
+        name="trivia",
+        description="Play trivia.",
+        parent=fun,
+        guild_only=True,
+    )
+
+    def _trivia_cog(self):
+        return self.bot.get_cog("Trivia")
+
+    @trivia.command(name="start", description="Start a trivia session.")
+    @app_commands.describe(
+        categories="One or more list names, separated by spaces."
+        " The dashboard lists what this server has."
+    )
+    async def trivia_start(self, interaction: discord.Interaction, categories: str):
+        """Start a trivia session on one or more lists."""
+        ctx = await commands.Context.from_interaction(interaction)
+        cog = self._trivia_cog()
+        if cog is None:
+            return await ctx.send(_("Trivia is not loaded."), ephemeral=True)
+        await cog.start_session(ctx, categories)
+
+    @trivia.command(name="stop", description="Stop the trivia session in this channel.")
+    async def trivia_stop(self, interaction: discord.Interaction):
+        """Stop the session running here."""
+        ctx = await commands.Context.from_interaction(interaction)
+        cog = self._trivia_cog()
+        if cog is None:
+            return await ctx.send(_("Trivia is not loaded."), ephemeral=True)
+        await cog.stop_session(ctx)
+
+    @trivia.command(name="upload", description="Add a custom trivia list from a YAML file.")
+    @app_checks.is_owner()
+    @app_commands.describe(file="The .yaml list to add.")
+    async def trivia_upload(
+        self, interaction: discord.Interaction, file: discord.Attachment
+    ):
+        """Add a custom trivia list."""
+        ctx = await commands.Context.from_interaction(interaction)
+        cog = self._trivia_cog()
+        if cog is None:
+            return await ctx.send(_("Trivia is not loaded."), ephemeral=True)
+        await cog.upload_list(ctx, file)
+
+    @trivia.command(name="leaderboard", description="Show the trivia leaderboard.")
+    @app_commands.describe(
+        scope="This server, or every server I am in.",
+        sort_by="Which column to rank by.",
+        top="How many places to show.",
+    )
+    @app_commands.choices(
+        scope=[
+            app_commands.Choice(name="This server", value="server"),
+            app_commands.Choice(name="Global", value="global"),
+        ],
+        sort_by=[
+            app_commands.Choice(name="Total wins", value="wins"),
+            app_commands.Choice(name="Average score", value="avg"),
+            app_commands.Choice(name="Total correct answers", value="total"),
+            app_commands.Choice(name="Games played", value="games"),
+        ],
+    )
+    async def trivia_leaderboard(
+        self,
+        interaction: discord.Interaction,
+        scope: str = "server",
+        sort_by: str = "wins",
+        top: app_commands.Range[int, 1, 100] = 10,
+    ):
+        """The trivia leaderboard."""
+        ctx = await commands.Context.from_interaction(interaction)
+        cog = self._trivia_cog()
+        if cog is None:
+            return await ctx.send(_("Trivia is not loaded."), ephemeral=True)
+        await cog.show_leaderboard(ctx, scope, sort_by, top)
 
     hunting = app_commands.Group(
         name="hunting",

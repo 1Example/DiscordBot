@@ -83,7 +83,12 @@ def support_any_profile_predicate():
         bot = ctx.client if isinstance(ctx, discord.Interaction) else ctx.bot
         author = ctx.user if isinstance(ctx, discord.Interaction) else ctx.author
         cog = bot.get_cog("Tickets")
-        return await cog.support_predicate.__func__()(ctx) or any(
+        if cog is None:
+            return False
+        # `support_predicate` is a module-level factory, not a method on the
+        # cog. Reaching for it through the instance found a bound Command and
+        # raised on every use of a command guarded by this check.
+        return await support_predicate()(ctx) or any(
             author.get_role(role_id) is not None
             for data in (await cog.config.guild(ctx.guild).profiles()).values()
             for role_id in data["support_roles"]
