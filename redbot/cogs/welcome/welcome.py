@@ -8,6 +8,7 @@ from redbot.core.i18n import Translator, cog_i18n
 
 from .events import Events
 from .dashboard_integration import DashboardIntegration
+from .invites import INVITE_DEFAULTS, InviteRewards
 
 default_greeting = "Welcome {0.name} to {1.name}!"
 default_goodbye = "See you later {0.name}!"
@@ -37,6 +38,7 @@ default_settings = {
     "PENDING": False,
     "MENTIONS": {"users": True, "roles": False, "everyone": False},
     "GOODBYE_MENTIONS": {"users": True, "roles": False, "everyone": False},
+    **INVITE_DEFAULTS,
     "EMBED_DATA": {
         "title": None,
         "colour": 0,
@@ -59,7 +61,7 @@ log = getLogger("red.trusty-cogs.Welcome")
 @cog_i18n(_)
 
 
-class Welcome(DashboardIntegration, Events, commands.Cog):
+class Welcome(DashboardIntegration, InviteRewards, Events, commands.Cog):
     """Greet new members and say goodbye to the ones who leave."""
 
     __author__ = ["irdumb", "TrustyJAID"]
@@ -72,6 +74,13 @@ class Welcome(DashboardIntegration, Events, commands.Cog):
         self.joined = {}
         self.today_count = {"now": datetime.now(timezone.utc)}
         self.group_welcome.start()
+        # Invite counts have to be known before anyone joins, or the first
+        # arrival after a restart credits nobody.
+        self.bot.loop.create_task(self._prime_invite_cache())
+
+    async def _prime_invite_cache(self) -> None:
+        await self.bot.wait_until_red_ready()
+        await self.refresh_all_invite_caches()
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         """

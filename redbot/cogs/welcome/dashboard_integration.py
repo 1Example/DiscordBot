@@ -5,7 +5,7 @@ import random
 import typing as t
 
 import discord
-from redbot.core import commands
+from redbot.core import bank, commands
 
 from redbot.core.utils.dashboard_helpers import (
     BASE_CSS,
@@ -113,6 +113,12 @@ class DashboardIntegration:
                 "bots_msg": settings.get("BOTS_MSG") or "",
                 "bots_goodbye_msg": settings.get("BOTS_GOODBYE_MSG") or "",
                 "minimum_days": settings.get("MINIMUM_DAYS") or 0,
+                "invite_reward_inviter": settings.get("INVITE_REWARD_INVITER") or 0,
+                "invite_reward_joiner": settings.get("INVITE_REWARD_JOINER") or 0,
+                "invite_reward_min_age": settings.get("INVITE_REWARD_MIN_AGE_DAYS") or 0,
+                "invite_reward_once": bool(settings.get("INVITE_REWARD_ONCE", True)),
+                "currency": await bank.get_currency_name(guild),
+                "can_read_invites": guild.me.guild_permissions.manage_guild,
                 "filter_setting": settings.get("FILTER_SETTING") or "",
                 "delete_after_greeting": settings.get("DELETE_AFTER_GREETING") or "",
                 "delete_after_goodbye": settings.get("DELETE_AFTER_GOODBYE") or "",
@@ -308,6 +314,9 @@ class DashboardIntegration:
 
         for key, form_key, floor in (
             ("MINIMUM_DAYS", "minimum_days", 0),
+            ("INVITE_REWARD_INVITER", "invite_reward_inviter", 0),
+            ("INVITE_REWARD_JOINER", "invite_reward_joiner", 0),
+            ("INVITE_REWARD_MIN_AGE_DAYS", "invite_reward_min_age", 0),
             ("DELETE_AFTER_GREETING", "delete_after_greeting", None),
             ("DELETE_AFTER_GOODBYE", "delete_after_goodbye", None),
         ):
@@ -320,6 +329,11 @@ class DashboardIntegration:
                 errors.append({"message": f"'{raw}' is not a number.", "category": "danger"})
                 continue
             await conf.get_attr(key).set(max(0, value))
+
+        await conf.INVITE_REWARD_ONCE.set(field.checked("invite_reward_once"))
+        # A reward that was just switched on needs a snapshot to compare
+        # against, or the next arrival credits nobody.
+        await self.refresh_invite_cache(guild)
 
         await conf.MENTIONS.set({k: field.checked(f"m_{k}") for k in MENTION_KEYS})
         await conf.GOODBYE_MENTIONS.set({k: field.checked(f"gm_{k}") for k in MENTION_KEYS})
@@ -516,6 +530,43 @@ WELCOME_TEMPLATE = (
                   none_label='same as join', placeholder='Search channels...') }}
         <div class="dz-label" style="margin-top:10px;">Minimum account age (days)</div>
         <input class="dz-input" type="number" min="0" name="minimum_days" value="{{ minimum_days }}" />
+        <div class="dz-label" style="margin-top:14px;">Invite rewards ({{ currency }})</div>
+        <div class="dz-hint">
+          Paid when someone joins on an invite this bot can attribute. Both 0
+          pays nothing.
+          {% if not can_read_invites %}
+            <b>I do not have Manage Server here, so I cannot read invites and
+            nothing will be paid.</b>
+          {% endif %}
+        </div>
+        <div class="dz-row" style="margin-top:6px;">
+          <div style="flex:1 1 130px;">
+            <div class="dz-label">To the inviter</div>
+            <input class="dz-input" type="number" min="0" name="invite_reward_inviter"
+                   value="{{ invite_reward_inviter }}" />
+          </div>
+          <div style="flex:1 1 130px;">
+            <div class="dz-label">To the new member</div>
+            <input class="dz-input" type="number" min="0" name="invite_reward_joiner"
+                   value="{{ invite_reward_joiner }}" />
+          </div>
+          <div style="flex:1 1 130px;">
+            <div class="dz-label">Minimum account age (days)</div>
+            <input class="dz-input" type="number" min="0" name="invite_reward_min_age"
+                   value="{{ invite_reward_min_age }}" />
+          </div>
+        </div>
+        <label class="dz-toggle" style="margin-top:6px;">
+          <input type="checkbox" name="invite_reward_once"
+                 {% if invite_reward_once %}checked{% endif %} />
+          <span>Pay for each person only once</span>
+        </label>
+        <div class="dz-hint">
+          Off means leaving and rejoining pays again, which is a wage. Nobody is
+          paid when two people arrive close enough together that the invite
+          cannot be told apart.
+        </div>
+
         <div class="dz-label" style="margin-top:10px;">Replace filtered names with</div>
         <input class="dz-input" name="filter_setting" value="{{ filter_setting }}"
                placeholder="[Redacted]" />

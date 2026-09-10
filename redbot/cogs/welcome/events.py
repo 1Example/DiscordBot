@@ -177,6 +177,9 @@ class Events:
 
     async def check_member_join(self, member: discord.Member):
         guild = member.guild
+        # Paid before the greeting checks, and regardless of them: a server
+        # that greets nobody can still pay for invites.
+        await self.handle_invite_rewards(member)
         if not await self.config.guild(guild).ON():
             return
         if guild is None:
