@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import random
 from dataclasses import dataclass, replace
@@ -8,7 +9,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
 import discord
-from redbot.core import commands
+from redbot.core import bank, commands
 
 from ..config.constants import URL_PATTERN
 from ..config.defaults import (
@@ -247,9 +248,46 @@ async def execute_response_request(
         if not ctx.interaction and URL_PATTERN.search(ctx.message.content):
             ctx = await wait_for_embed(ctx)
 
+        if not await charge_for_reply(services, ctx, request.kind):
+            return
+
         await build_and_respond(services, ctx, history_anchor=history_anchor)
     except Exception:
         logger.exception("Error generating aiuser response")
+
+
+async def charge_for_reply(
+    services: "AIUserServices", ctx: commands.Context, kind: ResponseKind
+) -> bool:
+    """Take the reply's price from whoever asked. False means do not answer.
+
+    Only a DIRECT reply is charged. A BURST is the bot deciding by itself to
+    join a conversation, and nobody should pay for that.
+    """
+    if kind is not ResponseKind.DIRECT or ctx.guild is None:
+        return True
+    try:
+        cost = int(await services.config.guild(ctx.guild).reply_cost() or 0)
+    except Exception:  # noqa: BLE001
+        return True
+    if cost <= 0:
+        return True
+    try:
+        if not await bank.can_spend(ctx.author, cost):
+            currency = await bank.get_currency_name(ctx.guild)
+            balance = await bank.get_balance(ctx.author)
+            with contextlib.suppress(discord.HTTPException):
+                await ctx.send(
+                    f"That costs {cost} {currency} and you have {balance}.",
+                    ephemeral=True,
+                )
+            return False
+        await bank.withdraw_credits(ctx.author, cost)
+    except Exception:
+        logger.exception("Could not charge %s for an aiuser reply", ctx.author)
+        # A broken bank should not take the feature down with it.
+        return True
+    return True
 
 
 async def get_latest_history_anchor(

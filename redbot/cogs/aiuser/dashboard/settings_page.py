@@ -51,6 +51,9 @@ SECTIONS: tuple[tuple[str, str, tuple], ...] = (
          "Let ordinary members reset the conversation, not just staff."),
         ("query_memories", "Use stored memories", "bool",
          "Let replies draw on remembered facts about the server."),
+        ("reply_cost", "Cost per reply", "int",
+         "Charged in the server's currency when someone asks the bot directly."
+         " Replies the bot starts by itself are always free. 0 charges nothing."),
     )),
     ("Who and where", "fa-filter", (
         ("channels_whitelist", "Enabled channels", "channels",

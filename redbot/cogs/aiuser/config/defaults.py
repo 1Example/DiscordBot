@@ -59,6 +59,8 @@ DEFAULT_GLOBAL = {
 }
 
 DEFAULT_GUILD = {
+    # What a member pays to be answered when they ask directly. 0 is free.
+    "reply_cost": 0,
     "optin_by_default": True,
     "optin_disable_embed": False,
     "reply_percent": DEFAULT_REPLY_PERCENT,
