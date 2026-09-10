@@ -9,15 +9,9 @@ from pathlib import Path
 from typing import Union, List, Optional
 
 import redbot.cogs
-from redbot.core.commands import positive_int
 from redbot.core.utils import deduplicate_iterables
 from redbot.core.utils.views import ConfirmView
-import discord
-
-from discord import app_commands
-
 from . import commands
-from .app_commands import checks as app_checks
 from .config import Config
 from .i18n import Translator, cog_i18n
 from .data_manager import cog_data_path, data_path
@@ -339,24 +333,19 @@ _ = Translator("CogManagerUI", __file__)
 
 @cog_i18n(_)
 class CogManagerUI(commands.Cog):
-    """Commands to interface with Red's cog manager."""
+    """Where the bot looks for cogs.
+
+    The commands live under /cog path, which is in Core - one group for
+    everything to do with cogs rather than three that start with the same
+    word. The work stays here, with its own translations.
+    """
 
     async def red_delete_data_for_user(self, **kwargs):
         """Nothing to delete (Core Config is handled in a bot method )"""
         return
 
-    cogpath = app_commands.Group(
-        name="cogpath",
-        description="Where I look for cogs.",
-        extras={"red_force_enable": True},
-    )
-    @cogpath.command(name="list", description="Show the paths I search, in order.")
-    @app_checks.is_owner()
-    async def paths(self, interaction: discord.Interaction):
-        """
-        Lists current cog paths in order of priority.
-        """
-        ctx = await commands.Context.from_interaction(interaction)
+    async def show_paths(self, ctx: commands.Context) -> None:
+        """Every path searched, in order, with the install and core paths."""
         cog_mgr = ctx.bot._cog_mgr
         install_path = await cog_mgr.install_path()
         core_path = cog_mgr.CORE_PATH
@@ -382,14 +371,8 @@ class CogManagerUI(commands.Cog):
 
         await ctx.send(box(msg))
 
-    @cogpath.command(name="add", description="Add a path to search.")
-    @app_checks.is_owner()
-    @app_commands.describe(path="A folder on the machine I run on.")
-    async def addpath(self, interaction: discord.Interaction, path: str):
-        """
-        Add a path to the list of available cog paths.
-        """
-        ctx = await commands.Context.from_interaction(interaction)
+    async def add_path(self, ctx: commands.Context, path: str) -> None:
+        """Add a folder to the list of places cogs are loaded from."""
         path = Path(path)
         if not path.is_dir():
             await ctx.send(_("That path does not exist or does not point to a valid directory."))
@@ -477,14 +460,8 @@ class CogManagerUI(commands.Cog):
         else:
             await ctx.send(_("Path successfully added."))
 
-    @cogpath.command(name="remove", description="Remove a path by its number.")
-    @app_checks.is_owner()
-    @app_commands.describe(path_numbers="Numbers from the list, separated by spaces.")
-    async def removepath(self, interaction: discord.Interaction, path_numbers: str):
-        """
-        Removes one or more paths from the available cog paths given the `path_numbers` from `[p]paths`.
-        """
-        ctx = await commands.Context.from_interaction(interaction)
+    async def remove_paths(self, ctx: commands.Context, path_numbers: str) -> None:
+        """Remove one or more paths, by the numbers /cog path list gives them."""
         numbers = []
         for token in path_numbers.split():
             if not token.isdigit() or int(token) < 1:
@@ -524,22 +501,8 @@ class CogManagerUI(commands.Cog):
         for page in pagify("\n\n".join(parts), ["\n", " "]):
             await ctx.send(page)
 
-    @cogpath.command(name="reorder", description="Move a path up or down the order.")
-    @app_checks.is_owner()
-    @app_commands.describe(
-        from_="The number it has now.",
-        to="The number it should have.",
-    )
-    async def reorderpath(
-        self,
-        interaction: discord.Interaction,
-        from_: app_commands.Range[int, 1, None],
-        to: app_commands.Range[int, 1, None],
-    ):
-        """
-        Reorders paths internally to allow discovery of different cogs.
-        """
-        ctx = await commands.Context.from_interaction(interaction)
+    async def reorder_path(self, ctx: commands.Context, from_: int, to: int) -> None:
+        """Move a path up or down the search order, changing which cog wins."""
         # Doing this because in the paths command they're 1 indexed
         from_ -= 1
         to -= 1
@@ -560,28 +523,20 @@ class CogManagerUI(commands.Cog):
         await ctx.bot._cog_mgr.set_paths(all_paths)
         await ctx.send(_("Paths reordered."))
 
-    @cogpath.command(name="install", description="Where Downloader puts cogs it installs.")
-    @app_checks.is_owner()
-    @app_commands.describe(path="Leave empty to see the current one.")
-    async def installpath(self, interaction: discord.Interaction, path: str = None):
-        """
-        Returns the current install path or sets it if one is provided.
+    async def set_install_path(self, ctx: commands.Context, path: str) -> None:
+        """Set where Downloader installs cogs.
 
-        The provided path must be absolute or relative to the bot's
-        directory and it must already exist.
-
-        No installed cogs will be transferred in the process.
+        Reading it back was this command's other half, and /cog path list
+        already prints it, so this only sets. Nothing already installed moves.
         """
-        ctx = await commands.Context.from_interaction(interaction)
-        path = Path(path) if path else None
-        if path:
-            if not path.is_absolute():
-                path = (ctx.bot._main_dir / path).resolve()
-            try:
-                await ctx.bot._cog_mgr.set_install_path(path)
-            except ValueError:
-                await ctx.send(_("That path does not exist."))
-                return
+        path = Path(path)
+        if not path.is_absolute():
+            path = (ctx.bot._main_dir / path).resolve()
+        try:
+            await ctx.bot._cog_mgr.set_install_path(path)
+        except ValueError:
+            await ctx.send(_("That path does not exist."))
+            return
 
         install_path = await ctx.bot._cog_mgr.install_path()
         await ctx.send(

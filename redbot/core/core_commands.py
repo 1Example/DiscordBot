@@ -582,10 +582,77 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
 
     cog = app_commands.Group(
         name="cog",
-        description="Load, unload and reload my modules.",
+        description="My modules: run them, find them, turn them off.",
         extras={"red_force_enable": True},
         default_permissions=discord.Permissions(administrator=True),
     )
+    # /cogpath and /cogset were separate roots saying the same word. The path
+    # commands still live in CogManagerUI - two cogs cannot share a group, and
+    # moving them would leave their translations behind.
+    cog_path = app_commands.Group(
+        name="path",
+        description="Where I look for cogs.",
+        parent=cog,
+    )
+
+    async def _cog_manager_ui(self, ctx):
+        """The cog holding the path commands. bot.py always adds it."""
+        ui = self.bot.get_cog("CogManagerUI")
+        if ui is None:
+            await ctx.send(_("The cog manager is not available."), ephemeral=True)
+        return ui
+
+    @cog_path.command(name="list", description="Every path I search, in order.")
+    @app_checks.is_owner()
+    async def cog_path_list(self, interaction: discord.Interaction):
+        """Show the cog paths, the install path and the core path."""
+        ctx = await commands.Context.from_interaction(interaction)
+        if (ui := await self._cog_manager_ui(ctx)) is not None:
+            await ui.show_paths(ctx)
+
+    @cog_path.command(name="add", description="Add a path to search.")
+    @app_checks.is_owner()
+    @app_commands.describe(path="A folder on the machine I run on.")
+    async def cog_path_add(self, interaction: discord.Interaction, path: str):
+        """Add a folder to search for cogs."""
+        ctx = await commands.Context.from_interaction(interaction)
+        if (ui := await self._cog_manager_ui(ctx)) is not None:
+            await ui.add_path(ctx, path)
+
+    @cog_path.command(name="remove", description="Remove a path by its number.")
+    @app_checks.is_owner()
+    @app_commands.describe(path_numbers="Numbers from the list, separated by spaces.")
+    async def cog_path_remove(self, interaction: discord.Interaction, path_numbers: str):
+        """Remove one or more paths."""
+        ctx = await commands.Context.from_interaction(interaction)
+        if (ui := await self._cog_manager_ui(ctx)) is not None:
+            await ui.remove_paths(ctx, path_numbers)
+
+    @cog_path.command(name="reorder", description="Move a path up or down the order.")
+    @app_checks.is_owner()
+    @app_commands.describe(
+        from_="The number it has now.",
+        to="The number it should have.",
+    )
+    async def cog_path_reorder(
+        self,
+        interaction: discord.Interaction,
+        from_: app_commands.Range[int, 1, None],
+        to: app_commands.Range[int, 1, None],
+    ):
+        """Change which path is searched first."""
+        ctx = await commands.Context.from_interaction(interaction)
+        if (ui := await self._cog_manager_ui(ctx)) is not None:
+            await ui.reorder_path(ctx, from_, to)
+
+    @cog_path.command(name="install", description="Set where Downloader installs cogs.")
+    @app_checks.is_owner()
+    @app_commands.describe(path="The folder to install into. See it with /cog path list.")
+    async def cog_path_install(self, interaction: discord.Interaction, path: str):
+        """Set the install path. Nothing already installed moves."""
+        ctx = await commands.Context.from_interaction(interaction)
+        if (ui := await self._cog_manager_ui(ctx)) is not None:
+            await ui.set_install_path(ctx, path)
 
     async def _cog_choices(
         self, interaction: discord.Interaction, current: str, loaded: bool
@@ -1382,13 +1449,6 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         description="Whether my replies use embeds.",
         extras={"red_force_enable": True},
     )
-    cogset = app_commands.Group(
-        name="cogset",
-        description="Turn a cog off for a server.",
-        extras={"red_force_enable": True},
-    )
-
-
     @embedset.command(
         name="command", description="Set whether one command's replies use embeds."
     )
@@ -2817,139 +2877,87 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         await ctx.send(_("Server blocklist has been cleared."))
 
 
-    @cogset.command(name="defaultdisable", description="Have a cog start off in servers I newly join.")
+    # These were four commands - enable, disable, defaultenable, defaultdisable -
+    # which is the same two verbs twice over. The scope is an option now.
+    SCOPES = [
+        app_commands.Choice(name="This server", value="guild"),
+        app_commands.Choice(name="Servers I newly join", value="default"),
+    ]
+
+    async def _scope_guild(self, ctx, scope: str):
+        """The guild a 'this server' change applies to, or None if there isn't one."""
+        if scope == "guild" and ctx.guild is None:
+            await ctx.send(
+                _("Run that in the server you mean, or choose the other scope."),
+                ephemeral=True,
+            )
+            return None
+        return ctx.guild
+
+    @cog.command(name="disable", description="Turn a cog off for a server. It stays loaded.")
     @app_checks.is_owner()
-    @app_commands.describe(cog="Which cog.")
-    async def command_default_disable_cog(
-        self,
-        interaction: discord.Interaction,
-        cog: str,
+    @app_commands.describe(cog="Which cog.", scope="Where this applies.")
+    @app_commands.choices(scope=SCOPES)
+    async def cog_disable(
+        self, interaction: discord.Interaction, cog: str, scope: str = "guild"
     ):
-        """Set the default state for a cog as disabled.
-
-        This will disable the cog for all servers by default.
-        To override it, use `[p]command enablecog` on the servers you want to allow usage.
-
-        Note: This will only work on loaded cogs, and must reference the title-case cog name.
-
-        **Examples:**
-        - `[p]command defaultdisablecog Economy`
-        - `[p]command defaultdisablecog ModLog`
-
-        **Arguments:**
-        - `<cog>` - The name of the cog to make disabled by default. Must be title-case.
-        """
+        """Stop a cog being usable, without unloading it."""
         ctx = await commands.Context.from_interaction(interaction)
-        cog = await self._one_cog(ctx, cog)
-        if cog is None:
+        found = await self._one_cog(ctx, cog)
+        if found is None:
             return
-        cogname = cog.qualified_name
-        if isinstance(cog, commands.commands._RuleDropper):
-            return await ctx.send(_("You can't disable this cog by default."))
-        await self.bot._disabled_cog_cache.default_disable(cogname)
-        await ctx.send(_("{cogname} has been set as disabled by default.").format(cogname=cogname))
-
-    @cogset.command(name="defaultenable", description="Have a cog start on in servers I newly join.")
-    @app_checks.is_owner()
-    @app_commands.describe(cog="Which cog.")
-    async def command_default_enable_cog(
-        self,
-        interaction: discord.Interaction,
-        cog: str,
-    ):
-        """Set the default state for a cog as enabled.
-
-        This will re-enable the cog for all servers by default.
-        To override it, use `[p]command disablecog` on the servers you want to disallow usage.
-
-        Note: This will only work on loaded cogs, and must reference the title-case cog name.
-
-        **Examples:**
-        - `[p]command defaultenablecog Economy`
-        - `[p]command defaultenablecog ModLog`
-
-        **Arguments:**
-        - `<cog>` - The name of the cog to make enabled by default. Must be title-case.
-        """
-        ctx = await commands.Context.from_interaction(interaction)
-        cog = await self._one_cog(ctx, cog)
-        if cog is None:
+        cogname = found.qualified_name
+        if isinstance(found, commands.commands._RuleDropper):
+            return await ctx.send(
+                _("You can't disable this cog by default.")
+                if scope == "default"
+                else _("You can't disable this cog as you would lock yourself out.")
+            )
+        if scope == "default":
+            await self.bot._disabled_cog_cache.default_disable(cogname)
+            return await ctx.send(
+                _("{cogname} will be off in servers I newly join.").format(cogname=cogname)
+            )
+        if (guild := await self._scope_guild(ctx, scope)) is None:
             return
-        cogname = cog.qualified_name
-        await self.bot._disabled_cog_cache.default_enable(cogname)
-        await ctx.send(_("{cogname} has been set as enabled by default.").format(cogname=cogname))
-
-    @cogset.command(name="disable", description="Turn a cog off in this server.")
-    @app_commands.guild_only()
-    @app_checks.is_owner()
-    @app_commands.describe(cog="Which cog.")
-    async def command_disable_cog(
-        self,
-        interaction: discord.Interaction,
-        cog: str,
-    ):
-        """Disable a cog in this server.
-
-        Note: This will only work on loaded cogs, and must reference the title-case cog name.
-
-        **Examples:**
-        - `[p]command disablecog Economy`
-        - `[p]command disablecog ModLog`
-
-        **Arguments:**
-        - `<cog>` - The name of the cog to disable on this server. Must be title-case.
-        """
-        ctx = await commands.Context.from_interaction(interaction)
-        cog = await self._one_cog(ctx, cog)
-        if cog is None:
-            return
-        cogname = cog.qualified_name
-        if isinstance(cog, commands.commands._RuleDropper):
-            return await ctx.send(_("You can't disable this cog as you would lock yourself out."))
-        if await self.bot._disabled_cog_cache.disable_cog_in_guild(cogname, ctx.guild.id):
+        if await self.bot._disabled_cog_cache.disable_cog_in_guild(cogname, guild.id):
             await ctx.send(_("{cogname} has been disabled in this guild.").format(cogname=cogname))
         else:
             await ctx.send(
                 _("{cogname} was already disabled (nothing to do).").format(cogname=cogname)
             )
 
-    @cogset.command(name="enable", description="Turn a cog back on in this server.")
-    @app_commands.guild_only()
+    @cog.command(name="enable", description="Turn a cog back on for a server.")
     @app_checks.is_owner()
-    @app_commands.describe(cogname="Which cog.")
-    async def command_enable_cog(
-        self,
-        interaction: discord.Interaction,
-        cogname: str,
+    @app_commands.describe(cog="Which cog.", scope="Where this applies.")
+    @app_commands.choices(scope=SCOPES)
+    async def cog_enable(
+        self, interaction: discord.Interaction, cog: str, scope: str = "guild"
     ):
-        """Enable a cog in this server.
-
-        Note: This will only work on loaded cogs, and must reference the title-case cog name.
-
-        **Examples:**
-        - `[p]command enablecog Economy`
-        - `[p]command enablecog ModLog`
-
-        **Arguments:**
-        - `<cog>` - The name of the cog to enable on this server. Must be title-case.
-        """
+        """Let a cog be used again."""
         ctx = await commands.Context.from_interaction(interaction)
-        if await self.bot._disabled_cog_cache.enable_cog_in_guild(cogname, ctx.guild.id):
-            await ctx.send(_("{cogname} has been enabled in this guild.").format(cogname=cogname))
-        else:
-            # putting this here allows enabling a cog that isn't loaded but was disabled.
-            cog = self.bot.get_cog(cogname)
-            if not cog:
-                return await ctx.send(_('Cog "{arg}" not found.').format(arg=cogname))
-
-            await ctx.send(
-                _("{cogname} was not disabled (nothing to do).").format(cogname=cogname)
+        if scope == "default":
+            found = await self._one_cog(ctx, cog)
+            if found is None:
+                return
+            cogname = found.qualified_name
+            await self.bot._disabled_cog_cache.default_enable(cogname)
+            return await ctx.send(
+                _("{cogname} will be on in servers I newly join.").format(cogname=cogname)
             )
+        if (guild := await self._scope_guild(ctx, scope)) is None:
+            return
+        # Deliberately not resolved first: a cog that was disabled and then
+        # unloaded still has to be re-enableable, and it is not in bot.cogs.
+        if await self.bot._disabled_cog_cache.enable_cog_in_guild(cog, guild.id):
+            await ctx.send(_("{cogname} has been enabled in this guild.").format(cogname=cog))
+        elif self.bot.get_cog(cog) is None:
+            await ctx.send(_('Cog "{arg}" not found.').format(arg=cog))
+        else:
+            await ctx.send(_("{cogname} was not disabled (nothing to do).").format(cogname=cog))
 
-    @command_disable_cog.autocomplete("cog")
-    @command_default_disable_cog.autocomplete("cog")
-    @command_default_enable_cog.autocomplete("cog")
-    @command_enable_cog.autocomplete("cogname")
+    @cog_disable.autocomplete("cog")
+    @cog_enable.autocomplete("cog")
     async def _cog_autocomplete(self, interaction, current: str) -> list:
         """The cogs this bot has loaded."""
         current = current.lower()
@@ -2959,17 +2967,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             if current in name.lower()
         ][:25]
 
-    @cogset.command(name="listdisabled", description="List the cogs turned off in this server.")
+    @cog.command(name="disabled", description="List the cogs turned off in this server.")
     @app_commands.guild_only()
-    async def command_list_disabled_cogs(
-        self,
-        interaction: discord.Interaction,
-    ):
-        """List the cogs which are disabled in this server.
-
-        **Example:**
-        - `[p]command listdisabledcogs`
-        """
+    async def cog_disabled(self, interaction: discord.Interaction):
+        """The cogs that are loaded but turned off here."""
         ctx = await commands.Context.from_interaction(interaction)
         disabled = [
             cog.qualified_name
