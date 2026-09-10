@@ -178,10 +178,37 @@ class RedTree(CommandTree):
             return msg
         return await interaction.response.send_message(*args, ephemeral=True, **kwargs)
 
+    @staticmethod
+    def _feedback_classes():
+        """Both flavours of check failure, since cogs raise either.
+
+        `redbot.core.commands.UserFeedbackCheckFailure` is an ext.commands
+        CheckFailure; the one imported above is an app_commands one. They are
+        different classes, so testing only for the second meant a cog raising
+        the first fell through to the catch-all and was logged as a fault.
+        """
+        from .commands.errors import UserFeedbackCheckFailure as PrefixFeedback
+        from discord.ext.commands import CheckFailure as PrefixCheckFailure
+
+        return (
+            (UserFeedbackCheckFailure, PrefixFeedback),
+            (CheckFailure, PrefixCheckFailure),
+        )
+
     async def on_error(
         self, interaction: discord.Interaction, error: AppCommandError, /, *args, **kwargs
     ) -> None:
         """Fallback error handler for app commands."""
+        feedback_classes, check_classes = self._feedback_classes()
+        # Raising one of these inside a command is how a cog says something to
+        # the person running it. discord.py wraps whatever a callback raises in
+        # CommandInvokeError, so "You have no tickets" arrived here looking
+        # like a crash: a traceback in the console and "check your logs" for
+        # them. Unwrap it before the branches below decide which it is.
+        if isinstance(error, CommandInvokeError) and isinstance(
+            error.original, feedback_classes + check_classes
+        ):
+            error = error.original
         if isinstance(error, CommandNotFound):
             await self._send_from_interaction(interaction, _("Command not found."))
             log.warning(
@@ -242,10 +269,11 @@ class RedTree(CommandTree):
                 relative_time=relative_time
             )
             await self._send_from_interaction(interaction, msg, delete_after=error.retry_after)
-        elif isinstance(error, UserFeedbackCheckFailure):
-            if error.message:
-                await self._send_from_interaction(interaction, error.message)
-        elif isinstance(error, CheckFailure):
+        elif isinstance(error, feedback_classes):
+            message = getattr(error, "message", None) or str(error)
+            if message:
+                await self._send_from_interaction(interaction, message)
+        elif isinstance(error, check_classes):
             await self._send_from_interaction(
                 interaction, _("You are not permitted to use this command.")
             )

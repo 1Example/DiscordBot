@@ -886,7 +886,7 @@ class Tickets(DashboardIntegration, CogBase):
         ctx = await commands.Context.from_interaction(interaction)
         await ctx.typing()
         if not (tickets := self.tickets.get(ctx.guild.id)):
-            raise commands.UserFeedbackCheckFailure(_("No ticket found."))
+            raise commands.UserFeedbackCheckFailure(_("This server has no tickets."))
         tickets_to_display = []
         for ticket in tickets.values():
             if (
@@ -914,6 +914,12 @@ class Tickets(DashboardIntegration, CogBase):
             ):
                 continue
             tickets_to_display.append(ticket)
+        if not tickets_to_display:
+            raise commands.UserFeedbackCheckFailure(
+                _("No ticket here matches what you asked for.")
+                if (status != "open" or claimed or owner is not None)
+                else _("There are no open tickets.")
+            )
         if not short:
             embeds = [await ticket.get_embed(for_logging=True) for ticket in tickets_to_display]
         else:
