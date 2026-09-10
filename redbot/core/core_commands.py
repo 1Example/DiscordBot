@@ -619,7 +619,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     @app_checks.is_owner()
     @app_commands.describe(names="One or more module names, separated by spaces.")
     @app_commands.autocomplete(names=_loadable)
-    async def cog_load(self, interaction: discord.Interaction, names: str):
+    async def load_modules(self, interaction: discord.Interaction, names: str):
         """Load one or more modules."""
         ctx = await commands.Context.from_interaction(interaction)
         wanted = self._cog_names(names)
@@ -651,7 +651,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     @app_checks.is_owner()
     @app_commands.describe(names="One or more module names, separated by spaces.")
     @app_commands.autocomplete(names=_loaded)
-    async def cog_unload(self, interaction: discord.Interaction, names: str):
+    async def unload_modules(self, interaction: discord.Interaction, names: str):
         """Unload one or more modules."""
         ctx = await commands.Context.from_interaction(interaction)
         wanted = self._cog_names(names)
@@ -671,7 +671,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     @app_checks.is_owner()
     @app_commands.describe(names="One or more module names, separated by spaces.")
     @app_commands.autocomplete(names=_loaded)
-    async def cog_reload(self, interaction: discord.Interaction, names: str):
+    async def reload_modules(self, interaction: discord.Interaction, names: str):
         """Reload one or more modules."""
         ctx = await commands.Context.from_interaction(interaction)
         wanted = self._cog_names(names)
@@ -699,7 +699,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
 
     @cog.command(name="list", description="Show which modules are running.")
     @app_checks.is_owner()
-    async def cog_list(self, interaction: discord.Interaction):
+    async def list_modules(self, interaction: discord.Interaction):
         """List the modules that are installed, and which are running."""
         ctx = await commands.Context.from_interaction(interaction)
         try:
