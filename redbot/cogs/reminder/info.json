@@ -1,0 +1,31 @@
+{
+    "author": [
+        "ZeLarpMaster",
+        "aikaterna"
+    ],
+    "description": "Have the bot remind you about anything you want, at a time you choose.",
+    "disabled": false,
+    "end_user_data_statement": "This cog stores the reminders you ask it to keep, and the UTC offset you set for displaying them, against your Discord user ID. Nothing is stored that you did not type into a command. Use /remind forget all to remove it yourself.",
+    "hidden": false,
+    "install_msg": "See `/remind` for available commands.",
+    "max_bot_version": "0.0.0",
+    "min_bot_version": "3.5.0",
+    "min_python_version": [
+        3,
+        9,
+        0
+    ],
+    "name": "Reminder",
+    "permissions": [
+        "embed_links"
+    ],
+    "required_cogs": {},
+    "requirements": [],
+    "short": "Remind yourself about anything, later.",
+    "tags": [
+        "remind",
+        "reminder",
+        "remindme"
+    ],
+    "type": "COG"
+}
