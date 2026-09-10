@@ -1,0 +1,32 @@
+{
+    "author": [
+        "TrustyJAID"
+    ],
+    "description": "Pin the messages a server thinks are worth keeping. React with a starboard's emoji and, once enough people have, the message is posted to that starboard's channel.",
+    "disabled": false,
+    "end_user_data_statement": "This cog stores the IDs of messages that have been starred, the IDs of the people who starred them, and the IDs of roles and channels a server has allowed or blocked. Everything it stores comes from reacting to a message or from a server's own settings.",
+    "hidden": false,
+    "install_msg": "Set your starboards up on the dashboard. `/starboard star`, `/starboard unstar` and `/starboard info` are the commands.",
+    "max_bot_version": "0.0.0",
+    "min_bot_version": "3.5.0",
+    "min_python_version": [
+        3,
+        9,
+        0
+    ],
+    "name": "Starboard",
+    "permissions": [
+        "embed_links",
+        "read_message_history",
+        "add_reactions"
+    ],
+    "required_cogs": {},
+    "requirements": [],
+    "short": "Keep the messages a server likes best.",
+    "tags": [
+        "star",
+        "starboard",
+        "pin"
+    ],
+    "type": "COG"
+}
