@@ -83,7 +83,6 @@ class User(MixinMeta):
         - `level` - Level
         - `voice` - Voicetime
         - `messages` - Messages
-        - `stars` - Stars
         `globalstats` - View the global leaderboard instead of the server leaderboard
         `displayname` - Use display names instead of usernames
         """

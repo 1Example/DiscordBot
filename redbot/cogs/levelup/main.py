@@ -29,7 +29,6 @@ import tempfile
 import typing as t
 from collections import defaultdict
 from contextlib import suppress
-from datetime import datetime
 from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
@@ -95,7 +94,6 @@ class LevelUp(
         self.lastmsg: t.Dict[int, t.Dict[int, float]] = {}  # GuildID: {UserID: LastMessageTime}
         self.msg_cache: t.Dict[int, t.Dict[int, t.List[str]]] = {}  # GuildID: {UserID: [normalized messages]}
         self.profile_cache: t.Dict[int, t.Dict[int, t.Tuple[str, bytes]]] = {}  # GuildID: {UserID: (last_used, bytes)}
-        self.stars: t.Dict[int, t.Dict[int, datetime]] = {}  # Guild_ID: {User_ID: {User_ID: datetime}}
 
         # {guild_id: {member_id: tracking_data}}
         self.voice_tracking: t.Dict[int, t.Dict[int, VoiceTracking]] = defaultdict(dict)

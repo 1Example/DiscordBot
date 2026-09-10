@@ -554,7 +554,9 @@ def generate_default_profile(
         (_("TO NEXT"), compact(max(next_xp - current_xp, 0)), _("LEVEL"), humanize_number(level + 1), figure),
         (_("MESSAGES"), compact(messages), None, None, figure),
         (_("VOICE TIME"), voice_text, None, None, figure),
-        (_("STARS"), humanize_number(stars), None, None, figure),
+        # Stars used to be here. Nothing can add to that number any more, so
+        # the tile shows something that still moves.
+        (_("PRESTIGE"), humanize_number(prestige), None, None, figure),
         (_("BALANCE"), compact(balance), None, None, figure),
     ]
     if currency_name:
