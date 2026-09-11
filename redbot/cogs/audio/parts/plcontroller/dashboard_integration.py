@@ -86,7 +86,7 @@ class ControllerDashboard:
             "pause", "resume", "skip", "previous", "shuffle",
             "seek", "volume_up", "volume_down", "volume_set", "mute",
             "search", "play", "play_now",
-            "radio_search", "radio_play",
+            "radio_search", "radio_play", "playlist_play",
             "fav_add", "fav_play", "fav_queue",
         }
     )
@@ -244,6 +244,7 @@ class ControllerDashboard:
                 "guild": self._dash_guild_card(guild),
                 "is_staff": is_staff,
                 "favourites": await self._dash_fav_list(guild),
+                "playlists": await self._dash_playlists(member, guild),
                 "wallet": await self._dash_wallet(member, guild),
                 "economy": await self._dash_economy_state(member, guild, is_staff),
                 "search_sources": [list(row) for row in self.SEARCH_SOURCES],
@@ -336,6 +337,11 @@ class ControllerDashboard:
         # --- guild favourites playlist ---
         if action in ("fav_add", "fav_remove", "fav_play", "fav_queue", "fav_clear"):
             message, category = await self._dash_favourites(action, member, guild, player, field)
+            return await reply(message, category)
+
+        # --- a whole playlist, from the server's or the global list ---
+        if action == "playlist_play":
+            message, category = await self._dash_playlist_play(member, guild, player, field)
             return await reply(message, category)
 
         # --- radio: the directory, and queueing a station from it ---
@@ -731,6 +737,90 @@ class ControllerDashboard:
                 }
             )
         return results, None
+
+    # ---------- playlists ----------
+
+    async def _dash_playlists(self, member, guild) -> dict:
+        """The server's playlists and the global ones, for the player page.
+
+        Two scopes only. Channel and voice-channel playlists are a thing, but
+        they are noise next to a player: what someone wants here is either what
+        this server saved or what everyone shares.
+        """
+        out = {"guild": [], "global": []}
+        try:
+            bundled, _user, guild_pl, _channel, _vc = await self.pylav.playlist_db_manager.get_all_for_user(
+                requester=member.id, guild=guild
+            )
+        except Exception:  # noqa: BLE001
+            log.exception("Could not list playlists for the player page")
+            return out
+
+        for key, playlists in (("guild", guild_pl), ("global", bundled)):
+            rows = []
+            for playlist in playlists or []:
+                try:
+                    rows.append(
+                        {
+                            "id": str(playlist.id),
+                            "name": await playlist.fetch_name() or "Untitled",
+                            "size": await playlist.size(),
+                        }
+                    )
+                except Exception:  # noqa: BLE001 - one bad row must not hide the rest
+                    log.exception("Could not read a playlist")
+            out[key] = sorted(rows, key=lambda r: r["name"].lower())
+        return out
+
+    async def _dash_playlist_play(self, member, guild, player, field):
+        """Queue every track of a playlist."""
+        playlist_id = (field("playlist_id") or "").strip()
+        if not playlist_id:
+            return "Pick a playlist first.", "warning"
+        try:
+            playlist = await self.pylav.playlist_db_manager.get_playlist_by_id(playlist_id)
+            name = await playlist.fetch_name() or "Untitled"
+        except Exception:  # noqa: BLE001
+            return "That playlist no longer exists.", "danger"
+        try:
+            tracks = await playlist.fetch_tracks() or []
+        except Exception:  # noqa: BLE001
+            log.exception("Could not read playlist %s", playlist_id)
+            return f"Could not read {name}.", "danger"
+        if not tracks:
+            return f"{name} is empty.", "warning"
+
+        if player is None:
+            channel = getattr(getattr(member, "voice", None), "channel", None)
+            if channel is None:
+                return "Join a voice channel first, then try again.", "warning"
+            try:
+                player = await self.pylav.player_manager.create(channel=channel, requester=member)
+            except Exception as exc:  # noqa: BLE001
+                log.exception("Dashboard could not create a player")
+                return f"Could not connect: {exc}", "danger"
+
+        # A playlist holds encoded tracks, not queries, so they are decoded
+        # rather than resolved - the same path the playlists page uses.
+        added = 0
+        for index, entry in enumerate(tracks):
+            identifier = entry if isinstance(entry, str) else (entry or {}).get("encoded")
+            if not identifier:
+                continue
+            try:
+                track = await self.pylav.decode_track(identifier, raise_on_failure=False)
+                if track is None:
+                    continue
+                if index == 0 and not player.current:
+                    await player.play(track, None, member)
+                else:
+                    await player.add(requester=member.id, track=track)
+                added += 1
+            except Exception:  # noqa: BLE001 - one bad track must not lose the rest
+                continue
+        if not added:
+            return f"Nothing in {name} could be played.", "warning"
+        return f"Queued {added} of {len(tracks)} from {name}.", "success"
 
     # ---------- radio ----------
 
@@ -2241,6 +2331,18 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
           <div class="plc-scroll" style="max-height:min(38vh,340px);"><ul class="plc-list" id="plcFavs"></ul></div>
         </div>
       </div>
+
+      <div class="plc-card">
+        <div class="plc-card-head">
+          <h5><i class="fa fa-folder-open-o"></i> Playlists</h5>
+          <span class="plc-count" id="plcPlCount">0</span>
+          <span class="plc-spacer"></span>
+          <div class="plc-sources" id="plcPlScopes"></div>
+        </div>
+        <div class="plc-card-body flush">
+          <div class="plc-scroll" style="max-height:min(38vh,340px);"><ul class="plc-list" id="plcPlaylists"></ul></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2358,6 +2460,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   var searchTerm = "";
   var radioResults = [];
   var radioSearched = false;
+  var playlistScope = "guild";
   var searchSource = "ytsearch";
   // The playhead is extrapolated between polls; `anchor` is the last point we
   // actually heard from the bot, so the clock never drifts further than one
@@ -2492,6 +2595,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     if (data.guild !== undefined) S.guild = data.guild;
     if (data.guilds !== undefined) S.guilds = data.guilds;
     if (data.favourites !== undefined) S.favourites = data.favourites;
+    if (data.playlists !== undefined) S.playlists = data.playlists;
     if (data.wallet !== undefined) S.wallet = data.wallet;
     if (data.economy !== undefined) S.economy = data.economy;
     if (data.radio_results !== undefined) {
@@ -2682,6 +2786,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     renderServer();
     renderQueue();
     renderFavs();
+    renderPlaylists();
     renderWallet();
     paintSeek();
   }
@@ -2766,6 +2871,44 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
             '" title="Add to the queue"><i class="fa fa-plus"></i></button>' +
           '<button class="plc-btn sm icon primary" data-act="play_now" data-result="' + i +
             '" title="Play it now"><i class="fa fa-play"></i></button>' +
+        "</span>" +
+        "</li>";
+    }).join("");
+  }
+
+  // ---- playlists ---------------------------------------------------------
+  function renderPlaylists() {
+    var all = S.playlists || {};
+    var rows = all[playlistScope] || [];
+    $("plcPlCount").textContent = rows.length;
+    $("plcPlScopes").innerHTML = [
+      ["guild", "This server"],
+      ["global", "Global"]
+    ].map(function (s) {
+      return '<button class="plc-src' + (playlistScope === s[0] ? " on" : "") +
+        '" data-scope="' + s[0] + '">' + esc(s[1]) +
+        " <b>" + ((all[s[0]] || []).length) + "</b></button>";
+    }).join("");
+
+    var box = $("plcPlaylists");
+    if (!rows.length) {
+      box.innerHTML = '<li class="plc-empty"><i class="fa fa-folder-open-o"></i>' +
+        (playlistScope === "guild"
+          ? "This server has no playlists yet."
+          : "There are no global playlists.") + "</li>";
+      return;
+    }
+    box.innerHTML = rows.map(function (p, i) {
+      return '<li class="plc-item">' +
+        '<span class="plc-thumb ph"><i class="fa fa-folder-open-o"></i></span>' +
+        '<div class="plc-item-main">' +
+          '<p class="plc-item-t">' + esc(p.name) + "</p>" +
+          '<p class="plc-item-s">' + esc(String(p.size)) +
+            (Number(p.size) === 1 ? " track" : " tracks") + "</p>" +
+        "</div>" +
+        '<span class="plc-item-acts">' +
+          '<button class="plc-btn sm icon primary" data-act="playlist_play" data-playlist="' + i +
+            '" title="Queue the whole playlist"><i class="fa fa-play"></i></button>' +
         "</span>" +
         "</li>";
     }).join("");
@@ -2977,6 +3120,12 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   // ---------------------------------------------------------------- events
   // One delegated handler for every button that maps straight to an action.
   ROOT.addEventListener("click", function (ev) {
+    var scope = ev.target.closest("[data-scope]");
+    if (scope) {
+      playlistScope = scope.dataset.scope;
+      renderPlaylists();
+      return;
+    }
     var src = ev.target.closest(".plc-src");
     if (src) {
       searchSource = src.dataset.source;
@@ -2997,6 +3146,11 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
       // Favouriting wants the encoded blob, which is the only handle that
       // survives a source with no public URL; playing wants the identifier.
       extra.identifier = action === "fav_add" ? (r.encoded || r.identifier) : r.identifier;
+    }
+    if (btn.dataset.playlist !== undefined) {
+      var pl = ((S.playlists || {})[playlistScope] || [])[Number(btn.dataset.playlist)];
+      if (!pl) return;
+      extra.playlist_id = pl.id;
     }
     if (btn.dataset.station !== undefined) {
       var st = radioResults[Number(btn.dataset.station)];
@@ -3212,6 +3366,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   renderSources();
   renderResults();
   renderRadio();
+  renderPlaylists();
   reanchor();
   render();
   markField();
