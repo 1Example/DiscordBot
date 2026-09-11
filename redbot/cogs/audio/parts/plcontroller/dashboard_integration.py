@@ -86,6 +86,7 @@ class ControllerDashboard:
             "pause", "resume", "skip", "previous", "shuffle",
             "seek", "volume_up", "volume_down", "volume_set", "mute",
             "search", "play", "play_now",
+            "radio_search", "radio_play",
             "fav_add", "fav_play", "fav_queue",
         }
     )
@@ -336,6 +337,11 @@ class ControllerDashboard:
         if action in ("fav_add", "fav_remove", "fav_play", "fav_queue", "fav_clear"):
             message, category = await self._dash_favourites(action, member, guild, player, field)
             return await reply(message, category)
+
+        # --- radio: the directory, and queueing a station from it ---
+        if action in ("radio_search", "radio_play"):
+            message, category, extra = await self._dash_radio(action, member, guild, player, field)
+            return await reply(message, category, **extra)
 
         # --- play / enqueue: connects if needed ---
         if action in ("play", "play_now"):
@@ -726,6 +732,79 @@ class ControllerDashboard:
             )
         return results, None
 
+    # ---------- radio ----------
+
+    RADIO_RESULT_LIMIT = 50
+
+    @staticmethod
+    def _dash_radio_row(station) -> dict:
+        """One station, flattened for the page."""
+        return {
+            "name": (getattr(station, "name", "") or "Unknown").strip(),
+            "url": getattr(station, "url_resolved", None) or getattr(station, "url", "") or "",
+            "homepage": getattr(station, "homepage", "") or "",
+            "country": getattr(station, "country", "") or "",
+            "language": getattr(station, "language", "") or "",
+            "codec": getattr(station, "codec", "") or "",
+            "bitrate": int(getattr(station, "bitrate", 0) or 0),
+            "votes": int(getattr(station, "votes", 0) or 0),
+            "favicon": getattr(station, "favicon", "") or "",
+            "uuid": getattr(station, "stationuuid", "") or "",
+        }
+
+    async def _dash_radio(self, action: str, member, guild, player, field):
+        """Search the radio directory, and queue a station from it.
+
+        This used to be a page of its own. Searching in one place and then
+        going somewhere else to listen is two pages for one job, so the
+        directory sits with the player and a station queues like any other
+        track. Returns (message, category, extra).
+        """
+        browser = getattr(self.pylav, "radio_browser", None)
+        if browser is None or getattr(browser, "disabled", False):
+            return "The radio directory is not available right now.", "warning", {}
+
+        if action == "radio_search":
+            filters = {
+                key: value
+                for key, value in (
+                    ("name", (field("radio_name") or "").strip()),
+                    ("country", (field("radio_country") or "").strip()),
+                    ("language", (field("radio_language") or "").strip()),
+                    ("tag", (field("radio_tag") or "").strip()),
+                )
+                if value
+            }
+            if not filters:
+                return "Type something to search for first.", "warning", {"radio_results": []}
+            try:
+                found = await browser.search(
+                    limit=self.RADIO_RESULT_LIMIT, order="votes", reverse=True, **filters
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.exception("Radio directory search failed")
+                return f"The radio directory did not answer: {exc}", "danger", {}
+            rows = [row for row in map(self._dash_radio_row, found or []) if row["url"]]
+            if not rows:
+                return "No station matched that.", "info", {"radio_results": []}
+            return "", "info", {"radio_results": rows}
+
+        url = (field("station_url") or "").strip()
+        name = (field("station_name") or "").strip() or url
+        if not url:
+            return "Pick a station first.", "warning", {}
+        message, category = await self._dash_play(member, guild, player, url)
+        if category == "success":
+            # A stream has no title until it is resolved, so say which station
+            # was picked rather than "Added to the queue".
+            message = f"Queued {name}."
+            # Tell the directory the station was played; it is how their
+            # popularity ordering stays meaningful. Never worth an error.
+            if uuid := (field("station_uuid") or "").strip():
+                with contextlib.suppress(Exception):
+                    await browser.click(station_id=uuid)
+        return message, category, {}
+
     async def _dash_play(self, member, guild, player, identifier: str, play_now: bool = False):
         """Enqueue (or immediately play) a query/URL. Returns (message, category)."""
         # Connect if we have no player yet - the requester must be in a voice channel.
@@ -788,11 +867,25 @@ class ControllerDashboard:
     # `dashboard_action_costs`; an action missing from that mapping is free.
     # Staff are never charged.
 
+    async def _dash_costs(self, guild: discord.Guild) -> dict:
+        """Stored costs, with any action added since filled in from defaults.
+
+        The whole mapping is a single Config key, so a guild that saved its
+        costs before an action existed would never see that action again: it
+        would be free, and missing from the settings page, permanently.
+        """
+        stored = await self._controller_config.guild(guild).dashboard_action_costs() or {}
+        try:
+            defaults = self._controller_config.defaults["GUILD"]["dashboard_action_costs"]
+        except Exception:  # noqa: BLE001
+            return dict(stored)
+        return {**dict(defaults or {}), **dict(stored)}
+
     async def _dash_economy_state(self, member: discord.Member, guild: discord.Guild, is_staff: bool):
         """Costs + balance for rendering the price list on the page."""
         try:
             enabled = await self._controller_config.guild(guild).dashboard_economy_enabled()
-            costs = await self._controller_config.guild(guild).dashboard_action_costs() or {}
+            costs = await self._dash_costs(guild)
         except Exception:  # noqa: BLE001
             return None
         if not enabled or is_staff or not costs:
@@ -815,7 +908,7 @@ class ControllerDashboard:
         try:
             if not await self._controller_config.guild(guild).dashboard_economy_enabled():
                 return True, None
-            costs = await self._controller_config.guild(guild).dashboard_action_costs()
+            costs = await self._dash_costs(guild)
         except Exception:  # noqa: BLE001
             return True, None
         cost = int((costs or {}).get(action, 0) or 0)
@@ -912,7 +1005,9 @@ class ControllerDashboard:
                 "guild_emojis": emoji_options(guild),
                 "economy_enabled": bool(settings.get("dashboard_economy_enabled")),
                 "currency": currency,
-                "cost_rows": self._dash_cost_rows(settings),
+                "cost_rows": self._dash_cost_rows(
+                    {**settings, "dashboard_action_costs": await self._dash_costs(guild)}
+                ),
                 "posted": bool(settings.get("persistent_view_message_id")),
                 "live": self._dash_live_buttons(guild),
             },
@@ -999,7 +1094,7 @@ class ControllerDashboard:
                     ]
                 return await self._dash_save_greedy(field)
             if action == "save_costs":
-                return await self._dash_save_costs(conf, field)
+                return await self._dash_save_costs(guild, conf, field)
             if action == "reset_buttons":
                 await conf.button_emojis.set({})
                 await conf.button_labels.set({})
@@ -1401,8 +1496,10 @@ class ControllerDashboard:
             {"message": "Buttons saved." + pushed, "category": "success"}
         ]
 
-    async def _dash_save_costs(self, conf, field) -> list[dict]:
-        costs = await conf.dashboard_action_costs()
+    async def _dash_save_costs(self, guild, conf, field) -> list[dict]:
+        # Merged, so an action added since this guild last saved is editable
+        # here rather than stuck at zero and invisible.
+        costs = await self._dash_costs(guild)
         bad = []
         updated = {}
         for key in costs:
@@ -1699,6 +1796,9 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 .plc-btn.on{ background:rgba(108,140,255,.22); border-color:rgba(108,140,255,.55); color:#cdd8ff; }
 .plc-btn.danger{ color:#ff9d9d; border-color:rgba(255,107,107,.35); }
 .plc-btn.danger:hover:not(:disabled){ background:rgba(255,107,107,.16); border-color:rgba(255,107,107,.55); }
+.plc-grid.four{ display:grid; gap:10px; grid-template-columns:1fr; }
+@media (min-width:700px){ .plc-grid.four{ grid-template-columns:1fr 1fr; } }
+@media (min-width:1100px){ .plc-grid.four{ grid-template-columns:repeat(4,1fr); } }
 .plc-btn .plc-cost{
   position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 5px;
   border-radius:999px; font-size:.6rem; font-weight:800; line-height:18px;
@@ -2144,6 +2244,44 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     </div>
   </div>
 
+  <!-- ============ RADIO ============ -->
+  <div class="plc-card" style="margin-top:16px;">
+    <div class="plc-card-head">
+      <h5><i class="fa fa-feed"></i> Radio</h5>
+      <span class="plc-spacer"></span>
+      <span class="plc-sub" id="plcRadioMeta"></span>
+    </div>
+    <div class="plc-card-body">
+      <p class="plc-sub" style="margin:0 0 9px;">
+        Search the worldwide station directory. Every box is optional, but fill
+        in at least one. Capitalisation does not matter.
+      </p>
+      <div class="plc-grid four">
+        <label class="plc-field"><i class="fa fa-search"></i>
+          <input class="plc-input" id="plcRadioName" type="text" autocomplete="off"
+                 placeholder="Station name" /></label>
+        <label class="plc-field"><i class="fa fa-globe"></i>
+          <input class="plc-input" id="plcRadioCountry" type="text" autocomplete="off"
+                 placeholder="Country, e.g. Romania" /></label>
+        <label class="plc-field"><i class="fa fa-language"></i>
+          <input class="plc-input" id="plcRadioLanguage" type="text" autocomplete="off"
+                 placeholder="Language" /></label>
+        <label class="plc-field"><i class="fa fa-tag"></i>
+          <input class="plc-input" id="plcRadioTag" type="text" autocomplete="off"
+                 placeholder="Genre or tag" /></label>
+      </div>
+      <div style="margin-top:10px;">
+        <button class="plc-btn primary wide" id="plcRadioGo">
+          <i class="fa fa-search"></i> Find stations</button>
+      </div>
+    </div>
+    <div class="plc-card-body flush">
+      <div class="plc-scroll" style="max-height:min(40vh,360px);">
+        <ul class="plc-list" id="plcRadio"></ul>
+      </div>
+    </div>
+  </div>
+
   <p class="plc-sub" style="text-align:center;">
     <span class="plc-kbd">Space</span> play/pause &nbsp;
     <span class="plc-kbd">&larr;</span><span class="plc-kbd">&rarr;</span> seek 10s &nbsp;
@@ -2218,6 +2356,8 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   var sources = [];
   var results = [];
   var searchTerm = "";
+  var radioResults = [];
+  var radioSearched = false;
   var searchSource = "ytsearch";
   // The playhead is extrapolated between polls; `anchor` is the last point we
   // actually heard from the bot, so the clock never drifts further than one
@@ -2354,6 +2494,10 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     if (data.favourites !== undefined) S.favourites = data.favourites;
     if (data.wallet !== undefined) S.wallet = data.wallet;
     if (data.economy !== undefined) S.economy = data.economy;
+    if (data.radio_results !== undefined) {
+      radioResults = data.radio_results;
+      renderRadio();
+    }
     if (data.search_results !== undefined) {
       results = data.search_results;
       searchTerm = data.search_term || "";
@@ -2627,6 +2771,62 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     }).join("");
   }
 
+  // ---- radio -------------------------------------------------------------
+  function renderRadio() {
+    var box = $("plcRadio");
+    $("plcRadioMeta").textContent = radioResults.length
+      ? radioResults.length + " station" + (radioResults.length === 1 ? "" : "s")
+      : "";
+    if (!radioResults.length) {
+      box.innerHTML = '<li class="plc-empty"><i class="fa fa-feed"></i>' +
+        (radioSearched ? "No station matched that." :
+         "Search by name, country, language or genre.") + "</li>";
+      return;
+    }
+    box.innerHTML = radioResults.map(function (s, i) {
+      var thumb = s.favicon
+        ? '<img class="plc-thumb" src="' + esc(s.favicon) + '" alt="" loading="lazy" />'
+        : '<span class="plc-thumb ph"><i class="fa fa-feed"></i></span>';
+      var bits = [s.country, s.language, s.codec].filter(Boolean).map(esc);
+      if (s.bitrate) bits.push(s.bitrate + " kbps");
+      return '<li class="plc-item">' +
+        thumb +
+        '<div class="plc-item-main">' +
+          '<p class="plc-item-t">' + (s.homepage
+            ? '<a href="' + esc(s.homepage) + '" target="_blank" rel="noopener">' + esc(s.name) + "</a>"
+            : esc(s.name)) + "</p>" +
+          '<p class="plc-item-s">' + bits.join(" · ") + "</p>" +
+        "</div>" +
+        '<span class="plc-item-len">LIVE</span>' +
+        '<span class="plc-item-acts">' +
+          '<button class="plc-btn sm icon primary" data-act="radio_play" data-station="' + i +
+            '" title="Queue this station"><i class="fa fa-play"></i>' +
+            '<span class="plc-cost" data-cost="radio_play" hidden></span></button>' +
+        "</span>" +
+        "</li>";
+    }).join("");
+    // Plenty of stations point their icon at a host that is long gone. A
+    // listener rather than an inline onerror, so no quoting inside a quoted
+    // attribute inside a template string.
+    Array.prototype.forEach.call(box.querySelectorAll("img.plc-thumb"), function (img) {
+      img.addEventListener("error", function () { img.style.visibility = "hidden"; },
+                           { once: true });
+    });
+    // The per-button price tags are painted from the wallet, and these rows
+    // did not exist when it last ran.
+    renderWallet();
+  }
+
+  function runRadioSearch() {
+    radioSearched = true;
+    act("radio_search", {
+      radio_name: $("plcRadioName").value.trim(),
+      radio_country: $("plcRadioCountry").value.trim(),
+      radio_language: $("plcRadioLanguage").value.trim(),
+      radio_tag: $("plcRadioTag").value.trim()
+    });
+  }
+
   // ---- favourites --------------------------------------------------------
   function renderFavs() {
     var favs = S.favourites || [];
@@ -2798,6 +2998,13 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
       // survives a source with no public URL; playing wants the identifier.
       extra.identifier = action === "fav_add" ? (r.encoded || r.identifier) : r.identifier;
     }
+    if (btn.dataset.station !== undefined) {
+      var st = radioResults[Number(btn.dataset.station)];
+      if (!st) return;
+      extra.station_url = st.url;
+      extra.station_name = st.name;
+      extra.station_uuid = st.uuid || "";
+    }
     if (btn.dataset.fav !== undefined) {
       var f = (S.favourites || [])[Number(btn.dataset.fav)];
       if (!f) return;
@@ -2927,6 +3134,12 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     runSearch();
   });
   $("plcSearchGo").addEventListener("click", function (ev) { ev.preventDefault(); runSearch(); });
+  $("plcRadioGo").addEventListener("click", function (ev) { ev.preventDefault(); runRadioSearch(); });
+  ["plcRadioName", "plcRadioCountry", "plcRadioLanguage", "plcRadioTag"].forEach(function (id) {
+    $(id).addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); runRadioSearch(); }
+    });
+  });
 
   function runSearch() {
     var value = queryEl.value.trim();
@@ -2998,6 +3211,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   // ---- go ----------------------------------------------------------------
   renderSources();
   renderResults();
+  renderRadio();
   reanchor();
   render();
   markField();

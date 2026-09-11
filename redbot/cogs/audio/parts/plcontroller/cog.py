@@ -79,6 +79,8 @@ class PyLavController(
                 "fav_queue": 25,
                 "fav_add": 10,
                 "search": 5,
+                # Charged once per station queued, not per directory search.
+                "radio_play": 25,
                 "skip": 50,
                 "previous": 50,
                 "pause": 10,

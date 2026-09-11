@@ -55,7 +55,8 @@ AUDIO_PAGES = (
     ("player-settings", "Player settings", "fa-sliders", False),
     ("playlists", "Playlists", "fa-list", False),
     ("effects", "Effects", "fa-sliders", False),
-    ("radio", "Radio", "fa-broadcast-tower", False),
+    # Radio is not a page any more - the directory lives on the player, where
+    # you can hear what you find without changing page.
     ("youtube-radio", "YouTube radio", "fa-youtube-play", False),
     ("lyrics", "Lyrics", "fa-align-left", False),
     ("local-files", "Local files", "fa-folder-open-o", False),
