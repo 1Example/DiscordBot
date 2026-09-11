@@ -1937,14 +1937,10 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 .plc-hero-controls{
   margin-top:16px; padding:0; background:none; border:none; border-radius:0;
 }
-.plc-next{ gap:12px; }
-.plc-next-label{
-  display:flex; align-items:center; gap:7px; font-size:.72rem; font-weight:800;
-  letter-spacing:.09em; text-transform:uppercase; color:var(--plc-dim);
-  white-space:nowrap;
-}
-.plc-next .plc-item-main{ flex:1 1 220px; min-width:0; }
-.plc-next.empty .plc-item-len, .plc-next.empty .plc-item-acts{ display:none; }
+/* The queue is the full width of the page now, so it can be taller without
+   squeezing anything beside it. */
+.plc-queue-wide{ margin-top:16px; }
+.plc-queue-wide .plc-scroll{ max-height:min(46vh,420px); }
 /* minmax(0,…) rather than a bare 1fr: a grid track sized `1fr` still refuses
    to go below its content's min-content width, and one un-wrappable track
    title is enough to push the whole column past the viewport. Same reason for
@@ -2292,17 +2288,19 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     </div>
   </div>
 
-  <!-- ============ UP NEXT ============ -->
-  <div class="plc-bar-row plc-next" id="plcNextRow">
-    <span class="plc-next-label"><i class="fa fa-step-forward"></i> Up next</span>
-    <span class="plc-thumb ph" id="plcNextArtPh"><i class="fa fa-music"></i></span>
-    <img class="plc-thumb" id="plcNextArt" alt="" hidden />
-    <div class="plc-item-main">
-      <p class="plc-item-t" id="plcNextTitle">&mdash;</p>
-      <p class="plc-item-s" id="plcNextAuthor"></p>
+  <!-- ============ QUEUE ============ -->
+  <div class="plc-card plc-queue-wide">
+    <div class="plc-card-head">
+      <h5><i class="fa fa-list-ol"></i> Queue</h5>
+      <span class="plc-count" id="plcQueueCount">0</span>
+      <span class="plc-spacer"></span>
+      <span class="plc-sub" id="plcQueueTime"></span>
+      <button class="plc-btn sm danger" data-act="clear_queue" id="plcClearQueue" title="Empty the queue" hidden>
+        <i class="fa fa-trash-o"></i></button>
     </div>
-    <span class="plc-item-len" id="plcNextLen"></span>
-    <span class="plc-item-acts" id="plcNextActs"></span>
+    <div class="plc-card-body flush">
+      <div class="plc-scroll"><ul class="plc-list" id="plcQueue"></ul></div>
+    </div>
   </div>
 
   <!-- ============ SEARCH + QUEUE ============ -->
@@ -2379,20 +2377,6 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     </div>
 
     <div style="display:flex; flex-direction:column; gap:16px; min-width:0;">
-      <div class="plc-card">
-        <div class="plc-card-head">
-          <h5><i class="fa fa-list-ol"></i> Queue</h5>
-          <span class="plc-count" id="plcQueueCount">0</span>
-          <span class="plc-spacer"></span>
-          <span class="plc-sub" id="plcQueueTime"></span>
-          <button class="plc-btn sm danger" data-act="clear_queue" id="plcClearQueue" title="Empty the queue" hidden>
-            <i class="fa fa-trash-o"></i></button>
-        </div>
-        <div class="plc-card-body flush">
-          <div class="plc-scroll"><ul class="plc-list" id="plcQueue"></ul></div>
-        </div>
-      </div>
-
       <div class="plc-card">
         <div class="plc-card-head">
           <h5><i class="fa fa-star"></i> Server favourites</h5>
@@ -2824,7 +2808,6 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 
     renderServer();
     renderQueue();
-    renderNext();
     renderFavs();
     renderPlaylists();
     renderWallet();
@@ -2867,42 +2850,6 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
       html += '<li class="plc-empty" style="padding:14px;">and ' + st.queue_truncated + " more not shown</li>";
     }
     box.innerHTML = html;
-  }
-
-  // ---- up next -----------------------------------------------------------
-  function renderNext() {
-    var st = S.state || {}, q = st.queue || [];
-    var row = $("plcNextRow"), next = q[0];
-    if (!next) {
-      row.classList.add("empty");
-      $("plcNextTitle").innerHTML = st.connected
-        ? "Nothing queued yet"
-        : "Not connected to a voice channel";
-      $("plcNextAuthor").textContent = "";
-      $("plcNextArt").hidden = true;
-      $("plcNextArtPh").hidden = false;
-      $("plcNextLen").textContent = "";
-      $("plcNextActs").innerHTML = "";
-      return;
-    }
-    row.classList.remove("empty");
-    $("plcNextTitle").innerHTML = next.uri
-      ? '<a href="' + esc(next.uri) + '" target="_blank" rel="noopener">' + esc(next.title) + "</a>"
-      : esc(next.title);
-    $("plcNextAuthor").textContent = next.author || "";
-    if (next.artwork) {
-      $("plcNextArt").src = next.artwork;
-      $("plcNextArt").hidden = false;
-      $("plcNextArtPh").hidden = true;
-    } else {
-      $("plcNextArt").hidden = true;
-      $("plcNextArtPh").hidden = false;
-    }
-    $("plcNextLen").textContent = next.duration || "";
-    $("plcNextActs").innerHTML = isStaff
-      ? '<button class="plc-btn sm icon danger" data-act="remove_track" data-index="0"' +
-        ' title="Remove it from the queue"><i class="fa fa-times"></i></button>'
-      : "";
   }
 
   // ---- search ------------------------------------------------------------
