@@ -1932,6 +1932,19 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   padding:14px 18px; border-radius:var(--plc-r);
   background:var(--plc-bg); border:1px solid var(--plc-line);
 }
+/* Inside the hero the controls sit on the hero's own surface, rather than as
+   a second card stacked on top of one. */
+.plc-hero-controls{
+  margin-top:16px; padding:0; background:none; border:none; border-radius:0;
+}
+.plc-next{ gap:12px; }
+.plc-next-label{
+  display:flex; align-items:center; gap:7px; font-size:.72rem; font-weight:800;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--plc-dim);
+  white-space:nowrap;
+}
+.plc-next .plc-item-main{ flex:1 1 220px; min-width:0; }
+.plc-next.empty .plc-item-len, .plc-next.empty .plc-item-acts{ display:none; }
 /* minmax(0,…) rather than a bare 1fr: a grid track sized `1fr` still refuses
    to go below its content's min-content width, and one un-wrappable track
    title is enough to push the whole column past the viewport. Same reason for
@@ -2234,49 +2247,62 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
           <span id="plcDur">0:00</span>
         </div>
       </div>
+
+      <div class="plc-bar-row plc-hero-controls">
+      <div class="plc-transport">
+        <div class="plc-transport-grp">
+          <button class="plc-btn icon" data-act="previous" title="Previous (Shift+&larr;)" aria-label="Previous">
+            <i class="fa fa-step-backward"></i></button>
+          <button class="plc-btn primary play" data-act="pause" id="plcPlay" title="Play / pause (Space)" aria-label="Play or pause">
+            <i class="fa fa-pause" id="plcPlayIcon"></i></button>
+          <button class="plc-btn icon" data-act="skip" title="Skip (Shift+&rarr;)" aria-label="Skip">
+            <i class="fa fa-step-forward"></i></button>
+        </div>
+
+        <span class="plc-sep"></span>
+
+        <div class="plc-transport-grp">
+          <button class="plc-btn icon" data-act="shuffle" id="plcShuffle" title="Shuffle the queue" aria-label="Shuffle">
+            <i class="fa fa-random"></i></button>
+          <button class="plc-btn" data-act="repeat_cycle" id="plcRepeat" title="Repeat: off / track / queue">
+            <i class="fa fa-repeat"></i> <span id="plcRepeatLabel">Off</span></button>
+          <button class="plc-btn icon" data-act="autoplay" id="plcAutoplay" title="Autoplay: keep playing from the guild's auto-play playlist when the queue runs out" aria-label="Autoplay">
+            <i class="fa fa-magic"></i></button>
+          <button class="plc-btn icon" data-act="fav_add" id="plcFav" title="Save this track to the guild favourites" aria-label="Favourite">
+            <i class="fa fa-star-o"></i></button>
+        </div>
+      </div>
+
+      <div class="plc-vol" style="margin-left:auto;">
+        <button class="plc-btn icon sm" data-act="mute" id="plcMute" title="Mute / unmute (M)" aria-label="Mute">
+          <i class="fa fa-volume-up" id="plcMuteIcon"></i></button>
+        <input type="range" id="plcVol" min="0" max="150" step="1" value="100" aria-label="Volume" />
+        <span class="plc-vol-num" id="plcVolNum">100%</span>
+      </div>
+
+      <div class="plc-transport-grp" id="plcStaffBar" hidden>
+        <span class="plc-sep"></span>
+        <button class="plc-btn icon danger" data-act="stop" title="Stop and clear" aria-label="Stop">
+          <i class="fa fa-stop"></i></button>
+        <button class="plc-btn icon danger" data-act="disconnect" title="Disconnect the bot" aria-label="Disconnect">
+          <i class="fa fa-sign-out"></i></button>
+      </div>
+  
+      </div>
     </div>
   </div>
 
-  <!-- ============ TRANSPORT ============ -->
-  <div class="plc-bar-row">
-    <div class="plc-transport">
-      <div class="plc-transport-grp">
-        <button class="plc-btn icon" data-act="previous" title="Previous (Shift+&larr;)" aria-label="Previous">
-          <i class="fa fa-step-backward"></i></button>
-        <button class="plc-btn primary play" data-act="pause" id="plcPlay" title="Play / pause (Space)" aria-label="Play or pause">
-          <i class="fa fa-pause" id="plcPlayIcon"></i></button>
-        <button class="plc-btn icon" data-act="skip" title="Skip (Shift+&rarr;)" aria-label="Skip">
-          <i class="fa fa-step-forward"></i></button>
-      </div>
-
-      <span class="plc-sep"></span>
-
-      <div class="plc-transport-grp">
-        <button class="plc-btn icon" data-act="shuffle" id="plcShuffle" title="Shuffle the queue" aria-label="Shuffle">
-          <i class="fa fa-random"></i></button>
-        <button class="plc-btn" data-act="repeat_cycle" id="plcRepeat" title="Repeat: off / track / queue">
-          <i class="fa fa-repeat"></i> <span id="plcRepeatLabel">Off</span></button>
-        <button class="plc-btn icon" data-act="autoplay" id="plcAutoplay" title="Autoplay: keep playing from the guild's auto-play playlist when the queue runs out" aria-label="Autoplay">
-          <i class="fa fa-magic"></i></button>
-        <button class="plc-btn icon" data-act="fav_add" id="plcFav" title="Save this track to the guild favourites" aria-label="Favourite">
-          <i class="fa fa-star-o"></i></button>
-      </div>
+  <!-- ============ UP NEXT ============ -->
+  <div class="plc-bar-row plc-next" id="plcNextRow">
+    <span class="plc-next-label"><i class="fa fa-step-forward"></i> Up next</span>
+    <span class="plc-thumb ph" id="plcNextArtPh"><i class="fa fa-music"></i></span>
+    <img class="plc-thumb" id="plcNextArt" alt="" hidden />
+    <div class="plc-item-main">
+      <p class="plc-item-t" id="plcNextTitle">&mdash;</p>
+      <p class="plc-item-s" id="plcNextAuthor"></p>
     </div>
-
-    <div class="plc-vol" style="margin-left:auto;">
-      <button class="plc-btn icon sm" data-act="mute" id="plcMute" title="Mute / unmute (M)" aria-label="Mute">
-        <i class="fa fa-volume-up" id="plcMuteIcon"></i></button>
-      <input type="range" id="plcVol" min="0" max="150" step="1" value="100" aria-label="Volume" />
-      <span class="plc-vol-num" id="plcVolNum">100%</span>
-    </div>
-
-    <div class="plc-transport-grp" id="plcStaffBar" hidden>
-      <span class="plc-sep"></span>
-      <button class="plc-btn icon danger" data-act="stop" title="Stop and clear" aria-label="Stop">
-        <i class="fa fa-stop"></i></button>
-      <button class="plc-btn icon danger" data-act="disconnect" title="Disconnect the bot" aria-label="Disconnect">
-        <i class="fa fa-sign-out"></i></button>
-    </div>
+    <span class="plc-item-len" id="plcNextLen"></span>
+    <span class="plc-item-acts" id="plcNextActs"></span>
   </div>
 
   <!-- ============ SEARCH + QUEUE ============ -->
@@ -2798,6 +2824,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 
     renderServer();
     renderQueue();
+    renderNext();
     renderFavs();
     renderPlaylists();
     renderWallet();
@@ -2840,6 +2867,42 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
       html += '<li class="plc-empty" style="padding:14px;">and ' + st.queue_truncated + " more not shown</li>";
     }
     box.innerHTML = html;
+  }
+
+  // ---- up next -----------------------------------------------------------
+  function renderNext() {
+    var st = S.state || {}, q = st.queue || [];
+    var row = $("plcNextRow"), next = q[0];
+    if (!next) {
+      row.classList.add("empty");
+      $("plcNextTitle").innerHTML = st.connected
+        ? "Nothing queued yet"
+        : "Not connected to a voice channel";
+      $("plcNextAuthor").textContent = "";
+      $("plcNextArt").hidden = true;
+      $("plcNextArtPh").hidden = false;
+      $("plcNextLen").textContent = "";
+      $("plcNextActs").innerHTML = "";
+      return;
+    }
+    row.classList.remove("empty");
+    $("plcNextTitle").innerHTML = next.uri
+      ? '<a href="' + esc(next.uri) + '" target="_blank" rel="noopener">' + esc(next.title) + "</a>"
+      : esc(next.title);
+    $("plcNextAuthor").textContent = next.author || "";
+    if (next.artwork) {
+      $("plcNextArt").src = next.artwork;
+      $("plcNextArt").hidden = false;
+      $("plcNextArtPh").hidden = true;
+    } else {
+      $("plcNextArt").hidden = true;
+      $("plcNextArtPh").hidden = false;
+    }
+    $("plcNextLen").textContent = next.duration || "";
+    $("plcNextActs").innerHTML = isStaff
+      ? '<button class="plc-btn sm icon danger" data-act="remove_track" data-index="0"' +
+        ' title="Remove it from the queue"><i class="fa fa-times"></i></button>'
+      : "";
   }
 
   // ---- search ------------------------------------------------------------
