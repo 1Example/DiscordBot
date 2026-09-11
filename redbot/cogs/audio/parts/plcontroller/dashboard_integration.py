@@ -1935,8 +1935,17 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
 /* Inside the hero the controls sit on the hero's own surface, rather than as
    a second card stacked on top of one. */
 .plc-hero-controls{
-  margin-top:16px; padding:0; background:none; border:none; border-radius:0;
+  margin-top:0; padding:0; background:none; border:none; border-radius:0;
+  flex:0 1 auto;
 }
+/* Track details on the left, the controls in the band beside them, and the
+   seek bar spanning under both - rather than everything stacked left with the
+   right half of the card empty. */
+.plc-info-row{
+  display:flex; gap:20px; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; margin-bottom:16px;
+}
+.plc-info-text{ min-width:0; flex:1 1 300px; }
 /* The queue is the full width of the page now, so it can be taller without
    squeezing anything beside it. */
 .plc-queue-wide{ margin-top:16px; }
@@ -2155,6 +2164,8 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   .plc-transport .plc-sep{ display:none; }
   .plc-bar-row{ justify-content:center; }
   .plc-vol{ margin-left:0 !important; width:100%; }
+  .plc-info-row{ justify-content:center; }
+  .plc-info-text{ flex:1 1 100%; }
 }
 </style>
 <div class="dz-subnav">
@@ -2220,29 +2231,16 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     </div>
 
     <div class="plc-info">
-      <p class="plc-eyebrow">
-        <span class="plc-live"><span class="plc-dot" id="plcDot"></span><span id="plcStatus">Now playing</span></span>
-        <span id="plcVoice"></span>
-      </p>
-      <h3 class="plc-track-title" id="plcTitle">&mdash;</h3>
-      <p class="plc-track-author" id="plcAuthor"></p>
-      <div class="plc-chips" id="plcChips"></div>
-
-      <div class="plc-seek">
-        <div class="plc-bar" id="plcSeek" role="slider" tabindex="0"
-             aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div class="plc-scrub" id="plcScrub">0:00</div>
-          <div class="plc-bar-track">
-            <div class="plc-bar-buffer"></div>
-            <div class="plc-bar-fill" id="plcFill"></div>
-          </div>
-          <div class="plc-bar-knob" id="plcKnob"></div>
+      <div class="plc-info-row">
+        <div class="plc-info-text">
+          <p class="plc-eyebrow">
+            <span class="plc-live"><span class="plc-dot" id="plcDot"></span><span id="plcStatus">Now playing</span></span>
+            <span id="plcVoice"></span>
+          </p>
+          <h3 class="plc-track-title" id="plcTitle">&mdash;</h3>
+          <p class="plc-track-author" id="plcAuthor"></p>
+          <div class="plc-chips" id="plcChips"></div>
         </div>
-        <div class="plc-times">
-          <span id="plcPos">0:00</span>
-          <span id="plcDur">0:00</span>
-        </div>
-      </div>
 
       <div class="plc-bar-row plc-hero-controls">
       <div class="plc-transport">
@@ -2282,8 +2280,24 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
           <i class="fa fa-stop"></i></button>
         <button class="plc-btn icon danger" data-act="disconnect" title="Disconnect the bot" aria-label="Disconnect">
           <i class="fa fa-sign-out"></i></button>
+        </div>
       </div>
-  
+      </div>
+
+      <div class="plc-seek">
+        <div class="plc-bar" id="plcSeek" role="slider" tabindex="0"
+             aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="plc-scrub" id="plcScrub">0:00</div>
+          <div class="plc-bar-track">
+            <div class="plc-bar-buffer"></div>
+            <div class="plc-bar-fill" id="plcFill"></div>
+          </div>
+          <div class="plc-bar-knob" id="plcKnob"></div>
+        </div>
+        <div class="plc-times">
+          <span id="plcPos">0:00</span>
+          <span id="plcDur">0:00</span>
+        </div>
       </div>
     </div>
   </div>
