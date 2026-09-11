@@ -120,16 +120,25 @@ def generate_level_img(
     accent = tuple(color or (88, 139, 255))[:3]
 
     # ---------------- The pane the text sits on ----------------
-    ink = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(ink)
+    # On its own layer, and it matters: text_halo blurs a layer's alpha and
+    # doubles it to put a soft edge behind text. Drawn together with the text,
+    # the pane's own 122 came back as 244 across the whole rectangle and the
+    # glass rendered as a near-solid slab - 4% of the background showing.
     panel_left = pad + pfp_size + 18
-    draw.rectangle(
+    pane = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
+    pane_draw = ImageDraw.Draw(pane)
+    pane_draw.rectangle(
         (panel_left, pad, width - pad, height - pad),
-        fill=(9, 11, 18, 122),
+        fill=(9, 11, 18, 72),
         outline=(255, 255, 255, 58),
         width=1,
     )
-    draw.line((panel_left + 1, pad + 1, width - pad - 1, pad + 1), fill=(255, 255, 255, 78), width=1)
+    pane_draw.line(
+        (panel_left + 1, pad + 1, width - pad - 1, pad + 1), fill=(255, 255, 255, 78), width=1
+    )
+
+    ink = Image.new("RGBA", desired_card_size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(ink)
 
     text_x = panel_left + 18
     text_right = width - pad - 16
@@ -151,7 +160,10 @@ def generate_level_img(
     draw.text((text_x, pad + 42), hero, font=hero_font, fill=accent, stroke_width=2,
               stroke_fill=(0, 0, 0, 205))
 
-    overlay = Image.alpha_composite(imgtools.text_halo(ink), ink)
+    # Pane at the bottom, then the halo, then the text itself.
+    overlay = Image.alpha_composite(
+        Image.alpha_composite(pane, imgtools.text_halo(ink)), ink
+    )
 
     # ---------------- Frames ----------------
     def background_frame(index: int) -> Image.Image:
