@@ -747,16 +747,23 @@ class ControllerDashboard:
         they are noise next to a player: what someone wants here is either what
         this server saved or what everyone shares.
         """
-        out = {"guild": [], "global": []}
+        out = {"guild": [], "user": [], "global": []}
         try:
-            bundled, _user, guild_pl, _channel, _vc = await self.pylav.playlist_db_manager.get_all_for_user(
+            bundled, user_pl, guild_pl, channel_pl, vc_pl = await self.pylav.playlist_db_manager.get_all_for_user(
                 requester=member.id, guild=guild
             )
         except Exception:  # noqa: BLE001
             log.exception("Could not list playlists for the player page")
             return out
 
-        for key, playlists in (("guild", guild_pl), ("global", bundled)):
+        # Channel and voice-channel playlists belong to this server as much as
+        # the guild ones do. Dropping them - and the member's own - is why the
+        # card showed one playlist when the picker offered four.
+        for key, playlists in (
+            ("guild", [*(guild_pl or []), *(channel_pl or []), *(vc_pl or [])]),
+            ("user", user_pl),
+            ("global", bundled),
+        ):
             rows = []
             for playlist in playlists or []:
                 try:
@@ -769,7 +776,10 @@ class ControllerDashboard:
                     )
                 except Exception:  # noqa: BLE001 - one bad row must not hide the rest
                     log.exception("Could not read a playlist")
-            out[key] = sorted(rows, key=lambda r: r["name"].lower())
+            # The same playlist can be reachable through more than one scope.
+            out[key] = sorted(
+                {row["id"]: row for row in rows}.values(), key=lambda r: r["name"].lower()
+            )
         return out
 
     async def _dash_playlist_play(self, member, guild, player, field):
@@ -2272,6 +2282,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   <!-- ============ SEARCH + QUEUE ============ -->
   <div class="plc-grid">
 
+    <div style="display:flex; flex-direction:column; gap:16px; min-width:0;">
     <div class="plc-card">
       <div class="plc-card-head">
         <h5><i class="fa fa-search"></i> Find something to play</h5>
@@ -2300,6 +2311,45 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
       <div class="plc-card-body flush">
         <div class="plc-scroll"><ul class="plc-list" id="plcResults"></ul></div>
       </div>
+    </div>
+
+    <!-- ============ RADIO ============ -->
+    <div class="plc-card">
+      <div class="plc-card-head">
+        <h5><i class="fa fa-feed"></i> Radio</h5>
+        <span class="plc-spacer"></span>
+        <span class="plc-sub" id="plcRadioMeta"></span>
+      </div>
+      <div class="plc-card-body">
+        <p class="plc-sub" style="margin:0 0 9px;">
+          Search the worldwide station directory. Every box is optional, but fill
+          in at least one. Capitalisation does not matter.
+        </p>
+        <div class="plc-grid four">
+          <label class="plc-field"><i class="fa fa-search"></i>
+            <input class="plc-input" id="plcRadioName" type="text" autocomplete="off"
+                   placeholder="Station name" /></label>
+          <label class="plc-field"><i class="fa fa-globe"></i>
+            <input class="plc-input" id="plcRadioCountry" type="text" autocomplete="off"
+                   placeholder="Country, e.g. Romania" /></label>
+          <label class="plc-field"><i class="fa fa-language"></i>
+            <input class="plc-input" id="plcRadioLanguage" type="text" autocomplete="off"
+                   placeholder="Language" /></label>
+          <label class="plc-field"><i class="fa fa-tag"></i>
+            <input class="plc-input" id="plcRadioTag" type="text" autocomplete="off"
+                   placeholder="Genre or tag" /></label>
+        </div>
+        <div style="margin-top:10px;">
+          <button class="plc-btn primary wide" id="plcRadioGo">
+            <i class="fa fa-search"></i> Find stations</button>
+        </div>
+      </div>
+      <div class="plc-card-body flush">
+        <div class="plc-scroll" style="max-height:min(40vh,360px);">
+          <ul class="plc-list" id="plcRadio"></ul>
+        </div>
+      </div>
+    </div>
     </div>
 
     <div style="display:flex; flex-direction:column; gap:16px; min-width:0;">
@@ -2342,44 +2392,6 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
         <div class="plc-card-body flush">
           <div class="plc-scroll" style="max-height:min(38vh,340px);"><ul class="plc-list" id="plcPlaylists"></ul></div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============ RADIO ============ -->
-  <div class="plc-card" style="margin-top:16px;">
-    <div class="plc-card-head">
-      <h5><i class="fa fa-feed"></i> Radio</h5>
-      <span class="plc-spacer"></span>
-      <span class="plc-sub" id="plcRadioMeta"></span>
-    </div>
-    <div class="plc-card-body">
-      <p class="plc-sub" style="margin:0 0 9px;">
-        Search the worldwide station directory. Every box is optional, but fill
-        in at least one. Capitalisation does not matter.
-      </p>
-      <div class="plc-grid four">
-        <label class="plc-field"><i class="fa fa-search"></i>
-          <input class="plc-input" id="plcRadioName" type="text" autocomplete="off"
-                 placeholder="Station name" /></label>
-        <label class="plc-field"><i class="fa fa-globe"></i>
-          <input class="plc-input" id="plcRadioCountry" type="text" autocomplete="off"
-                 placeholder="Country, e.g. Romania" /></label>
-        <label class="plc-field"><i class="fa fa-language"></i>
-          <input class="plc-input" id="plcRadioLanguage" type="text" autocomplete="off"
-                 placeholder="Language" /></label>
-        <label class="plc-field"><i class="fa fa-tag"></i>
-          <input class="plc-input" id="plcRadioTag" type="text" autocomplete="off"
-                 placeholder="Genre or tag" /></label>
-      </div>
-      <div style="margin-top:10px;">
-        <button class="plc-btn primary wide" id="plcRadioGo">
-          <i class="fa fa-search"></i> Find stations</button>
-      </div>
-    </div>
-    <div class="plc-card-body flush">
-      <div class="plc-scroll" style="max-height:min(40vh,360px);">
-        <ul class="plc-list" id="plcRadio"></ul>
       </div>
     </div>
   </div>
@@ -2461,6 +2473,7 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   var radioResults = [];
   var radioSearched = false;
   var playlistScope = "guild";
+  var playlistScopePicked = false;
   var searchSource = "ytsearch";
   // The playhead is extrapolated between polls; `anchor` is the last point we
   // actually heard from the bot, so the clock never drifts further than one
@@ -2879,10 +2892,21 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
   // ---- playlists ---------------------------------------------------------
   function renderPlaylists() {
     var all = S.playlists || {};
+    // Open on a tab that actually holds something. Defaulting to the server's
+    // is right until the server has none, at which point showing an empty card
+    // hides the playlists the person does have.
+    if (!playlistScopePicked && (all.guild || all.user || all.global)) {
+      playlistScopePicked = true;
+      ["guild", "user", "global"].some(function (s) {
+        if ((all[s] || []).length) { playlistScope = s; return true; }
+        return false;
+      });
+    }
     var rows = all[playlistScope] || [];
     $("plcPlCount").textContent = rows.length;
     $("plcPlScopes").innerHTML = [
       ["guild", "This server"],
+      ["user", "Yours"],
       ["global", "Global"]
     ].map(function (s) {
       return '<button class="plc-src' + (playlistScope === s[0] ? " on" : "") +
@@ -2893,9 +2917,11 @@ PLAYER_TEMPLATE = NOTIFICATIONS + r"""
     var box = $("plcPlaylists");
     if (!rows.length) {
       box.innerHTML = '<li class="plc-empty"><i class="fa fa-folder-open-o"></i>' +
-        (playlistScope === "guild"
-          ? "This server has no playlists yet."
-          : "There are no global playlists.") + "</li>";
+        ({
+          guild: "This server has no playlists yet.",
+          user: "You have not made any playlists.",
+          global: "There are no global playlists."
+        }[playlistScope] || "Nothing here.") + "</li>";
       return;
     }
     box.innerHTML = rows.map(function (p, i) {
