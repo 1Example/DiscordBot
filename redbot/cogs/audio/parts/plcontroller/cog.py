@@ -52,6 +52,9 @@ class PyLavController(
             list_for_requests=False,
             list_for_searches=False,
             persistent_view_message_id=None,
+            # 0 disables cleanup. Otherwise, every message in the controller
+            # channel except the persistent panel is removed after this many seconds.
+            auto_delete_messages_after=30,
             enable_antispam=True,
             use_slow_mode=True,
             # Per-button appearance, set from the dashboard's settings page.
@@ -128,6 +131,8 @@ class PyLavController(
             self.pylav.scheduler.remove_job(f"{self.__class__.__name__}-{self.bot.user.id}-delete_failed_messages")
         with contextlib.suppress(JobLookupError):
             self.pylav.scheduler.remove_job(f"{self.__class__.__name__}-{self.bot.user.id}-delete_successful_messages")
+        with contextlib.suppress(JobLookupError):
+            self.pylav.scheduler.remove_job(f"{self.__class__.__name__}-{self.bot.user.id}-delete_controller_messages")
 
     async def _controller_initialize(self):
         await self.pylav.wait_until_ready()
@@ -161,6 +166,16 @@ class PyLavController(
             seconds=5,
             max_instances=1,
             id=f"{self.__class__.__name__}-{self.bot.user.id}-delete_successful_messages",
+            replace_existing=True,
+            coalesce=True,
+            next_run_time=get_now_utc() + datetime.timedelta(seconds=5),
+        )
+        self.pylav.scheduler.add_job(
+            self.delete_controller_messages,
+            trigger="interval",
+            seconds=5,
+            max_instances=1,
+            id=f"{self.__class__.__name__}-{self.bot.user.id}-delete_controller_messages",
             replace_existing=True,
             coalesce=True,
             next_run_time=get_now_utc() + datetime.timedelta(seconds=5),
@@ -692,6 +707,66 @@ class PyLavController(
             messages = list(await self.__copy_failed_message_to_delete(guild_id))
             for chunk in [messages[i : i + 100] for i in range(0, len(messages), 100)]:
                 await channel.delete_messages(chunk, reason=_("PyLavController: Deleting failed messages is channel"))
+
+    async def delete_controller_messages(self) -> None:
+        """Delete messages below the persistent panel after the configured delay."""
+        await self.__ready.wait()
+        now = get_now_utc()
+
+        for guild_id, channel_id in list(self._channel_cache.items()):
+            guild = self.bot.get_guild(guild_id)
+            if guild is None:
+                self._channel_cache.pop(guild_id, None)
+                continue
+
+            retention = int(
+                await self._controller_config.guild(guild).auto_delete_messages_after()
+                or 0
+            )
+            if retention <= 0:
+                continue
+
+            channel = self.bot.get_channel(channel_id)
+            if not isinstance(channel, (discord.TextChannel, discord.Thread)):
+                continue
+
+            panel_id = await self._controller_config.guild(guild).persistent_view_message_id()
+            if not panel_id:
+                # Without an anchor, never mass-delete the channel.
+                continue
+
+            cutoff = now - timedelta(seconds=retention)
+            try:
+                messages = [
+                    message
+                    async for message in channel.history(
+                        limit=100, after=discord.Object(id=panel_id)
+                    )
+                    if message.id != panel_id and message.created_at <= cutoff
+                ]
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+
+            if not messages:
+                continue
+
+            # Bulk deletion is efficient for recent messages. Discord does not
+            # allow bulk deletion for messages older than 14 days, so fall back
+            # to individual deletes if an installation has a stale backlog.
+            recent = [m for m in messages if (now - m.created_at).days < 14]
+            old = [m for m in messages if m not in recent]
+
+            for chunk in [recent[i:i + 100] for i in range(0, len(recent), 100)]:
+                with contextlib.suppress(discord.Forbidden, discord.HTTPException):
+                    await channel.delete_messages(
+                        chunk, reason="PyLavController: automatic controller cleanup"
+                    )
+
+            for message in old:
+                with contextlib.suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    await message.delete(
+                        reason="PyLavController: automatic controller cleanup"
+                    )
 
     async def add_failure_reaction(self, message: discord.Message) -> None:
         await self.__add_failed_message_to_delete(message)

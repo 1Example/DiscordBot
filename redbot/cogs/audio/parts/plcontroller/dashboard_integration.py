@@ -18,6 +18,7 @@ from redbot.core.utils.dashboard_helpers import (
     emoji_options,
     emoji_rejection,
     form_reader,
+    channel_options,
 )
 
 from pylav.players.query.obj import Query
@@ -1098,6 +1099,11 @@ class ControllerDashboard:
                 "guild_name": guild.name,
                 "is_owner": is_owner,
                 "behaviour": behaviour,
+                "controller_channel_id": settings.get("channel") or 0,
+                "controller_channels": channel_options(
+                    guild, kinds=("text",), require_send=True
+                ),
+                "auto_delete_messages_after": int(settings.get("auto_delete_messages_after") or 0),
                 "greedy": bool(await self._controller_config.listen_to_any_message()),
                 "button_rows": self._dash_button_rows(settings),
                 "upload_target": settings.get("upload_target") or "guild",
@@ -1182,6 +1188,8 @@ class ControllerDashboard:
         action = field("action")
         conf = self._controller_config.guild(guild)
         try:
+            if action == "save_controller":
+                return await self._dash_save_controller(guild, conf, field)
             if action == "save_buttons":
                 return await self._dash_save_buttons(guild, conf, field)
             if action == "save_behaviour":
@@ -1228,6 +1236,82 @@ class ControllerDashboard:
          "Set the channel to slow mode",
          "Apply Discord slow mode to the controller channel."),
     )
+
+    async def _dash_save_controller(self, guild, conf, field) -> list[dict]:
+        """Save the controller channel and automatic message cleanup policy."""
+        raw_channel = field.integer("controller_channel_id", 0) or 0
+        channel = guild.get_channel(raw_channel) if raw_channel else None
+        if raw_channel and channel is None:
+            return [{"message": "That controller channel is not in this server.",
+                     "category": "warning"}]
+        if raw_channel:
+            if not isinstance(channel, (discord.TextChannel, discord.Thread)):
+                return [{"message": "Choose a text channel (or thread) for the controller.",
+                         "category": "warning"}]
+            permissions = channel.permissions_for(guild.me)
+            if not all((permissions.view_channel, permissions.send_messages,
+                        permissions.embed_links, permissions.manage_messages,
+                        permissions.read_message_history)):
+                return [{
+                    "message": f"I do not have enough permissions in #{channel.name} "
+                               "to run the controller and clean up its messages.",
+                    "category": "warning",
+                }]
+
+        raw_retention = field.integer("auto_delete_messages_after", 30)
+        if raw_retention is None:
+            raw_retention = 30
+        if raw_retention != 0 and not 5 <= raw_retention <= 1209600:
+            return [{
+                "message": "Automatic deletion must be disabled (0) or between "
+                           "5 seconds and 14 days.",
+                "category": "warning",
+            }]
+
+        old_id = await conf.channel()
+        old_message_id = await conf.persistent_view_message_id()
+
+        if old_id != raw_channel:
+            old_channel = guild.get_channel(old_id or 0)
+            if old_channel is not None and old_message_id:
+                with contextlib.suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    old_message = await old_channel.fetch_message(old_message_id)
+                    await old_message.delete(reason="PyLavController: controller channel changed")
+            old_view = self._view_cache.pop(old_id, None) if old_id else None
+            if old_view is not None:
+                old_view.stop()
+
+            await conf.channel.set(raw_channel or None)
+            await conf.persistent_view_message_id.set(None)
+            self._channel_cache.pop(guild.id, None)
+            if raw_channel:
+                self._channel_cache[guild.id] = raw_channel
+
+        await conf.auto_delete_messages_after.set(raw_retention)
+
+        if raw_channel:
+            # Creates the panel when the channel is new, or restores it when
+            # the message was manually removed. Existing panels are reused.
+            await self.prepare_channel(channel)
+            if old_id != raw_channel:
+                return [{
+                    "message": f"Controller channel set to #{channel.name}.",
+                    "category": "success",
+                }]
+            return [{
+                "message": f"Controller channel is #{channel.name}; cleanup is "
+                           f"{'disabled' if raw_retention == 0 else f'{raw_retention} seconds'}.",
+                "category": "success",
+            }]
+
+        self._channel_cache.pop(guild.id, None)
+        await conf.persistent_view_message_id.set(None)
+        await conf.channel.set(None)
+        return [{
+            "message": "Controller disabled for this server. Automatic cleanup is also disabled.",
+            "category": "success",
+        }]
+
 
     async def _dash_save_behaviour(self, guild, conf, field) -> list[dict]:
         """[p]plcontrollerset acceptrequests / acceptsearches / antispam / slowmode."""
@@ -3476,6 +3560,47 @@ SETTINGS_TEMPLATE = (
     </p>
   </div>
   {{ subnav(name, audio_pages, 'player-settings', guild) }}
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
+    <div class="dz-panel">
+      <h5><i class="fa fa-comments"></i> Controller channel</h5>
+      <p class="dz-hint">
+        Choose where the persistent music panel is posted. Messages sent in this
+        channel can be cleaned up automatically without deleting the panel itself.
+      </p>
+      <div class="dz-grid two">
+        <div>
+          <div class="dz-label">Panel channel</div>
+          {{ picker('controller_channel_id', controller_channels, allow_none=true,
+                    none_label='disabled', placeholder='Search channels...') }}
+        </div>
+        <div>
+          <div class="dz-label">Delete other messages after</div>
+          <select class="dz-select" name="auto_delete_messages_after">
+            <option value="0" {% if auto_delete_messages_after == 0 %}selected{% endif %}>Disabled</option>
+            <option value="10" {% if auto_delete_messages_after == 10 %}selected{% endif %}>10 seconds</option>
+            <option value="30" {% if auto_delete_messages_after == 30 %}selected{% endif %}>30 seconds</option>
+            <option value="60" {% if auto_delete_messages_after == 60 %}selected{% endif %}>1 minute</option>
+            <option value="300" {% if auto_delete_messages_after == 300 %}selected{% endif %}>5 minutes</option>
+            <option value="900" {% if auto_delete_messages_after == 900 %}selected{% endif %}>15 minutes</option>
+            <option value="3600" {% if auto_delete_messages_after == 3600 %}selected{% endif %}>1 hour</option>
+            <option value="86400" {% if auto_delete_messages_after == 86400 %}selected{% endif %}>24 hours</option>
+            <option value="604800" {% if auto_delete_messages_after == 604800 %}selected{% endif %}>7 days</option>
+            <option value="1209600" {% if auto_delete_messages_after == 1209600 %}selected{% endif %}>14 days</option>
+          </select>
+          <div class="dz-hint" style="margin-top:4px;">
+            Deletes user and bot messages in the controller channel, but never the panel.
+          </div>
+        </div>
+      </div>
+      <div class="dz-save">
+        <button class="dz-btn primary" name="action" value="save_controller">
+          <i class="fa fa-save"></i> Save channel &amp; cleanup
+        </button>
+      </div>
+    </div>
+  </form>
 
   <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}" />
