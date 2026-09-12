@@ -198,18 +198,19 @@
             </div>
             <div class="aiuser-prompts__body">
                 <form method="POST">
-                    {{ prompt_form.hidden_tag() if prompt_form is defined and prompt_form.hidden_tag is defined and prompt_form.hidden_tag }}
-                    {% if prompt_form is defined and prompt_form.custom_text_prompt is defined and prompt_form.custom_text_prompt is callable %}
-                        {{ prompt_form.custom_text_prompt(class="aiuser-prompts__editor-textarea") }}
-                    {% elif prompt_form is defined and prompt_form.custom_text_prompt is defined %}
-                        <textarea name="aiuser_prompt_-custom_text_prompt" class="aiuser-prompts__editor-textarea" rows="12">{{ prompt_form.custom_text_prompt.data or '' }}</textarea>
+                    {% if prompt_form and prompt_form.hidden_tag %}
+                        {{ prompt_form.hidden_tag() }}
                     {% endif %}
+                    
+                    <textarea 
+                        name="aiuser_prompt_-custom_text_prompt" 
+                        class="aiuser-prompts__editor-textarea" 
+                        rows="12"
+                        placeholder="Enter custom server prompt here..."
+                    >{{ current_prompt_text or (prompt_form.custom_text_prompt.data if prompt_form and prompt_form.custom_text_prompt) or '' }}</textarea>
+
                     <div>
-                        {% if prompt_form is defined and prompt_form.submit is defined and prompt_form.submit is callable %}
-                            {{ prompt_form.submit(class="aiuser-prompts__btn") }}
-                        {% else %}
-                            <button type="submit" class="aiuser-prompts__btn">Save Prompt</button>
-                        {% endif %}
+                        <button type="submit" class="aiuser-prompts__btn">Save Prompt</button>
                     </div>
                 </form>
             </div>
