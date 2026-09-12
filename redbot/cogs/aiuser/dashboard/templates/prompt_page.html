@@ -198,10 +198,10 @@
             </div>
             <div class="aiuser-prompts__body">
                 <form method="POST">
-                    {{ form.hidden_tag() if form.hidden_tag }}
-                    {{ form.custom_text_prompt(class="aiuser-prompts__editor-textarea") }}
+                    {{ prompt_form.hidden_tag() if prompt_form.hidden_tag }}
+                    {{ prompt_form.custom_text_prompt(class="aiuser-prompts__editor-textarea") }}
                     <div>
-                        {{ form.submit(class="aiuser-prompts__btn") }}
+                        {{ prompt_form.submit(class="aiuser-prompts__btn") }}
                     </div>
                 </form>
             </div>

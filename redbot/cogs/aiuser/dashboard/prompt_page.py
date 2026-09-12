@@ -136,11 +136,11 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
         submit = wtforms.SubmitField("Save Prompt")
 
     current_prompt = await conf.custom_text_prompt() or ""
-    form = PromptForm(prefix="aiuser_prompt_")
+    prompt_form = PromptForm(prefix="aiuser_prompt_")
 
     notifications = []
-    if form.validate_on_submit():
-        new_prompt = (form.custom_text_prompt.data or "").strip()
+    if prompt_form.validate_on_submit():
+        new_prompt = (prompt_form.custom_text_prompt.data or "").strip()
         max_len = await self.config.max_prompt_length()
         if max_len and len(new_prompt) > max_len:
             notifications.append(
@@ -161,7 +161,7 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
             }
 
     if kwargs.get("request_method") == "GET":
-        form.custom_text_prompt.data = current_prompt
+        prompt_form.custom_text_prompt.data = current_prompt
 
     server_prompt_resolved = await self.services.resolver.resolve_prompt(guild=guild)
     template_path = TEMPLATES_PATH / "prompt_page.html"
@@ -172,7 +172,7 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
         "notifications": notifications,
         "web_content": {
             "source": source,
-            "form": form,
+            "prompt_form": prompt_form,
             "metrics_footer": _metrics_footer(
                 await get_prompt_metrics(server_prompt_resolved, model)
             ),
