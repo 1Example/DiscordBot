@@ -4,6 +4,7 @@ import json
 import pathlib
 
 import discord
+import wtforms
 
 from ..dashboard.decorator import dashboard_page
 from ..types.abc import MixinMeta
@@ -120,26 +121,63 @@ def _load_presets(raw_presets: str):
 
 @dashboard_page(
     name="prompt_overview",
-    description="Read-only page of configured prompts.",
-    methods=("GET",),
+    description="View and edit server prompts.",
+    methods=("GET", "POST"),
     is_owner=True,
 )
 async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
     model = await self.config.guild(guild).model()
-    server_prompt = await self.services.resolver.resolve_prompt(guild=guild)
+    conf = self.config.guild(guild)
 
+    class PromptForm(kwargs["Form"]):
+        custom_text_prompt = wtforms.TextAreaField(
+            "Server Prompt", render_kw={"rows": 12}
+        )
+        submit = wtforms.SubmitField("Save Prompt")
+
+    current_prompt = await conf.custom_text_prompt() or ""
+    form = PromptForm(prefix="aiuser_prompt_")
+
+    notifications = []
+    if form.validate_on_submit():
+        new_prompt = (form.custom_text_prompt.data or "").strip()
+        max_len = await self.config.max_prompt_length()
+        if max_len and len(new_prompt) > max_len:
+            notifications.append(
+                {
+                    "message": f"Prompt exceeds maximum allowed length of {max_len} characters.",
+                    "category": "danger",
+                }
+            )
+        else:
+            await conf.custom_text_prompt.set(new_prompt or None)
+            notifications.append(
+                {"message": "Server prompt saved successfully.", "category": "success"}
+            )
+            return {
+                "status": 0,
+                "notifications": notifications,
+                "redirect_url": kwargs["request_url"],
+            }
+
+    if kwargs.get("request_method") == "GET":
+        form.custom_text_prompt.data = current_prompt
+
+    server_prompt_resolved = await self.services.resolver.resolve_prompt(guild=guild)
     template_path = TEMPLATES_PATH / "prompt_page.html"
-    source = template_path.read_text()
+    source = template_path.read_text(encoding="utf-8")
 
     return {
         "status": 0,
+        "notifications": notifications,
         "web_content": {
             "source": source,
+            "form": form,
             "metrics_footer": _metrics_footer(
-                await get_prompt_metrics(server_prompt, model)
+                await get_prompt_metrics(server_prompt_resolved, model)
             ),
             "server_prompt": await _prompt_item(
-                "Server", guild.name, server_prompt, model
+                "Server", guild.name, server_prompt_resolved, model
             ),
             "scoped_prompts": await _collect_scoped_prompts(
                 self, guild, model, "custom_text_prompt"

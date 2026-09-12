@@ -1,9 +1,5 @@
 <style>
-    /* Surfaces come from the dashboard's tokens so these pages track the theme
-       instead of carrying a second copy of it. The fallbacks keep them legible
-       if the cog is ever loaded against a different shell. */
     #third-party-content .aiuser-prompts {
-        /* No max-width: the page is as wide as the card it sits in. */
         padding: 0.25rem 0 1.5rem;
         color: var(--cx-text, #e6e9ef);
     }
@@ -13,7 +9,7 @@
         grid-template-columns: minmax(0, 1fr);
         gap: 0.85rem;
     }
-    /* Wide screens get two columns rather than one long ribbon of cards. */
+
     @media (min-width: 1400px) {
         #third-party-content .aiuser-prompts__grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -63,6 +59,35 @@
         padding: 0.7rem 0.85rem 0.85rem;
     }
 
+    #third-party-content .aiuser-prompts__editor-textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid var(--cx-panel-3-bd, rgba(255, 255, 255, .12));
+        border-radius: 8px;
+        padding: 0.75rem;
+        background: rgba(4, 10, 32, .65);
+        color: var(--cx-text, #e6e9ef);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        resize: vertical;
+    }
+
+    #third-party-content .aiuser-prompts__btn {
+        margin-top: 0.75rem;
+        padding: 0.5rem 1.25rem;
+        border: none;
+        border-radius: 6px;
+        background: #3b82f6;
+        color: #ffffff;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    #third-party-content .aiuser-prompts__btn:hover {
+        background: #2563eb;
+    }
+
     #third-party-content .aiuser-prompts__list {
         display: grid;
         gap: 0.6rem;
@@ -105,8 +130,6 @@
         text-align: right;
     }
 
-    /* The prompt body is the darkest well on the page, the way a code block is
-       elsewhere in the shell. */
     #third-party-content .aiuser-prompts__text {
         max-height: 13rem;
         margin: 0;
@@ -114,7 +137,7 @@
         overflow: auto;
         background: rgba(4, 10, 32, .45);
         color: var(--cx-text, #e6e9ef);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         font-size: 0.8rem;
         line-height: 1.55;
         white-space: pre-wrap;
@@ -126,14 +149,6 @@
         color: var(--cx-text-dim, #9aa4b2);
         font-size: 0.86rem;
         line-height: 1.5;
-    }
-
-    #third-party-content .aiuser-prompts__item-cost {
-        display: block;
-        margin-top: 0.08rem;
-        color: var(--cx-text-dim, #9aa4b2);
-        font-weight: 600;
-        opacity: .8;
     }
 
     #third-party-content .aiuser-prompts__footer {
@@ -149,19 +164,6 @@
         font-size: 0.78rem;
         line-height: 1.45;
     }
-
-    @media (max-width: 640px) {
-        #third-party-content .aiuser-prompts__item-head {
-            display: block;
-        }
-
-        #third-party-content .aiuser-prompts__item-meta {
-            display: block;
-            margin-top: 0.2rem;
-            white-space: normal;
-            text-align: left;
-        }
-    }
 </style>
 
 {% macro prompt_item(item) -%}
@@ -169,8 +171,7 @@
     <div class="aiuser-prompts__item-head">
         <div class="aiuser-prompts__item-title">{{ item.scope }}: {{ item.name }}</div>
         <div class="aiuser-prompts__item-meta">
-            {{ item.token_label }}{% if item.cost_per_1k_label %}<span class="aiuser-prompts__item-cost">{{
-                item.cost_per_1k_label }}</span>{% endif %}
+            {{ item.token_label }}
         </div>
     </div>
     <pre class="aiuser-prompts__text">{{ item.value }}</pre>
@@ -190,11 +191,25 @@
 {%- endmacro %}
 
 <section class="aiuser-prompts">
-
     <div class="aiuser-prompts__grid">
         <section class="aiuser-prompts__section">
             <div class="aiuser-prompts__section-header">
-                <h3 class="aiuser-prompts__section-title">Server Prompt</h3>
+                <h3 class="aiuser-prompts__section-title">Edit Server Prompt</h3>
+            </div>
+            <div class="aiuser-prompts__body">
+                <form method="POST">
+                    {{ form.hidden_tag() if form.hidden_tag }}
+                    {{ form.custom_text_prompt(class="aiuser-prompts__editor-textarea") }}
+                    <div>
+                        {{ form.submit(class="aiuser-prompts__btn") }}
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="aiuser-prompts__section">
+            <div class="aiuser-prompts__section-header">
+                <h3 class="aiuser-prompts__section-title">Resolved Active Prompt</h3>
             </div>
             <div class="aiuser-prompts__body">
                 {{ prompt_item(server_prompt) }}
@@ -218,26 +233,6 @@
             </div>
             <div class="aiuser-prompts__body">
                 {{ prompt_list(presets, "No presets are configured for this server.") }}
-            </div>
-        </section>
-
-        <section class="aiuser-prompts__section">
-            <div class="aiuser-prompts__section-header">
-                <h3 class="aiuser-prompts__section-title">Random Message Topics</h3>
-                <span class="aiuser-prompts__count">{{ random_prompts|length }}</span>
-            </div>
-            <div class="aiuser-prompts__body">
-                {{ prompt_list(random_prompts, "No random message topics are configured.") }}
-            </div>
-        </section>
-
-        <section class="aiuser-prompts__section">
-            <div class="aiuser-prompts__section-header">
-                <h3 class="aiuser-prompts__section-title">Image Pre-prompts</h3>
-                <span class="aiuser-prompts__count">{{ image_preprompts|length }}</span>
-            </div>
-            <div class="aiuser-prompts__body">
-                {{ prompt_list(image_preprompts, "No image request pre-prompts are configured.") }}
             </div>
         </section>
     </div>
