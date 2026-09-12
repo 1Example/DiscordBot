@@ -137,7 +137,7 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
 
     current_prompt = await conf.custom_text_prompt() or ""
     form_data = kwargs.get("form_data")
-    prompt_form = PromptForm(form_data, prefix="aiuser_prompt_")
+    prompt_form = PromptForm(form_data)
 
     notifications = []
     if kwargs.get("request_method") == "POST" and prompt_form.validate():
@@ -174,6 +174,7 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
         "web_content": {
             "source": source,
             "prompt_form": prompt_form,
+            "current_prompt_text": current_prompt,
             "metrics_footer": _metrics_footer(
                 await get_prompt_metrics(server_prompt_resolved, model)
             ),

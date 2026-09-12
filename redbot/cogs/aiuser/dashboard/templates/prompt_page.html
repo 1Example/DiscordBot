@@ -171,10 +171,10 @@
     <div class="aiuser-prompts__item-head">
         <div class="aiuser-prompts__item-title">{{ item.scope }}: {{ item.name }}</div>
         <div class="aiuser-prompts__item-meta">
-            {{ item.token_label }}
+            {{ item.token_label if item is mapping and item.token_label is defined else '' }}
         </div>
     </div>
-    <pre class="aiuser-prompts__text">{{ item.value }}</pre>
+    <pre class="aiuser-prompts__text">{{ item.value if item is mapping and item.value is defined else item }}</pre>
 </article>
 {%- endmacro %}
 
@@ -198,10 +198,17 @@
             </div>
             <div class="aiuser-prompts__body">
                 <form method="POST">
-                    {{ prompt_form.hidden_tag() }}
-                    {{ prompt_form.custom_text_prompt(class="aiuser-prompts__editor-textarea") }}
+                    {% if prompt_form and prompt_form.hidden_tag %}
+                        {{ prompt_form.hidden_tag() }}
+                    {% endif %}
+                    {{ prompt_form.custom_text_prompt(
+                        class="aiuser-prompts__editor-textarea",
+                        rows=12,
+                        placeholder="Enter custom server prompt here..."
+                    ) }}
+
                     <div>
-                        {{ prompt_form.submit(class="aiuser-prompts__btn") }}
+                        <button type="submit" class="aiuser-prompts__btn">Save Prompt</button>
                     </div>
                 </form>
             </div>
@@ -219,7 +226,7 @@
         <section class="aiuser-prompts__section">
             <div class="aiuser-prompts__section-header">
                 <h3 class="aiuser-prompts__section-title">Scoped Custom Prompts</h3>
-                <span class="aiuser-prompts__count">{{ scoped_prompts|length }}</span>
+                <span class="aiuser-prompts__count">{{ scoped_prompts|length if scoped_prompts is sequence else 0 }}</span>
             </div>
             <div class="aiuser-prompts__body">
                 {{ prompt_list(scoped_prompts, "No server, channel, role, or member custom prompts are configured.") }}
@@ -229,7 +236,7 @@
         <section class="aiuser-prompts__section">
             <div class="aiuser-prompts__section-header">
                 <h3 class="aiuser-prompts__section-title">Presets</h3>
-                <span class="aiuser-prompts__count">{{ presets|length }}</span>
+                <span class="aiuser-prompts__count">{{ presets|length if presets is sequence else 0 }}</span>
             </div>
             <div class="aiuser-prompts__body">
                 {{ prompt_list(presets, "No presets are configured for this server.") }}
