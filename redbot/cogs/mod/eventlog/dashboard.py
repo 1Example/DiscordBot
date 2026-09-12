@@ -81,6 +81,11 @@ class EventLogDashboard:
         notifications: list[dict] = []
         if kwargs.get("method") == "POST":
             notifications = await self._eml_handle_post(guild, kwargs)
+            # _eml_handle_post only writes to eventlog_config; the live event
+            # handlers in eventmixin.py read from self.settings, so without
+            # this refresh a dashboard change has no effect until the cog
+            # next reloads.
+            self.settings[guild.id] = await self.eventlog_config.guild(guild).all()
 
         settings = await self.eventlog_config.guild(guild).all()
         groups = []
