@@ -202,6 +202,7 @@
                         {{ prompt_form.hidden_tag() }}
                     {% endif %}
                     
+                    {{ prompt_form.hidden_tag() }}
                     {{ prompt_form.custom_text_prompt(
                         class="aiuser-prompts__editor-textarea",
                         rows=12,
@@ -209,7 +210,7 @@
                     ) }}
 
                     <div>
-                        <button type="submit" class="aiuser-prompts__btn">Save Prompt</button>
+                        {{ prompt_form.submit(class="aiuser-prompts__btn") }}
                     </div>
                 </form>
             </div>

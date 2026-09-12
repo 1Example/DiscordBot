@@ -129,22 +129,24 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
     model = await self.config.guild(guild).model()
     conf = self.config.guild(guild)
 
+    current_prompt = await conf.custom_text_prompt() or ""
+
     class PromptForm(kwargs["Form"]):
         custom_text_prompt = wtforms.TextAreaField(
-            "Server Prompt", render_kw={"rows": 12}
+            "Server Prompt",
+            default=current_prompt,
+            render_kw={"rows": 12},
         )
         submit = wtforms.SubmitField("Save Prompt")
 
-    current_prompt = await conf.custom_text_prompt() or ""
-    # Third-party dashboard pages receive the submitted MultiDict through
-    # kwargs["form_data"]. Bind it explicitly, but DO NOT use a WTForms
-    # prefix here: the dashboard expects the CSRF field to be named
-    # ``csrf_token``.
-    form_data = kwargs.get("form_data")
-    prompt_form = PromptForm(form_data) if form_data is not None else PromptForm()
+    # Let the dashboard's Form base class bind the live Flask request data.
+    # This is the same pattern used by the working settings page.  Do not pass
+    # kwargs["form_data"] manually: the base class handles request binding and
+    # CSRF validation for us.
+    prompt_form = PromptForm()
 
     notifications = []
-    if kwargs.get("request_method") == "POST" and prompt_form.validate():
+    if prompt_form.validate_on_submit():
         new_prompt = (prompt_form.custom_text_prompt.data or "").strip()
         max_len = await self.config.max_prompt_length()
         if max_len and len(new_prompt) > max_len:
@@ -165,57 +167,47 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
                 "redirect_url": kwargs["request_url"],
             }
 
-    if kwargs.get("request_method") == "GET":
-        prompt_form.custom_text_prompt.data = current_prompt
-
     server_prompt_resolved = await self.services.resolver.resolve_prompt(guild=guild)
     template_path = TEMPLATES_PATH / "prompt_page.html"
-    source = template_path.read_text(encoding="utf-8")
-
-    metrics_footer = _metrics_footer(
-        await get_prompt_metrics(server_prompt_resolved, model)
-    )
-    server_prompt = await _prompt_item(
-        "Server", guild.name, server_prompt_resolved, model
-    )
-    scoped_prompts = await _collect_scoped_prompts(
-        self, guild, model, "custom_text_prompt"
-    )
-    presets = await _collect_presets(self.config, guild, model)
-    random_prompts = await _collect_random_prompts(self.config, guild, model)
-    image_preprompts = await _collect_scoped_prompts(
-        self, guild, model, "function_calling_image_preprompt"
+    source = _render_prompt_page(
+        template_path.read_text(encoding="utf-8"),
+        prompt_form=prompt_form,
+        current_prompt_text=current_prompt,
+        server_prompt=await _prompt_item(
+            "Server", guild.name, server_prompt_resolved, model
+        ),
+        scoped_prompts=await _collect_scoped_prompts(
+            self, guild, model, "custom_text_prompt"
+        ),
+        presets=await _collect_presets(self.config, guild, model),
+        random_prompts=await _collect_random_prompts(self.config, guild, model),
+        image_preprompts=await _collect_scoped_prompts(
+            self, guild, model, "function_calling_image_preprompt"
+        ),
+        metrics_footer=_metrics_footer(
+            await get_prompt_metrics(server_prompt_resolved, model)
+        ),
     )
 
     return {
         "status": 0,
         "notifications": notifications,
-        "web_content": {
-            # The dashboard serializes web_content before rendering it, so the
-            # live WTForms object cannot be passed through as a template value.
-            # Render the form while it is still a real WTForms object.
-            "source": _render(
-                source,
-                prompt_form=prompt_form,
-                current_prompt_text=current_prompt,
-                metrics_footer=metrics_footer,
-                server_prompt=server_prompt,
-                scoped_prompts=scoped_prompts,
-                presets=presets,
-                random_prompts=random_prompts,
-                image_preprompts=image_preprompts,
-            ),
-        },
+        "web_content": {"source": source},
     }
 
 
-def _render(template_source: str, **context) -> str:
+def _render_prompt_page(template: str, **context) -> str:
+    """Render the WTForms form before RedDash serializes web_content.
+
+    RedDash renders the returned ``source`` string again on the dashboard side,
+    so the finished HTML is wrapped in Jinja ``raw`` blocks after the local
+    render. This matches the established pattern in settings_page.py.
+    """
     import jinja2
 
     env = jinja2.Environment(autoescape=True)
-    html = env.from_string(template_source).render(**context)
-    # The dashboard renders ``source`` a second time. Protect the already
-    # rendered HTML and, importantly, user prompt text containing Jinja syntax.
+    html = env.from_string(template).render(**context)
     return "{% raw %}" + html.replace(
         "{% endraw %}", "{% endraw %}{% raw %}"
     ) + "{% endraw %}"
+
