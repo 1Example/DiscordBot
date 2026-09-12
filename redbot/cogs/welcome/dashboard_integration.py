@@ -359,11 +359,12 @@ class DashboardIntegration:
         """Send the greeting to the configured channel, using the actor."""
         settings = await self.config.guild(guild).all()
         which = field("which") or "join"
-        messages = settings.get("GREETING" if which == "join" else "GOODBYE") or []
+        is_welcome = which == "join"
+        messages = settings.get("GREETING" if is_welcome else "GOODBYE") or []
         if not messages:
             return [{"message": "No messages to test.", "category": "warning"}]
 
-        channel_id = settings.get("CHANNEL") if which == "join" else (
+        channel_id = settings.get("CHANNEL") if is_welcome else (
             settings.get("LEAVE_CHANNEL") or settings.get("CHANNEL")
         )
         channel = guild.get_channel(channel_id or 0)
@@ -372,21 +373,27 @@ class DashboardIntegration:
         if not channel.permissions_for(guild.me).send_messages:
             return [{"message": f"I cannot post in #{channel.name}.", "category": "danger"}]
 
-        body = self._wc_render(random.choice(messages), guild, actor)
+        msg = random.choice(messages)
+        mentions = await self.config.guild(guild).MENTIONS()
+        allowed_mentions = discord.AllowedMentions(**mentions)
         try:
-            if settings.get("EMBED"):
-                data = settings.get("EMBED_DATA") or {}
-                colour = data.get("colour" if which == "join" else "colour_goodbye") or 0
-                embed = discord.Embed(
-                    title=(data.get("title") or "") or None,
-                    description=body,
-                    colour=discord.Colour(colour) if colour else discord.Colour.blurple(),
-                )
-                if data.get("footer"):
-                    embed.set_footer(text=data["footer"])
-                await channel.send(embed=embed)
+            if settings.get("EMBED") and channel.permissions_for(guild.me).embed_links:
+                # Reuse the real embed builder instead of a hand-rolled one, so
+                # the test message matches what an actual join/leave posts -
+                # image, thumbnail, author and timestamp included, not just
+                # title/description/colour/footer.
+                embed = await self.make_embed(actor, guild, msg, is_welcome)
+                if await self.config.guild(guild).EMBED_DATA.mention():
+                    await channel.send(
+                        actor.mention, embed=embed, allowed_mentions=allowed_mentions
+                    )
+                else:
+                    await channel.send(embed=embed, allowed_mentions=allowed_mentions)
             else:
-                await channel.send(body)
+                await channel.send(
+                    await self.convert_parms(actor, guild, msg, is_welcome),
+                    allowed_mentions=allowed_mentions,
+                )
         except discord.HTTPException as exc:
             return [{"message": f"Discord rejected the test: {exc}", "category": "danger"}]
         return [
