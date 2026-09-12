@@ -1,3 +1,4 @@
+import asyncio
 import re
 from datetime import datetime, timedelta, timezone
 from random import choice as rand_choice
@@ -166,6 +167,19 @@ class Events:
         if await self.config.guild(guild).PENDING() and member.pending:
             log.debug("Ignoring member join %r to wait for pending", member)
             return
+        # Right after a join, the gateway-cached Member object can carry an
+        # avatar hash that hasn't finished propagating on Discord's CDN yet,
+        # so the embed's author/thumbnail image renders blank and never
+        # retries. Re-fetching from the API after a short delay gives the
+        # asset time to settle before we build the message.
+        try:
+            await asyncio.sleep(2)
+            member = await guild.fetch_member(member.id)
+        except discord.HTTPException:
+            log.debug(
+                "welcome.py: could not re-fetch %r before welcoming, using cached data",
+                member,
+            )
         await self.check_member_join(member)
 
     @commands.Cog.listener()
