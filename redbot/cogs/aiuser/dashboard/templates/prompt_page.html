@@ -201,6 +201,7 @@
                     {% if prompt_form and prompt_form.hidden_tag %}
                         {{ prompt_form.hidden_tag() }}
                     {% endif %}
+                    
                     {{ prompt_form.custom_text_prompt(
                         class="aiuser-prompts__editor-textarea",
                         rows=12,

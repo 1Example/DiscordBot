@@ -136,8 +136,12 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
         submit = wtforms.SubmitField("Save Prompt")
 
     current_prompt = await conf.custom_text_prompt() or ""
+    # Third-party dashboard pages receive the submitted MultiDict through
+    # kwargs["form_data"]. Bind it explicitly, but DO NOT use a WTForms
+    # prefix here: the dashboard expects the CSRF field to be named
+    # ``csrf_token``.
     form_data = kwargs.get("form_data")
-    prompt_form = PromptForm(form_data)
+    prompt_form = PromptForm(form_data) if form_data is not None else PromptForm()
 
     notifications = []
     if kwargs.get("request_method") == "POST" and prompt_form.validate():
@@ -187,6 +191,9 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
         "status": 0,
         "notifications": notifications,
         "web_content": {
+            # The dashboard serializes web_content before rendering it, so the
+            # live WTForms object cannot be passed through as a template value.
+            # Render the form while it is still a real WTForms object.
             "source": _render(
                 source,
                 prompt_form=prompt_form,
@@ -203,17 +210,12 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
 
 
 def _render(template_source: str, **context) -> str:
-    """Render the page while the live WTForms object still exists.
-
-    Third-party dashboard responses cross an RPC boundary before the dashboard
-    renders ``web_content``. Live form objects therefore cannot be passed in
-    the context; render the complete HTML here and protect it from the
-    dashboard's second Jinja pass.
-    """
     import jinja2
 
     env = jinja2.Environment(autoescape=True)
     html = env.from_string(template_source).render(**context)
+    # The dashboard renders ``source`` a second time. Protect the already
+    # rendered HTML and, importantly, user prompt text containing Jinja syntax.
     return "{% raw %}" + html.replace(
         "{% endraw %}", "{% endraw %}{% raw %}"
     ) + "{% endraw %}"
