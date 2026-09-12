@@ -136,10 +136,11 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
         submit = wtforms.SubmitField("Save Prompt")
 
     current_prompt = await conf.custom_text_prompt() or ""
-    prompt_form = PromptForm(prefix="aiuser_prompt_")
+    form_data = kwargs.get("form_data")
+    prompt_form = PromptForm(form_data, prefix="aiuser_prompt_")
 
     notifications = []
-    if prompt_form.validate_on_submit():
+    if kwargs.get("request_method") == "POST" and prompt_form.validate():
         new_prompt = (prompt_form.custom_text_prompt.data or "").strip()
         max_len = await self.config.max_prompt_length()
         if max_len and len(new_prompt) > max_len:
