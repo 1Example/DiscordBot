@@ -95,9 +95,24 @@ class EventLogMixin(EventLogDashboard, EventMixin):
         if await self.eventlog_config.version() < "2.8.5":
             await self.migrate_2_8_5_settings()
         for guild_id in await self.eventlog_config.all_guilds():
-            self.settings[int(guild_id)] = await self.eventlog_config.guild_from_id(
-                guild_id
-            ).all()
+            data = await self.eventlog_config.guild_from_id(guild_id).all()
+            if not isinstance(data.get("ignored_mods"), list):
+                # A previous dashboard build saved the "ignore all mods"
+                # checkbox into this key, overwriting the per-ID list with a
+                # bare bool and crashing every event with "argument of type
+                # 'bool' is not iterable". Recover the intent into the new
+                # dedicated flag and put the list back the way it should be.
+                logger.warning(
+                    "Repairing corrupted ignored_mods for guild %s (was %r).",
+                    guild_id,
+                    data.get("ignored_mods"),
+                )
+                data["ignore_all_mods"] = bool(data.get("ignored_mods")) or data.get(
+                    "ignore_all_mods", False
+                )
+                data["ignored_mods"] = []
+                await self.eventlog_config.guild_from_id(guild_id).set(data)
+            self.settings[int(guild_id)] = data
 
     async def migrate_2_8_5_settings(self):
         all_data = await self.eventlog_config.all_guilds()
@@ -169,7 +184,9 @@ class EventLogMixin(EventLogDashboard, EventMixin):
             else:
                 ignored_channels.append(chn)
         ignored_users = [f"<@{uid}>" for uid in data["ignored_users"]]
-        ignored_mods = [f"<@{uid}>" for uid in data["ignored_mods"]]
+        ignored_mods = [
+            f"<@{uid}>" for uid in data["ignored_mods"] if isinstance(data["ignored_mods"], list)
+        ]
         enabled = ""
         disabled = ""
         for settings, name in cur_settings.items():

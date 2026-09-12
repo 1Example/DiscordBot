@@ -19,6 +19,7 @@ from redbot.core.utils.chat_formatting import (
     inline,
     pagify,
 )
+from redbot.core.utils.mod import is_mod_or_superior
 
 _ = i18n.Translator("ExtendedModLog", __file__)
 logger = getLogger("red.trusty-cogs.ExtendedModLog")
@@ -211,12 +212,31 @@ class EventMixin:
         self, guild: discord.Guild, user: Union[discord.User, discord.Member, int]
     ) -> bool:
         ignored_mods = self.settings[guild.id]["ignored_mods"]
+        if not isinstance(ignored_mods, list):
+            # A previous dashboard build stored the "ignore all mods" toggle
+            # under this same key, overwriting the per-ID list with a bare
+            # bool. That raises "argument of type 'bool' is not iterable" on
+            # every event. Treat anything that isn't a list as "nobody
+            # specifically ignored" rather than crashing; the toggle itself
+            # now lives under "ignore_all_mods" below.
+            logger.warning(
+                "ignored_mods for guild %s was %r, not a list; ignoring it.",
+                guild.id,
+                ignored_mods,
+            )
+            ignored_mods = []
         if isinstance(user, int):
-            logger.debug("Ignored mod %s in guild %s", user, guild)
-            return user in ignored_mods
-        if user.id in ignored_mods:
+            member = guild.get_member(user)
+        else:
+            member = user if isinstance(user, discord.Member) else guild.get_member(user.id)
+        user_id = user if isinstance(user, int) else user.id
+        if user_id in ignored_mods:
             logger.debug("Ignored mod %s in guild %s", user, guild)
             return True
+        if self.settings[guild.id].get("ignore_all_mods") and member is not None:
+            if await is_mod_or_superior(self.bot, obj=member):
+                logger.debug("Ignored mod %s in guild %s (ignore_all_mods)", user, guild)
+                return True
         return False
 
     async def modlog_channel(self, guild: discord.Guild, event: str) -> discord.TextChannel:

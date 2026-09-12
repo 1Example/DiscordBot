@@ -165,5 +165,10 @@ inv_settings = {
     "ignored_channels": [],
     "ignored_users": [],
     "ignored_mods": [],
+    # Separate from "ignored_mods" (a list of specific user IDs) on purpose:
+    # this is the "don't log actions performed by any moderator" checkbox,
+    # a blanket boolean flag. The two used to share one config key and a
+    # bool saved there broke every `user.id in ignored_mods` check.
+    "ignore_all_mods": False,
     "invite_links": {},
 }

@@ -19,7 +19,13 @@ from redbot.core.utils.dashboard_helpers import (
 log = logging.getLogger("red.mod.eventlog.dashboard")
 
 # Config keys that hold lists rather than an event definition.
-NON_EVENT_KEYS = {"ignored_channels", "ignored_users", "ignored_mods", "invite_links"}
+NON_EVENT_KEYS = {
+    "ignored_channels",
+    "ignored_users",
+    "ignored_mods",
+    "ignore_all_mods",
+    "invite_links",
+}
 
 # Grouping only affects presentation - 21 flat toggles is unusable.
 EVENT_GROUPS = (
@@ -137,7 +143,7 @@ class EventLogDashboard:
                     guild, selected_many=settings.get("ignored_channels") or []
                 ),
                 "ignored_roles": role_options(guild),
-                "ignored_mods": bool(settings.get("ignored_mods")),
+                "ignored_mods": bool(settings.get("ignore_all_mods")),
             },
         }
 
@@ -208,7 +214,7 @@ class EventLogDashboard:
             if action == "save_ignores":
                 ids = [int(x) for x in field.many("ignored_channels") if str(x).isdigit()]
                 await conf.ignored_channels.set(ids)
-                await conf.ignored_mods.set(field.checked("ignored_mods"))
+                await conf.ignore_all_mods.set(field.checked("ignored_mods"))
                 return [{"message": "Ignore list saved.", "category": "success"}]
             if action in ("enable_all", "disable_all"):
                 target = action == "enable_all"
