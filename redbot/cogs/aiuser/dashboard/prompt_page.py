@@ -168,26 +168,52 @@ async def prompt_overview(self: MixinMeta, guild: discord.Guild, **kwargs):
     template_path = TEMPLATES_PATH / "prompt_page.html"
     source = template_path.read_text(encoding="utf-8")
 
+    metrics_footer = _metrics_footer(
+        await get_prompt_metrics(server_prompt_resolved, model)
+    )
+    server_prompt = await _prompt_item(
+        "Server", guild.name, server_prompt_resolved, model
+    )
+    scoped_prompts = await _collect_scoped_prompts(
+        self, guild, model, "custom_text_prompt"
+    )
+    presets = await _collect_presets(self.config, guild, model)
+    random_prompts = await _collect_random_prompts(self.config, guild, model)
+    image_preprompts = await _collect_scoped_prompts(
+        self, guild, model, "function_calling_image_preprompt"
+    )
+
     return {
         "status": 0,
         "notifications": notifications,
         "web_content": {
-            "source": source,
-            "prompt_form": prompt_form,
-            "current_prompt_text": current_prompt,
-            "metrics_footer": _metrics_footer(
-                await get_prompt_metrics(server_prompt_resolved, model)
-            ),
-            "server_prompt": await _prompt_item(
-                "Server", guild.name, server_prompt_resolved, model
-            ),
-            "scoped_prompts": await _collect_scoped_prompts(
-                self, guild, model, "custom_text_prompt"
-            ),
-            "presets": await _collect_presets(self.config, guild, model),
-            "random_prompts": await _collect_random_prompts(self.config, guild, model),
-            "image_preprompts": await _collect_scoped_prompts(
-                self, guild, model, "function_calling_image_preprompt"
+            "source": _render(
+                source,
+                prompt_form=prompt_form,
+                current_prompt_text=current_prompt,
+                metrics_footer=metrics_footer,
+                server_prompt=server_prompt,
+                scoped_prompts=scoped_prompts,
+                presets=presets,
+                random_prompts=random_prompts,
+                image_preprompts=image_preprompts,
             ),
         },
     }
+
+
+def _render(template_source: str, **context) -> str:
+    """Render the page while the live WTForms object still exists.
+
+    Third-party dashboard responses cross an RPC boundary before the dashboard
+    renders ``web_content``. Live form objects therefore cannot be passed in
+    the context; render the complete HTML here and protect it from the
+    dashboard's second Jinja pass.
+    """
+    import jinja2
+
+    env = jinja2.Environment(autoescape=True)
+    html = env.from_string(template_source).render(**context)
+    return "{% raw %}" + html.replace(
+        "{% endraw %}", "{% endraw %}{% raw %}"
+    ) + "{% endraw %}"
