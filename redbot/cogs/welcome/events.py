@@ -1,4 +1,3 @@
-import asyncio
 import re
 from datetime import datetime, timedelta, timezone
 from random import choice as rand_choice
@@ -91,6 +90,23 @@ class Events:
             )
         return raw_response
 
+    @staticmethod
+    def _resolve_avatar(member: Union[discord.Member, List[discord.Member]]) -> str:
+        """Return a usable avatar URL for either a single member or a grouped-join list.
+
+        With "Group rapid joins" enabled, even a single join is delivered as a
+        one-item list rather than a bare discord.Member, so the old
+        `isinstance(member, discord.Member)` guard silently dropped the
+        author icon/thumbnail for every guild with grouping on. Use the sole
+        member's avatar when there is exactly one, and only give up (empty
+        string) when genuinely batching multiple people into one message.
+        """
+        if isinstance(member, discord.Member):
+            return str(member.display_avatar)
+        if isinstance(member, list) and len(member) == 1:
+            return str(member[0].display_avatar)
+        return ""
+
     async def make_embed(
         self,
         member: Union[discord.Member, List[discord.Member]],
@@ -101,7 +117,11 @@ class Events:
         EMBED_DATA = await self.config.guild(guild).EMBED_DATA()
         converted_msg = await self.convert_parms(member, guild, msg, is_welcome)
         has_filter = self.bot.get_cog("Filter")
-        username = str(member)
+        if isinstance(member, discord.Member):
+            username = str(member)
+        else:
+            names = [str(m) for m in member]
+            username = humanize_list(names) if len(names) > 1 else names[0]
         if has_filter:
             replace_word = await self.config.guild(guild).FILTER_SETTING() or "[Redacted]"
             if version_info < VersionInfo.from_str("3.5.10"):
@@ -131,7 +151,7 @@ class Events:
             elif url == "splash":
                 url = str(guild.splash) if guild.splash else ""
             elif url == "avatar":
-                url = str(member.display_avatar) if isinstance(member, discord.Member) else ""
+                url = self._resolve_avatar(member)
             em.set_thumbnail(url=url)
         if EMBED_DATA["image"] or EMBED_DATA["image_goodbye"]:
             url = ""
@@ -144,7 +164,7 @@ class Events:
             elif url == "splash":
                 url = str(guild.splash) if guild.splash else ""
             elif url == "avatar":
-                url = str(member.display_avatar) if isinstance(member, discord.Member) else ""
+                url = self._resolve_avatar(member)
             em.set_image(url=url)
         if EMBED_DATA["icon_url"]:
             url = EMBED_DATA["icon_url"]
@@ -153,12 +173,16 @@ class Events:
             elif url == "splash":
                 url = str(guild.splash) if guild.splash else ""
             elif url == "avatar":
-                url = str(member.display_avatar) if isinstance(member, discord.Member) else ""
+                url = self._resolve_avatar(member)
             em.set_author(name=username, icon_url=url)
         if EMBED_DATA["timestamp"]:
             em.timestamp = datetime.now(timezone.utc)
-        if EMBED_DATA["author"] and isinstance(member, discord.Member):
-            em.set_author(name=username, icon_url=str(member.display_avatar))
+        if EMBED_DATA["author"]:
+            icon = self._resolve_avatar(member)
+            if icon:
+                em.set_author(name=username, icon_url=icon)
+            else:
+                em.set_author(name=username)
         return em
 
     @commands.Cog.listener()
@@ -167,19 +191,6 @@ class Events:
         if await self.config.guild(guild).PENDING() and member.pending:
             log.debug("Ignoring member join %r to wait for pending", member)
             return
-        # Right after a join, the gateway-cached Member object can carry an
-        # avatar hash that hasn't finished propagating on Discord's CDN yet,
-        # so the embed's author/thumbnail image renders blank and never
-        # retries. Re-fetching from the API after a short delay gives the
-        # asset time to settle before we build the message.
-        try:
-            await asyncio.sleep(2)
-            member = await guild.fetch_member(member.id)
-        except discord.HTTPException:
-            log.debug(
-                "welcome.py: could not re-fetch %r before welcoming, using cached data",
-                member,
-            )
         await self.check_member_join(member)
 
     @commands.Cog.listener()
