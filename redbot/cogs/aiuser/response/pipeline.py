@@ -186,11 +186,21 @@ class LLMPipeline:
         Build a base kwargs dict for the OpenAI call, including logit_bias handling.
         """
         params = await self.services.config.guild(self.ctx.guild).parameters()
-        kwargs: Dict[str, Any] = json.loads(params) if params else {}
+        # Tolerate legacy/corrupted values saved as an already-parsed dict
+        # (a past dashboard bug did this) instead of the JSON string this
+        # setting is meant to hold, so a stale stored value can't crash a
+        # live response.
+        if isinstance(params, dict):
+            kwargs: Dict[str, Any] = params
+        else:
+            kwargs: Dict[str, Any] = json.loads(params) if params else {}
 
         if "logit_bias" not in kwargs:
             weights = await self.services.config.guild(self.ctx.guild).weights()
-            weights_dict = json.loads(weights or "{}")
+            if isinstance(weights, dict):
+                weights_dict = weights
+            else:
+                weights_dict = json.loads(weights or "{}")
             if weights_dict:
                 kwargs["logit_bias"] = weights_dict
 

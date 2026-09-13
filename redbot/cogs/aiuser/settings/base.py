@@ -256,7 +256,7 @@ class Settings(
 
         parameters = config["parameters"]
         if parameters is not None:
-            parameters = json.loads(parameters)
+            parameters = parameters if isinstance(parameters, dict) else json.loads(parameters)
             parameters_embed = discord.Embed(
                 title="Custom Parameters to Endpoint", color=await ctx.embed_color()
             )
