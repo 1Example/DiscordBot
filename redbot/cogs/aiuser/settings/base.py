@@ -39,22 +39,33 @@ class Settings(
     )
 
     @aiuser.command(name="forget")
-    @app_checks.bot_has_permissions(add_reactions=True)
     async def forget(self, interaction: discord.Interaction):
         """Forces the bot to forget the current conversation up to this point
 
         This is useful if the LLM is stuck doing unwanted behaviour or giving undesirable results.
         See `[p]aiuser triggers public_forget` to allow non-admins to use this command.
         """
+        # This is a plain app_commands slash command, not a hybrid prefix+slash
+        # command, so there is no real Message behind it for react_quietly()
+        # to react to. Reacting to a message and acknowledging the interaction
+        # are two different Discord API calls - the old code only ever did the
+        # former, so Discord never saw a real response and eventually showed
+        # "The application did not respond" even though the setting above was
+        # applied. Responding directly with interaction.response.send_message()
+        # satisfies Discord's actual requirement for this interaction.
         ctx = await commands.Context.from_interaction(interaction)
         if (
             not ctx.channel.permissions_for(ctx.author).manage_messages
             and not await self.config.guild(ctx.guild).public_forget()
         ):
-            return await ctx.react_quietly("❌")
+            return await interaction.response.send_message(
+                "❌ You don't have permission to do that.", ephemeral=True
+            )
 
-        self.services.override_prompt_start_time[ctx.guild.id] = ctx.message.created_at
-        await ctx.react_quietly("✅")
+        self.services.override_prompt_start_time[ctx.guild.id] = interaction.created_at
+        await interaction.response.send_message(
+            "✅ Forgot the conversation up to this point.", ephemeral=True
+        )
 
     @aiuser.command(name="status")
     @app_checks.bot_has_permissions(embed_links=True)
