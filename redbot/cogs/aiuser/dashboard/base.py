@@ -5,6 +5,7 @@ from ..types.abc import MixinMeta
 
 from .consent_page import opt_consent
 from .main_page import main
+from .memories_page import memories_page
 from .owner_config_page import bot_owner_server_config
 from .prompt_page import prompt_overview
 from .settings_page import server_settings
@@ -17,6 +18,7 @@ class DashboardIntegration(MixinMeta):
     bot_owner_server_config = bot_owner_server_config
     prompt_overview = prompt_overview
     server_settings = server_settings
+    memories_page = memories_page
 
     @commands.Cog.listener()
     async def on_dashboard_cog_add(self, dashboard_cog: commands.Cog) -> None:

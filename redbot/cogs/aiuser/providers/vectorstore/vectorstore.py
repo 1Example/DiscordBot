@@ -73,6 +73,26 @@ class VectorStore:
 
         return [(r[0], r[1]) for r in res]
 
+    async def list_detailed(
+        self, guild_id: int
+    ) -> List[Tuple[int, str, str, Optional[str], Optional[str]]]:
+        """List full memory rows (id, name, text, user scope, channel scope) for a guild.
+
+        Used by the dashboard's memory management page, which needs enough
+        to render and scope each row without an extra fetch per memory.
+        """
+        async with aiosqlite.connect(self.db_path) as conn:
+            cursor = await conn.execute(
+                """
+                SELECT id, memory_name, memory_text, user, channel
+                FROM memories WHERE guild_id = ? ORDER BY id ASC
+                """,
+                (guild_id,),
+            )
+            res = await cursor.fetchall()
+
+        return [(r[0], r[1], r[2], r[3], r[4]) for r in res]
+
     async def fetch_by_id(
         self, memory_id: int, guild_id: int
     ) -> Optional[Tuple[str, str]]:
