@@ -192,9 +192,30 @@ async def server_settings(
     import wtforms
 
     conf = self.config.guild(guild)
-    current = await conf.all()
+
+    async def _safe_all(cfg, fields):
+        """Fetch each setting individually instead of `cfg.all()`.
+
+        `all()` recursively merges the whole stored dict against the whole
+        registered-defaults dict (Red core's `nested_update`). If any single
+        key was ever saved with a type that doesn't match its registered
+        default (e.g. a dict saved where the default is `None`), that merge
+        throws for the *entire* page, not just that field. Fetching each
+        setting on its own sidesteps that merge entirely, so one bad legacy
+        value can no longer take the whole settings page down - and it lets
+        the page render so the offending field can be corrected and re-saved.
+        """
+        out = {}
+        for key, *_ in fields:
+            try:
+                out[key] = await cfg.get_attr(key)()
+            except Exception:
+                out[key] = None
+        return out
+
+    current = await _safe_all(conf, ALL_FIELDS)
     is_owner = await self.bot.is_owner(user)
-    global_current = await self.config.all() if is_owner else {}
+    global_current = await _safe_all(self.config, OWNER_FIELDS) if is_owner else {}
 
     channel_choices = [(str(c.id), f"#{c.name}") for c in guild.text_channels]
     role_choices = [(str(r.id), r.name) for r in guild.roles if not r.is_default()]
@@ -260,13 +281,21 @@ async def server_settings(
                     value = None
                 else:
                     try:
-                        value = json.loads(text)
+                        json.loads(text)  # validate only - see note below
                     except ValueError:
                         notifications.append(
                             {"message": f"{_label}: that is not valid JSON, so it was "
                                         "left unchanged.", "category": "warning"}
                         )
                         continue
+                    # Store the raw JSON text, not the parsed object. Every
+                    # reader of these settings (pipeline.py, settings/base.py)
+                    # calls json.loads() on the stored value itself, and the
+                    # registered default is `None` - saving a parsed dict/list
+                    # here mismatches that default's type and breaks Red's
+                    # config merge (`conf.all()`) for the whole settings page,
+                    # not just this field.
+                    value = text
             else:
                 text = (raw or "").strip()
                 value = text or None
