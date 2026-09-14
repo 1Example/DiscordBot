@@ -138,14 +138,26 @@ class VectorStore:
         k: int = 1,
         user: Optional[str] = None,
         channel: Optional[str] = None,
+        extra_users: Optional[List[str]] = None,
     ) -> List[Tuple[str, str, float]]:
-        """Search all in-scope memories using embedding similarity."""
-        where_clause = "guild_id = ?"
-        params = [guild_id]
+        """Search all in-scope memories using embedding similarity.
 
-        if user:
-            where_clause += " AND (user = ? OR user IS NULL)"
-            params.append(user)
+        `user` scopes to whoever is asking; `extra_users` additionally
+        allows memories scoped to specific other people to surface too -
+        notably anyone directly @mentioned in the query. Without this, a
+        memory saved about a person (e.g. "Dorinel is an alt of 1Example")
+        could only ever come up when Dorinel himself was the one talking,
+        never when someone else asked about him - which is the actual
+        common case for a fact like that.
+        """
+        where_clause = "guild_id = ?"
+        params: List = [guild_id]
+
+        user_ids = [u for u in ([user] if user else []) + list(extra_users or []) if u]
+        if user_ids:
+            placeholders = ", ".join("?" for _ in user_ids)
+            where_clause += f" AND (user IN ({placeholders}) OR user IS NULL)"
+            params.extend(user_ids)
         if channel:
             where_clause += " AND (channel = ? OR channel IS NULL)"
             params.append(channel)

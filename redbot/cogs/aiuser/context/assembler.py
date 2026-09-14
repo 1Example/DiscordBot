@@ -112,8 +112,17 @@ class ConversationAssembler:
     async def _fetch_relevant_memory(self) -> Optional[str]:
         if not await self.services.config.guild(self.guild).query_memories():
             return None
+        # Anyone actually @mentioned in the triggering message should also
+        # be able to surface memories scoped to them - see search_similar()
+        # for why this couldn't happen before.
+        mentioned_ids = [
+            str(member.id) for member in self.init_message.mentions if not member.bot
+        ]
         return await fetch_relevant_memory(
-            self.ctx, self.services.memories, mention_to_text(self.init_message)
+            self.ctx,
+            self.services.memories,
+            mention_to_text(self.init_message),
+            extra_users=mentioned_ids,
         )
 
     # --- message conversion / filtering ---

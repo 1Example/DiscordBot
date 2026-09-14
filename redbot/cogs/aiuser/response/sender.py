@@ -9,7 +9,7 @@ import logging
 import random
 import re
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, List, Optional, Set
+from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
 import discord
 from discord.utils import MISSING
@@ -36,16 +36,21 @@ async def deliver(
     can_reply: bool,
 ) -> Optional[discord.Message]:
     response = ""
+    mentioned_members: List[discord.Member] = []
     if result.completion:
         response = await _remove_patterns_from_response(
             ctx, services, result.completion
         )
+        response, mentioned_members = _linkify_mentions(ctx, response)
     if not response and not result.files_to_send:
         return None
 
     files = result.files_to_send
+    allowed_users = {ctx.message.author.id: ctx.message.author}
+    for member in mentioned_members:
+        allowed_users.setdefault(member.id, member)
     allowed = discord.AllowedMentions(
-        everyone=False, roles=False, users=[ctx.message.author]
+        everyone=False, roles=False, users=list(allowed_users.values())
     )
     chunks = _chunk_message(response)
     last = len(chunks) - 1
@@ -79,6 +84,47 @@ async def deliver(
         )
 
     return sent_message
+
+
+def _linkify_mentions(
+    ctx: commands.Context, text: str
+) -> Tuple[str, List[discord.Member]]:
+    """Turn @DisplayName text the model wrote into a real Discord mention.
+
+    Incoming mentions are converted to plain "@DisplayName" text for the
+    model to read (see mention_to_text() / format_text_content()), since it
+    has no way to understand a raw <@id> snowflake. The model naturally
+    imitates that exact style back in its own output - but plain
+    "@DisplayName" text was never converted back. It doesn't ping, doesn't
+    render as a clickable pill, and isn't distinguishable from someone just
+    typing an "@" followed by a name. This resolves any @DisplayName that
+    matches an actual member into a real mention, and reports who got
+    mentioned so the caller can actually allow that ping through - a
+    generic prompt instruction can't make text into a real mention; only
+    code that knows the guild's member list can.
+    """
+    if not ctx.guild or "@" not in text:
+        return text, []
+
+    # Longest display name first, so "Baca - Frugerul Gros" is matched
+    # whole before a shorter "Baca" would grab just the prefix.
+    candidates = sorted(
+        (m for m in ctx.guild.members if not m.bot and m.display_name),
+        key=lambda m: len(m.display_name),
+        reverse=True,
+    )
+
+    mentioned: List[discord.Member] = []
+    for member in candidates:
+        pattern = re.compile(
+            r"(?<!\w)@" + re.escape(member.display_name) + r"(?!\w)", re.IGNORECASE
+        )
+        if pattern.search(text):
+            text = pattern.sub(member.mention, text)
+            mentioned.append(member)
+
+    return text, mentioned
+
 
 
 async def _should_reply(ctx: commands.Context) -> bool:

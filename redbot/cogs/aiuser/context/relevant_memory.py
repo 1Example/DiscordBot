@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from redbot.core import commands
 
@@ -16,9 +16,18 @@ logger = logging.getLogger("red.bz_cogs.aiuser.memory")
 
 
 async def fetch_relevant_memory(
-    ctx: commands.Context, db: "VectorStore", query: str, threshold: float = 0.75
+    ctx: commands.Context,
+    db: "VectorStore",
+    query: str,
+    threshold: float = 0.75,
+    extra_users: Optional[List[str]] = None,
 ) -> Optional[str]:
-    """Return the most relevant memory above the similarity threshold, prompt-formatted."""
+    """Return the most relevant memory above the similarity threshold, prompt-formatted.
+
+    `extra_users` lets memories scoped to someone other than the asker
+    surface too - pass the IDs of anyone actually mentioned in `query`'s
+    source message.
+    """
     if not query.strip():
         return None
 
@@ -29,6 +38,7 @@ async def fetch_relevant_memory(
             k=1,
             user=str(ctx.author.id),
             channel=str(ctx.channel.id),
+            extra_users=extra_users,
         )
     except Exception:
         logger.exception("Database error while searching memories")
