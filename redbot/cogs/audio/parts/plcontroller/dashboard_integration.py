@@ -5,8 +5,10 @@ import inspect
 import json
 import logging
 import time
+import types
 import typing as t
 
+import aiohttp
 import discord
 from redbot.core import bank
 
@@ -836,6 +838,7 @@ class ControllerDashboard:
     # ---------- radio ----------
 
     RADIO_RESULT_LIMIT = 50
+    RADIO_BROWSER_FALLBACK_URL = "https://all.api.radio-browser.info/json/stations/search"
 
     @staticmethod
     def _dash_radio_row(station) -> dict:
@@ -852,6 +855,42 @@ class ControllerDashboard:
             "favicon": getattr(station, "favicon", "") or "",
             "uuid": getattr(station, "stationuuid", "") or "",
         }
+
+    async def _fallback_radio_search(self, *, limit: int, order: str, reverse: bool, **filters):
+        """Query radio-browser.info directly when PyLav's own mirror can't be reached.
+
+        PyLav's radio browser talks to one fixed mirror (currently
+        de1.api.radio-browser.info, per the connection errors this is meant
+        to recover from) - if that specific host is down or resetting
+        connections, every search fails even though the rest of the
+        radio-browser.info network is fine. `all.api.radio-browser.info` is
+        the service's own documented entry point: it DNS-resolves to
+        whichever mirror is currently healthy, so querying it directly
+        (bypassing PyLav's fixed mirror entirely) recovers from exactly this
+        failure without needing to know which mirrors are up.
+
+        Returns plain dicts with the same field names PyLav's own Station
+        objects expose (this API is what those objects are built from in
+        the first place), wrapped so _dash_radio_row's getattr() calls work
+        on them unchanged.
+        """
+        params = {
+            "limit": limit,
+            "order": order,
+            "reverse": "true" if reverse else "false",
+            "hidebroken": "true",
+            **filters,
+        }
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with self.bot.session.get(
+            self.RADIO_BROWSER_FALLBACK_URL,
+            params=params,
+            headers={"User-Agent": "Red-DiscordBot-PLController/1.0"},
+            timeout=timeout,
+        ) as resp:
+            resp.raise_for_status()
+            stations = await resp.json()
+        return [types.SimpleNamespace(**station) for station in stations]
 
     async def _dash_radio(self, action: str, member, guild, player, field):
         """Search the radio directory, and queue a station from it.
@@ -882,6 +921,27 @@ class ControllerDashboard:
                 found = await browser.search(
                     limit=self.RADIO_RESULT_LIMIT, order="votes", reverse=True, **filters
                 )
+            except (
+                aiohttp.ClientConnectorError,
+                ConnectionResetError,
+                aiohttp.ServerDisconnectedError,
+            ) as exc:
+                log.warning(
+                    "PyLav's radio directory mirror is unreachable (%s); "
+                    "falling back to all.api.radio-browser.info directly",
+                    exc,
+                )
+                try:
+                    found = await self._fallback_radio_search(
+                        limit=self.RADIO_RESULT_LIMIT, order="votes", reverse=True, **filters
+                    )
+                except Exception as fallback_exc:  # noqa: BLE001
+                    log.exception("Fallback radio directory search also failed")
+                    return (
+                        f"The radio directory did not answer: {fallback_exc}",
+                        "danger",
+                        {},
+                    )
             except Exception as exc:  # noqa: BLE001
                 log.exception("Radio directory search failed")
                 return f"The radio directory did not answer: {exc}", "danger", {}

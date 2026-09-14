@@ -2250,7 +2250,7 @@ class EventMixin:
                         relative = discord.utils.format_dt(after_attr, "R")
                         embed.description += _(
                             "- {author} has subscribed to the guild since {since} ({relative})."
-                        ).format(author=after.mention, since=since)
+                        ).format(author=after.mention, since=since, relative=relative)
                     elif before_attr:
                         since = discord.utils.format_dt(before_attr, "F")
                         relative = discord.utils.format_dt(before_attr, "R")
