@@ -744,7 +744,13 @@ class PyLavController(
                     )
                     if message.id != panel_id and message.created_at <= cutoff
                 ]
-            except (discord.Forbidden, discord.HTTPException):
+            except (discord.Forbidden, discord.HTTPException, OSError):
+                # OSError also covers aiohttp.ClientOSError/ConnectionResetError -
+                # a transport-level drop that happens before discord.py can wrap
+                # it into an HTTPException. This job runs every 5 seconds, so a
+                # bare network hiccup here is routine, not a bug; skip this
+                # guild for this cycle and let the next tick retry rather than
+                # taking down the whole scheduled job.
                 continue
 
             if not messages:
