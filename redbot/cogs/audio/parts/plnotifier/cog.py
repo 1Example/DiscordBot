@@ -11,6 +11,7 @@ from pathlib import Path
 import aiohttp
 import discord
 from apscheduler.job import Job
+from apscheduler.jobstores.base import JobLookupError
 from redbot.core import Config, commands
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import box
@@ -196,7 +197,12 @@ class PyLavNotifier(NotifierDashboard, DISCORD_COG_TYPE_MIXIN):
 
     async def _notifier_unload(self) -> None:
         for job in self._scheduled_jobs:
-            job.remove()
+            with contextlib.suppress(JobLookupError):
+                # PyLav's own scheduler shutdown can already have cleared
+                # this job (it happens before this cog's unload runs, per
+                # the shutdown log ordering), so "already gone" here is a
+                # race, not an error worth surfacing.
+                job.remove()
         if not self._session.closed:
             await self._session.close()
 

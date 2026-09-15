@@ -89,7 +89,13 @@ class EventLogMixin(EventLogDashboard, EventMixin):
         self.audit_log: Dict[int, Deque[discord.AuditLogEntry]] = {}
 
     def _eventlog_unload(self) -> None:
-        self.invite_links_loop.stop()
+        # .stop() lets an already-running iteration finish rather than
+        # cutting it off, which is exactly what let this loop's HTTP call
+        # (guild.invites()) run straight into a session the rest of the
+        # shutdown sequence had already closed. .cancel() ends it
+        # immediately instead - safe here since this task only reads and
+        # caches invite data, nothing that needs to finish cleanly.
+        self.invite_links_loop.cancel()
 
     async def _eventlog_load(self) -> None:
         if await self.eventlog_config.version() < "2.8.5":

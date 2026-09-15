@@ -710,6 +710,13 @@ class EventMixin:
         invites = {}
         if not guild.me.guild_permissions.manage_guild:
             return False
+        if self.bot.is_closed():
+            # The 5-minute interval loop that calls this can still be
+            # mid-flight when the rest of the bot's shutdown sequence closes
+            # the HTTP session out from under it - this task only reads and
+            # caches invites, so skipping quietly here is correct, not just
+            # convenient.
+            return False
         try:
             for invite in await guild.invites():
                 created_at = getattr(
@@ -728,6 +735,12 @@ class EventMixin:
                 }
         except discord.HTTPException:
             logger.error("Error saving invites for guild %s. Discord Server Error.", guild.id)
+            return False
+        except RuntimeError:
+            # Covers the narrower race the is_closed() check above can't:
+            # the bot was still open when we checked, but the session shut
+            # down mid-await. Same reasoning as above - quietly skip.
+            logger.debug("Session closed mid-request saving invites for guild %s.", guild.id)
             return False
         except Exception:
             logger.exception("Error saving invites for guild %s.", guild.id)
