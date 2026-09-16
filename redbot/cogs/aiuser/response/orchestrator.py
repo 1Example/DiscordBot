@@ -35,6 +35,7 @@ async def build_and_respond(
     services: "AIUserServices",
     ctx: commands.Context,
     history_anchor: Optional["discord.Message"] = None,
+    force_reply: bool = False,
 ) -> None:
     assembler = ConversationAssembler(services, ctx, history_anchor=history_anchor)
     async with ctx.message.channel.typing():
@@ -49,7 +50,7 @@ async def build_and_respond(
                 ctx, assembler.compaction_candidates
             )
 
-        await generate_and_send(services, ctx, conversation)
+        await generate_and_send(services, ctx, conversation, force_reply=force_reply)
 
 
 async def generate_and_send(
@@ -57,11 +58,12 @@ async def generate_and_send(
     ctx: commands.Context,
     conversation: Conversation,
     can_reply: bool = True,
+    force_reply: bool = False,
 ) -> None:
     result = await LLMPipeline(services, ctx, conversation).run()
     if result.error is not None:
         await _notify_failure(ctx, result.error)
-    sent_message = await deliver(services, ctx, result, can_reply)
+    sent_message = await deliver(services, ctx, result, can_reply, force_reply=force_reply)
 
     if sent_message is None:
         return

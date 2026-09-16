@@ -251,7 +251,19 @@ async def execute_response_request(
         if not await charge_for_reply(services, ctx, request.kind):
             return
 
-        await build_and_respond(services, ctx, history_anchor=history_anchor)
+        await build_and_respond(
+            services,
+            ctx,
+            history_anchor=history_anchor,
+            # A DIRECT request means someone specifically @mentioned or
+            # replied to the bot - that deserves an actual reply-thread
+            # every time, not the same random/idle-based coin flip used for
+            # a BURST (the bot deciding on its own to join a conversation
+            # nobody addressed it in). Without this, a direct 1:1 exchange
+            # in a busy, multi-thread channel could render as an unlinked
+            # message indistinguishable from anything else being said.
+            force_reply=(request.kind is ResponseKind.DIRECT),
+        )
     except Exception:
         logger.exception("Error generating aiuser response")
 

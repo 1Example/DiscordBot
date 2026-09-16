@@ -34,6 +34,7 @@ async def deliver(
     ctx: commands.Context,
     result: "PipelineResult",
     can_reply: bool,
+    force_reply: bool = False,
 ) -> Optional[discord.Message]:
     response = ""
     mentioned_members: List[discord.Member] = []
@@ -56,7 +57,7 @@ async def deliver(
     last = len(chunks) - 1
 
     first_files = files if last == 0 else MISSING
-    if can_reply and await _should_reply(ctx):
+    if can_reply and (force_reply or await _should_reply(ctx)):
         try:
             sent_message = await ctx.message.reply(
                 chunks[0],
