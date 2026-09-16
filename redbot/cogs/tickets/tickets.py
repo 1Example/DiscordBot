@@ -236,6 +236,18 @@ class Tickets(DashboardIntegration, CogBase):
                     "image": "➖",
                     "case_str": "Member Removed from Ticket",
                 },
+                {
+                    "name": "ticket_deleted",
+                    "default_setting": True,
+                    "image": "🗑️",
+                    "case_str": "Ticket Deleted",
+                },
+                {
+                    "name": "ticket_appeal_approved",
+                    "default_setting": True,
+                    "image": "✅",
+                    "case_str": "Ticket Appeal Approved",
+                },
             ],
         )
         asyncio.create_task(self.load_tickets())
