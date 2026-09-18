@@ -709,11 +709,7 @@ class DashboardIntegration:
             new_owner = guild.get_member(int(raw_member)) if raw_member.isdigit() else None
             if new_owner is None:
                 return [{"message": "Pick a member to hand the room to.", "category": "warning"}]
-            async with conf.rooms() as rooms:
-                entry = rooms.get(str(channel.id))
-                if entry is None:
-                    return [{"message": "That room is not tracked.", "category": "warning"}]
-                entry["owner"] = new_owner.id
+            await self.set_owner(guild, channel, new_owner)
             return [
                 {"message": f"'{channel.name}' now belongs to {new_owner.display_name}.",
                  "category": "success"}
@@ -993,7 +989,7 @@ PRIVATEROOMS_TEMPLATE = (
         <label class="dz-toggle">
           <input type="checkbox" name="notice_enabled"
                  {% if notice_enabled %}checked{% endif %} />
-          <span>Point the owner at the panel after their room is made</span>
+          <span>Show the custom notice in the owner-only My room controls</span>
         </label>
 
         <div class="dz-label" style="margin-top:10px;">Message</div>
@@ -1002,15 +998,15 @@ PRIVATEROOMS_TEMPLATE = (
         <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
           <code>{user}</code> mentions the owner and is required;
           <code>{room}</code>, <code>{cost}</code> and <code>{currency}</code> also work.
-          It is posted in the panel channel and removes itself, because Discord
-          cannot deliver a private message without the user clicking something first.
+          Shown only to the owner after they click My room in the interface channel.
+          This is an ephemeral message. Nothing is posted publicly or sent by DM.
         </div>
 
         <div class="dz-label" style="margin-top:10px;">Remove it after (seconds)</div>
         <input class="dz-input" type="number" min="0" max="600" name="notice_delete_after"
                value="{{ notice_delete_after }}" style="max-width:160px;" />
         <div style="font-size:.72rem; opacity:.45; margin-top:4px;">
-          0 keeps it in the channel for good.
+          0 disables automatic deletion of the ephemeral message.
         </div>
       </div>
 

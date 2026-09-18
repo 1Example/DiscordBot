@@ -1,6 +1,8 @@
+import asyncio
 import contextlib
 import logging
 import re
+import time
 
 import discord
 from redbot.core import bank, commands, Config
@@ -37,6 +39,7 @@ DEFAULT_STYLES = {
     "limit": "secondary",
     "kick": "danger",
     "claim": "success",
+    "myroom": "primary",
 }
 
 ACTIONS = (
@@ -46,15 +49,16 @@ ACTIONS = (
     ("unhide", "\N{EYE}", "Unhide", "make the room visible again"),
     ("rename", "\N{PENCIL}", "Rename", "change your room's name"),
     ("limit", "\N{BUST IN SILHOUETTE}", "Limit", "set a max number of people (0 = unlimited)"),
-    ("kick", "\N{WOMANS BOOTS}", "Kick", "remove someone from your room"),
+    ("kick", "\N{WOMANS BOOTS}", "Members", "choose someone in your room to kick or ban"),
     ("claim", "\N{CROWN}", "Claim", "take ownership of an empty-of-owner room"),
+    ("myroom", "\N{HOUSE BUILDING}", "My room", "open your private room controls"),
 )
 
 # The panel's two button rows, and the two columns of the legend above them.
 # Reading down a column tells you what the row of buttons under it does.
 ACTION_GROUPS = (
     ("Access", ("lock", "unlock", "hide", "unhide")),
-    ("Manage", ("rename", "limit", "kick", "claim")),
+    ("Manage", ("rename", "limit", "kick", "claim", "myroom")),
 )
 
 # An inline embed field is only about half the card wide, so the sentences in
@@ -68,8 +72,9 @@ PANEL_BLURBS = {
     "unhide": "show it again",
     "rename": "change the name",
     "limit": "cap the headcount",
-    "kick": "remove someone",
+    "kick": "kick or ban members",
     "claim": "take an ownerless room",
+    "myroom": "private controls",
 }
 
 DEFAULT_EMOJIS = {key: default for key, default, _label, _blurb in ACTIONS}
@@ -141,7 +146,7 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
         title=f"{emojis['hub']} {title}",
         description=(
             "Join a hub below and a room is made for you straight away. "
-            "You will be pinged here once it exists."
+            "Click **My room** to see your room notice and controls privately."
         ),
         colour=colour,
     )
@@ -258,28 +263,92 @@ class LimitModal(discord.ui.Modal, title="Set user limit"):
             await interaction.response.send_message(f"Couldn't set the limit: {e}", ephemeral=True)
 
 
-class KickSelectView(discord.ui.View):
-    def __init__(self, cog: "PrivateRooms", channel: discord.VoiceChannel):
-        super().__init__(timeout=60)
-        self.cog = cog
-        self.channel = channel
-        self.add_item(self.KickSelect(channel))
+class RoomMemberView(discord.ui.View):
+    """Owner-only, paginated snapshot of this room's current occupants."""
 
-    class KickSelect(discord.ui.UserSelect):
-        def __init__(self, channel: discord.VoiceChannel):
-            super().__init__(placeholder="Choose a member to remove from your room…", min_values=1, max_values=1)
-            self.channel = channel
+    def __init__(self, cog, channel, owner_id):
+        super().__init__(timeout=180)
+        self.cog, self.channel, self.owner_id = cog, channel, owner_id
+        self.page = 0
+        self.selected_id = None
+        self.refresh_members()
 
-        async def callback(self, interaction: discord.Interaction):
-            member = self.values[0]
-            if not isinstance(member, discord.Member) or member.voice is None or member.voice.channel != self.channel:
-                await interaction.response.send_message("That member isn't in your room.", ephemeral=True)
-                return
-            try:
-                await member.move_to(None, reason=f"Kicked by room owner {interaction.user}")
-                await interaction.response.send_message(f"Removed **{member.display_name}** from your room.", ephemeral=True)
-            except discord.HTTPException as e:
-                await interaction.response.send_message(f"Couldn't remove them: {e}", ephemeral=True)
+    def refresh_members(self):
+        channel = self.channel.guild.get_channel(self.channel.id)
+        members = sorted(
+            (m for m in channel.members if m.id != self.owner_id),
+            key=lambda m: (m.display_name.casefold(), m.id),
+        ) if isinstance(channel, discord.VoiceChannel) else []
+        self.page = min(self.page, max(0, (len(members) - 1) // 25))
+        page = members[self.page * 25 : (self.page + 1) * 25]
+        if self.selected_id not in {m.id for m in page}:
+            self.selected_id = None
+        self.members.options = [discord.SelectOption(
+            label=m.display_name[:100], value=str(m.id),
+            description=f"{m} · {m.id}"[:100], default=m.id == self.selected_id,
+        ) for m in page] or [discord.SelectOption(label="Nobody else is in this room", value="empty")]
+        self.members.disabled = not page
+        self.members.placeholder = f"Room members — page {self.page + 1}/{max(1, (len(members) + 24) // 25)}"
+        self.kick.disabled = self.ban.disabled = self.selected_id is None
+        self.previous.disabled = self.page == 0
+        self.next_page.disabled = (self.page + 1) * 25 >= len(members)
+
+    async def interaction_check(self, interaction):
+        rooms = await self.cog.config.guild(self.channel.guild).rooms()
+        if (interaction.guild is None or interaction.guild.id != self.channel.guild.id
+                or interaction.user.id != self.owner_id
+                or rooms.get(str(self.channel.id), {}).get("owner") != self.owner_id
+                or self.channel.guild.get_channel(self.channel.id) is None):
+            await interaction.response.send_message(
+                "Only the current owner can use these room controls. Reopen Members from the panel.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @discord.ui.select(placeholder="Choose someone in your room", row=0)
+    async def members(self, interaction, select):
+        self.selected_id = int(select.values[0]) if select.values[0].isdigit() else None
+        self.refresh_members()
+        await interaction.response.edit_message(view=self)
+
+    async def _apply(self, interaction, ban):
+        await interaction.response.defer(ephemeral=True)
+        message = await self.cog.moderate_member(
+            self.channel.guild, self.channel.id, interaction.user.id, self.selected_id, ban=ban
+        )
+        self.selected_id = None
+        self.refresh_members()
+        await interaction.edit_original_response(
+            content=message, view=self, allowed_mentions=discord.AllowedMentions.none()
+        )
+
+    @discord.ui.button(label="Kick", style=discord.ButtonStyle.danger, row=1)
+    async def kick(self, interaction, button):
+        await self._apply(interaction, ban=False)
+
+    @discord.ui.button(label="Ban from room", style=discord.ButtonStyle.danger, row=1)
+    async def ban(self, interaction, button):
+        await self._apply(interaction, ban=True)
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary, row=1)
+    async def previous(self, interaction, button):
+        self.page = max(0, self.page - 1)
+        self.selected_id = None
+        self.refresh_members()
+        await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary, row=1)
+    async def next_page(self, interaction, button):
+        self.page += 1
+        self.selected_id = None
+        self.refresh_members()
+        await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label="Refresh", style=discord.ButtonStyle.secondary, row=1)
+    async def refresh(self, interaction, button):
+        self.refresh_members()
+        await interaction.response.edit_message(view=self)
 
 
 class ControlPanelView(discord.ui.View):
@@ -378,16 +447,52 @@ class ControlPanelView(discord.ui.View):
             return
         await interaction.response.send_modal(LimitModal(self.cog, channel))
 
-    @discord.ui.button(label="Kick", style=discord.ButtonStyle.secondary, custom_id="prooms:kick", row=1)
+    @discord.ui.button(label="Members", style=discord.ButtonStyle.secondary, custom_id="prooms:kick", row=1)
     async def kick(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = await self._get_channel_or_warn(interaction)
         if channel is None:
             return
-        if len(channel.members) <= 1:
+        if not any(m.id != interaction.user.id for m in channel.members):
             await interaction.response.send_message("There's nobody else in your room to remove.", ephemeral=True)
             return
         await interaction.response.send_message(
-            "Choose who to remove:", view=KickSelectView(self.cog, channel), ephemeral=True
+            "Select a room member, then choose Kick or Ban from room. Kick allows rejoining; a ban blocks re-entry to this room.",
+            view=RoomMemberView(self.cog, channel, interaction.user.id), ephemeral=True
+        )
+
+    @discord.ui.button(label="My room", style=discord.ButtonStyle.primary, custom_id="prooms:myroom", row=1)
+    async def myroom(self, interaction: discord.Interaction, button: discord.ui.Button):
+        channel = await self.cog.get_owned_channel(interaction)
+        if channel is None:
+            pending = self.cog._notices.pop((interaction.guild_id, interaction.user.id), None)
+            text = pending[1] if pending and time.monotonic() - pending[0] < 600 else (
+                "You don't currently own a room. Join a create-room channel first."
+            )
+            await interaction.response.send_message(text, ephemeral=True)
+            return
+        settings = await self.cog.config.guild(interaction.guild).all()
+        room = settings["rooms"].get(str(channel.id), {})
+        template = settings.get("notice_text") if settings.get("notice_enabled") else None
+        template = template or "Your room is ready: {room}. Manage it using the controls below."
+        try:
+            text = template.format(user=interaction.user.mention, room=channel.mention,
+                                   cost=room.get("cost", 0), currency=room.get("currency", ""))
+        except (KeyError, IndexError, ValueError):
+            text = f"Your room is ready: {channel.mention}. Manage it using the controls below."
+        if channel.mention not in text:
+            text += f"\nRoom: {channel.mention}"
+        if room.get("cost") and "{cost}" not in template:
+            text += f" It cost you {room['cost']} {room.get('currency', '')}."
+        view = ControlPanelView(self.cog, resolve_emojis(settings.get("emojis")),
+                                settings.get("button_labels"), settings.get("button_styles"))
+        view.timeout = 180
+        for child in list(view.children):
+            if child.custom_id in {"prooms:myroom", "prooms:claim"}:
+                view.remove_item(child)
+        await interaction.response.send_message(
+            text, view=view, ephemeral=True,
+            delete_after=settings.get("notice_delete_after") or None,
+            allowed_mentions=discord.AllowedMentions.none(),
         )
 
     @discord.ui.button(label="Claim", style=discord.ButtonStyle.secondary, custom_id="prooms:claim", row=1)
@@ -397,18 +502,21 @@ class ControlPanelView(discord.ui.View):
             await interaction.response.send_message("You need to be in the room you want to claim.", ephemeral=True)
             return
         channel = member.voice.channel
-        rooms = await self.cog.config.guild(interaction.guild).rooms()
-        data = rooms.get(str(channel.id))
-        if data is None:
-            await interaction.response.send_message("This isn't a private room.", ephemeral=True)
-            return
-        owner_id = data.get("owner")
-        owner_still_here = any(m.id == owner_id for m in channel.members)
-        if owner_still_here and owner_id != member.id:
-            await interaction.response.send_message("The current owner is still in the room.", ephemeral=True)
-            return
-        await self.cog.set_owner(interaction.guild, channel, member)
-        await interaction.response.send_message("You are now the owner of this room.", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        async with self.cog.guild_lock(interaction.guild.id):
+            rooms = await self.cog.config.guild(interaction.guild).rooms()
+            data = rooms.get(str(channel.id))
+            if data is None:
+                message = "This isn't a tracked room."
+            elif member.voice is None or member.voice.channel != channel:
+                message = "You are no longer in that room."
+            elif any(m.id == data.get("owner") and m.id != member.id for m in channel.members):
+                message = "The current owner is still in the room."
+            else:
+                await self.cog._set_owner(interaction.guild, channel, member)
+                message = "You are now the owner of this room."
+        await interaction.followup.send(message, ephemeral=True)
+
 
 
 class PrivateRooms(DashboardIntegration, commands.Cog):
@@ -444,24 +552,63 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             "economy_enabled": False,
             "cost_public": 0,
             "cost_private": 0,
-            # After a room is made, point its owner at the panel. Discord has no
-            # way to send a truly private message outside an interaction, so
-            # this is a mention that removes itself.
+            # Custom notice shown only in the owner's ephemeral My room reply.
+            # Voice events cannot send ephemeral messages by themselves.
             "notice_enabled": True,
             "notice_text": (
-                "{user}, your room is ready \N{EM DASH} from here you can control "
-                "your voice chat."
+                "{user}, your room {room} is ready \N{EM DASH} use the control panel "
+                "to manage your voice chat."
             ),
             "notice_delete_after": 30,
             "rooms": {},  # str(voice_channel_id) -> {"owner": user_id, "public": bool}
         }
         self.config.register_guild(**default_guild)
         self._panel_view_added = False
+        self._guild_locks = {}
+        self._notices = {}
+        self._pending_moves = {}
+        self._cleanup_task = None
+        self._panel_view = None
 
     async def cog_load(self):
         if not self._panel_view_added:
-            self.bot.add_view(ControlPanelView(self))
+            self._panel_view = ControlPanelView(self)
+            self.bot.add_view(self._panel_view)
             self._panel_view_added = True
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+
+    def cog_unload(self):
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+        if self._panel_view:
+            self._panel_view.stop()
+
+    def guild_lock(self, guild_id):
+        return self._guild_locks.setdefault(guild_id, asyncio.Lock())
+
+    async def _cleanup_loop(self):
+        await self.bot.wait_until_red_ready()
+        while True:
+            now = time.monotonic()
+            self._notices = {key: value for key, value in self._notices.items() if now - value[0] < 600}
+            self._pending_moves = {key: value for key, value in self._pending_moves.items() if now - value[1] < 10}
+            for guild in list(self.bot.guilds):
+                try:
+                    async with self.guild_lock(guild.id):
+                        await self._cleanup_empty_rooms(guild)
+                except Exception:
+                    log.exception("PrivateRooms cleanup failed in guild %s", guild.id)
+            await asyncio.sleep(60)
+
+    async def _cleanup_empty_rooms(self, guild):
+        rooms = await self.config.guild(guild).rooms()
+        for channel_id in rooms:
+            channel = guild.get_channel(int(channel_id))
+            if channel is None:
+                async with self.config.guild(guild).rooms() as current:
+                    current.pop(channel_id, None)
+            elif isinstance(channel, discord.VoiceChannel):
+                await self._maybe_delete_room(channel)
 
     # ---------- helpers ----------
 
@@ -470,6 +617,9 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
         if guild is None:
             return None
         rooms = await self.config.guild(guild).rooms()
+        current = getattr(getattr(interaction.user, "voice", None), "channel", None)
+        if current and rooms.get(str(current.id), {}).get("owner") == interaction.user.id:
+            return current
         for channel_id_str, data in rooms.items():
             if data.get("owner") == interaction.user.id:
                 channel = guild.get_channel(int(channel_id_str))
@@ -478,8 +628,14 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
         return None
 
     async def set_owner(self, guild: discord.Guild, channel: discord.VoiceChannel, member: discord.Member):
+        async with self.guild_lock(guild.id):
+            await self._set_owner(guild, channel, member)
+
+    async def _set_owner(self, guild, channel, member):
         async with self.config.guild(guild).rooms() as rooms:
-            entry = rooms.get(str(channel.id), {})
+            entry = rooms.get(str(channel.id))
+            if entry is None:
+                raise ValueError("That room is no longer tracked.")
             old_owner_id = entry.get("owner")
             entry["owner"] = member.id
             rooms[str(channel.id)] = entry
@@ -518,27 +674,54 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             return True, 0, ""
         return True, cost, currency
 
-    async def _send_notice(self, guild: discord.Guild, settings: dict, text: str) -> None:
-        """Post a self-removing message in the panel channel."""
-        channel = guild.get_channel(settings.get("panel_channel") or 0)
-        me = guild.me
-        if channel is None or me is None or not hasattr(channel, "send"):
-            return
-        if not channel.permissions_for(me).send_messages:
-            return
-        delete_after = settings.get("notice_delete_after") or 0
-        try:
-            await channel.send(
-                text,
-                delete_after=delete_after or None,
-                allowed_mentions=discord.AllowedMentions(users=True),
-            )
-        except discord.HTTPException:
-            pass
+    async def moderate_member(self, guild, channel_id, owner_id, target_id, *, ban=False):
+        async with self.guild_lock(guild.id):
+            channel = guild.get_channel(channel_id)
+            rooms = await self.config.guild(guild).rooms()
+            if not isinstance(channel, discord.VoiceChannel) or rooms.get(str(channel_id), {}).get("owner") != owner_id:
+                return "You no longer own that room. Reopen Members from the panel."
+            if target_id is None or target_id == owner_id:
+                return "Choose another member in your room."
+            member = guild.get_member(target_id)
+            if not member or not member.voice or member.voice.channel != channel:
+                return "That member is no longer in your room. Refresh the list."
+            if ban and member.guild_permissions.administrator:
+                return "Server administrators bypass channel bans; they cannot be banned from a room."
+            reason = f"Room {'ban' if ban else 'kick'} by owner {owner_id}"
+            if ban:
+                overwrite = channel.overwrites_for(member)
+                overwrite.connect = False
+                try:
+                    await channel.set_permissions(member, overwrite=overwrite, reason=reason)
+                except discord.HTTPException:
+                    return "Could not save the room ban. Check my Manage Roles permission."
+            # Voice state can change while Discord processes the overwrite.
+            if not member.voice or member.voice.channel != channel:
+                return "Room ban saved; the member has already left." if ban else "That member has already left."
+            try:
+                await member.move_to(None, reason=reason)
+            except discord.HTTPException:
+                return ("Room ban saved, but I could not disconnect the member. Check my Move Members permission."
+                        if ban else "Could not disconnect the member. Check my Move Members permission.")
+            name = discord.utils.escape_markdown(member.display_name)
+            return (f"Banned **{name}** from this room. They cannot rejoin while the room ban is in place."
+                    if ban else f"Kicked **{name}** from this room. They can rejoin if room permissions allow it.")
 
     async def create_room(self, member: discord.Member, public: bool):
+        async with self.guild_lock(member.guild.id):
+            await self._create_room(member, public)
+
+    async def _create_room(self, member, public):
         guild = member.guild
         settings = await self.config.guild(guild).all()
+        hub_id = settings["hub_public"] if public else settings["hub_private"]
+        if not hub_id or not member.voice or not member.voice.channel or member.voice.channel.id != hub_id:
+            return  # stale/duplicate event: they have already left this hub
+        now = time.monotonic()
+        if any(owner_id == member.id and now - started < 10
+               for owner_id, started in self._pending_moves.values()):
+            return
+        await self._cleanup_empty_rooms(guild)
 
         allowed, cost, currency = await self._charge_for_room(member, settings, public)
         if not allowed:
@@ -546,11 +729,8 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             # than leaving them sitting in the hub.
             with contextlib.suppress(discord.HTTPException):
                 await member.move_to(None, reason="Cannot afford a room")
-            await self._send_notice(
-                guild,
-                settings,
-                f"{member.mention} a room costs {cost} {currency}, "
-                f"which is more than you have.",
+            self._notices[(guild.id, member.id)] = (
+                time.monotonic(), f"A room costs {cost} {currency}, which is more than you have."
             )
             return
         category = guild.get_channel(settings["category"]) if settings["category"] else None
@@ -596,32 +776,40 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             return
 
         async with self.config.guild(guild).rooms() as rooms:
-            rooms[str(channel.id)] = {"owner": member.id, "public": public}
+            rooms[str(channel.id)] = {"owner": member.id, "public": public, "cost": cost, "currency": currency}
 
+        # They may leave or change hubs while the create request is in flight.
+        if not member.voice or not member.voice.channel or member.voice.channel.id != hub_id:
+            await self._maybe_delete_room(channel)
+            if cost:
+                with contextlib.suppress(Exception):
+                    await bank.deposit_credits(member, cost)
+            return
+        self._pending_moves[channel.id] = (member.id, time.monotonic())
         try:
             await member.move_to(channel, reason="Moved to their new room")
         except discord.HTTPException:
-            pass
+            self._pending_moves.pop(channel.id, None)
+            await self._maybe_delete_room(channel)
+            if cost:
+                with contextlib.suppress(Exception):
+                    await bank.deposit_credits(member, cost)
+            return
 
-        if settings.get("notice_enabled"):
-            template = settings.get("notice_text") or ""
-            try:
-                text = template.format(
-                    user=member.mention,
-                    room=channel.mention,
-                    cost=cost,
-                    currency=currency,
-                )
-            except (KeyError, IndexError, ValueError):
-                # A typo in the template is not worth losing the pointer over.
-                text = f"{member.mention} from here you can control your voice chat."
-            # Only tack the price on when the template did not already say it.
-            if cost and "{cost}" not in template:
-                text = f"{text} It cost you {cost} {currency}."
-            await self._send_notice(guild, settings, text)
+        if member.voice and member.voice.channel == channel:
+            self._pending_moves.pop(channel.id, None)
+        self._notices.pop((guild.id, member.id), None)
 
     async def maybe_delete_room(self, channel: discord.VoiceChannel):
+        async with self.guild_lock(channel.guild.id):
+            await self._maybe_delete_room(channel)
+
+    async def _maybe_delete_room(self, channel):
         guild = channel.guild
+        pending = self._pending_moves.get(channel.id)
+        if pending and time.monotonic() - pending[1] < 10:
+            return  # wait for the gateway to acknowledge a successful move
+        self._pending_moves.pop(channel.id, None)
         rooms = await self.config.guild(guild).rooms()
         if str(channel.id) not in rooms:
             return
@@ -629,6 +817,8 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             return
         try:
             await channel.delete(reason="Room empty")
+        except discord.NotFound:
+            pass  # Already deleted: its tracking entry can be removed.
         except discord.HTTPException:
             # Forgetting the room before the delete succeeds strands the channel:
             # nothing tracks it any more, so nothing will ever try again. Keep
@@ -649,18 +839,21 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        if before.channel == after.channel:
+            return  # mute/deafen/stream updates are not hub joins
         guild = member.guild
-        settings = await self.config.guild(guild).all()
-        hub_private_id = settings["hub_private"]
-        hub_public_id = settings["hub_public"]
-
-        if after.channel is not None:
-            if hub_private_id is not None and after.channel.id == hub_private_id:
-                await self.create_room(member, public=False)
-            elif hub_public_id is not None and after.channel.id == hub_public_id:
-                await self.create_room(member, public=True)
-
-        if before.channel is not None and str(before.channel.id) in settings["rooms"]:
-            await self.maybe_delete_room(before.channel)
+        async with self.guild_lock(guild.id):
+            for state in (before, after):
+                if state.channel and self._pending_moves.get(state.channel.id, (None,))[0] == member.id:
+                    self._pending_moves.pop(state.channel.id, None)
+            # Clean up the old room first, even if charging/creation later fails.
+            if isinstance(before.channel, discord.VoiceChannel):
+                await self._maybe_delete_room(before.channel)
+            settings = await self.config.guild(guild).all()
+            if after.channel is not None:
+                if after.channel.id == settings.get("hub_private"):
+                    await self._create_room(member, public=False)
+                elif after.channel.id == settings.get("hub_public"):
+                    await self._create_room(member, public=True)
 
     # ---------- commands ----------

@@ -21,6 +21,41 @@
     Replies follow the existing enabled channels, member permissions, consent and reply-cost settings.</p>
   <form method="POST">
     {{ form.hidden_tag() }}
+    <div class="panel">
+      <h5>Import trigger list</h5>
+      <p>Choose the <strong>BlacknightMT2-triggers-RO-EN.md</strong> file, preview its entries,
+        then save them together. Markdown lists and JSON exports are supported, up to 256 KB.</p>
+      <label for="trigger-import-file">Trigger list file</label>
+      <input id="trigger-import-file" type="file" accept=".md,.markdown,.json,.txt"
+             data-target="{{ form.import_text.id }}" />
+      <p class="hint" id="trigger-import-file-status" role="status"></p>
+      <details>
+        <summary>File contents / paste instead</summary>
+        {{ form.import_text() }}
+      </details>
+      <div class="actions">{{ form.import_preview(class="btn btn-outline-primary") }}</div>
+      {% if show_import_preview %}
+      <h5 style="margin-top:18px;">Preview: {{ imported|length }} entries</h5>
+      <p class="hint">Review the facts and choose Add, Replace or Skip for each entry.
+        Existing matches such as website and opening are suggested automatically.
+        Unrelated entries stay unchanged; replacements keep their enabled/disabled state.
+        Replacing a linked memory entry changes it to custom information.</p>
+      {% for entry in imported %}
+      <div class="panel">
+        <strong>{{ loop.index }}. {{ entry.name }}</strong>
+        <p class="hint">{{ entry.phrases|length }} phrases · {{ entry.text|length }} information characters</p>
+        {{ form['import_target_' ~ loop.index0]() }}
+        <details>
+          <summary>View triggers and information</summary>
+          <p>{{ entry.phrases|join(' · ') }}</p>
+          <div class="facts">{{ entry.text }}</div>
+        </details>
+      </div>
+      {% endfor %}
+      <div class="actions">{{ form.import_save(class="btn bg-gradient-primary") }}</div>
+      <p class="hint">The entire import is checked before saving. The server limit remains 50 entries.</p>
+      {% endif %}
+    </div>
     {% for entry in entries %}
     <div class="panel">
       <h5>{{ entry.name }} {% if not entry.enabled %}<small>(disabled)</small>{% endif %}</h5>
@@ -65,3 +100,41 @@
     </div>
   </form>
 </div>
+
+<script>
+(function () {
+  function wireImport() {
+    var input = document.getElementById('trigger-import-file');
+    if (!input || input.dataset.wired) return;
+    input.dataset.wired = '1';
+    var target = document.getElementById(input.dataset.target);
+    var status = document.getElementById('trigger-import-file-status');
+    var serial = 0;
+    input.addEventListener('change', function () {
+      var token = ++serial;
+      var file = input.files && input.files[0];
+      target.value = '';
+      if (!file) { status.textContent = ''; return; }
+      if (file.size > {{ max_import_bytes }}) {
+        status.textContent = 'File too large. Choose a file no larger than 256 KB.';
+        input.value = '';
+        return;
+      }
+      status.textContent = 'Reading file…';
+      var reader = new FileReader();
+      reader.onload = function () {
+        if (token !== serial) return;
+        target.value = reader.result;
+        status.textContent = file.name + ' is ready. Click Preview import.';
+      };
+      reader.onerror = function () {
+        if (token === serial) status.textContent = 'Could not read the file. Try again.';
+      };
+      // The dashboard forwards form fields, not multipart file uploads.
+      reader.readAsText(file, 'UTF-8');
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wireImport);
+  else wireImport();
+})();
+</script>

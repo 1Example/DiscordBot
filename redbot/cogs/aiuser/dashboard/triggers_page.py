@@ -5,6 +5,9 @@ import pathlib
 import discord
 
 from ..context.triggered_memory import MAX_ENTRIES, MAX_FACT_LENGTH, make_entry
+from ..context.trigger_import import (
+    MAX_IMPORT_BYTES, parse_import, suggested_target, build_import_plan, revision, content_digest,
+)
 from ..dashboard.decorator import dashboard_page
 from ..dashboard.memories_page import _render, _resolve_channel, _resolve_user
 from ..types.abc import MixinMeta
@@ -39,6 +42,11 @@ async def triggers_page(self: MixinMeta, user: discord.User, guild: discord.Guil
     choices.extend((str(mid), f"Deleted memory ({mid})") for mid in missing_ids if mid)
     attrs = {
         "entry_id": wtforms.HiddenField(),
+        "import_text": wtforms.TextAreaField("Import file contents", render_kw={"rows": 6}),
+        "import_revision": wtforms.HiddenField(),
+        "import_digest": wtforms.HiddenField(),
+        "import_preview": wtforms.SubmitField("Preview import"),
+        "import_save": wtforms.SubmitField("Save import"),
         "name": wtforms.StringField("Name", render_kw={"maxlength": 80}),
         "phrases": wtforms.TextAreaField("Trigger words or phrases", render_kw={"rows": 4}),
         "memory_id": wtforms.SelectField("Information source", choices=choices),
@@ -53,56 +61,110 @@ async def triggers_page(self: MixinMeta, user: discord.User, guild: discord.Guil
     attrs["__init__"] = lambda s: super(type(s), s).__init__(prefix="aiuser_triggers_")
     form = type("AIUserTriggersForm", (kwargs["Form"],), attrs)()
     notifications = []
+    imported = []
+    import_error = None
+    # A second form construction binds the per-entry SelectFields to the
+    # submitted data. Parsing does not write anything; CSRF validation below
+    # still gates both preview and apply.
+    if form.import_preview.data or form.import_save.data:
+        try:
+            imported = parse_import(form.import_text.data or "")
+        except ValueError as exc:
+            import_error = str(exc)
+        for i, entry in enumerate(imported):
+            options = [("new", "Add as new"), ("skip", "Skip")]
+            options.extend((e["id"], "Replace: " + e["name"] + (
+                " (linked memory becomes custom information)" if e.get("memory_id") else ""
+            )) for e in entries)
+            attrs[f"import_target_{i}"] = wtforms.SelectField(
+                "Import action", choices=options, default=suggested_target(entry, entries)
+            )
+        form = type("AIUserTriggersForm", (kwargs["Form"],), attrs)()
 
+    show_import_preview = False
     if form.validate_on_submit():
-        edit = next((e for e in entries if getattr(form, f"edit_{e['id']}").data), None)
-        delete = next((e for e in entries if getattr(form, f"delete_{e['id']}").data), None)
-        if delete:
-            async with conf.triggered_memories() as current:
-                current[:] = [e for e in current if e["id"] != delete["id"]]
-            return {
-                "status": 0, "redirect_url": kwargs["request_url"],
-                "notifications": [{"message": "Trigger deleted.", "category": "success"}],
-            }
-        if edit:
-            form.entry_id.data = edit["id"]
-            form.name.data = edit["name"]
-            form.phrases.data = "\n".join(edit["phrases"])
-            form.memory_id.data = str(edit["memory_id"]) if edit.get("memory_id") else ""
-            form.information.data = edit.get("text", "")
-            form.enabled.data = edit.get("enabled", True)
-        elif form.cancel.data:
-            return {"status": 0, "redirect_url": kwargs["request_url"]}
-        elif form.save.data:
-            try:
-                memory_id = int(form.memory_id.data) if form.memory_id.data else None
-                if memory_id is not None:
-                    row = memories.get(memory_id)
-                    if not row:
-                        raise ValueError("That memory no longer exists; choose another source.")
-                    if not row[2].strip() or len(row[2]) > MAX_FACT_LENGTH:
-                        raise ValueError(f"Choose a memory with 1–{MAX_FACT_LENGTH} characters of information.")
-                entry = make_entry(
-                    form.name.data or "", form.phrases.data or "",
-                    form.information.data or "", memory_id=memory_id,
-                    enabled=form.enabled.data, entry_id=form.entry_id.data or None,
-                )
+        if form.import_preview.data or form.import_save.data:
+            if import_error:
+                notifications.append({"message": import_error, "category": "warning"})
+            elif form.import_preview.data:
+                for i, entry in enumerate(imported):
+                    getattr(form, f"import_target_{i}").data = suggested_target(entry, entries)
+                form.import_revision.data = revision(entries)
+                form.import_digest.data = content_digest(form.import_text.data or "")
+                show_import_preview = True
+            else:
+                try:
+                    if form.import_digest.data != content_digest(form.import_text.data or ""):
+                        raise ValueError("The file contents changed. Preview the import again before saving.")
+                    async with conf.triggered_memories() as current:
+                        if form.import_revision.data != revision(current):
+                            raise ValueError("Your triggers changed since the preview. Preview the import again.")
+                        merged, counts = build_import_plan(
+                            current, imported,
+                            [getattr(form, f"import_target_{i}").data for i in range(len(imported))],
+                        )
+                        current[:] = merged
+                    return {
+                        "status": 0, "redirect_url": kwargs["request_url"],
+                        "notifications": [{"message": (
+                            f"Import complete: {counts['added']} added, {counts['updated']} updated, "
+                            f"{counts['skipped']} skipped."
+                        ), "category": "success"}],
+                    }
+                except ValueError as exc:
+                    notifications.append({"message": str(exc), "category": "warning"})
+                    show_import_preview = True
+        # Regular edit/save actions are separate from the import actions.
+
+        if not (form.import_preview.data or form.import_save.data):
+            edit = next((e for e in entries if getattr(form, f"edit_{e['id']}").data), None)
+            delete = next((e for e in entries if getattr(form, f"delete_{e['id']}").data), None)
+            if delete:
                 async with conf.triggered_memories() as current:
-                    index = next((i for i, e in enumerate(current) if e["id"] == entry["id"]), None)
-                    if form.entry_id.data and index is None:
-                        raise ValueError("This trigger was deleted. Reload the page to create a new entry.")
-                    if index is not None:
-                        current[index] = entry
-                    elif len(current) >= MAX_ENTRIES:
-                        raise ValueError(f"A server can have up to {MAX_ENTRIES} trigger entries.")
-                    else:
-                        current.append(entry)
+                    current[:] = [e for e in current if e["id"] != delete["id"]]
                 return {
                     "status": 0, "redirect_url": kwargs["request_url"],
-                    "notifications": [{"message": "Trigger saved.", "category": "success"}],
+                    "notifications": [{"message": "Trigger deleted.", "category": "success"}],
                 }
-            except ValueError as exc:
-                notifications.append({"message": str(exc), "category": "warning"})
+            if edit:
+                form.entry_id.data = edit["id"]
+                form.name.data = edit["name"]
+                form.phrases.data = "\n".join(edit["phrases"])
+                form.memory_id.data = str(edit["memory_id"]) if edit.get("memory_id") else ""
+                form.information.data = edit.get("text", "")
+                form.enabled.data = edit.get("enabled", True)
+            elif form.cancel.data:
+                return {"status": 0, "redirect_url": kwargs["request_url"]}
+            elif form.save.data:
+                try:
+                    memory_id = int(form.memory_id.data) if form.memory_id.data else None
+                    if memory_id is not None:
+                        row = memories.get(memory_id)
+                        if not row:
+                            raise ValueError("That memory no longer exists; choose another source.")
+                        if not row[2].strip() or len(row[2]) > MAX_FACT_LENGTH:
+                            raise ValueError(f"Choose a memory with 1–{MAX_FACT_LENGTH} characters of information.")
+                    entry = make_entry(
+                        form.name.data or "", form.phrases.data or "",
+                        form.information.data or "", memory_id=memory_id,
+                        enabled=form.enabled.data, entry_id=form.entry_id.data or None,
+                    )
+                    async with conf.triggered_memories() as current:
+                        index = next((i for i, e in enumerate(current) if e["id"] == entry["id"]), None)
+                        if form.entry_id.data and index is None:
+                            raise ValueError("This trigger was deleted. Reload the page to create a new entry.")
+                        if index is not None:
+                            current[index] = entry
+                        elif len(current) >= MAX_ENTRIES:
+                            raise ValueError(f"A server can have up to {MAX_ENTRIES} trigger entries.")
+                        else:
+                            current.append(entry)
+                    return {
+                        "status": 0, "redirect_url": kwargs["request_url"],
+                        "notifications": [{"message": "Trigger saved.", "category": "success"}],
+                    }
+                except ValueError as exc:
+                    notifications.append({"message": str(exc), "category": "warning"})
 
     display = []
     for entry in entries:
@@ -115,5 +177,8 @@ async def triggers_page(self: MixinMeta, user: discord.User, guild: discord.Guil
     template = (pathlib.Path(__file__).parent / "templates" / "triggers_page.html").read_text(encoding="utf-8")
     return {
         "status": 0, "notifications": notifications,
-        "web_content": {"source": _render(template, form=form, entries=display)},
+        "web_content": {"source": _render(
+            template, form=form, entries=display, imported=imported,
+            show_import_preview=show_import_preview, max_import_bytes=MAX_IMPORT_BYTES,
+        )},
     }
