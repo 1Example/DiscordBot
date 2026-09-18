@@ -1,8 +1,8 @@
 import asyncio
+import time
 import contextlib
 import logging
 import re
-import time
 
 import discord
 from redbot.core import bank, commands, Config
@@ -39,7 +39,6 @@ DEFAULT_STYLES = {
     "limit": "secondary",
     "kick": "danger",
     "claim": "success",
-    "myroom": "primary",
 }
 
 ACTIONS = (
@@ -49,16 +48,15 @@ ACTIONS = (
     ("unhide", "\N{EYE}", "Unhide", "make the room visible again"),
     ("rename", "\N{PENCIL}", "Rename", "change your room's name"),
     ("limit", "\N{BUST IN SILHOUETTE}", "Limit", "set a max number of people (0 = unlimited)"),
-    ("kick", "\N{WOMANS BOOTS}", "Members", "choose someone in your room to kick or ban"),
+    ("kick", "\N{WOMANS BOOTS}", "Members", "select a member to kick or ban from your room"),
     ("claim", "\N{CROWN}", "Claim", "take ownership of an empty-of-owner room"),
-    ("myroom", "\N{HOUSE BUILDING}", "My room", "open your private room controls"),
 )
 
 # The panel's two button rows, and the two columns of the legend above them.
 # Reading down a column tells you what the row of buttons under it does.
 ACTION_GROUPS = (
     ("Access", ("lock", "unlock", "hide", "unhide")),
-    ("Manage", ("rename", "limit", "kick", "claim", "myroom")),
+    ("Manage", ("rename", "limit", "kick", "claim")),
 )
 
 # An inline embed field is only about half the card wide, so the sentences in
@@ -72,9 +70,8 @@ PANEL_BLURBS = {
     "unhide": "show it again",
     "rename": "change the name",
     "limit": "cap the headcount",
-    "kick": "kick or ban members",
+    "kick": "kick / ban",
     "claim": "take an ownerless room",
-    "myroom": "private controls",
 }
 
 DEFAULT_EMOJIS = {key: default for key, default, _label, _blurb in ACTIONS}
@@ -146,7 +143,7 @@ def room_embed(guild: discord.Guild, settings: Optional[dict] = None) -> discord
         title=f"{emojis['hub']} {title}",
         description=(
             "Join a hub below and a room is made for you straight away. "
-            "Click **My room** to see your room notice and controls privately."
+            "You will be pinged here once it exists."
         ),
         colour=colour,
     )
@@ -460,41 +457,6 @@ class ControlPanelView(discord.ui.View):
             view=RoomMemberView(self.cog, channel, interaction.user.id), ephemeral=True
         )
 
-    @discord.ui.button(label="My room", style=discord.ButtonStyle.primary, custom_id="prooms:myroom", row=1)
-    async def myroom(self, interaction: discord.Interaction, button: discord.ui.Button):
-        channel = await self.cog.get_owned_channel(interaction)
-        if channel is None:
-            pending = self.cog._notices.pop((interaction.guild_id, interaction.user.id), None)
-            text = pending[1] if pending and time.monotonic() - pending[0] < 600 else (
-                "You don't currently own a room. Join a create-room channel first."
-            )
-            await interaction.response.send_message(text, ephemeral=True)
-            return
-        settings = await self.cog.config.guild(interaction.guild).all()
-        room = settings["rooms"].get(str(channel.id), {})
-        template = settings.get("notice_text") if settings.get("notice_enabled") else None
-        template = template or "Your room is ready: {room}. Manage it using the controls below."
-        try:
-            text = template.format(user=interaction.user.mention, room=channel.mention,
-                                   cost=room.get("cost", 0), currency=room.get("currency", ""))
-        except (KeyError, IndexError, ValueError):
-            text = f"Your room is ready: {channel.mention}. Manage it using the controls below."
-        if channel.mention not in text:
-            text += f"\nRoom: {channel.mention}"
-        if room.get("cost") and "{cost}" not in template:
-            text += f" It cost you {room['cost']} {room.get('currency', '')}."
-        view = ControlPanelView(self.cog, resolve_emojis(settings.get("emojis")),
-                                settings.get("button_labels"), settings.get("button_styles"))
-        view.timeout = 180
-        for child in list(view.children):
-            if child.custom_id in {"prooms:myroom", "prooms:claim"}:
-                view.remove_item(child)
-        await interaction.response.send_message(
-            text, view=view, ephemeral=True,
-            delete_after=settings.get("notice_delete_after") or None,
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
-
     @discord.ui.button(label="Claim", style=discord.ButtonStyle.secondary, custom_id="prooms:claim", row=1)
     async def claim(self, interaction: discord.Interaction, button: discord.ui.Button):
         member = interaction.user
@@ -502,21 +464,18 @@ class ControlPanelView(discord.ui.View):
             await interaction.response.send_message("You need to be in the room you want to claim.", ephemeral=True)
             return
         channel = member.voice.channel
-        await interaction.response.defer(ephemeral=True)
-        async with self.cog.guild_lock(interaction.guild.id):
-            rooms = await self.cog.config.guild(interaction.guild).rooms()
-            data = rooms.get(str(channel.id))
-            if data is None:
-                message = "This isn't a tracked room."
-            elif member.voice is None or member.voice.channel != channel:
-                message = "You are no longer in that room."
-            elif any(m.id == data.get("owner") and m.id != member.id for m in channel.members):
-                message = "The current owner is still in the room."
-            else:
-                await self.cog._set_owner(interaction.guild, channel, member)
-                message = "You are now the owner of this room."
-        await interaction.followup.send(message, ephemeral=True)
-
+        rooms = await self.cog.config.guild(interaction.guild).rooms()
+        data = rooms.get(str(channel.id))
+        if data is None:
+            await interaction.response.send_message("This isn't a private room.", ephemeral=True)
+            return
+        owner_id = data.get("owner")
+        owner_still_here = any(m.id == owner_id for m in channel.members)
+        if owner_still_here and owner_id != member.id:
+            await interaction.response.send_message("The current owner is still in the room.", ephemeral=True)
+            return
+        await self.cog.set_owner(interaction.guild, channel, member)
+        await interaction.response.send_message("You are now the owner of this room.", ephemeral=True)
 
 
 class PrivateRooms(DashboardIntegration, commands.Cog):
@@ -552,12 +511,13 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             "economy_enabled": False,
             "cost_public": 0,
             "cost_private": 0,
-            # Custom notice shown only in the owner's ephemeral My room reply.
-            # Voice events cannot send ephemeral messages by themselves.
+            # After a room is made, point its owner at the panel. Discord has no
+            # way to send a truly private message outside an interaction, so
+            # this is a mention that removes itself.
             "notice_enabled": True,
             "notice_text": (
-                "{user}, your room {room} is ready \N{EM DASH} use the control panel "
-                "to manage your voice chat."
+                "{user}, your room is ready \N{EM DASH} from here you can control "
+                "your voice chat."
             ),
             "notice_delete_after": 30,
             "rooms": {},  # str(voice_channel_id) -> {"owner": user_id, "public": bool}
@@ -565,7 +525,6 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
         self.config.register_guild(**default_guild)
         self._panel_view_added = False
         self._guild_locks = {}
-        self._notices = {}
         self._pending_moves = {}
         self._cleanup_task = None
         self._panel_view = None
@@ -590,7 +549,6 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
         await self.bot.wait_until_red_ready()
         while True:
             now = time.monotonic()
-            self._notices = {key: value for key, value in self._notices.items() if now - value[0] < 600}
             self._pending_moves = {key: value for key, value in self._pending_moves.items() if now - value[1] < 10}
             for guild in list(self.bot.guilds):
                 try:
@@ -674,6 +632,24 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             return True, 0, ""
         return True, cost, currency
 
+    async def _send_notice(self, guild: discord.Guild, settings: dict, text: str) -> None:
+        """Post a self-removing message in the panel channel."""
+        channel = guild.get_channel(settings.get("panel_channel") or 0)
+        me = guild.me
+        if channel is None or me is None or not hasattr(channel, "send"):
+            return
+        if not channel.permissions_for(me).send_messages:
+            return
+        delete_after = settings.get("notice_delete_after") or 0
+        try:
+            await channel.send(
+                text,
+                delete_after=delete_after or None,
+                allowed_mentions=discord.AllowedMentions(users=True),
+            )
+        except discord.HTTPException:
+            pass
+
     async def moderate_member(self, guild, channel_id, owner_id, target_id, *, ban=False):
         async with self.guild_lock(guild.id):
             channel = guild.get_channel(channel_id)
@@ -729,8 +705,11 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             # than leaving them sitting in the hub.
             with contextlib.suppress(discord.HTTPException):
                 await member.move_to(None, reason="Cannot afford a room")
-            self._notices[(guild.id, member.id)] = (
-                time.monotonic(), f"A room costs {cost} {currency}, which is more than you have."
+            await self._send_notice(
+                guild,
+                settings,
+                f"{member.mention} a room costs {cost} {currency}, "
+                f"which is more than you have.",
             )
             return
         category = guild.get_channel(settings["category"]) if settings["category"] else None
@@ -776,7 +755,7 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
             return
 
         async with self.config.guild(guild).rooms() as rooms:
-            rooms[str(channel.id)] = {"owner": member.id, "public": public, "cost": cost, "currency": currency}
+            rooms[str(channel.id)] = {"owner": member.id, "public": public}
 
         # They may leave or change hubs while the create request is in flight.
         if not member.voice or not member.voice.channel or member.voice.channel.id != hub_id:
@@ -798,7 +777,22 @@ class PrivateRooms(DashboardIntegration, commands.Cog):
 
         if member.voice and member.voice.channel == channel:
             self._pending_moves.pop(channel.id, None)
-        self._notices.pop((guild.id, member.id), None)
+        if settings.get("notice_enabled"):
+            template = settings.get("notice_text") or ""
+            try:
+                text = template.format(
+                    user=member.mention,
+                    room=channel.mention,
+                    cost=cost,
+                    currency=currency,
+                )
+            except (KeyError, IndexError, ValueError):
+                # A typo in the template is not worth losing the pointer over.
+                text = f"{member.mention} from here you can control your voice chat."
+            # Only tack the price on when the template did not already say it.
+            if cost and "{cost}" not in template:
+                text = f"{text} It cost you {cost} {currency}."
+            await self._send_notice(guild, settings, text)
 
     async def maybe_delete_room(self, channel: discord.VoiceChannel):
         async with self.guild_lock(channel.guild.id):
