@@ -29,6 +29,7 @@ import logging
 import asyncio
 import aiohttp
 import contextlib
+import time
 from datetime import datetime
 from typing import Optional, List, Tuple, Union, Dict
 
@@ -553,6 +554,21 @@ class Streams(DashboardIntegration, commands.Cog):
                     stream.messages.clear()
                     await self.save_streams()
                 except APIError as e:
+                    if stream.__class__.__name__ == "TikTokStream" and e.status_code == 200:
+                        # The request succeeded, but it did not confirm live/offline.
+                        # Preserve alert state and retry on the next scheduled poll.
+                        # Limit repeated diagnostics to once per creator per 15 minutes.
+                        now = time.monotonic()
+                        last_warning = getattr(stream, "_tiktok_status_warning_at", None)
+                        if last_warning is None or now - last_warning >= 900:
+                            log.warning(
+                                "TikTok LIVE status unavailable for @%s; keeping alert state "
+                                "and retrying on the next poll. Details: %s",
+                                stream.name,
+                                e.raw_data,
+                            )
+                            stream._tiktok_status_warning_at = now
+                        continue
                     log.error(
                         "Something went wrong whilst trying to contact the stream service's API.\n"
                         "Raw response data:\n%r",

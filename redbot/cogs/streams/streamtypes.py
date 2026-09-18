@@ -592,8 +592,17 @@ class TikTokStream(Stream):
     async def is_online(self):
         room = await self._get_live_data()
         status = room.get("status")
+        # Some responses may encode the known status codes as JSON strings.
+        # Do not coerce booleans/floats or guess what undocumented codes mean.
+        if isinstance(status, str) and status.strip() in ("2", "4"):
+            status = int(status.strip())
         if type(status) is not int or status not in (2, 4):
-            raise APIError(200, "TikTok returned an unknown LIVE room status.")
+            raise APIError(200, {
+                "message": "TikTok returned an unknown LIVE room status.",
+                "status": repr(status)[:120],
+                "status_type": type(status).__name__,
+                "status_present": "status" in room,
+            })
         self.retry_count = 0
         if status == 4:
             raise OfflineStream()
