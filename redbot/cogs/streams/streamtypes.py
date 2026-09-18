@@ -599,6 +599,23 @@ class TikTokStream(Stream):
             raise OfflineStream()
         return self.make_embed(room)
 
+    @staticmethod
+    def _image_url(value) -> Optional[str]:
+        """Accept an image URL or an image object; preserve signed URLs as-is."""
+        if isinstance(value, dict):
+            value = value.get("url_list") or value.get("urlList") or value.get("url")
+        candidates = value if isinstance(value, list) else [value]
+        for candidate in candidates:
+            if not isinstance(candidate, str) or any(c.isspace() for c in candidate):
+                continue
+            try:
+                parsed = urlsplit(candidate)
+                if parsed.scheme in ("http", "https") and parsed.hostname:
+                    return candidate
+            except ValueError:
+                continue
+        return None
+
     def make_embed(self, data):
         title = data.get("title")
         if not isinstance(title, str) or not title.strip():
@@ -609,6 +626,10 @@ class TikTokStream(Stream):
             color=0xFE2C55,
         )
         embed.set_author(name=self.display_name)
+        cover = self._image_url(data.get("coverUrl")) or self._image_url(data.get("cover"))
+        if cover:
+            # Do not append cache-busting parameters: TikTok CDN URLs can be signed.
+            embed.set_image(url=cover)
         embed.set_footer(text="TikTok LIVE")
         return embed
 
