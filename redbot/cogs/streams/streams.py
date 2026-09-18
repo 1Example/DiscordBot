@@ -234,6 +234,8 @@ class Streams(DashboardIntegration, commands.Cog):
             await self.get_twitch_bearer_token()
 
     async def get_kick_bearer_token(self, api_tokens: Optional[Dict] = None) -> None:
+        # Discard tokens issued for old credentials, including when keys are removed.
+        self.kick_bearer_cache = {}
         tokens = await self.bot.get_shared_api_tokens("kick") if api_tokens is None else api_tokens
         if tokens.get("client_id"):
             notified_owner_missing_kick_secret = (
@@ -246,10 +248,12 @@ class Streams(DashboardIntegration, commands.Cog):
             except KeyError:
                 if notified_owner_missing_kick_secret is False:
                     asyncio.create_task(self._notify_owner_about_missing_kick_secret())
+        if not tokens.get("client_id") or not tokens.get("client_secret"):
+            return
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 "https://id.kick.com/oauth/token",
-                params={
+                data={
                     "client_id": tokens.get("client_id", ""),
                     "client_secret": tokens.get("client_secret", ""),
                     "grant_type": "client_credentials",
@@ -281,8 +285,8 @@ class Streams(DashboardIntegration, commands.Cog):
 
     async def maybe_renew_kick_token(self) -> None:
         if (
-            self.kick_bearer_cache
-            and self.kick_bearer_cache["expires_at"] - datetime.now().timestamp() <= 60
+            not self.kick_bearer_cache.get("access_token")
+            or self.kick_bearer_cache.get("expires_at", 0) - datetime.now().timestamp() <= 60
         ):
             await self.get_kick_bearer_token()
 
@@ -494,6 +498,7 @@ class Streams(DashboardIntegration, commands.Cog):
 
                     elif stream.__class__.__name__ == "KickStream":
                         await self.maybe_renew_kick_token()
+                        stream._token = self.kick_bearer_cache.get("access_token")
                         embed = await stream.is_online()
 
                     else:

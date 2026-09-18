@@ -556,10 +556,9 @@ class KickStream(Stream):
         channel_code, channel_data = await self.get_data(
             KICK_CHANNELS_ENDPOINT, {"slug": self.name}
         )
-        if not channel_data:
-            raise StreamNotFound()
-
         if channel_code == 200:
+            if not channel_data:
+                raise StreamNotFound()
             if channel_data["stream"]["is_live"] is False:
                 raise OfflineStream()
 
@@ -587,7 +586,7 @@ class KickStream(Stream):
         elif channel_code == 400:
             raise StreamNotFound()
         else:
-            raise APIError(channel_code, stream_data)
+            raise APIError(channel_code, channel_data)
 
     async def _fetch_user_profile(self):
         code, data = await self.get_data(KICK_USERS_ENDPOINT, {"id": self.id})
