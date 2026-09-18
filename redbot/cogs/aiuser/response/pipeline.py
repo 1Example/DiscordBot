@@ -79,7 +79,9 @@ class LLMPipeline:
         if self.provider is None:
             logger.error("No LLM backend available while starting response pipeline")
             return self._build_result(None, error=PipelineError.NO_PROVIDER)
-        await self.tool_executor.setup()
+        await self.tool_executor.setup(
+            allow_no_response=not bool(getattr(self.conversation, "triggered_facts", []))
+        )
         tool_call_rounds = (
             await self.services.config.guild(
                 self.ctx.guild

@@ -113,6 +113,7 @@ DEFAULT_GUILD = {
     "custom_model_tokens_limit": None,
     "always_reply_on_words": [],
     "query_memories": False,
+    "triggered_memories": [],
     "reply_to_webhooks": False,
     "webhook_whitelist_enabled": False,
     "webhook_user_whitelist": [],

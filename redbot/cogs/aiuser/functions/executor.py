@@ -44,10 +44,14 @@ class ToolExecutor:
         self.enabled_tools: List[ToolCall] = []
         self.enabled_tools_map: Dict[str, ToolCall] = {}
 
-    async def setup(self):
+    async def setup(self, *, allow_no_response: bool = True):
         if not (await self.config.guild(self.ctx.guild).function_calling()):
             return
         self.enabled_tools = await get_enabled_tools(self.config, self.ctx)
+        if not allow_no_response:
+            self.enabled_tools = [
+                tool for tool in self.enabled_tools if tool.function_name != "do_not_respond"
+            ]
         self.enabled_tools_map = {t.function_name: t for t in self.enabled_tools}
 
     def get_tools_kwargs(self) -> Dict[str, Any]:

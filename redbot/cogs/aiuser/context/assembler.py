@@ -13,6 +13,7 @@ from ..context.conversation import Conversation
 from ..context.converter.converter import MessageConverter
 from ..context.entry import MessageEntry
 from ..context.relevant_memory import fetch_relevant_memory
+from ..context.triggered_memory import get_triggered_facts, format_triggered_facts
 from ..utils.cache import memory_cache_key, tool_calls_cache_key
 from ..utils.utilities import format_variables, mention_to_text
 
@@ -77,6 +78,14 @@ class ConversationAssembler:
         if memory := await self._fetch_relevant_memory():
             entry = await conversation.append_system(memory)
             conversation.memory_entries.append(entry)
+
+        # Keep configured facts with this request, outside the long-term memory cache.
+        # Fresh lookup also handles edits/deletions while a reply was queued.
+        conversation.triggered_facts = await get_triggered_facts(self.services, self.ctx)
+        if conversation.triggered_facts:
+            await conversation.append_system(
+                format_triggered_facts(conversation.triggered_facts), protected=True
+            )
 
         reference = self.init_message.reference
         if reference and isinstance(reference.resolved, discord.Message):

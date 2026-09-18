@@ -14,6 +14,7 @@ from ...config.constants import (
     GROK_SECONDARY_TRIGGERS,
 )
 from ...core.decision.validators import is_bot_mentioned_or_replied
+from ...context.triggered_memory import get_triggered_facts
 
 if TYPE_CHECKING:
     from ...core.services import AIUserServices
@@ -89,6 +90,7 @@ async def check_direct_triggers(
         lambda: is_bot_mentioned_or_replied(services, message),
         lambda: is_always_reply_on_words_triggered(services, ctx),
         lambda: is_grok_triggered(services, ctx),
+        lambda: get_triggered_facts(services, ctx),
     ]
 
     # Short-circuit on first True

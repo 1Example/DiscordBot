@@ -1,0 +1,67 @@
+<style>
+.ai-triggers .panel { padding: 18px; margin-bottom: 16px; border-radius: 12px;
+  background: var(--cx-panel-2, rgba(90,130,220,.07)); border: 1px solid rgba(120,160,255,.15); }
+.ai-triggers .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap: 16px; }
+.ai-triggers label { display: block; margin: 12px 0 5px; font-weight: 600; }
+.ai-triggers input[type=text], .ai-triggers textarea, .ai-triggers select {
+  width: 100%; border: 1px solid rgba(120,160,255,.25); border-radius: 8px; padding: 9px;
+  background: var(--cx-panel-3, #111b30); color: var(--cx-text, #e6e9ef); }
+.ai-triggers .hint { opacity: .75; font-size: .85rem; }
+.ai-triggers .facts { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-triggers .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.ai-triggers .check label { display: inline; }
+.ai-triggers ul { padding-left: 22px; }
+</style>
+<div class="ai-triggers">
+  <h4>Trigger words &amp; information</h4>
+  <p>When a message contains a trigger phrase, the bot replies using its saved information.
+     The AI can vary the wording while keeping the facts and links intact.</p>
+  <p class="hint">Matches ignore letter case and use whole words or phrases:
+    “site” matches “our site?” but not “opposite”. Put alternative phrases on separate lines.
+    Replies follow the existing enabled channels, member permissions, consent and reply-cost settings.</p>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    {% for entry in entries %}
+    <div class="panel">
+      <h5>{{ entry.name }} {% if not entry.enabled %}<small>(disabled)</small>{% endif %}</h5>
+      <p><strong>Triggers:</strong> {{ entry.phrases|join(' · ') }}</p>
+      <p class="hint">{{ entry.source }}</p>
+      <div class="facts">{{ entry.information }}</div>
+      <div class="actions">
+        {{ form['edit_' ~ entry.id](class="btn btn-sm btn-outline-primary") }}
+        {{ form['delete_' ~ entry.id](class="btn btn-sm btn-outline-danger") }}
+      </div>
+    </div>
+    {% else %}
+    <div class="panel">No information triggers yet. Add your first one below.</div>
+    {% endfor %}
+    <div class="panel">
+      <h5>{{ 'Edit trigger' if form.entry_id.data else 'Add trigger' }}</h5>
+      {% if form.errors %}
+      <ul role="alert">
+        {% for errors in form.errors.values() %}{% for error in errors %}<li>{{ error }}</li>{% endfor %}{% endfor %}
+      </ul>
+      {% endif %}
+      <div class="grid">
+        <div>
+          {{ form.name.label }}{{ form.name(placeholder="Website") }}
+          {{ form.phrases.label }}{{ form.phrases(placeholder="website\nweb site\nhomepage") }}
+        </div>
+        <div>
+          {{ form.memory_id.label }}{{ form.memory_id() }}
+          <p class="hint">Reuse a saved memory, or enter information below. Linked memories retain
+            their user/channel scope and use the latest saved text.</p>
+          {{ form.information.label }}{{ form.information(placeholder="Our website is https://example.com. It has our guides and events.") }}
+          <p class="hint">Used only when “Enter information below” is selected. Maximum 2,000 characters.</p>
+        </div>
+      </div>
+      <div class="check">{{ form.enabled() }} {{ form.enabled.label }}</div>
+      <div class="actions">
+        {{ form.save(class="btn bg-gradient-primary") }}
+        {{ form.cancel(class="btn btn-outline-secondary") }}
+      </div>
+      <p class="hint">Up to 50 entries and 20 phrases per entry. A message uses the first five matching entries.
+        Triggered information works even when semantic memory search is off.</p>
+    </div>
+  </form>
+</div>
