@@ -2,12 +2,14 @@ import asyncio
 import contextlib
 import json
 import logging
+import re
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from random import choice
 from string import ascii_letters
 from typing import ClassVar, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 import aiohttp
 import discord
@@ -514,6 +516,100 @@ class PicartoStream(Stream):
             data["adult"] = ""
 
         embed.set_footer(text=_("{adult}Category: {category} | Tags: {tags}").format(**data))
+        return embed
+
+
+class TikTokStream(Stream):
+    """Best-effort public TikTok LIVE status, without login or a signing service."""
+
+    token_name = None
+    platform_name = "TikTok"
+    _endpoint = "https://www.tiktok.com/api-live/user/room"
+
+    def __init__(self, **kwargs):
+        kwargs["name"] = self.normalize_name(kwargs.get("name", ""))
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def normalize_name(value: str) -> str:
+        value = value.strip()
+        error = "Enter a TikTok username, @username, or full TikTok profile/live URL."
+        if "://" in value:
+            parsed = urlsplit(value)
+            if parsed.scheme not in ("http", "https") or parsed.netloc.lower() not in (
+                "tiktok.com", "www.tiktok.com", "m.tiktok.com"
+            ):
+                raise ValueError(error)
+            match = re.fullmatch(r"/@([^/]+)(?:/live)?/?", parsed.path)
+            if not match:
+                raise ValueError(error)
+            value = match.group(1)
+        elif value.startswith("@"):
+            value = value[1:]
+        if not re.fullmatch(r"[A-Za-z0-9_.]{1,24}", value):
+            raise ValueError(error)
+        return value.lower()
+
+    @property
+    def display_name(self) -> str:
+        return "@" + self.name
+
+    async def _get_live_data(self) -> dict:
+        # This is a website endpoint, not an official developer API. Treat
+        # blocking, non-JSON responses and changed schemas as unknown status.
+        # Never let those responses clear alerts or remove a tracked creator.
+        url = f"https://www.tiktok.com/@{self.name}/live"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    self._endpoint,
+                    params={"aid": 1988, "sourceType": 54, "uniqueId": self.name},
+                    headers={
+                        "User-Agent": "Mozilla/5.0",
+                        "Accept": "application/json",
+                        "Referer": url,
+                    },
+                    timeout=aiohttp.ClientTimeout(total=15),
+                    allow_redirects=False,
+                ) as response:
+                    if response.status != 200:
+                        raise APIError(response.status, "TikTok LIVE request failed.")
+                    try:
+                        payload = await response.json()
+                    except (ValueError, aiohttp.ContentTypeError) as exc:
+                        raise APIError(200, "TikTok did not return LIVE JSON.") from exc
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            raise APIError(None, "TikTok LIVE could not be reached.") from exc
+
+        if not isinstance(payload, dict) or payload.get("statusCode") != 0:
+            raise APIError(200, "TikTok could not confirm this creator's LIVE status.")
+        data = payload.get("data")
+        room = data.get("liveRoom") if isinstance(data, dict) else None
+        if not isinstance(room, dict):
+            raise APIError(200, "TikTok returned no usable LIVE room information.")
+        return room
+
+    async def is_online(self):
+        room = await self._get_live_data()
+        status = room.get("status")
+        if type(status) is not int or status not in (2, 4):
+            raise APIError(200, "TikTok returned an unknown LIVE room status.")
+        self.retry_count = 0
+        if status == 4:
+            raise OfflineStream()
+        return self.make_embed(room)
+
+    def make_embed(self, data):
+        title = data.get("title")
+        if not isinstance(title, str) or not title.strip():
+            title = _("Untitled broadcast")
+        embed = discord.Embed(
+            title=title[:256],
+            url=f"https://www.tiktok.com/@{self.name}/live",
+            color=0xFE2C55,
+        )
+        embed.set_author(name=self.display_name)
+        embed.set_footer(text="TikTok LIVE")
         return embed
 
 

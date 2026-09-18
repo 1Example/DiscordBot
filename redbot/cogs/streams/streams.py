@@ -9,6 +9,7 @@ from .streamtypes import (
     PicartoStream,
     Stream,
     TwitchStream,
+    TikTokStream,
     YoutubeStream,
 )
 from .errors import (
@@ -46,7 +47,7 @@ log = logging.getLogger("red.core.cogs.Streams")
 
 @cog_i18n(_)
 class Streams(DashboardIntegration, commands.Cog):
-    """Check whether a Twitch, YouTube, Picarto or Kick stream is live.
+    """Check whether a Twitch, YouTube, Picarto, Kick or TikTok stream is live.
 
     Who gets announced where, the alert messages, the mentions and the
     API credentials all live on this cog's page.
@@ -357,10 +358,24 @@ class Streams(DashboardIntegration, commands.Cog):
         stream = _streamtypes.KickStream(_bot=self.bot, name=channel_name, token=token)
         await self.check_online(ctx, stream)
 
+    @stream_lookup.command(name="tiktok", description="Check if a TikTok creator is live.")
+    @app_commands.describe(channel_name="TikTok username, @username, or profile/live URL.")
+    @app_commands.checks.cooldown(1, 15, key=lambda i: i.guild_id)
+    async def tiktokstream(self, interaction: discord.Interaction, channel_name: str):
+        """Check a public TikTok LIVE broadcast."""
+        ctx = await commands.Context.from_interaction(interaction)
+        await ctx.typing()
+        try:
+            stream = TikTokStream(_bot=self.bot, name=channel_name)
+        except ValueError:
+            await ctx.send(_("Enter a TikTok username, @username, or full TikTok profile/live URL."))
+            return
+        await self.check_online(ctx, stream)
+
     async def check_online(
         self,
         ctx: commands.Context,
-        stream: Union[PicartoStream, YoutubeStream, TwitchStream, KickStream],
+        stream: Union[PicartoStream, YoutubeStream, TwitchStream, KickStream, TikTokStream],
     ):
         try:
             info = await stream.is_online()
@@ -389,9 +404,15 @@ class Streams(DashboardIntegration, commands.Cog):
                 "Raw response data:\n%r",
                 e,
             )
-            await ctx.send(
-                _("Something went wrong whilst trying to contact the stream service's API.")
-            )
+            if isinstance(stream, TikTokStream):
+                await ctx.send(_(
+                    "TikTok could not confirm this creator's LIVE status. "
+                    "Check the username and try again later; TikTok may be blocking requests."
+                ))
+            else:
+                await ctx.send(
+                    _("Something went wrong whilst trying to contact the stream service's API.")
+                )
         else:
             if isinstance(info, tuple):
                 embed, is_rerun = info
@@ -673,7 +694,10 @@ class Streams(DashboardIntegration, commands.Cog):
             _class = getattr(_streamtypes, raw_stream["type"], None)
             if not _class:
                 continue
-            token = await self.bot.get_shared_api_tokens(_class.token_name)
+            token = (
+                await self.bot.get_shared_api_tokens(_class.token_name)
+                if _class.token_name else {}
+            )
             if token:
                 if _class.__name__ == "TwitchStream":
                     raw_stream["token"] = token.get("client_id")

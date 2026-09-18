@@ -84,6 +84,7 @@ PLATFORMS = {
     ),
     "picarto": ("PicartoStream", "Picarto", "picarto", "Channel name"),
     "kick": ("KickStream", "Kick", "kick", "Channel name"),
+    "tiktok": ("TikTokStream", "TikTok", None, "Username, @username, or profile/live URL"),
 }
 
 ALERT_CHANNEL_KINDS = ("text", "voice", "stage")
@@ -99,7 +100,7 @@ class DashboardIntegration:
     mentions, auto-delete, rerun and schedule filtering, buttons, and the
     owner-only refresh timer plus how to obtain each service's credentials.
 
-    ``/stream twitch|youtube|picarto|kick`` is all that stayed in Discord.
+    ``/stream twitch|youtube|picarto|kick|tiktok`` is all that stayed in Discord.
     """
 
     bot: t.Any
@@ -226,7 +227,10 @@ class DashboardIntegration:
 
         class_name = PLATFORMS[platform][0]
         stream_class = getattr(_streamtypes, class_name)
-        token = await self.bot.get_shared_api_tokens(stream_class.token_name)
+        token = (
+            await self.bot.get_shared_api_tokens(stream_class.token_name)
+            if stream_class.token_name else {}
+        )
 
         if class_name == "TwitchStream":
             await self.maybe_renew_twitch_bearer_token()
@@ -269,6 +273,16 @@ class DashboardIntegration:
         name = (field("stream_name") or "").strip()
 
         try:
+            if platform == "tiktok" and action in ("add_alert", "check", "remove_alert"):
+                from .streamtypes import TikTokStream
+
+                try:
+                    name = TikTokStream.normalize_name(name)
+                except ValueError:
+                    return [{
+                        "message": "Enter a TikTok username, @username, or full TikTok profile/live URL.",
+                        "category": "warning",
+                    }], {}
             if action in ("add_alert", "check"):
                 if platform not in PLATFORMS:
                     return [{"message": "Pick a platform.", "category": "warning"}], {}
@@ -464,6 +478,12 @@ class DashboardIntegration:
             ], {}
         except APIError:
             log.exception("Streams dashboard action %r hit an API error", action)
+            if platform == "tiktok":
+                return [{
+                    "message": "TikTok could not confirm this creator's LIVE status. "
+                    "Check the username and try again later; TikTok may be blocking requests.",
+                    "category": "warning",
+                }], {}
             return [
                 {"message": "The stream service's API could not be reached.",
                  "category": "danger"}
@@ -482,7 +502,7 @@ STREAMS_TEMPLATE = (
 <div class="dz">
   <div class="dz-head">
     <h4><i class="fa fa-video-camera"></i> Stream alerts in {{ guild_name }}</h4>
-    <p>Announce when a Twitch, YouTube, Picarto or Kick channel goes live.</p>
+    <p>Announce when a Twitch, YouTube, Picarto, Kick or TikTok channel goes live.</p>
   </div>
 
   {{ stats([('Alerts', alerts|length),
@@ -535,6 +555,8 @@ STREAMS_TEMPLATE = (
           </select>
           <p class="dz-hint" style="margin-top:6px;">
             YouTube accepts a name or a <code>UC...</code> channel ID.
+            TikTok accepts a username, @username, or full profile/live URL.
+            TikTok needs no API key; checks may be unavailable if TikTok blocks requests.
           </p>
         </div>
         <div>
