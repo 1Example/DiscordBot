@@ -17,6 +17,7 @@ from redbot.core import commands
 
 from ..config.constants import REGEX_RUN_TIMEOUT
 from ..utils.utilities import to_thread
+from ..utils.reply_metadata import strip_reply_context_prefix
 
 if TYPE_CHECKING:
     from ..core.services import AIUserServices
@@ -171,8 +172,8 @@ def _chunk_message(response: str) -> List[str]:
 async def _remove_patterns_from_response(
     ctx: commands.Context, services: "AIUserServices", response: str
 ) -> str:
-    """Strip text matching the guild's removelist regexes."""
-    cleaned = response.strip(" \n")
+    """Strip internal reply labels and the guild's removelist regexes."""
+    cleaned = strip_reply_context_prefix(response.strip(" \n"))
     patterns = await services.config.guild(ctx.guild).removelist_regexes()
     if not patterns:
         return cleaned
@@ -188,7 +189,8 @@ async def _remove_patterns_from_response(
             logger.warning(f"Timeout applying regex pattern: {pattern}")
         except Exception:
             logger.warning(f"Error applying regex pattern: {pattern}", exc_info=True)
-    return cleaned
+    # A configured cleanup may have removed a speaker prefix in front of a label.
+    return strip_reply_context_prefix(cleaned)
 
 
 async def _expand_authorname_patterns(

@@ -4,6 +4,7 @@ from typing import Optional
 from discord import Message, MessageType
 
 from ...utils.utilities import mention_to_text
+from ...utils.reply_metadata import strip_reply_context_prefix
 
 logger = logging.getLogger("red.bz_cogs.aiuser.context")
 
@@ -37,9 +38,12 @@ def format_text_content(message: Message) -> Optional[str]:
     if not message.content or message.content == "" or message.content.isspace():
         return None
     content = mention_to_text(message)
-    reply_hint = _reply_hint(message)
     if message.author.id == message.guild.me.id:
-        return f"{reply_hint.strip()} {content}".strip() if reply_hint else content
+        # Assistant history is an example of what the model should output.
+        # Do not teach it to print internal reply labels. Also clean old replies
+        # where the model already copied a label into the visible message.
+        return strip_reply_context_prefix(content) or None
+    reply_hint = _reply_hint(message)
     return f'User "{message.author.display_name}"{reply_hint} said: {content}'
 
 
